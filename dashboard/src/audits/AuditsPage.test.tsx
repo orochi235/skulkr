@@ -26,6 +26,8 @@ const renderPage = (dev = true) =>
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  // The page keeps the last map it drew; each test starts with none kept.
+  localStorage.clear();
 });
 
 describe('AuditsPage', () => {

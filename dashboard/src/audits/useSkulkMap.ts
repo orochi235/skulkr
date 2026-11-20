@@ -12,6 +12,32 @@ export type SkulkMapState =
 /** How often the page asks again. Each ask runs `map.mjs`, which asks onto for its running jobs. */
 export const POLL_MS = 15_000;
 
+const KEPT = 'skulk-map:';
+
+/** The map this viewer last drew from `url`, so a reload draws at once; none where storage is empty or refused. */
+export function keptMapOf(url: string): SkulkMap | null {
+  try {
+    const text = localStorage.getItem(KEPT + url);
+    return text ? (JSON.parse(text) as SkulkMap) : null;
+  } catch {
+    return null;
+  }
+}
+
+function keepMap(url: string, map: SkulkMap): void {
+  try {
+    localStorage.setItem(KEPT + url, JSON.stringify(map));
+  } catch {
+    // Full or refused storage costs only the instant first draw on the next load.
+  }
+}
+
+/** Where a tenant's map starts: the copy this viewer kept, or loading. */
+const startOf = (url: string | null): SkulkMapState => {
+  const kept = url ? keptMapOf(url) : null;
+  return kept ? { status: 'ready', map: kept } : { status: 'loading' };
+};
+
 export interface UseSkulkMapOptions {
   /** A tenant's map route; none yet asks for nothing. */
   readonly url: string | null;
@@ -22,15 +48,16 @@ export interface UseSkulkMapOptions {
 
 /**
  * The audit map's data from the dev server, asked for again every `everyMs` while the page is visible, and at
- * once when it becomes visible again. A failed ask keeps the last map it had and says why.
+ * once when it becomes visible again. A failed ask keeps the last map it had and says why. It starts from the map this
+ * viewer last drew from `url`, kept in local storage, so a reload draws at once and the first answer replaces it.
  */
 export function useSkulkMap(options: UseSkulkMapOptions): SkulkMapState {
   const { url, everyMs = POLL_MS, dev = import.meta.env.DEV } = options;
-  const [state, setState] = useState<SkulkMapState>(dev ? { status: 'loading' } : { status: 'no-server' });
+  const [state, setState] = useState<SkulkMapState>(() => (dev ? startOf(url) : { status: 'no-server' }));
   useEffect(() => {
     if (!dev || url === null) return;
-    // Another tenant's map is not this one's: start from loading rather than show the last.
-    setState({ status: 'loading' });
+    // Another tenant's map is not this one's: start from the copy kept for this one, or from loading.
+    setState(startOf(url));
     let live = true;
     let stop = () => {};
     let asking = false;
@@ -44,7 +71,9 @@ export function useSkulkMap(options: UseSkulkMapOptions): SkulkMapState {
         if (res.status === 404 || res.headers.get('content-type')?.includes('text/html')) return noServer();
         if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
         const map = (await res.json()) as SkulkMap;
-        if (live) setState({ status: 'ready', map });
+        if (!live) return;
+        keepMap(url, map);
+        setState({ status: 'ready', map });
       } catch (e) {
         if (!live) return;
         const error = (e as Error).message;

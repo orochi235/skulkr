@@ -10,6 +10,9 @@
  * environment, else `skulk.config.mjs` in the directory the child runs in.
  */
 import { execFile } from 'node:child_process';
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 import { TENANTS_PATH, parseTenantPath } from '../shared/routes.ts';
@@ -26,6 +29,8 @@ export interface SkulkRunnerOptions {
   readonly cwd?: string;
   /** How a child is started; tests swap it. */
   readonly exec?: typeof execFile;
+  /** `false` keeps no map on disk between server runs. */
+  readonly cache?: boolean;
 }
 
 /** A runner for the CLI at `bin`, in `cwd`, with `env`: the server's own unless given. */
@@ -45,6 +50,51 @@ export function createMapBuilder(run: SkulkRunner = createSkulkRunner(), args: r
       pending = null;
     });
     return pending;
+  };
+}
+
+/** How old a kept map may be before a request for it also starts a fresh build. */
+export const FRESH_MS = 5_000;
+
+/** Where a tenant's last good map is kept between server runs: one file per tenant, overwritten. */
+export const mapCachePath = (tenant: string, home = homedir()) => join(home, '.cache', 'skulk', tenant.replace(/[^\w.-]+/g, '-'), 'map.json');
+
+/**
+ * `build` with its last good answer kept: a request gets the kept map at once, and starts a build in the background
+ * when that map is older than `freshMs`; only with nothing kept does a request wait for the build. `file` keeps the
+ * map across server restarts. A failed build keeps the last good map, and fails a request only when there is none.
+ */
+export function createKeptMap(build: () => Promise<string>, file: string | null, { freshMs = FRESH_MS, now = Date.now } = {}): () => Promise<string> {
+  let kept: { text: string; at: number } | null = null;
+  if (file) {
+    try {
+      kept = { text: readFileSync(file, 'utf8'), at: statSync(file).mtimeMs };
+    } catch {
+      kept = null;
+    }
+  }
+  let building: Promise<string> | null = null;
+  const refresh = () => {
+    building ??= build().then((text) => {
+      kept = { text, at: now() };
+      if (file) {
+        try {
+          mkdirSync(dirname(file), { recursive: true });
+          writeFileSync(file, text);
+        } catch {
+          // The kept copy is a convenience; a disk that refuses it costs only a slower first load after a restart.
+        }
+      }
+      return text;
+    }).finally(() => {
+      building = null;
+    });
+    return building;
+  };
+  return () => {
+    if (!kept) return refresh();
+    if (now() - kept.at > freshMs) refresh().catch(() => {});
+    return Promise.resolve(kept.text);
   };
 }
 
@@ -104,7 +154,7 @@ export function skulkMapPlugin(options: SkulkRunnerOptions = {}): Plugin {
           if (!args) throw new Error(`no tenant ${route!.tenant}; this dashboard reads ${list.map((t) => t.name).join(', ')}`);
           if (route!.what === 'area') return run(args);
           const key = args.join('\n');
-          if (!builds.has(key)) builds.set(key, createMapBuilder(run, args));
+          if (!builds.has(key)) builds.set(key, createKeptMap(createMapBuilder(run, args), options.cache === false ? null : mapCachePath(route!.tenant)));
           return builds.get(key)!();
         }));
       });

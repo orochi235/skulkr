@@ -1,7 +1,10 @@
 // @vitest-environment node
 import type { execFile } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
-import { SKULK_BIN, createMapBuilder, createSkulkRunner, listTenants, tenantArgs } from './plugin';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { SKULK_BIN, createKeptMap, createMapBuilder, createSkulkRunner, listTenants, tenantArgs } from './plugin';
 import { parseTenantPath, tenantMapPath } from '../shared/routes';
 
 describe('createMapBuilder', () => {
@@ -67,5 +70,43 @@ describe('tenants', () => {
     expect(parseTenantPath(`/base/${tenantMapPath('x-skulk.demo')}`)).toEqual({ tenant: 'x-skulk.demo', what: 'map' });
     expect(parseTenantPath('/base/api/t/a/area')).toEqual({ tenant: 'a', what: 'area' });
     expect(parseTenantPath('/base/api/tenants')).toBeNull();
+  });
+});
+
+describe('createKeptMap', () => {
+  it('answers the kept map at once, rebuilds it in the background once stale, and keeps it through a failed build', async () => {
+    let clock = 0;
+    let n = 0;
+    let fail = false;
+    const build = vi.fn(async () => {
+      if (fail) throw new Error('onto is down');
+      n += 1;
+      return `map ${n}`;
+    });
+    const kept = createKeptMap(build, null, { freshMs: 5_000, now: () => clock });
+    expect(await kept()).toBe('map 1');
+    clock = 1_000;
+    expect(await kept()).toBe('map 1');
+    expect(build).toHaveBeenCalledTimes(1);
+    clock = 10_000;
+    expect(await kept()).toBe('map 1');
+    await vi.waitFor(() => expect(build).toHaveBeenCalledTimes(2));
+    expect(await kept()).toBe('map 2');
+    fail = true;
+    clock = 20_000;
+    expect(await kept()).toBe('map 2');
+    await vi.waitFor(() => expect(build).toHaveBeenCalledTimes(3));
+    expect(await kept()).toBe('map 2');
+  });
+
+  it('starts from the copy kept on disk, and writes each fresh build there', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'skulk-kept-'));
+    const file = join(dir, 'weasel', 'map.json');
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, 'map from disk');
+    const kept = createKeptMap(async () => 'map fresh', file, { freshMs: 5_000, now: () => Date.now() + 60_000 });
+    expect(await kept()).toBe('map from disk');
+    await vi.waitFor(() => expect(readFileSync(file, 'utf8')).toBe('map fresh'));
+    rmSync(dir, { recursive: true, force: true });
   });
 });
