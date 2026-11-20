@@ -1,15 +1,18 @@
 /**
  * The nightly audit as a long-running service: requests on stdin, replies on stdout, one JSON object per line.
- * Everything else goes to stderr, which the service host (onto, launchd, …) keeps as its log. README.md "The service"
- * says how to bring it up and what each request does.
+ * Everything else goes to stderr, which the service host (onto, launchd, …) keeps as its log. It hosts one project
+ * or every registered tenant (`host.mjs`). README.md "The service" and "Tenants" say how to bring it up and what each
+ * request does.
  */
 import { execFile, execFileSync, spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { after } from './after.mjs';
 import { mainCheckout } from './batch.mjs';
+import { loadConfig } from './config.mjs';
+import { createHost } from './host.mjs';
 import { lastFinished, lastStartedAt, liveRuns, requestStop } from './runs.mjs';
-import { handle, msUntil, shouldAutoStart } from './serviceCore.mjs';
+import { readTenants, tenantsPath } from './tenants.mjs';
 
 /**
  * The skulk each run starts: `SKULK_BIN` (a checkout's `bin/skulk.mjs`, so runs pick up its latest code without the
@@ -17,91 +20,150 @@ import { handle, msUntil, shouldAutoStart } from './serviceCore.mjs';
  */
 const BIN = process.env.SKULK_BIN ?? fileURLToPath(new URL('../bin/skulk.mjs', import.meta.url));
 const log = (line) => process.stderr.write(`${new Date().toISOString()} ${line}\n`);
+/** How often the host rereads the registry and checks each tenant's schedule. */
+const TICK_MS = 30_000;
 
-/** Runs the service for `cfg` until its stdin closes. Each run is `skulk night` from the project's main checkout. */
-export const serve = (cfg) => {
+const commitIn = (dir) => {
+  try {
+    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();
+  } catch {
+    return 'unknown';
+  }
+};
+
+/** One tenant as the host drives it: `cfg`'s project, each run `skulk night` from its main checkout. */
+export const createTenant = (name, cfg, { readOnly = false } = {}) => {
   const root = mainCheckout(cfg);
   const state = cfg.state;
-  /** Every run starts from the same config and checkout as this service. */
+  /** Every run starts from the same config and checkout as this tenant. */
   const base = ['--config', cfg.file, '--root', root];
   const env = { ...process.env, SKULK_CONFIG: cfg.file, SKULK_ROOT: root };
+  const say = (line) => log(`${name}: ${line}`);
 
   /** The runs this service started that have not exited, by pid, with the last line each printed. */
   const children = new Map();
   let startedHere;
-
-  /** A run this service started counts before it has claimed its round, so the start-time check never starts a second. */
-  const anyRunning = () => children.size > 0 || liveRuns(state).length > 0;
-
-  const lastStarted = () => {
-    const times = [lastStartedAt(state), startedHere].filter(Boolean);
-    return times.length ? new Date(Math.max(...times)) : undefined;
-  };
 
   const start = (args) => {
     startedHere = new Date();
     const child = spawn(process.execPath, [BIN, 'night', ...base, ...args], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
     const entry = { lastLine: '' };
     children.set(child.pid, entry);
-    log(`run started: skulk night ${args.join(' ')} (pid ${child.pid})`);
+    say(`run started: skulk night ${args.join(' ')} (pid ${child.pid})`);
     for (const stream of [child.stdout, child.stderr]) {
       createInterface({ input: stream }).on('line', (line) => {
         entry.lastLine = line;
-        log(`run ${child.pid}: ${line}`);
+        say(`run ${child.pid}: ${line}`);
       });
     }
     child.on('close', (code) => {
-      log(`run ${child.pid} exited ${code}`);
+      say(`run ${child.pid} exited ${code}`);
       children.delete(child.pid);
     });
     return args;
   };
 
-  const deps = {
-    build: (() => {
-      try {
-        return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
-      } catch {
-        return 'unknown';
+  return {
+    name,
+    readOnly,
+    startAt: cfg.schedule.startAt,
+    /** A run this service started counts before it has claimed its round, so no second one starts beside it. */
+    running: () => children.size > 0 || liveRuns(state).length > 0,
+    lastStarted: () => {
+      const times = [lastStartedAt(state), startedHere].filter(Boolean);
+      return times.length ? new Date(Math.max(...times)) : undefined;
+    },
+    deps: {
+      build: commitIn(root),
+      live: () => liveRuns(state).map((r) => r.round),
+      status: () => {
+        const runs = liveRuns(state).map((r) => (children.has(r.pid) ? { ...r, lastLine: children.get(r.pid).lastLine } : r));
+        return { running: runs.length > 0, runs, last: lastFinished(state) ?? null };
+      },
+      plan: () =>
+        new Promise((done) => {
+          execFile(process.execPath, [BIN, 'night', ...base, '--dry'], { cwd: root, env }, (error, stdout, stderr) => {
+            done((error ? `${stdout}${stderr}` : stdout).trim().split('\n'));
+          });
+        }),
+      start,
+      stop: (rounds) => {
+        if (readOnly) throw new Error(`${name} is read-only here: its rounds run under another service`);
+        for (const round of rounds) requestStop(round, state);
+        say(`stop requested for round ${rounds.join(', ')}`);
+      },
+    },
+  };
+};
+
+/**
+ * The tenants from the registry at `path`, reread on each call: an entry whose config path and read-only flag are
+ * unchanged keeps its tenant (and the runs it started); a new or changed one is loaded. A registry or config that
+ * fails to read keeps what was there and logs why.
+ */
+const registryTenants = (path) => {
+  const known = new Map();
+  let list = [];
+  const refresh = async () => {
+    let entries;
+    try {
+      entries = readTenants(path);
+    } catch (error) {
+      log(`tenants: ${error.message}; keeping ${list.map((t) => t.name).join(', ') || 'none'}`);
+      return;
+    }
+    const next = [];
+    for (const e of entries) {
+      const key = `${e.name}\n${e.config}\n${Boolean(e.readOnly)}`;
+      if (!known.has(key)) {
+        try {
+          known.set(key, createTenant(e.name, await loadConfig({ config: e.config }), { readOnly: Boolean(e.readOnly) }));
+          log(`tenants: hosting ${e.name}${e.readOnly ? ' (read-only)' : ''} from ${e.config}`);
+        } catch (error) {
+          log(`tenants: ${e.name}: ${error.message}`);
+          continue;
+        }
       }
-    })(),
-    live: () => liveRuns(state).map((r) => r.round),
-    status: () => {
-      const runs = liveRuns(state).map((r) => (children.has(r.pid) ? { ...r, lastLine: children.get(r.pid).lastLine } : r));
-      return { running: runs.length > 0, runs, last: lastFinished(state) ?? null };
-    },
-    plan: () =>
-      new Promise((done) => {
-        execFile(process.execPath, [BIN, 'night', ...base, '--dry'], { cwd: root, env }, (error, stdout, stderr) => {
-          done((error ? `${stdout}${stderr}` : stdout).trim().split('\n'));
-        });
-      }),
-    start,
-    stop: (rounds) => {
-      for (const round of rounds) requestStop(round, state);
-      log(`stop requested for round ${rounds.join(', ')}`);
-    },
+      next.push(known.get(key));
+    }
+    list = next;
   };
+  return { refresh, current: () => list };
+};
 
-  const autoStart = () => {
-    if (shouldAutoStart({ now: new Date(), running: anyRunning(), lastStarted: lastStarted(), startAt: cfg.schedule.startAt })) start([]);
+/**
+ * Runs the service until its stdin closes: for `cfg` alone when given, else for every tenant registered in
+ * `tenantsPath()`, reread every tick and before each request, so a tenant added while it runs is picked up.
+ */
+export const serve = async (cfg) => {
+  const source = cfg
+    ? (() => {
+      const only = [createTenant(cfg.name, cfg)];
+      return { refresh: async () => {}, current: () => only };
+    })()
+    : registryTenants(tenantsPath());
+  await source.refresh();
+  const host = createHost({ tenants: source.current, log, build: commitIn(fileURLToPath(new URL('..', import.meta.url))) });
+
+  // The first tick only arms each schedule: a restart (every `onto sync`) never starts a round by itself.
+  const loop = async () => {
+    await source.refresh();
+    host.tick();
+    after(TICK_MS, loop);
   };
+  await loop();
 
-  const schedule = () => {
-    const wait = msUntil(new Date(), cfg.schedule.startAt);
-    log(`next automatic night check in ${(wait / 3_600_000).toFixed(2)} h`);
-    after(wait, () => {
-      autoStart();
-      schedule();
-    });
-  };
-
-  // No check at startup: a restart (every `onto sync`) never starts a night, only the start-time timer does.
-  schedule();
-
-  createInterface({ input: process.stdin }).on('line', async (line) => {
+  // Requests are answered in the order they arrive, and the service exits once stdin closes and the last is answered.
+  let answered = Promise.resolve();
+  const input = createInterface({ input: process.stdin });
+  input.on('line', (line) => {
     if (!line.trim()) return;
-    const reply = await handle(line, deps);
-    process.stdout.write(`${JSON.stringify(reply)}\n`);
+    answered = answered.then(async () => {
+      await source.refresh();
+      const reply = await host.request(line);
+      process.stdout.write(`${JSON.stringify(reply)}\n`);
+      host.tick();
+    });
   });
+  input.on('close', () => answered.then(() => process.exit(0)));
 };

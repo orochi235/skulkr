@@ -1,4 +1,4 @@
-/** The JSON `skulk map` prints, which `/__skulk/map` serves. */
+/** The JSON `skulk map` prints, which `api/t/<tenant>/map` serves. */
 
 /** `tonight` is an area a live run holds. */
 export type AreaStatus = 'unaudited' | 'due' | 'settled' | 'tonight';

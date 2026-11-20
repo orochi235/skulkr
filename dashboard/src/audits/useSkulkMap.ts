@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { after } from '@weasel-js/registry';
-import { SKULK_MAP_PATH } from '@shared/routes';
 import type { SkulkMap } from './skulkMap.types';
 
 export type SkulkMapState =
@@ -14,7 +13,8 @@ export type SkulkMapState =
 export const POLL_MS = 15_000;
 
 export interface UseSkulkMapOptions {
-  readonly url?: string;
+  /** A tenant's map route; none yet asks for nothing. */
+  readonly url: string | null;
   readonly everyMs?: number;
   /** Whether a dev server can be there at all; a build has none. */
   readonly dev?: boolean;
@@ -24,11 +24,13 @@ export interface UseSkulkMapOptions {
  * The audit map's data from the dev server, asked for again every `everyMs` while the page is visible, and at
  * once when it becomes visible again. A failed ask keeps the last map it had and says why.
  */
-export function useSkulkMap(options: UseSkulkMapOptions = {}): SkulkMapState {
-  const { url = `${import.meta.env.BASE_URL}${SKULK_MAP_PATH}`, everyMs = POLL_MS, dev = import.meta.env.DEV } = options;
+export function useSkulkMap(options: UseSkulkMapOptions): SkulkMapState {
+  const { url, everyMs = POLL_MS, dev = import.meta.env.DEV } = options;
   const [state, setState] = useState<SkulkMapState>(dev ? { status: 'loading' } : { status: 'no-server' });
   useEffect(() => {
-    if (!dev) return;
+    if (!dev || url === null) return;
+    // Another tenant's map is not this one's: start from loading rather than show the last.
+    setState({ status: 'loading' });
     let live = true;
     let stop = () => {};
     let asking = false;

@@ -14,7 +14,10 @@ import { NEXT_UP_ROUNDS, nextUpOf, runHolding, statsFor } from './areaData';
 import { createAuditScene } from './auditScene';
 import { phasesOf, withLivePasses } from './phases';
 import { useAuditPalette } from './useAuditPalette';
-import { useSkulkMap, type UseSkulkMapOptions } from './useSkulkMap';
+import { useSkulkMap } from './useSkulkMap';
+import { TENANTS_PATH, tenantAreaPath, tenantMapPath } from '@shared/routes';
+import { TenantTitle } from '@dash/tenants/TenantTitle';
+import { useTenantChoice, useTenants } from '@dash/tenants/useTenants';
 import { readSize, useViewerPref } from './viewerPref';
 import type { SkulkMap } from './skulkMap.types';
 import palette from './palette.module.css';
@@ -43,7 +46,7 @@ function AreaNote({ map }: { map: SkulkMap | null }) {
   return <>Each area is a directory of at most {partition.maxFiles} source files (<code>{partition.path}</code>).</>;
 }
 
-function Chart({ map }: { map: SkulkMap }) {
+function Chart({ map, areaUrl }: { map: SkulkMap; areaUrl: string }) {
   const [scene] = useState(createAuditScene);
   const selection = useSelection({ scene, mode: 'single' });
   const [hovered, setHovered] = useState<string | null>(null);
@@ -93,7 +96,7 @@ function Chart({ map }: { map: SkulkMap }) {
         <ResizeHandle value={asideWidth} min={ASIDE.min} max={ASIDE.max} invert onInput={setAsideWidth} onChange={keepAside} aria-label="Resize the side panel" />
         <aside className={s.aside} aria-label="Area">
           <AreaDetail area={area} holder={area && runHolding(map.runs, area.id)} />
-          {picked && <AreaDefects id={picked} version={map.generated} />}
+          {picked && <AreaDefects url={areaUrl} id={picked} version={map.generated} />}
         </aside>
       </div>
       <ResizeHandle
@@ -105,27 +108,45 @@ function Chart({ map }: { map: SkulkMap }) {
   );
 }
 
+/** Where the page reads its data: the dev server's routes under `base`, asked again every `everyMs`. */
+export interface AuditsSource {
+  readonly base?: string;
+  readonly everyMs?: number;
+  /** Whether a dev server can be there at all; a build has none. */
+  readonly dev?: boolean;
+}
+
 /** The audit chart: every live skulk run, the partition as a treemap shaded by what audits estimate is left, the
- *  queue, the rounds, and the jobs coming back. Reads `/__skulk/map` from the dashboard's dev server. */
-export function AuditsPage({ source }: { source?: UseSkulkMapOptions } = {}) {
-  const state = useSkulkMap(source);
+ *  queue, the rounds, and the jobs coming back, for the tenant the title's menu picks. Reads the dashboard's dev
+ *  server: `api/tenants`, then `api/t/<tenant>/map`. */
+export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
+  const { base = import.meta.env.BASE_URL, everyMs, dev = import.meta.env.DEV } = source;
+  const tenants = useTenants({ url: `${base}${TENANTS_PATH}`, dev });
+  const names = tenants.status === 'ready' ? tenants.names : [];
+  const [tenant, choose] = useTenantChoice(names);
+  const state = useSkulkMap({ url: tenant === null ? null : `${base}${tenantMapPath(tenant)}`, everyMs, dev });
   const map = state.status === 'ready' ? state.map : null;
   const header = map ? <span className={s.stamp}>{stampOf(map)}</span> : null;
+  const heading = tenant !== null ? <TenantTitle names={names} current={tenant} onChoose={choose} /> : undefined;
+  const noServer = tenants.status === 'no-server' || state.status === 'no-server';
+  const failed = tenants.status === 'failed' ? `Couldn't read the tenants: ${tenants.error}`
+    : tenants.status === 'ready' && !names.length ? 'The dev server reads no tenant: register one with skulk tenants add.'
+    : state.status === 'failed' ? `Couldn't read the audit map: ${state.error}` : null;
   return (
-    <Shell title={titleOf(map)} header={header}>
+    <Shell title={tenant !== null ? `${tenant} audits` : titleOf(map)} heading={heading} header={header}>
       <div className={`${palette.palette} ${s.root}`}>
-        {state.status === 'loading' && <p className={s.note}>Reading the audit map…</p>}
-        {state.status === 'no-server' && (
+        {!noServer && !failed && state.status === 'loading' && <p className={s.note}>Reading the audit map…</p>}
+        {noServer && (
           <p className={s.note}>
-            This page reads the audit map from the dashboard&apos;s dev server, which serves <code>/__skulk/map</code>.
-            Start it with <code>npm run dev</code> in <code>dashboard/</code>, naming the project in <code>SKULK_CONFIG</code>, and open this page there.
+            This page reads the audit map from the dashboard&apos;s dev server, which serves <code>/api/tenants</code>.
+            Start it with <code>npm run dev</code> in <code>dashboard/</code>, with a tenant registered or the project in <code>SKULK_CONFIG</code>, and open this page there.
           </p>
         )}
-        {state.status === 'failed' && <p className={s.note}>Couldn&apos;t read the audit map: {state.error}</p>}
-        {state.status === 'ready' && (
+        {!noServer && failed && <p className={s.note}>{failed}</p>}
+        {state.status === 'ready' && tenant !== null && (
           <>
             {state.error && <p className={s.note}>The last refresh failed ({state.error}); showing the map before it.</p>}
-            <Chart map={state.map} />
+            <Chart key={tenant} map={state.map} areaUrl={`${base}${tenantAreaPath(tenant)}`} />
           </>
         )}
         <p className={s.foot}>

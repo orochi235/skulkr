@@ -25,8 +25,8 @@ function Defect({ d }: { d: AuditDefect }) {
 }
 
 /** What each round found in the picked area and what became of each: the fixer's report once it has one. */
-export function AreaDefects({ id, version }: { id: string; version: string }) {
-  const state = useAreaDefects(id, version);
+export function AreaDefects({ url, id, version }: { url: string; id: string; version: string }) {
+  const state = useAreaDefects(url, id, version);
   return (
     <SidebarPanel title="Defects">
       <div className={s.id}>{id}</div>

@@ -1,17 +1,18 @@
 # skulk dashboard
 
-A live page of one project's audit rounds: the areas as a treemap shaded by what the audits estimate is left, every
+A live page of each tenant's audit rounds: the areas as a treemap shaded by what the audits estimate is left, every
 running round's lanes, the rounds chart, the jobs coming back, the queue, and an area's defects. Its data comes from
-the pipeline's CLI (`../bin/skulk.mjs map` and `defects <area>`), which a small Vite plugin (`server/plugin.ts`)
-runs on each request at `__skulk/map` and `__skulk/area?id=<area>`.
+the pipeline's CLI (`../bin/skulk.mjs tenants ls`, `map` and `defects <area>`), which a small Vite plugin
+(`server/plugin.ts`) runs on each request at `api/tenants`, `api/t/<name>/map` and `api/t/<name>/area?id=<area>`.
+The title's menu switches tenants; the URL hash names the one shown.
 
 ```sh
 npm install
-SKULK_CONFIG=~/src/<project>/skulk.config.mjs npm run dev   # http://localhost:5214, and the LAN address
+npm run dev   # http://localhost:5214, and the LAN address: every tenant in ~/.config/skulk/tenants.json
 ```
 
-`SKULK_CONFIG` names the project's config and `SKULK_ROOT` its root; with neither, the CLI reads
-`skulk.config.mjs` in the directory the server starts in. Under emilia: `emilia up dev` from this directory.
+With no tenant registered it reads the one project the CLI finds: `SKULK_CONFIG` names its config and `SKULK_ROOT`
+its root; with neither, `skulk.config.mjs` in the directory the server starts in. Under emilia: `emilia up dev` from this directory.
 
 ## weasel
 

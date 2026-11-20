@@ -5,21 +5,23 @@ import { renderWithIcons } from '@dash/test/icons';
 import { AuditsPage } from './AuditsPage';
 import fixture from './fixture.map.json';
 
-const URL = '/test/__skulk/map';
+const URL = '/test/api/t/example/map';
 
 const DEFECTS = [{ round: 41, recorded: true, fixed: true, items: [{ claim: 'A scene write is lost on undo', from: 'A', verdict: 'fixed', note: 'Undo now keeps it.' }] }];
 
-/** Answers the map's route with `body`, and an area's defects route with {@link DEFECTS}. */
+/** Answers the tenants route with one tenant, the map's route with `body`, and an area's defects route with {@link DEFECTS}. */
 function serve(status: number, body: unknown) {
-  const fetch = vi.fn(async (url: string) => (String(url).includes('__skulk/area')
-    ? new Response(JSON.stringify(DEFECTS), { status: 200 })
-    : new Response(typeof body === 'string' ? body : JSON.stringify(body), { status })));
+  const fetch = vi.fn(async (url: string) => (String(url).endsWith('api/tenants')
+    ? new Response('[{"name":"example"}]', { status: 200 })
+    : String(url).includes('/area')
+      ? new Response(JSON.stringify(DEFECTS), { status: 200 })
+      : new Response(typeof body === 'string' ? body : JSON.stringify(body), { status })));
   vi.stubGlobal('fetch', fetch);
   return fetch;
 }
 
 const renderPage = (dev = true) =>
-  renderWithIcons(<WeaselProvider><AuditsPage source={{ url: URL, everyMs: 60_000, dev }} /></WeaselProvider>);
+  renderWithIcons(<WeaselProvider><AuditsPage source={{ base: '/test/', everyMs: 60_000, dev }} /></WeaselProvider>);
 
 afterEach(() => {
   cleanup();
@@ -78,10 +80,10 @@ describe('AuditsPage', () => {
     expect(await screen.findByText(/reads the audit map from the dashboard's dev server/)).toBeInTheDocument();
   });
 
-  it("titles the page from the map's project, and stands without one", async () => {
+  it('titles the page with its tenant, and stands on a map without a project', async () => {
     serve(200, fixture);
     renderPage();
-    expect(await screen.findByRole('heading', { name: 'example audits' })).toBeInTheDocument();
+    expect(await screen.findByRole('combobox', { name: 'Project' })).toHaveValue('example');
     expect(screen.getByText('docs/audits/partition.json')).toBeInTheDocument();
 
     cleanup();
@@ -89,7 +91,7 @@ describe('AuditsPage', () => {
     serve(200, bare);
     renderPage();
     expect(await screen.findByText('6b331e4', { exact: false })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Audits' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Project' })).toHaveValue('example');
     expect(screen.getByText(/Each area is a directory of source files\./)).toBeInTheDocument();
   });
 

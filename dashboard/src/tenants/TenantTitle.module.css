@@ -1,0 +1,45 @@
+.title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25em;
+}
+
+.pick {
+  position: relative;
+  display: inline-flex;
+}
+
+/* The caret that says the first word opens, drawn in the title's own color. */
+.pick::after {
+  content: '';
+  position: absolute;
+  right: 0.15em;
+  top: 50%;
+  width: 0.3em;
+  height: 0.3em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-70%) rotate(45deg);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* The menu reads as the title's first word: its face and size. */
+.menu {
+  appearance: none;
+  margin: 0;
+  padding: 0 0.8em 0 0;
+  border: none;
+  border-radius: var(--wzl-radius-sm);
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.menu:hover { background: var(--wzl-surface-hover); }
+
+.menu:focus-visible {
+  outline: 2px solid var(--wzl-focus-ring);
+  outline-offset: 2px;
+}

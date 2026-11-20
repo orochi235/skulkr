@@ -46,7 +46,8 @@ export const startArgs = (req) => {
 };
 
 /**
- * Answers one request line. `deps` is the service's live side: `status()`, `plan()`, `start(args)`,
+ * Answers one request line. `deps` is the service's live side: `status()`, `plan()`, `start(args)` (answering the args
+ * it started with, or `{ started, waiting, behind, args }` when a host queues it),
  * `stop(rounds)`, and `live()`, the rounds running now. `start` starts a run whatever else runs; `stop`
  * stops the run `round` names, or every one. Every reply echoes the request's `id`.
  */
@@ -62,7 +63,10 @@ export const handle = async (line, deps) => {
     if (req.ping) return reply({ pong: true, build: deps.build });
     if (req.status) return reply(deps.status());
     if (req.plan) return reply({ plan: await deps.plan() });
-    if (req.start || req.resume !== undefined) return reply({ started: true, args: deps.start(startArgs(req)) });
+    if (req.start || req.resume !== undefined) {
+      const started = deps.start(startArgs(req));
+      return reply(Array.isArray(started) ? { started: true, args: started } : started);
+    }
     if (req.stop) {
       const live = deps.live();
       const round = req.round === undefined ? undefined : Number(req.round);

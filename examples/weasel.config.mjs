@@ -9,7 +9,8 @@ const NVM = 'export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"; . "$NVM_DIR/nvm.sh" >/dev/
 
 export default {
   name: 'weasel',
-  // Unset `root` is the main worktree of the repo holding this file; from x-skulk, pass --root ~/src/weasel.
+  // Kept here in x-skulk, so it names weasel's checkout; at cutover drop it: unset is the repo holding the config.
+  root: '~/src/weasel',
   state: '~/.local/state/weasel-skulk',
   keepNights: 30,
 

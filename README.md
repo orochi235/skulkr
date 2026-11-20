@@ -177,17 +177,21 @@ the object itself.
 
 ## The service
 
-`skulk service` runs nights for one project as a long-running service: it starts a run by itself at
+`skulk service` runs nights as a long-running service, for the project its config names or, with none named, for
+every registered tenant (see "Tenants"). For each project it starts a run by itself at
 `schedule.startAt` unless one is live or one has started since then that day (one started by hand after midnight
 does not count as that evening's), and answers requests, one JSON object a line on stdin, each echoing its `id`:
 
 | Request | Reply |
 |---|---|
-| `{"ping":true}` | `pong` and the project checkout's commit |
+| `{"ping":true}` | `pong`, x-skulk's commit (`build`), and the tenants hosted; with `tenant`, that project checkout's commit |
 | `{"status":true}` | `runs`: every live run's round, step, areas, flags, and dollars used against its cap; `last`: the summary of the run that ended last |
 | `{"plan":true}` | what a run started now would pick |
 | `{"start":true}` | starts a run now, beside any already running; takes `areas`, `only`, `nodes`, `capUsd`, `budget` (`{review, match, fix}`), `merge: false`, `sweep: true`, and `resume` |
 | `{"stop":true}` | with `round`, that run; without, every live run: no new jobs start, running ones finish, then each run patches, batches, and records what completed |
+
+Every request but a bare `ping` may carry `tenant`, the project it is about, and every reply to one names its
+`tenant`. Without one it means the only tenant, and is refused when there are several.
 
 Starting or restarting the service never starts a run. Under onto, on the machine holding the project's checkout:
 
@@ -200,11 +204,38 @@ Starting or restarting the service never starts a run. Under onto, on the machin
 `SKULK_BIN` makes each run start from the x-skulk checkout rather than the service's synced copy, so a change to
 the pipeline reaches the next run without a sync.
 
+## Tenants
+
+One x-skulk host can serve several projects, its *tenants*. Each keeps its own config and state; the registry,
+`~/.config/skulk/tenants.json` (`SKULK_TENANTS` names another), lists them as `[{ "name", "config" }]`, the config an
+absolute path.
+
+    skulk tenants ls [--json]                          # the registered tenants
+    skulk tenants add <config> [--name n] [--read-only] # name: the config's own `name` unless given
+    skulk tenants rm <name>
+
+Every command takes `--tenant <name>` beside `--config` to name a tenant's config (`skulk map --tenant weasel`).
+
+`skulk service` with no config named hosts every tenant in the registry, reread every 30 seconds and before each
+request, so one added while it runs is picked up without a restart. Each tenant keeps its own `schedule.startAt`.
+Rounds of different tenants never run at once, since they share the fleet's slots: a tenant due, or asked to start,
+while another's round runs waits, and its `status` reply lists that under `waiting` (`behind` names the tenant it
+waits on), beside `nextStart`, its next scheduled start. A tenant's own rounds may still run beside each other. A
+tenant added `--read-only` is shown and its live rounds hold the fleet like any other's, but the service never
+starts or stops one: its rounds run under another service.
+
+weasel is registered read-only (`examples/weasel.config.mjs`, root `~/src/weasel`, state
+`~/.local/state/weasel-skulk`), so the dashboard reads its live state while weasel's own service runs its rounds.
+Cutting over drops `--read-only` (see "Moving weasel over").
+
 ## The dashboard
 
 `dashboard/` is a standalone Vite app that draws the treemap of areas, the live runs' lanes, the rounds chart, the
-jobs feed, the queue, and an area's defects. Its dev server answers `__skulk/map` and `__skulk/area?id=<area>` by
-running `skulk map` and `skulk defects`. `dashboard/README.md` says how to start it.
+jobs feed, the queue, and an area's defects. Its dev server lists the tenants at `api/tenants` (`skulk tenants ls`,
+or with none registered the one project `SKULK_CONFIG` or the working directory names), and serves each tenant's
+map at `api/t/<name>/map` and an area's defects at `api/t/<name>/area?id=<area>`, by running `skulk map` and
+`skulk defects` with `--tenant`. The page's title is a menu of the tenants; the one shown is in the URL hash
+(`#weasel`), and each viewer's last choice is remembered. `dashboard/README.md` says how to start it.
 
 `skulk map [--out <file>]` writes the same JSON for anything else that draws it.
 
@@ -234,8 +265,8 @@ to the originals' (`project` aside, a field the map gained). Cutting over, with 
 | Delete from weasel | `scripts/skulk/` (code, tests, briefs, README); `apps/draw/src/dev/audits/`; `apps/draw/vite-plugin-skulk-map.ts` and its plugin in `apps/draw/vite.config.ts`; the `#/dev/audits` route in `apps/draw/src/main.tsx` and `apps/draw/src/dev/devRoutes.ts`, and its row in `RegistryInspector.test.tsx`; the `vite-plugin-skulk-map.ts` mention in `scripts/lib/fleet-triggers.mjs`. |
 | Repoint docs | `docs/fleet.md` cites `scripts/skulk/README.md` for the control sweep; the config's round README intro and ledger row say "run by `scripts/skulk`" and cite `scripts/skulk/usage.mjs` — change the text to x-skulk if wanted. Rows already in `docs/hardening.md` stay as written. |
 | State | None to migrate: the config's `state` is `~/.local/state/weasel-skulk`, and `runs/`, `nights/`, `slots/`, `limits.json`, and the locks keep their format. Node trees keep their names (`weasel-skulk-r<k>`, `weasel-skulk-f<k>`). A round stopped under the old code resumes under the new with `--resume N`. |
-| The onto service | It changes from weasel's tree and `WEASEL_ROOT` to x-skulk's tree and `SKULK_CONFIG`: `onto sync --in skulk-weasel orochi` from `~/src/x-skulk`, then `onto service up skulk --in skulk-weasel --here --prefer orochi --env SKULK_CONFIG=/Users/mike/src/weasel/skulk.config.mjs --env SKULK_BIN=/Users/mike/src/x-skulk/bin/skulk.mjs --about "Runs the nightly blind-pair audit of weasel." -- bash -lc 'exec node bin/skulk.mjs service'`, which rewrites `~/.config/onto/services/skulk/`; the old `weasel-skulk` service tree can then go. Requests and replies are unchanged. |
-| The dashboard | `SKULK_CONFIG=~/src/weasel/skulk.config.mjs` for x-skulk's dashboard instead of draw's `#/dev/audits`. |
+| The onto service | It changes from weasel's tree and `WEASEL_ROOT` to x-skulk's tree and `SKULK_CONFIG`: `onto sync --in skulk-weasel orochi` from `~/src/x-skulk`, then `onto service up skulk --in skulk-weasel --here --prefer orochi --env SKULK_CONFIG=/Users/mike/src/weasel/skulk.config.mjs --env SKULK_BIN=/Users/mike/src/x-skulk/bin/skulk.mjs --about "Runs the nightly blind-pair audit of weasel." -- bash -lc 'exec node bin/skulk.mjs service'`, which rewrites `~/.config/onto/services/skulk/`; the old `weasel-skulk` service tree can then go. Requests are unchanged; each reply also names its `tenant`. To host every tenant instead, leave out `SKULK_CONFIG`: the service then reads the registry. |
+| The dashboard | Already reads weasel as a tenant; re-register it from its new config: `skulk tenants rm weasel`, then `skulk tenants add ~/src/weasel/skulk.config.mjs` (no `--read-only`, now that this host runs its rounds). The config's `root: '~/src/weasel'` line goes: unset is the repository holding the config. |
 | Log wording | The gate's log line reads `gate: test:batch passed` where weasel's read `fleet: test:batch passed`, and its log is `<batch>.test-batch.log` as before. Nothing parses it. |
 
 ## Developing

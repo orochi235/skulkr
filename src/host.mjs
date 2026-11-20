@@ -1,0 +1,122 @@
+/**
+ * One service hosting several tenants (projects), apart from its process and pipes so it can be tested. Each tenant
+ * keeps its own schedule; rounds of different tenants never run at once, since they share the fleet's slots, so a
+ * start (scheduled or asked for) while another tenant's round runs waits in a queue until it ends.
+ *
+ * A tenant here is `{ name, readOnly, startAt, running(), lastStarted(), deps }`: `deps` is `handle`'s for that tenant,
+ * its `start(args)` the raw start. A read-only tenant's runs count as busy, but nothing starts it.
+ */
+import { handle, msUntil, shouldAutoStart } from './serviceCore.mjs';
+
+/**
+ * Which tenant a request means: the one its `tenant` names, or the only one. Throws when it names none there is, or
+ * names none while there are several.
+ */
+export const tenantFor = (req, tenants) => {
+  if (req.tenant !== undefined) {
+    const found = tenants.find((t) => t.name === req.tenant);
+    if (!found) throw new Error(`no tenant ${req.tenant}; this service hosts ${tenants.map((t) => t.name).join(', ') || 'none'}`);
+    return found;
+  }
+  if (tenants.length === 1) return tenants[0];
+  if (tenants.length === 0) throw new Error('this service hosts no tenant; register one with `skulk tenants add`');
+  throw new Error(`this service hosts several tenants (${tenants.map((t) => t.name).join(', ')}); name one with "tenant"`);
+};
+
+/**
+ * The host: `tenants()` answers the tenants now (reread live), `now()` the time. `tick()` fires each tenant's
+ * schedule and starts what the queue lets; `request(line)` answers one request line.
+ */
+export const createHost = ({ tenants, now = () => new Date(), log = () => {}, build }) => {
+  /** Starts waiting for the fleet, oldest first: `{ tenant, args, auto, since }`. */
+  const queue = [];
+  /** Each tenant's next scheduled start, armed when it is first seen, so a restart never starts a round by itself. */
+  const fireAt = new Map();
+
+  /** Another tenant whose round runs now, by name, or undefined. */
+  const busyBeside = (name, list) => list.find((t) => t.name !== name && t.running())?.name;
+  /** Whether `entry` may start: no other tenant runs, and no other tenant's start has waited longer. */
+  const free = (entry, list) => !busyBeside(entry.tenant, list) && !queue.slice(0, queue.indexOf(entry)).some((q) => q.tenant !== entry.tenant);
+
+  const drain = (list) => {
+    for (const entry of [...queue]) {
+      const t = list.find((x) => x.name === entry.tenant);
+      if (!t || t.readOnly) {
+        queue.splice(queue.indexOf(entry), 1);
+        continue;
+      }
+      if (!free(entry, list)) continue;
+      queue.splice(queue.indexOf(entry), 1);
+      // A round started by hand meanwhile stands in for a scheduled one.
+      if (entry.auto && t.running()) continue;
+      log(`${t.name}: starting${entry.auto ? ' its scheduled round' : ''}${entry.args.length ? ` (${entry.args.join(' ')})` : ''}`);
+      t.deps.start(entry.args);
+    }
+  };
+
+  const tick = () => {
+    const list = tenants();
+    const at = now();
+    for (const name of [...fireAt.keys()]) if (!list.some((t) => t.name === name)) fireAt.delete(name);
+    for (const t of list) {
+      if (t.readOnly) continue;
+      const armed = fireAt.get(t.name);
+      if (!armed || armed.startAt !== t.startAt) {
+        fireAt.set(t.name, { startAt: t.startAt, at: new Date(at.getTime() + msUntil(at, t.startAt)) });
+        continue;
+      }
+      if (at < armed.at) continue;
+      fireAt.set(t.name, { startAt: t.startAt, at: new Date(at.getTime() + msUntil(at, t.startAt)) });
+      const due = shouldAutoStart({ now: at, running: t.running(), lastStarted: t.lastStarted(), startAt: t.startAt });
+      if (due && !queue.some((q) => q.tenant === t.name && q.auto)) queue.push({ tenant: t.name, args: [], auto: true, since: at.toISOString() });
+    }
+    drain(list);
+  };
+
+  /** A start for tenant `t`: now when the fleet is free, else queued. Answers what `handle` replies with. */
+  const startFor = (t, list) => (args) => {
+    if (t.readOnly) throw new Error(`${t.name} is read-only here: its rounds run under another service`);
+    const entry = { tenant: t.name, args, auto: false, since: now().toISOString() };
+    queue.push(entry);
+    drain(list);
+    if (!queue.includes(entry)) return { started: true, args };
+    return { started: false, waiting: true, behind: busyBeside(t.name, list) ?? queue.find((q) => q.tenant !== t.name)?.tenant, args };
+  };
+
+  /** What tenant `t` is waiting on: each of its queued starts and what holds it. */
+  const waitingOf = (t, list) => queue.filter((q) => q.tenant === t.name).map((q) => ({
+    since: q.since, scheduled: q.auto, args: q.args, behind: busyBeside(t.name, list) ?? queue.find((o) => o.tenant !== t.name)?.tenant ?? null,
+  }));
+
+  const request = async (line) => {
+    let req;
+    try {
+      req = JSON.parse(line);
+    } catch {
+      return { error: 'not a JSON object' };
+    }
+    const list = tenants();
+    if (req.ping && req.tenant === undefined) {
+      return { id: req.id, pong: true, build, tenants: list.map((t) => t.name), ...(list.length === 1 ? { project: list[0].deps.build } : {}) };
+    }
+    let t;
+    try {
+      t = tenantFor(req, list);
+    } catch (error) {
+      return { id: req.id, error: error.message };
+    }
+    const { tenant: _named, ...rest } = req;
+    const deps = {
+      ...t.deps,
+      start: startFor(t, list),
+      status: () => {
+        const waiting = waitingOf(t, list);
+        const next = fireAt.get(t.name)?.at;
+        return { ...t.deps.status(), ...(waiting.length ? { waiting } : {}), ...(next ? { nextStart: next.toISOString() } : {}), ...(t.readOnly ? { readOnly: true } : {}) };
+      },
+    };
+    return { tenant: t.name, ...(await handle(JSON.stringify(rest), deps)) };
+  };
+
+  return { tick, request, queue };
+};

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { SKULK_AREA_PATH } from '@shared/routes';
 import type { AuditAreaRound } from './skulkMap.types';
 
 export type AreaDefectsState =
@@ -7,14 +6,14 @@ export type AreaDefectsState =
   | { readonly status: 'ready'; readonly rounds: readonly AuditAreaRound[] }
   | { readonly status: 'failed'; readonly error: string };
 
-/** Every round's defects in area `id` from the dashboard's dev server, asked for again whenever `version` changes. */
-export function useAreaDefects(id: string, version: string): AreaDefectsState {
+/** Every round's defects in area `id` from the dashboard's dev server at `url` (a tenant's area route), asked for
+ *  again whenever `version` changes. */
+export function useAreaDefects(url: string, id: string, version: string): AreaDefectsState {
   const [state, setState] = useState<{ key: string; value: AreaDefectsState }>({ key: '', value: { status: 'loading' } });
-  const key = `${id}\n${version}`;
+  const key = `${url}\n${id}\n${version}`;
   useEffect(() => {
     let live = true;
-    const url = `${import.meta.env.BASE_URL}${SKULK_AREA_PATH}?id=${encodeURIComponent(id)}`;
-    fetch(url, { cache: 'no-store' })
+    fetch(`${url}?id=${encodeURIComponent(id)}`, { cache: 'no-store' })
       .then(async (res) => {
         if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
         const rounds: unknown = await res.json();
@@ -24,7 +23,7 @@ export function useAreaDefects(id: string, version: string): AreaDefectsState {
       .then((rounds) => live && setState({ key, value: { status: 'ready', rounds } }),
         (e: Error) => live && setState({ key, value: { status: 'failed', error: e.message } }));
     return () => { live = false; };
-  }, [id, key]);
+  }, [url, id, key]);
   // A new area shows as loading rather than the last one's list.
-  return state.key === key || state.value.status === 'ready' && state.key.startsWith(`${id}\n`) ? state.value : { status: 'loading' };
+  return state.key === key || state.value.status === 'ready' && state.key.startsWith(`${url}\n${id}\n`) ? state.value : { status: 'loading' };
 }

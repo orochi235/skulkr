@@ -1,7 +1,8 @@
 // @vitest-environment node
 import type { execFile } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
-import { SKULK_BIN, createMapBuilder, createSkulkRunner } from './plugin';
+import { SKULK_BIN, createMapBuilder, createSkulkRunner, listTenants, tenantArgs } from './plugin';
+import { parseTenantPath, tenantMapPath } from '../shared/routes';
 
 describe('createMapBuilder', () => {
   it('shares one build among the calls made while it runs, and starts afresh after', async () => {
@@ -43,5 +44,28 @@ describe('createSkulkRunner', () => {
   it("fails with the CLI's own complaint", async () => {
     const { exec } = fakeExec({ fail: true, stderr: 'no skulk.config.mjs in /x\n' });
     await expect(createSkulkRunner({ env: {}, cwd: '/x', exec })(['map'])).rejects.toThrow('no skulk.config.mjs in /x');
+  });
+});
+
+describe('tenants', () => {
+  it('lists the registry\'s tenants, or the one project the CLI finds when none is registered', async () => {
+    const answers = (registry: string) => vi.fn(async (args: readonly string[]) => (args[0] === 'tenants' ? registry : '{"name":"solo"}'));
+    expect(await listTenants(answers('[{"name":"weasel","config":"/w.mjs"},{"name":"b","config":"/b.mjs"}]')))
+      .toEqual([{ name: 'weasel', registered: true }, { name: 'b', registered: true }]);
+    expect(await listTenants(answers('[]'))).toEqual([{ name: 'solo', registered: false }]);
+  });
+
+  it('asks the CLI for a tenant\'s map and defects by its name, and for no tenant it does not read', () => {
+    const list = [{ name: 'weasel', registered: true }, { name: 'solo', registered: false }];
+    expect(tenantArgs(list, 'weasel', 'map', null)).toEqual(['map', '--tenant', 'weasel']);
+    expect(tenantArgs(list, 'weasel', 'area', 'core.ops')).toEqual(['defects', 'core.ops', '--tenant', 'weasel']);
+    expect(tenantArgs(list, 'solo', 'map', null)).toEqual(['map']);
+    expect(tenantArgs(list, 'nope', 'map', null)).toBeNull();
+  });
+
+  it('reads a tenant route back from its path', () => {
+    expect(parseTenantPath(`/base/${tenantMapPath('x-skulk.demo')}`)).toEqual({ tenant: 'x-skulk.demo', what: 'map' });
+    expect(parseTenantPath('/base/api/t/a/area')).toEqual({ tenant: 'a', what: 'area' });
+    expect(parseTenantPath('/base/api/tenants')).toBeNull();
   });
 });
