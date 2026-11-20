@@ -1,4 +1,4 @@
-# x-skulk
+# skulkr
 
 Nightly blind-pair audits of a git repository. Each night (a *run*, one numbered *round*) takes some areas of the
 codebase. Two Claude reviewers read each area without seeing each other's work, a matcher pairs their findings,
@@ -7,21 +7,21 @@ The branches merge into one batch, the batch runs the project's test gate, and a
 `main`. A record of the round is committed beside the fixes. A dashboard draws the areas, the live runs, and the
 rounds so far.
 
-`x-skulk` is a code name. This README is for whoever adopts it in a project or runs it.
+This README is for whoever adopts skulkr in a project or runs it.
 
 Everything is plain Node (24 or later). The model calls are `claude -p` jobs run on fleet nodes through a *runner*:
 onto (`~/src/onto`) by default, swappable (see "Runners").
 
 ## Adopting it
 
-A project adopts skulk by committing one file, `skulk.config.mjs`, at its root. It is an ES module whose default
+A project adopts skulkr by committing one file, `skulkr.config.mjs`, at its root. It is an ES module whose default
 export is a plain object (or a function answering one). Everything left out takes the default below.
 `examples/weasel.config.mjs` is a full one.
 
 ```js
-// skulk.config.mjs
+// skulkr.config.mjs
 export default {
-  name: 'myproject',                 // node tree names (myproject-skulk-r1 …) and the default state directory
+  name: 'myproject',                 // node tree names (myproject-skulkr-r1 …) and the default state directory
 
   partition: {
     roots: ['src', 'packages/*/src'], // where areas are cut from; `*` matches one path segment
@@ -89,20 +89,20 @@ export default {
   areasPerRound: 16,
   budget: { review: 8, match: 1, fix: 15, capUsd: 160, areaGuessUsd: 10, nightUsd: undefined }, // list-price dollars
   schedule: { startAt: '23:00', stopAt: '07:00', continuous: false }, // the service's start; when a run stops dispatching
-  state: undefined,                   // default ~/.local/state/skulk/<name>
+  state: undefined,                   // default ~/.local/state/skulkr/<name>
   sweep: null,                        // an extra check beside the reviews; see "A sweep"
 };
 ```
 
 Then, from the project's checkout:
 
-    node ~/src/x-skulk/bin/skulk.mjs partition       # writes docs/audits/partition.json; check the areas look right
-    node ~/src/x-skulk/bin/skulk.mjs night --dry     # the plan a run would make
-    node ~/src/x-skulk/bin/skulk.mjs night           # one run
+    node ~/src/skulkr/bin/skulkr.mjs partition       # writes docs/audits/partition.json; check the areas look right
+    node ~/src/skulkr/bin/skulkr.mjs night --dry     # the plan a run would make
+    node ~/src/skulkr/bin/skulkr.mjs night           # one run
 
-Every command finds the config through `--config <file>`, else `SKULK_CONFIG`, else `skulk.config.mjs` in
-`--root`, `SKULK_ROOT`, or the working directory. The project root is the main worktree of the repository holding
-the config, unless the config's `root` or `--root` says otherwise. `skulk config` prints the resolved config.
+Every command finds the config through `--config <file>`, else `SKULKR_CONFIG`, else `skulkr.config.mjs` in
+`--root`, `SKULKR_ROOT`, or the working directory. The project root is the main worktree of the repository holding
+the config, unless the config's `root` or `--root` says otherwise. `skulkr config` prints the resolved config.
 
 **Briefs.** The shipped briefs in `briefs/` are generic and fill `{{project}}`, `{{rules}}`, `{{test}}`,
 `{{typecheck}}`, and `{{lint}}` from the config, beside their own variables (`{{round}}`, `{{area}}`,
@@ -112,7 +112,7 @@ brief's `tally:` line are read back by the pipeline, so a replacement must keep 
 
 ## A run
 
-`skulk night` runs one round. Several may run at once, each with its own flags; a run's id is its round number.
+`skulkr night` runs one round. Several may run at once, each with its own flags; a run's id is its round number.
 Each step prints one line as it completes (`review 3/16 …`).
 
 | Step | What happens |
@@ -120,7 +120,7 @@ Each step prints one line as it completes (`review 3/16 …`).
 | plan | Areas come from the partition, less every area a live run holds. The round number is one past the highest used by a `<record.dir>/round-<N>/` directory, the ledger's text, a branch named `audit<N>-…`, or a run's claim. The run claims it by creating `runs/<N>/`; if another run got there first it takes the next. Planning holds `plan.lock`, so two runs starting at once never pick the same area. |
 | freeze | A detached worktree at `main`'s tip, `.worktrees/audit<N>-frozen-night`. That sha is the round's commit. |
 | sweep | Only with `--sweep` and a configured sweep: one job at the frozen commit beside the reviews; its findings go to one fixer. |
-| review | Per area, two reviewer jobs from the frozen tree with the reviewer brief and the area's file list. Reviewers may read, search, and run `git log/show/diff/blame`, and write only `.skulk/out/`. Each lists the files it read; its stream goes through `src/progress.mjs`, so the runner shows how many of the area's files it has opened. |
+| review | Per area, two reviewer jobs from the frozen tree with the reviewer brief and the area's file list. Reviewers may read, search, and run `git log/show/diff/blame`, and write only `.skulkr/out/`. Each lists the files it read; its stream goes through `src/progress.mjs`, so the runner shows how many of the area's files it has opened. |
 | match | One job per area pairs the two lists (the matcher brief); the pipeline keeps only one-to-one pairs and computes the estimate. |
 | fix | Per area with findings, one fixer job, permissions bypassed, in the node's synced tree. It first commits the synced tree and checks it hashes to the frozen commit's tree, installs if the lockfile changed, then hands back its commits as an mbox. |
 | patch | Each mbox is applied with `git am` onto `audit<N>-<area>` at the frozen commit. One that does not apply is reported and left out. |
@@ -161,7 +161,7 @@ passes still shown.
 **Stale estimates.** An area whose files changed since its last pass carries `staleLines` in the map: lines added
 plus deleted in those files (`git log --numstat`, merges left out) by every commit since the pass's commit but that
 pass's own fixes. The plan prints it, the queue weighs it, and the dashboard fades the area and says how much of
-"≈ left" sits in such areas. Each commit's counts are cached in `~/.cache/skulk/<name>/churn.json`, so a map
+"≈ left" sits in such areas. Each commit's counts are cached in `~/.cache/skulkr/<name>/churn.json`, so a map
 rebuild asks git only about commits it has not seen.
 
 **Limits.** Each job's model is stopped at `claude.timeoutMin` and the runner stops the job ten minutes later, so
@@ -198,7 +198,7 @@ the object itself.
 
 ## The service
 
-`skulk service` runs nights as a long-running service, for the project its config names or, with none named, for
+`skulkr service` runs nights as a long-running service, for the project its config names or, with none named, for
 every registered tenant (see "Tenants"). For each project it starts a run by itself at
 `schedule.startAt` unless one is live or one has started since then that day (one started by hand after midnight
 does not count as that evening's), or keeps rounds coming in continuous mode (see "Continuous rounds"), and answers
@@ -206,7 +206,7 @@ requests, one JSON object a line on stdin, each echoing its `id`:
 
 | Request | Reply |
 |---|---|
-| `{"ping":true}` | `pong`, x-skulk's commit (`build`), and the tenants hosted; with `tenant`, that project checkout's commit |
+| `{"ping":true}` | `pong`, skulkr's commit (`build`), and the tenants hosted; with `tenant`, that project checkout's commit |
 | `{"status":true}` | `runs`: every live run's round, step, areas, flags, dollars used against its cap, and `behind`, what a waiting one waits for; `last`: the summary of the run that ended last; `continuous`: the mode, what the next round waits on (`next`), and `nightUsd`, `spentUsd`, `leftUsd`, and `estimateUsd`; `queues`: the round in its model steps (`model`) and the fleet queue's holder and waiters (`fleet`) |
 | `{"plan":true}` | what a run started now would pick |
 | `{"start":true}` | starts a run now, beside any already running; takes `areas`, `only`, `nodes`, `capUsd`, `budget` (`{review, match, fix}`), `merge: false`, `sweep: true`, and `resume` |
@@ -218,13 +218,13 @@ Every request but a bare `ping` may carry `tenant`, the project it is about, and
 
 Starting or restarting the service never starts a run. Under onto, on the machine holding the project's checkout:
 
-    onto sync --in skulk-myproject orochi                     # from ~/src/x-skulk
-    onto service up skulk-myproject --in skulk-myproject --here --prefer orochi \
-      --env SKULK_CONFIG=$HOME/src/myproject/skulk.config.mjs --env SKULK_BIN=$HOME/src/x-skulk/bin/skulk.mjs \
-      --about "Runs the nightly blind-pair audit of myproject." -- bash -lc 'exec node bin/skulk.mjs service'
-    onto call skulk-myproject '{"id":1,"status":true}'
+    onto sync --in skulkr-myproject orochi                     # from ~/src/skulkr
+    onto service up skulkr-myproject --in skulkr-myproject --here --prefer orochi \
+      --env SKULKR_CONFIG=$HOME/src/myproject/skulkr.config.mjs --env SKULKR_BIN=$HOME/src/skulkr/bin/skulkr.mjs \
+      --about "Runs the nightly blind-pair audit of myproject." -- bash -lc 'exec node bin/skulkr.mjs service'
+    onto call skulkr-myproject '{"id":1,"status":true}'
 
-`SKULK_BIN` makes each run start from the x-skulk checkout rather than the service's synced copy, so a change to
+`SKULKR_BIN` makes each run start from the skulkr checkout rather than the service's synced copy, so a change to
 the pipeline reaches the next run without a sync.
 
 ## Continuous rounds
@@ -237,7 +237,7 @@ fleet run. Continuous mode overlaps the two, keeping a tenant's rounds coming th
 | model | at most one round per tenant in its model steps (`freeze`, `review`) | the next continuous round starts once the last reaches `patch` |
 | fleet | at most one gate across every tenant and every run, however started | sits at step `fleet-wait`, its status `behind` naming the holder |
 
-The fleet queue is on disk, in `~/.local/state/skulk/fleet/` (`SKULK_FLEET` names another): `gate.lease` is the
+The fleet queue is on disk, in `~/.local/state/skulkr/fleet/` (`SKULKR_FLEET` names another): `gate.lease` is the
 holder, a lease like the slots', and `waiting/` holds a ticket per waiting run, taken oldest first. A run whose
 process has died loses its lease and its ticket.
 
@@ -262,17 +262,17 @@ claims nothing or fails ends the chain for the night. `stopAt` still stops every
 
 ## Tenants
 
-One x-skulk host can serve several projects, its *tenants*. Each keeps its own config and state; the registry,
-`~/.config/skulk/tenants.json` (`SKULK_TENANTS` names another), lists them as `[{ "name", "config" }]`, the config an
+One skulkr host can serve several projects, its *tenants*. Each keeps its own config and state; the registry,
+`~/.config/skulkr/tenants.json` (`SKULKR_TENANTS` names another), lists them as `[{ "name", "config" }]`, the config an
 absolute path.
 
-    skulk tenants ls [--json]                          # the registered tenants
-    skulk tenants add <config> [--name n] [--read-only] # name: the config's own `name` unless given
-    skulk tenants rm <name>
+    skulkr tenants ls [--json]                          # the registered tenants
+    skulkr tenants add <config> [--name n] [--read-only] # name: the config's own `name` unless given
+    skulkr tenants rm <name>
 
-Every command takes `--tenant <name>` beside `--config` to name a tenant's config (`skulk map --tenant weasel`).
+Every command takes `--tenant <name>` beside `--config` to name a tenant's config (`skulkr map --tenant weasel`).
 
-`skulk service` with no config named hosts every tenant in the registry, reread every 30 seconds and before each
+`skulkr service` with no config named hosts every tenant in the registry, reread every 30 seconds and before each
 request, so one added while it runs is picked up without a restart. Each tenant keeps its own `schedule.startAt`.
 Rounds of different tenants never do their model work at once, since they share the fleet's slots: a tenant due, or
 asked to start, while another's round is in its model steps waits until that round reaches its patch step, and its
@@ -282,19 +282,19 @@ when started by hand. A tenant added `--read-only` is shown and its live rounds 
 the service never starts or stops one: its rounds run under another service.
 
 weasel is registered read-only (`examples/weasel.config.mjs`, root `~/src/weasel`, state
-`~/.local/state/weasel-skulk`), so the dashboard reads its live state while weasel's own service runs its rounds.
+`~/.local/state/weasel-skulkr`), so the dashboard reads its live state while weasel's own service runs its rounds.
 Cutting over drops `--read-only` (see "Moving weasel over").
 
 ## The dashboard
 
 `dashboard/` is a standalone Vite app that draws the treemap of areas, the live runs' lanes, the rounds chart, the
-jobs feed, the queue, and an area's defects. Its dev server lists the tenants at `api/tenants` (`skulk tenants ls`,
-or with none registered the one project `SKULK_CONFIG` or the working directory names), and serves each tenant's
-map at `api/t/<name>/map` and an area's defects at `api/t/<name>/area?id=<area>`, by running `skulk map` and
-`skulk defects` with `--tenant`. The page's title is a menu of the tenants; the one shown is in the URL hash
+jobs feed, the queue, and an area's defects. Its dev server lists the tenants at `api/tenants` (`skulkr tenants ls`,
+or with none registered the one project `SKULKR_CONFIG` or the working directory names), and serves each tenant's
+map at `api/t/<name>/map` and an area's defects at `api/t/<name>/area?id=<area>`, by running `skulkr map` and
+`skulkr defects` with `--tenant`. The page's title is a menu of the tenants; the one shown is in the URL hash
 (`#weasel`), and each viewer's last choice is remembered. `dashboard/README.md` says how to start it.
 
-`skulk map [--out <file>]` writes the same JSON for anything else that draws it.
+`skulkr map [--out <file>]` writes the same JSON for anything else that draws it.
 
 ## Where things go
 
@@ -302,31 +302,31 @@ map at `api/t/<name>/map` and an area's defects at `api/t/<name>/area?id=<area>`
 |---|---|---|
 | A run's log, job outputs, and runner logs | `<state>/nights/<start>-round<N>/` | the newest `keepNights`; older ones are deleted when a run starts |
 | A run's claim, status, stop request, and summary | `<state>/runs/<N>/`: the directory is the claim; `status.json` (with its pid) while it runs, `stop` when asked, `summary.json` when it ends | the newest `keepNights`, never a live one nor one started in the last day; pruned when a run starts |
-| Each commit's lines changed, for `staleLines` | `~/.cache/skulk/<name>/churn.json` | only the commits after the oldest pass any area last had; rewritten without the rest on each build that adds one |
+| Each commit's lines changed, for `staleLines` | `~/.cache/skulkr/<name>/churn.json` | only the commits after the oldest pass any area last had; rewritten without the rest on each build that adds one |
 | Node tree leases | `<state>/slots/<node>/<tree>` | deleted as each job ends; one whose pid is dead is taken back |
 | Locks | `<state>/plan.lock`, `<state>/merge.lock` | one file each, deleted on release |
-| The fleet queue | `~/.local/state/skulk/fleet/`: `gate.lease` and a ticket per waiting run in `waiting/` | the lease deleted on release, a ticket when its run takes the gate; a dead pid's of either is cleared |
+| The fleet queue | `~/.local/state/skulkr/fleet/`: `gate.lease` and a ticket per waiting run in `waiting/` | the lease deleted on release, a ticket when its run takes the gate; a dead pid's of either is cleared |
 | Continuous mode asked for | `<state>/continuous.json` | one file, rewritten by each request |
 | Worktrees | `.worktrees/audit<N>-frozen-night`, `audit<N>-am-<area>`, `batch-<date>-audit<N>` in the project checkout | removed when the run ends, except a red batch's, which the report names |
-| Node trees | `<name>-skulk-r<k>`, `<name>-skulk-f<k>` on each node | a fixed set; each job clears its own output |
+| Node trees | `<name>-skulkr-r<k>`, `<name>-skulkr-f<k>` on each node | a fixed set; each job clears its own output |
 
-`<state>` is the config's `state`, by default `~/.local/state/skulk/<name>`.
+`<state>` is the config's `state`, by default `~/.local/state/skulkr/<name>`.
 
 ## Moving weasel over
 
 weasel still runs its own copy (`scripts/skulk/`, and the audits page in WeaselDraw). `examples/weasel.config.mjs`
 reproduces it: on weasel's tree at round 49 the partition, the dry-run plan, and the map JSON come out identical
 to the originals' (`project` aside, a field the map gained). Cutting over, with no run live
-(`onto call skulk '{"id":1,"status":true}'` shows none):
+(`onto call skulk '{"id":1,"status":true}'`, weasel's own service, shows none):
 
 | Step | Detail |
 |---|---|
-| Add the config | `examples/weasel.config.mjs` → weasel's `skulk.config.mjs`; `examples/weasel/briefs/` and `examples/weasel/sweep.mjs` → weasel's `scripts/audit/`, and the config's `./weasel/` paths → `./scripts/audit/`. `examples/weasel/sweep.test.ts` goes with them (its imports then point at the x-skulk checkout) or stays here. |
+| Add the config | `examples/weasel.config.mjs` → weasel's `skulkr.config.mjs`; `examples/weasel/briefs/` and `examples/weasel/sweep.mjs` → weasel's `scripts/audit/`, and the config's `./weasel/` paths → `./scripts/audit/`. `examples/weasel/sweep.test.ts` goes with them (its imports then point at the skulkr checkout) or stays here. |
 | Delete from weasel | `scripts/skulk/` (code, tests, briefs, README); `apps/draw/src/dev/audits/`; `apps/draw/vite-plugin-skulk-map.ts` and its plugin in `apps/draw/vite.config.ts`; the `#/dev/audits` route in `apps/draw/src/main.tsx` and `apps/draw/src/dev/devRoutes.ts`, and its row in `RegistryInspector.test.tsx`; the `vite-plugin-skulk-map.ts` mention in `scripts/lib/fleet-triggers.mjs`. |
-| Repoint docs | `docs/fleet.md` cites `scripts/skulk/README.md` for the control sweep; the config's round README intro and ledger row say "run by `scripts/skulk`" and cite `scripts/skulk/usage.mjs` — change the text to x-skulk if wanted. Rows already in `docs/hardening.md` stay as written. |
-| State | None to migrate: the config's `state` is `~/.local/state/weasel-skulk`, and `runs/`, `nights/`, `slots/`, `limits.json`, and the locks keep their format. Node trees keep their names (`weasel-skulk-r<k>`, `weasel-skulk-f<k>`). A round stopped under the old code resumes under the new with `--resume N`. |
-| The onto service | It changes from weasel's tree and `WEASEL_ROOT` to x-skulk's tree and `SKULK_CONFIG`: `onto sync --in skulk-weasel orochi` from `~/src/x-skulk`, then `onto service up skulk --in skulk-weasel --here --prefer orochi --env SKULK_CONFIG=/Users/mike/src/weasel/skulk.config.mjs --env SKULK_BIN=/Users/mike/src/x-skulk/bin/skulk.mjs --about "Runs the nightly blind-pair audit of weasel." -- bash -lc 'exec node bin/skulk.mjs service'`, which rewrites `~/.config/onto/services/skulk/`; the old `weasel-skulk` service tree can then go. Requests are unchanged; each reply also names its `tenant`. To host every tenant instead, leave out `SKULK_CONFIG`: the service then reads the registry. |
-| The dashboard | Already reads weasel as a tenant; re-register it from its new config: `skulk tenants rm weasel`, then `skulk tenants add ~/src/weasel/skulk.config.mjs` (no `--read-only`, now that this host runs its rounds). The config's `root: '~/src/weasel'` line goes: unset is the repository holding the config. |
+| Repoint docs | `docs/fleet.md` cites `scripts/skulk/README.md` for the control sweep; the config's round README intro and ledger row say "run by `scripts/skulk`" and cite `scripts/skulk/usage.mjs` — change the text to skulkr if wanted. Rows already in `docs/hardening.md` stay as written. |
+| State | weasel's state is in `~/.local/state/weasel-skulk`; the config's `state` is `~/.local/state/weasel-skulkr`, so move the directory across. `runs/`, `nights/`, `limits.json`, and the locks keep their format; `slots/` names the old trees, and with no run live it can be emptied. Node trees are renamed (`weasel-skulkr-r<k>`, `weasel-skulkr-f<k>`), so each node syncs fresh ones and the old `weasel-skulk-r<k>`, `weasel-skulk-f<k>` can go. |
+| The onto service | It changes from weasel's tree and `WEASEL_ROOT` to skulkr's tree and `SKULKR_CONFIG`: `onto sync --in skulkr-weasel orochi` from `~/src/skulkr`, then `onto service up skulkr --in skulkr-weasel --here --prefer orochi --env SKULKR_CONFIG=/Users/mike/src/weasel/skulkr.config.mjs --env SKULKR_BIN=/Users/mike/src/skulkr/bin/skulkr.mjs --about "Runs the nightly blind-pair audit of weasel." -- bash -lc 'exec node bin/skulkr.mjs service'`, which writes `~/.config/onto/services/skulkr/`; then take down weasel's own `skulk` service, and its `weasel-skulk` service tree can go. Requests are unchanged; each reply also names its `tenant`. To host every tenant instead, leave out `SKULKR_CONFIG`: the service then reads the registry. |
+| The dashboard | Already reads weasel as a tenant; re-register it from its new config: `skulkr tenants rm weasel`, then `skulkr tenants add ~/src/weasel/skulkr.config.mjs` (no `--read-only`, now that this host runs its rounds). The config's `root: '~/src/weasel'` line goes: unset is the repository holding the config. |
 | Log wording | The gate's log line reads `gate: test:batch passed` where weasel's read `fleet: test:batch passed`, and its log is `<batch>.test-batch.log` as before. Nothing parses it. |
 
 ## Developing

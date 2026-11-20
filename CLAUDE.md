@@ -1,13 +1,13 @@
-# x-skulk
+# skulkr
 
-Nightly blind-pair audit rounds over any git repository, configured by that repository's `skulk.config.mjs`;
-extracted from weasel's `scripts/skulk` on 2026-11-20. `x-skulk` is a code name: build nothing costly to rename on it.
+Nightly blind-pair audit rounds over any git repository, configured by that repository's `skulkr.config.mjs`;
+extracted from weasel's `scripts/skulk` on 2026-11-20.
 README.md is the documentation: how a project adopts it, a run's steps, the service, the dashboard, and the
 weasel cutover.
 
 ## Layout
 
-- `bin/skulk.mjs` — the one command (`night`, `partition`, `map`, `defects`, `service`, `config`).
+- `bin/skulkr.mjs` — the one command (`night`, `partition`, `map`, `defects`, `service`, `config`).
 - `src/` — the pipeline, plain Node ESM `.mjs` with no build. `config.mjs` holds every default and derives the
   names and regexes the rest reads; no other file may hold a project-specific value.
 - `src/runner/` — the runner interface (documented in `onto.mjs`) and its onto implementation.
