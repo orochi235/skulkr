@@ -93,13 +93,13 @@ describe('createCommitProgress', () => {
     expect(JSON.parse(plain.feed(result('fixed 1a2b3c4d | a thing (A)')).result!)).not.toHaveProperty('report');
   });
 
-  it('steps once per git commit the fixer runs, out of its findings, and raises the total past them', () => {
+  it('steps once per git commit the fixer runs, out of its findings, and holds there past them', () => {
     const { start, feed } = createCommitProgress(2);
     expect(start).toBe('onto: progress 0/2');
     expect(feed(bash('npx vitest run a.test.ts')).progress).toBeUndefined();
     expect(feed(bash('git add -A && git commit -m one')).progress).toBe('onto: progress 1/2');
     expect(feed(bash('git -c user.name=a commit -q -m two')).progress).toBe('onto: progress 2/2');
-    expect(feed(bash('git commit -m three')).progress).toBe('onto: progress 3/3');
+    expect(feed(bash('git commit -m fixup')).progress).toBeUndefined();
     expect(feed('{"type":"result","result":"ok"}').result).toBe('{"type":"result","result":"ok"}');
   });
 });

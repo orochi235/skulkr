@@ -164,12 +164,13 @@ const assistantText = (event) => {
 
 /**
  * As {@link createProgress}, for a fixer: a step each time it runs `git commit`, out of `findings`, the
- * distinct findings it was handed. One commit a finding is the fixer brief's rule, so a fixer that commits
- * more than that raises the total rather than running past it. Its result keeps the fixer's last report as `report`
+ * distinct findings it was handed. One commit a finding is the fixer brief's rule; the commits past that are
+ * fixups for its own failing checks, so the count holds at the findings rather than raising the total, which
+ * read as a full bar while the fixer was still working. Its result keeps the fixer's last report as `report`
  * where its final reply is not one.
  */
 export const createCommitProgress = (findings, tally = null) => {
-  let total = Math.max(1, findings);
+  const total = Math.max(1, findings);
   let made = 0;
   let report = '';
   const checks = tally ? createCheckTally(tally) : { see: () => [] };
@@ -188,9 +189,8 @@ export const createCommitProgress = (findings, tally = null) => {
     if (isReport(text)) report = text;
     const lines = checks.see(event);
     const commits = bashCommands(event).filter((c) => COMMITS.test(c)).length;
-    if (commits > 0) {
-      made += commits;
-      total = Math.max(total, made);
+    if (commits > 0 && made < total) {
+      made = Math.min(total, made + commits);
       lines.unshift(`onto: progress ${made}/${total}`);
     }
     return lines.length ? { progress: lines.join('\n') } : {};
