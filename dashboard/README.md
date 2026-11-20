@@ -9,6 +9,7 @@ The title's menu switches tenants; the URL hash names the one shown.
 ```sh
 npm install
 npm run dev   # http://localhost:5214, and the LAN address: every tenant in ~/.config/skulk/tenants.json
+npm run serve # the same page built: one bundle, so it loads in a fraction of the time; for watching rounds
 ```
 
 With no tenant registered it reads the one project the CLI finds: `SKULK_CONFIG` names its config and `SKULK_ROOT`
