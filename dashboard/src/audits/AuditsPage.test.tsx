@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { WeaselProvider } from '@weasel-js/core';
 import { renderWithIcons } from '@dash/test/icons';
 import { AuditsPage } from './AuditsPage';
@@ -66,7 +66,12 @@ describe('AuditsPage', () => {
     expect(within(detail).getByText('due again')).toBeInTheDocument();
     expect(within(detail).getByRole('table')).toHaveTextContent('33');
     expect(await screen.findByText('A scene write is lost on undo')).toBeInTheDocument();
-    expect(screen.getByText('Undo now keeps it.')).toBeInTheDocument();
+    // The fixer's note is behind the tile, which a note makes a button.
+    expect(screen.queryByText('Undo now keeps it.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'fixed: details' }));
+    expect(await screen.findByText('Undo now keeps it.')).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Defect details' }), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByText('Undo now keeps it.')).toBeNull());
 
     fireEvent.click(within(screen.getByRole('list', { name: 'Round 41 lanes' })).getByRole('button', { name: 'core.ops' }));
     expect(screen.getByText('in round 41')).toBeInTheDocument();
