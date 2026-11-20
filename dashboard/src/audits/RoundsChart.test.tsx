@@ -52,6 +52,17 @@ describe('RoundsChart', () => {
     expect(titles).toContain("an area's 2nd pass found 2.0 on average, over 1 areas");
   });
 
+  it('draws a fresh chart when its scope goes back to every area, with nothing of the area\'s left', () => {
+    const other = { ...area, id: 'core', passes: [{ ...area.passes[0]!, distinct: 3 }] } as AuditArea;
+    const { rerender } = render(<RoundsChart rounds={rounds} area={area} areas={[area, other]} />);
+    const before = screen.getByRole('img');
+    rerender(<RoundsChart rounds={rounds} areas={[area, other]} />);
+    const after = screen.getByRole('img');
+    expect(after).not.toBe(before);
+    expect(after.getAttribute('aria-label')).toBe('Defects found and estimated per area, by round');
+    expect([...after.querySelectorAll('title')].map((t) => t.textContent).some((t) => /geom\.part1|on average/.test(t ?? ''))).toBe(false);
+  });
+
   it('turns an area\'s passes into rounds of one area, a live pass pending', () => {
     expect(areaRoundsOf(area).map((r) => [r.round, r.areas, r.distinct, r.est, r.pending])).toEqual([
       [1, 1, 7, 10, undefined], [2, 1, 2, 2, 'live'],

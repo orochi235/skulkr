@@ -67,7 +67,8 @@ export function RoundsChart({ rounds: all, area: picked, areas = [] }: {
     <>
       <div ref={box} className={s.box}>
       {rounds.length > 0 && (
-        <svg className={s.chart} viewBox={`0 0 ${W} ${H}`} role="img"
+        // Keyed by scope, so leaving an area's chart draws on a fresh svg rather than patching its bars in place.
+        <svg key={area ? `area:${area.id}` : 'all'} className={s.chart} viewBox={`0 0 ${W} ${H}`} role="img"
           aria-label={area ? `Defects found and estimated in ${area.id}, by round` : 'Defects found and estimated per area, by round'}>
           <defs>
             <pattern id={hatch} width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
