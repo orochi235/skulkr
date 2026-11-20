@@ -24,6 +24,7 @@ alpo link weasel --for "<why>"   # serve ~/src/weasel's built dist; alpo unlink 
 ALPO_WEASEL=<checkout> npm run dev   # another checkout, for one run
 ```
 
-alpo serves the checkout's **built** `dist`, so that checkout's packages must be built first. Tests resolve through
+alpo serves the checkout's **built** `dist`, so that checkout's packages must be built first. Build all of them together (`npm run build` in the checkout), never one package alone: the packages call each
+other across their `dist`, and a newer `ui` over an older `text` left the map drawing nothing (2026-11-20). Tests resolve through
 the same plugin (`vitest.config.ts` also inlines the checkout's third-party modules, so they share the app's
 React). `npm run typecheck` checks against the linked checkout's types while a link is active.
