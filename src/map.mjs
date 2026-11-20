@@ -271,6 +271,8 @@ export const buildMap = (cfg, root, runner) => {
   return {
     generated: new Date().toISOString(),
     project: cfg.name,
+    branch: git('rev-parse', '--abbrev-ref', 'HEAD'),
+    partition: { path: cfg.partition.path, maxFiles: cfg.partition.maxFiles },
     head,
     runs,
     areas: out,
