@@ -18,8 +18,8 @@ export interface AuditCellData {
   readonly backing?: string;
   /** Its queue place, in the cell's corner. */
   readonly queue?: number;
-  /** How much its files changed since its last pass, 0 to 0.6: a corner cut off in the edge color, that much larger. */
-  readonly worn?: number;
+  /** Its files changed since its last pass: a corner cut off in the edge color. */
+  readonly worn?: boolean;
   /** A check in its corner: no audit is due. */
   readonly settled?: boolean;
   /** One per pass, up to four. */
@@ -49,6 +49,8 @@ export interface AuditFrameData {
 
 export type AuditNodeData = AuditCellData | AuditFrameData;
 
+/** The side of a changed area's cut corner, in pixels. */
+const CUT_PX = 12;
 const rect = (p: RectPose, by = 0): Path => ({ kind: 'rect', x: p.x + by, y: p.y + by, width: Math.max(0, p.width - 2 * by), height: Math.max(0, p.height - 2 * by) });
 
 /** `y` is the text's top: a text command is top-anchored by default. */
@@ -87,7 +89,8 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
     { kind: 'path', path: rect(p), stroke: { paint: { color: d.edge }, width: 0.5 } },
   ];
   if (d.worn) {
-    const cut = Math.min(Math.min(p.width, p.height) * 0.45, 6 + 30 * d.worn);
+    // One size for every cell, shrunk only where a cell is too small to hold it.
+    const cut = Math.min(Math.min(p.width, p.height) * 0.45, CUT_PX);
     const x = p.x, y = p.y + p.height;
     out.push(...filled(pathFromD(`M ${x} ${y} L ${x} ${y - cut} L ${x + cut} ${y} Z`), { color: d.edge }));
   }

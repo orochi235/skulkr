@@ -95,7 +95,7 @@ describe('rampAt', () => {
     const areas = map.areas.map((a) => (a.id === due.id ? { ...a, staleLines: 1000 } : a));
     const scene = createAuditScene();
     syncAuditScene(scene, auditNodeSpecs(areas, layoutMap(areas, 900, 400), PALETTE));
-    expect(cellOf(scene, due.id).worn).toBeCloseTo(0.5, 5);
+    expect(cellOf(scene, due.id).worn).toBe(true);
     expect(cellOf(scene, due.id).over).toBeUndefined();
     const unaudited = map.areas.find((a) => a.status === 'unaudited')!;
     expect(cellOf(scene, unaudited.id).over).toMatchObject({ kind: 'hatch' });

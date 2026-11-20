@@ -36,10 +36,8 @@ export function toneOf(area: AuditArea): AreaTone {
   return pass ? { left: pass.left } : 'unaudited';
 }
 
-/** How worn an area whose files changed since its last pass reads, 0 to 0.6: none unchanged, more the more lines
- *  changed. */
-export const staleFadeOf = (lines: number | undefined): number =>
-  !lines || lines <= 0 ? 0 : Math.min(0.6, 0.2 + 0.1 * Math.log10(lines));
+/** Whether an area's files changed since its last pass. */
+export const changedSincePass = (area: { readonly staleLines?: number }): boolean => (area.staleLines ?? 0) > 0;
 
 /** How near the top, as a share of the bar, a round tick gives way to the top's own. */
 const TOP_ROOM = 0.12;

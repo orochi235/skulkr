@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { heatScaleOf, labelIn, nextUpOf, runHolding, staleFadeOf, statsFor, toneOf, wrapAtDots } from './areaData';
+import { changedSincePass, heatScaleOf, labelIn, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
 import { continuousText, headlineOf, parseJob, recentJobsOf, spendOf, stepText } from './runData';
 import { inSharedSteps, leadsWithNode, sharedSpansOf, stageCountsOf } from './phases';
 import { ticksFor } from './RoundsChart';
@@ -169,11 +169,11 @@ describe('areas', () => {
     expect(toneOf({ ...due, status: 'unaudited' })).toBe('unaudited');
   });
 
-  it('fades a changed area more the more lines changed, never past 0.6', () => {
-    expect(staleFadeOf(undefined)).toBe(0);
-    expect(staleFadeOf(10)).toBeCloseTo(0.3);
-    expect(staleFadeOf(1000)).toBeCloseTo(0.5);
-    expect(staleFadeOf(1e9)).toBe(0.6);
+  it('marks an area changed once any of its lines changed since its pass, however many', () => {
+    expect(changedSincePass({})).toBe(false);
+    expect(changedSincePass({ staleLines: 0 })).toBe(false);
+    expect(changedSincePass({ staleLines: 1 })).toBe(true);
+    expect(changedSincePass({ staleLines: 1e9 })).toBe(true);
   });
 
   it('queues by place, leaving out areas a live run holds', () => {

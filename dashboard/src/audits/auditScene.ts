@@ -2,7 +2,7 @@
 import { asNodeId, contrastRatio, createScene, nodeShapesOf, type NodeId, type RectPose, type Scene } from '@weasel-js/core';
 import { deepEqual } from '@weasel-js/registry';
 import { AUDIT_PAINTER, type AuditCellData, type AuditFrameData, type AuditNodeData } from './auditPainter';
-import { heatScaleOf, labelIn, staleFadeOf, toneOf, wrapAtDots, type HeatScale } from './areaData';
+import { changedSincePass, heatScaleOf, labelIn, toneOf, wrapAtDots, type HeatScale } from './areaData';
 import { rampAt } from './heat';
 import type { MapCell, MapFrame } from './mapLayout';
 import type { AuditPhase } from './phases';
@@ -113,9 +113,9 @@ function cellData(
   estimate: number | undefined,
 ): AuditCellData {
   const tone = toneOf(area);
-  // An estimate older than its files' last changes wears a cut corner, larger the more changed; its color stays the
-  // heat its estimate gives, since a color washed toward the panel reads as another estimate.
-  const worn = typeof tone === 'object' ? staleFadeOf(area.staleLines) : 0;
+  // An estimate older than its files' last changes wears a cut corner; its color stays the heat its estimate gives,
+  // since a color washed toward the panel reads as another estimate.
+  const worn = typeof tone === 'object' && changedSincePass(area);
   const fill = tone === 'settled' ? palette.settled : tone === 'unaudited' ? palette.uncharted : rampAt(palette.depth, heat.at(tone.left));
   const ink = tone === 'unaudited' ? palette.ink : inkOn(fill, palette);
   const live = area.status === 'tonight';
@@ -127,7 +127,7 @@ function cellData(
     ...(tone === 'unaudited' ? {
       over: { kind: 'hatch', color: estimate === undefined ? palette.hatch : rampAt(palette.depth, heat.at(estimate)), size: 6, lineWidth: 1.6 },
     } : {}),
-    ...(worn > 0 ? { worn } : {}),
+    ...(worn ? { worn } : {}),
     edge: palette.panel,
     ink,
     ...(labeled ? { label: labelLines(area, cell, palette.font.ui) } : {}),
