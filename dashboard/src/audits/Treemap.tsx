@@ -108,6 +108,7 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
           audited, estimated defects left after the last pass:
           <HeatLegend heat={heat} />
         </span>
+        <span><i className={`${s.key} ${s.worn}`} />changed since its pass</span>
         <span><i className={`${s.key} ${s.settled}`} />settled</span>
         <span className={s.phases}>
           in a live run:

@@ -50,6 +50,9 @@
   background-image: repeating-linear-gradient(135deg, var(--audit-hatch) 0 1.5px, transparent 1.5px 5px);
 }
 
+/* A cell's cut corner: its files changed since the pass its color comes from. */
+.worn { background: linear-gradient(45deg, var(--audit-panel) 0 38%, var(--audit-depth-2) 38%); }
+
 .settled {
   position: relative;
   background: var(--audit-settled);
