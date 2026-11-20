@@ -11,7 +11,11 @@ import { mainCheckout } from './batch.mjs';
 import { lastFinished, lastStartedAt, liveRuns, requestStop } from './runs.mjs';
 import { handle, msUntil, shouldAutoStart } from './serviceCore.mjs';
 
-const BIN = fileURLToPath(new URL('../bin/skulk.mjs', import.meta.url));
+/**
+ * The skulk each run starts: `SKULK_BIN` (a checkout's `bin/skulk.mjs`, so runs pick up its latest code without the
+ * service's tree being synced), else this one.
+ */
+const BIN = process.env.SKULK_BIN ?? fileURLToPath(new URL('../bin/skulk.mjs', import.meta.url));
 const log = (line) => process.stderr.write(`${new Date().toISOString()} ${line}\n`);
 
 /** Runs the service for `cfg` until its stdin closes. Each run is `skulk night` from the project's main checkout. */
