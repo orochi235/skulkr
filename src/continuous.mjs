@@ -48,6 +48,7 @@ export const roundEstimate = ({ finished, areasPerRound, areaGuessUsd }) => {
  * until the night's stop time, or off after a `stop` until then. Without one, `schedule.continuous` turns it on
  * between `startAt` and `stopAt`. With no `nightUsd` there is no continuous mode.
  */
+/** @param {{ now: Date, schedule: any, nightUsd?: number | null, override?: { on: boolean, until: string } }} input */
 export const modeOf = ({ now, schedule, nightUsd, override }) => {
   const live = override && new Date(override.until) > now ? override : undefined;
   const asked = live ? live.on : Boolean(schedule.continuous) && inWindow(now, schedule.startAt, schedule.stopAt);
@@ -65,6 +66,10 @@ const usd = (n) => `$${n.toFixed(2)}`;
  * `idleUntil`, set when the last round it started found nothing to do or failed.
  * Answers `{ start, capUsd?, why?, behind? }`; `behind` is the round whose model steps it waits on.
  */
+/**
+ * @param {{ now: Date, mode: any, readOnly: boolean, runs: any[], pending?: number, spentUsd: number, estimateUsd: number,
+ *   nightUsd: number | null, capUsd: number, idleUntil?: string }} input
+ */
 export const nextContinuous = ({ now, mode, readOnly, runs, pending = 0, spentUsd, estimateUsd, nightUsd, capUsd, idleUntil }) => {
   if (readOnly) return { start: false, why: 'read-only here' };
   if (!mode.on) return { start: false, why: mode.why ?? (mode.by === 'stop' ? 'stopped for the night' : 'off') };
@@ -72,9 +77,10 @@ export const nextContinuous = ({ now, mode, readOnly, runs, pending = 0, spentUs
   const model = runs.find(inModelSteps);
   if (model) return { start: false, why: `round ${model.round} is in its model steps`, behind: model.round };
   if (pending > 0) return { start: false, why: 'a round is starting' };
-  const left = nightUsd - spentUsd;
-  if (spentUsd + estimateUsd > nightUsd) {
-    return { start: false, why: `the night's budget: ${usd(spentUsd)} of ${usd(nightUsd)} spent, and the next round is expected to cost ${usd(estimateUsd)}` };
+  const night = nightUsd ?? 0;
+  const left = night - spentUsd;
+  if (spentUsd + estimateUsd > night) {
+    return { start: false, why: `the night's budget: ${usd(spentUsd)} of ${usd(night)} spent, and the next round is expected to cost ${usd(estimateUsd)}` };
   }
   return { start: true, capUsd: Math.floor(Math.min(capUsd, left) * 100) / 100 };
 };
