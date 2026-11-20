@@ -9,7 +9,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSyn
 import { join } from 'node:path';
 import { runArea } from './area.mjs';
 import { addWorktree, gitIn, mainCheckout, removeWorktree } from './batch.mjs';
-import { JOB_IN, nodesAt } from './config.mjs';
+import { JOB_IN, nextClock, nodesAt } from './config.mjs';
 import { createSlots, runUntilFree } from './jobs.mjs';
 import { batchAndTest, patchAreas, patchSweep } from './land.mjs';
 import { waitForLease } from './lease.mjs';
@@ -25,15 +25,6 @@ const UNAVAILABLE_TTL_MS = 5 * 60_000;
 const usd = (n) => `$${n.toFixed(2)}`;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const localDate = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-/** The first `hh:mm` local after `from`. */
-export const nextClock = (from, hhmm) => {
-  const [h, m] = hhmm.split(':').map(Number);
-  const at = new Date(from);
-  at.setHours(h, m, 0, 0);
-  if (at <= from) at.setDate(at.getDate() + 1);
-  return at;
-};
 
 export const parseArgs = (cfg, argv) => {
   const value = (flag) => {
@@ -214,7 +205,7 @@ const runContext = ({ cfg, runner, root, p, args, status, frozen, say, setStep }
       appendFileSync(join(status.nightDir, 'usage.jsonl'), `${JSON.stringify({ round: p.round, ...record })}\n`);
       status.weightedTokens += record.weightedTokens;
       status.costUsd += record.costUsd;
-      setStep(status.step);
+      setStep(status.step, { behind: status.behind });
     },
     acquire: async (role) => {
       for (;;) {
@@ -303,8 +294,11 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     echo(line);
     appendFileSync(join(status.nightDir, 'night.log'), `${line}\n`);
   };
-  const setStep = (step) => {
+  /** The run's step, and what it waits behind (`{ behind }`) while it waits for a lock or the fleet. */
+  const setStep = (step, { behind } = {}) => {
     status.step = step;
+    if (behind) status.behind = behind;
+    else delete status.behind;
     writeStatus(p.round, status, cfg.state);
   };
 

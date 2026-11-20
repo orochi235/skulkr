@@ -9,9 +9,11 @@ import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { after } from './after.mjs';
 import { mainCheckout } from './batch.mjs';
-import { loadConfig } from './config.mjs';
+import { loadConfig, nextClock } from './config.mjs';
+import { inModelSteps } from './continuous.mjs';
+import { continuousOf } from './continuousOf.mjs';
 import { createHost } from './host.mjs';
-import { lastFinished, lastStartedAt, liveRuns, requestStop } from './runs.mjs';
+import { lastFinished, lastStartedAt, liveRuns, requestStop, writeContinuous } from './runs.mjs';
 import { readTenants, tenantsPath } from './tenants.mjs';
 
 /**
@@ -43,9 +45,17 @@ export const createTenant = (name, cfg, { readOnly = false } = {}) => {
   /** The runs this service started that have not exited, by pid, with the last line each printed. */
   const children = new Map();
   let startedHere;
+  /** Set when a continuous round exited without claiming one or failed, so another is not started every tick. */
+  let idleUntil;
+  /** Rounds this service started that have not claimed a round yet. */
+  const pending = () => {
+    const live = new Set(liveRuns(state).map((r) => r.pid));
+    return [...children.keys()].filter((pid) => !live.has(pid)).length;
+  };
 
-  const start = (args) => {
-    startedHere = new Date();
+  const start = (args, { continuous = false } = {}) => {
+    const at = new Date();
+    startedHere = at;
     const child = spawn(process.execPath, [BIN, 'night', ...base, ...args], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
     const entry = { lastLine: '' };
     children.set(child.pid, entry);
@@ -59,6 +69,12 @@ export const createTenant = (name, cfg, { readOnly = false } = {}) => {
     child.on('close', (code) => {
       say(`run ${child.pid} exited ${code}`);
       children.delete(child.pid);
+      const claimed = (lastStartedAt(state) ?? 0) >= at;
+      // A continuous round that found nothing to do, or failed, would only be followed by another like it.
+      if (continuous && (!claimed || code !== 0)) {
+        idleUntil = nextClock(new Date(), cfg.schedule.stopAt).toISOString();
+        say(`continuous: that round ${claimed ? 'failed' : 'found nothing to do'}; no more start until ${idleUntil}`);
+      }
     });
     return args;
   };
@@ -69,6 +85,15 @@ export const createTenant = (name, cfg, { readOnly = false } = {}) => {
     startAt: cfg.schedule.startAt,
     /** A run this service started counts before it has claimed its round, so no second one starts beside it. */
     running: () => children.size > 0 || liveRuns(state).length > 0,
+    modelBusy: () => pending() > 0 || liveRuns(state).some(inModelSteps),
+    scheduledContinuous: Boolean(cfg.schedule.continuous && cfg.budget.nightUsd > 0),
+    continuous: (now) => continuousOf(cfg, { now, pending: pending(), idleUntil, readOnly }),
+    setContinuous: (on, now) => {
+      const until = nextClock(now, cfg.schedule.stopAt).toISOString();
+      writeContinuous(state, { on, until, at: now.toISOString() });
+      if (on) idleUntil = undefined;
+      say(`continuous mode ${on ? 'on' : 'off'} until ${until}`);
+    },
     lastStarted: () => {
       const times = [lastStartedAt(state), startedHere].filter(Boolean);
       return times.length ? new Date(Math.max(...times)) : undefined;

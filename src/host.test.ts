@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { nextContinuous } from './continuous.mjs';
 import { createHost, tenantFor } from './host.mjs';
 
 const at = (hhmm: string, day = 16) => {
@@ -116,5 +117,96 @@ describe('createHost', () => {
     h.tick();
     expect(list[0]!.starts).toEqual([[]]);
     expect(ro.starts).toEqual([]);
+  });
+});
+
+describe('continuous rounds', () => {
+  /** A tenant in continuous mode whose rounds move through `steps`; each decision is `nextContinuous`'s on them. */
+  const continuous = (name: string, { readOnly = false, nightUsd = 200, spent = 0, estimate = 50 } = {}) => {
+    const t = tenant(name, { readOnly });
+    const runs: { round: number; step: string }[] = [];
+    let on = false;
+    const decide = (now: Date) => {
+      const mode = on ? { on: true, by: 'request', until: at('07:00', 17).toISOString() } : { on: false, by: 'off' };
+      return {
+        mode,
+        next: nextContinuous({ now, mode, readOnly, runs, spentUsd: spent, estimateUsd: estimate, nightUsd, capUsd: 160 }),
+        budget: { nightUsd, spentUsd: spent, leftUsd: nightUsd - spent, estimateUsd: estimate },
+        queues: { model: null, fleet: { holder: null, waiting: [] } },
+      };
+    };
+    return Object.assign(t, {
+      runs,
+      running: () => runs.some((r) => r.step !== 'done'),
+      modelBusy: () => runs.some((r) => r.step === 'review'),
+      scheduledContinuous: false,
+      continuous: decide,
+      setContinuous: (value: boolean) => { on = value; },
+      setSpent: (usd: number) => { spent = usd; },
+      deps: {
+        ...t.deps,
+        start: (args: string[]) => {
+          t.starts.push(args);
+          runs.push({ round: 50 + runs.length, step: 'review' });
+          return args;
+        },
+      },
+    });
+  };
+  const host = (list: ReturnType<typeof tenant>[]) => createHost({ tenants: () => list, now: () => at('23:30'), build: 'host' });
+
+  it('starts a round on request, the next when that one reaches its batch, until the budget runs out', async () => {
+    const a = continuous('a');
+    const h = host([a]);
+    expect(await h.request('{"id":1,"start":true,"continuous":true}')).toMatchObject({ tenant: 'a', continuous: true, started: true });
+    expect(a.starts).toEqual([['--cap-usd', '160']]);
+    h.tick();
+    expect(a.starts).toHaveLength(1);
+    expect(await h.request('{"id":2,"status":true}')).toMatchObject({
+      continuous: { on: true, next: 'round 50 is in its model steps', nightUsd: 200 },
+    });
+    a.runs[0]!.step = 'batch';
+    a.setSpent(120);
+    h.tick();
+    expect(a.starts).toEqual([['--cap-usd', '160'], ['--cap-usd', '80']]);
+    a.runs[1]!.step = 'fleet-wait';
+    a.setSpent(160);
+    h.tick();
+    expect(a.starts).toHaveLength(2);
+    expect(await h.request('{"id":3,"status":true}')).toMatchObject({ continuous: { next: expect.stringContaining('the night\'s budget') } });
+  });
+
+  it('ends with a bare stop, and refuses a read-only tenant or one with no nightly budget', async () => {
+    const a = continuous('a');
+    const h = host([a]);
+    await h.request('{"id":1,"start":true,"continuous":true}');
+    expect(await h.request('{"id":2,"stop":true}')).toMatchObject({ continuous: false });
+    a.runs[0]!.step = 'batch';
+    h.tick();
+    expect(a.starts).toHaveLength(1);
+    const ro = continuous('ro', { readOnly: true });
+    expect(await host([ro]).request('{"id":3,"start":true,"continuous":true}')).toMatchObject({ error: expect.stringContaining('read-only') });
+    expect(ro.starts).toEqual([]);
+    const poor = continuous('poor', { nightUsd: 0 });
+    expect(await host([poor]).request('{"id":4,"start":true,"continuous":true}')).toMatchObject({ error: expect.stringContaining('budget.nightUsd') });
+    expect(await host([a]).request('{"id":5,"start":true,"continuous":true,"areas":2}')).toMatchObject({ error: expect.stringContaining('takes no areas') });
+  });
+
+  it('holds another tenant\'s start only while a round is in its model steps', async () => {
+    const [a, b] = [continuous('a'), tenant('b')];
+    const h = host([a, b]);
+    await h.request('{"id":1,"start":true,"continuous":true,"tenant":"a"}');
+    expect(await h.request('{"id":2,"start":true,"tenant":"b"}')).toMatchObject({ started: false, behind: 'a' });
+    a.runs[0]!.step = 'fleet';
+    h.tick();
+    expect(b.starts).toEqual([[]]);
+    // b's round is now in its model steps, so a's next continuous round waits for it.
+    b.live = [7];
+    const busyB = Object.assign(b, { modelBusy: () => b.live.length > 0 });
+    h.tick();
+    expect(a.starts).toHaveLength(1);
+    busyB.live = [];
+    h.tick();
+    expect(a.starts).toHaveLength(2);
   });
 });

@@ -1,10 +1,13 @@
 /**
  * One service hosting several tenants (projects), apart from its process and pipes so it can be tested. Each tenant
- * keeps its own schedule; rounds of different tenants never run at once, since they share the fleet's slots, so a
- * start (scheduled or asked for) while another tenant's round runs waits in a queue until it ends.
+ * keeps its own schedule. Rounds of different tenants never do their model work at once, since they share the fleet's
+ * slots, so a start (scheduled, continuous, or asked for) while another tenant's round is in its model steps waits in
+ * a queue until that round reaches its patch step. Their gates take turns through the fleet queue (`fleet.mjs`).
  *
- * A tenant here is `{ name, readOnly, startAt, running(), lastStarted(), deps }`: `deps` is `handle`'s for that tenant,
- * its `start(args)` the raw start. A read-only tenant's runs count as busy, but nothing starts it.
+ * A tenant here is `{ name, readOnly, startAt, running(), modelBusy?(), lastStarted(), deps }`, and for continuous
+ * mode `continuous?(now)` (`continuousOf`), `setContinuous?(on, now)` and `scheduledContinuous`: `deps` is `handle`'s
+ * for that tenant, its `start(args, { continuous })` the raw start. A read-only tenant's runs count as busy, but
+ * nothing starts it.
  */
 import { handle, msUntil, shouldAutoStart } from './serviceCore.mjs';
 
@@ -27,14 +30,27 @@ export const tenantFor = (req, tenants) => {
  * The host: `tenants()` answers the tenants now (reread live), `now()` the time. `tick()` fires each tenant's
  * schedule and starts what the queue lets; `request(line)` answers one request line.
  */
+/** A continuous round's arguments: the night's budget left, under the per-run cap, is its cap. */
+const continuousArgs = (next) => ['--cap-usd', String(next.capUsd)];
+
+/** What `status` says of continuous mode and the two queues. */
+export const continuousStatus = ({ mode, next, budget, queues }) => ({
+  continuous: {
+    on: mode.on, by: mode.by, ...(mode.until ? { until: mode.until } : {}), ...(mode.why ? { why: mode.why } : {}),
+    next: mode.on ? (next.start ? 'starts now' : next.why) : null,
+    ...budget,
+  },
+  queues,
+});
+
 export const createHost = ({ tenants, now = () => new Date(), log = () => {}, build }) => {
   /** Starts waiting for the fleet, oldest first: `{ tenant, args, auto, since }`. */
   const queue = [];
   /** Each tenant's next scheduled start, armed when it is first seen, so a restart never starts a round by itself. */
   const fireAt = new Map();
 
-  /** Another tenant whose round runs now, by name, or undefined. */
-  const busyBeside = (name, list) => list.find((t) => t.name !== name && t.running())?.name;
+  /** Another tenant whose round is in its model steps now, by name, or undefined. */
+  const busyBeside = (name, list) => list.find((t) => t.name !== name && (t.modelBusy ? t.modelBusy() : t.running()))?.name;
   /** Whether `entry` may start: no other tenant runs, and no other tenant's start has waited longer. */
   const free = (entry, list) => !busyBeside(entry.tenant, list) && !queue.slice(0, queue.indexOf(entry)).some((q) => q.tenant !== entry.tenant);
 
@@ -49,9 +65,23 @@ export const createHost = ({ tenants, now = () => new Date(), log = () => {}, bu
       queue.splice(queue.indexOf(entry), 1);
       // A round started by hand meanwhile stands in for a scheduled one.
       if (entry.auto && t.running()) continue;
-      log(`${t.name}: starting${entry.auto ? ' its scheduled round' : ''}${entry.args.length ? ` (${entry.args.join(' ')})` : ''}`);
-      t.deps.start(entry.args);
+      let args = entry.args;
+      if (entry.continuous) {
+        // The queue may have held it while its own rounds moved or its budget went: decide again.
+        const next = t.continuous?.(now()).next;
+        if (!next?.start) continue;
+        args = continuousArgs(next);
+      }
+      log(`${t.name}: starting${entry.auto ? ' its scheduled round' : entry.continuous ? ' its next continuous round' : ''}${args.length ? ` (${args.join(' ')})` : ''}`);
+      t.deps.start(args, { continuous: Boolean(entry.continuous) });
     }
+  };
+
+  /** Queues tenant `t`'s next continuous round when its decision says it may start. */
+  const offerContinuous = (t, at) => {
+    if (t.readOnly || !t.continuous || queue.some((q) => q.tenant === t.name && q.continuous)) return;
+    const next = t.continuous(at).next;
+    if (next.start) queue.push({ tenant: t.name, args: continuousArgs(next), auto: false, continuous: true, since: at.toISOString() });
   };
 
   const tick = () => {
@@ -67,9 +97,12 @@ export const createHost = ({ tenants, now = () => new Date(), log = () => {}, bu
       }
       if (at < armed.at) continue;
       fireAt.set(t.name, { startAt: t.startAt, at: new Date(at.getTime() + msUntil(at, t.startAt)) });
+      // Continuous mode from the config starts the night's first round itself, under the budget.
+      if (t.scheduledContinuous) continue;
       const due = shouldAutoStart({ now: at, running: t.running(), lastStarted: t.lastStarted(), startAt: t.startAt });
       if (due && !queue.some((q) => q.tenant === t.name && q.auto)) queue.push({ tenant: t.name, args: [], auto: true, since: at.toISOString() });
     }
+    for (const t of list) offerContinuous(t, at);
     drain(list);
   };
 
@@ -85,8 +118,32 @@ export const createHost = ({ tenants, now = () => new Date(), log = () => {}, bu
 
   /** What tenant `t` is waiting on: each of its queued starts and what holds it. */
   const waitingOf = (t, list) => queue.filter((q) => q.tenant === t.name).map((q) => ({
-    since: q.since, scheduled: q.auto, args: q.args, behind: busyBeside(t.name, list) ?? queue.find((o) => o.tenant !== t.name)?.tenant ?? null,
+    since: q.since, scheduled: q.auto, ...(q.continuous ? { continuous: true } : {}), args: q.args,
+    behind: busyBeside(t.name, list) ?? queue.find((o) => o.tenant !== t.name)?.tenant ?? null,
   }));
+
+  /** Turns tenant `t`'s continuous mode on (`on`) until the night's stop time, or off, and says what follows. */
+  const continuousFor = (t, list) => (on) => {
+    if (t.readOnly) throw new Error(`${t.name} is read-only here: its rounds run under another service`);
+    if (!t.setContinuous) throw new Error(`${t.name} has no continuous mode`);
+    const at = now();
+    const was = t.continuous(at).mode;
+    if (on && !(t.continuous(at).budget.nightUsd > 0)) throw new Error(`continuous mode needs budget.nightUsd in ${t.name}'s config`);
+    t.setContinuous(on, at);
+    if (!on) {
+      for (const q of queue.filter((e) => e.tenant === t.name && e.continuous)) queue.splice(queue.indexOf(q), 1);
+      return { continuous: false, was: was.on, until: t.continuous(at).mode.until };
+    }
+    offerContinuous(t, at);
+    const entry = queue.find((q) => q.tenant === t.name && q.continuous);
+    drain(list);
+    const state = t.continuous(at);
+    if (entry && !queue.includes(entry)) return { continuous: true, until: state.mode.until, started: true };
+    return {
+      continuous: true, until: state.mode.until, started: false,
+      ...(entry ? { waiting: true, behind: busyBeside(t.name, list) ?? null } : { why: state.next.why }),
+    };
+  };
 
   const request = async (line) => {
     let req;
@@ -109,10 +166,14 @@ export const createHost = ({ tenants, now = () => new Date(), log = () => {}, bu
     const deps = {
       ...t.deps,
       start: startFor(t, list),
+      ...(t.continuous ? { continuous: continuousFor(t, list), continuousOn: () => t.continuous(now()).mode.on } : {}),
       status: () => {
         const waiting = waitingOf(t, list);
         const next = fireAt.get(t.name)?.at;
-        return { ...t.deps.status(), ...(waiting.length ? { waiting } : {}), ...(next ? { nextStart: next.toISOString() } : {}), ...(t.readOnly ? { readOnly: true } : {}) };
+        return {
+          ...t.deps.status(), ...(waiting.length ? { waiting } : {}), ...(next && !t.scheduledContinuous ? { nextStart: next.toISOString() } : {}),
+          ...(t.readOnly ? { readOnly: true } : {}), ...(t.continuous ? continuousStatus(t.continuous(now())) : {}),
+        };
       },
     };
     return { tenant: t.name, ...(await handle(JSON.stringify(rest), deps)) };

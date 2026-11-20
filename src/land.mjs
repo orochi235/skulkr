@@ -1,11 +1,13 @@
 /**
  * How a run lands what its fixers made: each mbox onto its own `audit<N>-<area>` branch, the branches into
  * the batch, the record committed there, the gate run on its tip, and `main` fast-forwarded when green.
- * The gate run through the fast-forward holds the merge lock, so runs land one at a time.
+ * The gate run through the fast-forward holds the merge lock, so runs land one at a time, and the gate itself holds
+ * the fleet queue's lease (`fleet.mjs`), so one gate runs at a time across every tenant.
  */
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { applyFix, catchUpWithMain, commitRecord, fastForwardMain, makeBatch, removeWorktree, runGate } from './batch.mjs';
+import { fleetDir, waitForFleet } from './fleet.mjs';
 import { waitForLease } from './lease.mjs';
 import { mergeLock } from './runs.mjs';
 /** How many times a green batch merges a moved main in and tests again before leaving the fast-forward to fail. */
@@ -96,11 +98,27 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
 
   setStep('merge-wait');
   const release = await waitForLease(mergeLock(cfg.state), { round }, {
-    onWait: (holder) => say(`batch: waiting for the merge lock${holder?.round ? `, held by round ${holder.round}` : ''}`),
+    onWait: (holder) => {
+      say(`batch: waiting for the merge lock${holder?.round ? `, held by round ${holder.round}` : ''}`);
+      if (holder?.round) setStep('merge-wait', { behind: `round ${holder.round}` });
+    },
   });
   try {
-    setStep('fleet');
-    const tested = await testBatch({ cfg, root, batch, nightDir, merge, say, tip: recorded });
+    setStep('fleet-wait');
+    const releaseFleet = await waitForFleet(fleetDir(), { tenant: cfg.name, round }, {
+      onWait: ({ holder, ahead }) => {
+        const behind = holder ? `${holder.tenant} round ${holder.round}` : ahead[0] ? `${ahead[0].tenant} round ${ahead[0].round}` : undefined;
+        say(`batch: waiting for the fleet${behind ? `, behind ${behind}` : ''}${ahead.length ? ` (${ahead.length} ahead)` : ''}`);
+        setStep('fleet-wait', behind ? { behind } : {});
+      },
+    });
+    let tested;
+    try {
+      setStep('fleet');
+      tested = await testBatch({ cfg, root, batch, nightDir, merge, say, tip: recorded });
+    } finally {
+      releaseFleet();
+    }
     if (tested.report) return tested.report;
     removeWorktree(root, batch.tree);
     if (!merge) return `green; --no-merge, so ${cfg.git.main} is untouched and ${batch.name} and its branches are kept`;

@@ -11,6 +11,7 @@ import { fixTallyOf } from './findings.mjs';
 import { fleetOf } from './gate.mjs';
 import { partitionAt } from './partition.mjs';
 import { COVERED, areaStats, chapman, gitTouched, pickAreas, readPasses } from './rounds.mjs';
+import { continuousOf } from './continuousOf.mjs';
 import { lastFinished, liveRuns, readJson } from './runs.mjs';
 import { parseEnvelope } from './usage.mjs';
 
@@ -146,6 +147,7 @@ export const readRun = (found, running, jobs = [], state, { names = NAMES, sweep
     started: run.started,
     ended: run.ended ?? null,
     step: running ? run.step : 'done',
+    ...(running && run.behind ? { behind: run.behind } : {}),
     costUsd: run.costUsd ?? 0,
     capUsd: run.capUsd ?? null,
     report: run.report ?? null,
@@ -312,10 +314,18 @@ export const buildMap = (cfg, root, runner) => {
     partition: { path: cfg.partition.path, maxFiles: cfg.partition.maxFiles },
     head,
     areasPerRound: cfg.areasPerRound,
+    ...continuousOfMap(cfg),
     runs,
     areas: out,
     rounds: [...rounds.values()].sort((x, y) => x.round - y.round).map((r) => ({ ...r, est: Math.round(r.est) })),
   };
+};
+
+/** The map's `continuous`: the mode, what the next round waits on, and the night's spend, while the mode is on. */
+const continuousOfMap = (cfg) => {
+  const { mode, next, budget } = continuousOf(cfg, { fleet: { holder: null, waiting: [] } });
+  if (!mode.on) return {};
+  return { continuous: { until: mode.until, next: next.start ? 'starts now' : next.why, nightUsd: budget.nightUsd, spentUsd: budget.spentUsd, leftUsd: budget.leftUsd } };
 };
 
 /** `skulk map [--out <file>]`: prints or writes the map. */

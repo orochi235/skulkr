@@ -86,11 +86,34 @@ export const requestStop = (round, state) => writeFileSync(stopFile(round, state
 export const stopRequested = (round, state) => existsSync(stopFile(round, state));
 export const clearStop = (round, state) => rmSync(stopFile(round, state), { force: true });
 
-/** Deletes the oldest run directories past the newest `keep`, never a live one. */
-export const pruneRuns = (keep, state) => {
+/** Every finished run's summary, by round. */
+export const finishedRuns = (state) => rounds(state).flatMap((round) => {
+  const summary = readJson(join(runDir(round, state), 'summary.json'));
+  return summary ? [{ ...summary, round }] : [];
+});
+
+const DAY_MS = 24 * 3_600_000;
+
+/**
+ * Deletes the oldest run directories past the newest `keep`, never a live one, nor one started in the last day, whose
+ * spend the night's budget still counts.
+ */
+export const pruneRuns = (keep, state, now = new Date()) => {
   const live = new Set(liveRuns(state).map((r) => r.round));
   const all = rounds(state);
+  const recent = (round) => {
+    const started = readJson(join(runDir(round, state), 'summary.json'))?.started;
+    return started && now - new Date(started) < DAY_MS;
+  };
   for (const round of all.slice(0, Math.max(0, all.length - keep))) {
-    if (!live.has(round)) rmSync(runDir(round, state), { recursive: true, force: true });
+    if (!live.has(round) && !recent(round)) rmSync(runDir(round, state), { recursive: true, force: true });
   }
+};
+
+/** What a `start` with `continuous` or a `stop` left for continuous mode: `{ on, until, at }`, or undefined. */
+const continuousFile = (state) => join(state, 'continuous.json');
+export const readContinuous = (state) => readJson(continuousFile(state));
+export const writeContinuous = (state, value) => {
+  mkdirSync(state, { recursive: true });
+  writeJson(continuousFile(state), value);
 };

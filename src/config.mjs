@@ -150,9 +150,16 @@ export const DEFAULTS = {
   },
 
   areasPerRound: 16,
-  budget: { review: 8, match: 1, fix: 15, capUsd: 160, areaGuessUsd: 10 },
-  /** Local clock times: the service starts a run at `startAt`; a run stops dispatching at the first `stopAt`. */
-  schedule: { startAt: '23:00', stopAt: '07:00' },
+  /**
+   * List-price dollars: each job's `--max-budget-usd` by role, a run's `capUsd`, the guess at an area's cost, and
+   * `nightUsd`, what continuous mode may spend from one `stopAt` to the next (unset: no continuous mode).
+   */
+  budget: { review: 8, match: 1, fix: 15, capUsd: 160, areaGuessUsd: 10, nightUsd: undefined },
+  /**
+   * Local clock times: the service starts a run at `startAt`; a run stops dispatching at the first `stopAt`.
+   * `continuous` keeps rounds coming between them, under `budget.nightUsd` (README "Continuous rounds").
+   */
+  schedule: { startAt: '23:00', stopAt: '07:00', continuous: false },
 
   /** An extra check run beside the reviews whose findings go to one fixer; see README "A sweep". */
   sweep: null,
@@ -247,6 +254,15 @@ export const inWindow = (date, from, until) => {
   const now = date.getHours() * 60 + date.getMinutes();
   const [a, b] = [minutes(from), minutes(until)];
   return a <= b ? now >= a && now < b : now >= a || now < b;
+};
+
+/** The first `hh:mm` local after `from`. */
+export const nextClock = (from, hhmm) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  const at = new Date(from);
+  at.setHours(h, m, 0, 0);
+  if (at <= from) at.setDate(at.getDate() + 1);
+  return at;
 };
 
 /** The nodes a job may be offered to at `date`, before the runner's own quiet hours and availability. */
