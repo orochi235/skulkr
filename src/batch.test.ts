@@ -73,7 +73,7 @@ describe('commitRecord', () => {
     const night = mkdtempSync(join(tmpdir(), 'skulk-night-'));
     dirs.push(night);
     const plain = resolveConfig({ record: { dir: 'audit-log' } });
-    commitRecord(plain, dir, { round: 3, commit: head, date: '2026-11-20', nightDir: night, areas: [area('x')], outcomes: {} });
+    commitRecord(plain, dir, { round: 3, commit: head, date: '2026-11-20', nightDir: night, areas: [area('x')], outcomes: {}, sweep: undefined });
     expect(readFileSync(join(dir, 'audit-log/round-3/README.md'), 'utf8')).toContain(`Blind pairs at \`${head}\` (2026-11-20)`);
     expect(existsSync(join(dir, 'audit-log/partition.json'))).toBe(true);
     expect(git('log', '-1', '--format=%B')).toBe("record audit round 3: 1 areas' raw findings, estimates and fixes");
@@ -82,7 +82,7 @@ describe('commitRecord', () => {
     git('add', '.');
     git('commit', '-q', '-m', 'ledger');
     const ledgered = resolveConfig({ record: { ledger: { path: 'LEDGER.md', section: 'Rounds', row: ({ round }: { round: number }) => `| ${round} |` }, trailer: 'T: x' } });
-    commitRecord(ledgered, dir, { round: 4, commit: head, date: '2026-11-20', nightDir: night, areas: [area('x')], outcomes: {} });
+    commitRecord(ledgered, dir, { round: 4, commit: head, date: '2026-11-20', nightDir: night, areas: [area('x')], outcomes: {}, sweep: undefined });
     expect(readFileSync(join(dir, 'LEDGER.md'), 'utf8')).toContain('|---|\n| 4 |');
     expect(git('log', '-1', '--format=%B')).toMatch(/\n\nT: x$/);
   });

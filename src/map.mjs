@@ -156,6 +156,7 @@ export const readRun = (found, running, jobs = [], state, { names = NAMES, sweep
  * Every live run, then the one that finished last. `jobs` are the runner's jobs, or `listJobs(sinceIso)` is asked
  * for them (the runner's `jobs`); `opts` is `readRun`'s.
  */
+/** @param {string} state @param {any[] | null} [jobs] @param {{ listJobs?: (since: string) => any[], names?: any, sweepId?: string }} [opts] */
 export const readRuns = (state, jobs = null, { listJobs = () => [], ...opts } = {}) => {
   const legacy = !existsSync(join(state, 'runs'));
   const current = legacy ? readJson(join(state, 'current.json')) : null;

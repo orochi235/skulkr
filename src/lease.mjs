@@ -88,6 +88,7 @@ export const takeLease = (path, about = {}) => {
 };
 
 /** Waits for the lease at `path`, polling every `pollMs`, and answers its `release`. `onWait(holder)` hears once that it waits. */
+/** @param {string} path @param {object} [about] @param {{ pollMs?: number, onWait?: (holder: any) => void }} [opts] */
 export const waitForLease = async (path, about = {}, { pollMs = 15_000, onWait } = {}) => {
   for (let waited = false; ; waited = true) {
     const release = takeLease(path, about);

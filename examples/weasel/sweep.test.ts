@@ -11,7 +11,7 @@ const dead = [
 describe('the sweep’s findings', () => {
   it('read back as reviewer findings, one per dead control, citing the demo’s file', () => {
     const found = parseFindings(findingsOf(dead));
-    expect(found.map((f) => f.claim)).toEqual([
+    expect(found.map((f: { claim: string }) => f.claim)).toEqual([
       'Dead control: slider "Distance" in demo `lab-tween`',
       'Dead control: slider "Steps" in demo `lab-tween`',
     ]);

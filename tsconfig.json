@@ -10,6 +10,7 @@
     "checkJs": false,
     "skipLibCheck": true,
     "isolatedModules": true,
+    "allowImportingTsExtensions": true,
     "types": ["node"]
   },
   "include": ["src", "examples", "test", "bin", "vitest.config.ts"]

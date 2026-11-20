@@ -37,6 +37,7 @@ export const readPasses = (root, recordDir) => {
  * "rounds 28–30"), branches named for a round (`roundIn`, the config's `names.roundIn`: `audit30-ui`,
  * `batch/…-audit31`), and the rounds runs have claimed (`claimed`, numbers as strings or numbers).
  */
+/** @param {{ roundDirs?: string[], hardening?: string, branches?: string[], claimed?: (string | number)[], roundIn?: RegExp }} used */
 export const nextRound = ({ roundDirs = [], hardening = '', branches = [], claimed = [], roundIn = /(?:^|[/-])audit(\d+)(?:-|$)/ }) => {
   const used = [0, ...claimed.map(Number)];
   for (const name of roundDirs) {

@@ -124,7 +124,7 @@ describe('nightRoundOf', () => {
     mkdirSync(join(nightDir, 'areas', 'cursor'));
     const bar = nightRoundOf({ round: 42, running: true, started: '2026-11-20T03:23:24Z', nightDir });
     expect(bar).toMatchObject({ round: 42, date: '2026-11-20', areas: 2, files: 34, distinct: 8, pending: 'live' });
-    expect(bar.est).toBeCloseTo(5 + 3);
+    expect(bar!.est).toBeCloseTo(5 + 3);
     expect(nightRoundOf({ round: 41, running: false, nightDir })?.pending).toBe('unmerged');
     expect(nightRoundOf({ round: 40, running: false, nightDir: null })).toBeNull();
   });
