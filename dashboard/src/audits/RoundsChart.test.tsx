@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { RoundsChart, areaRoundsOf } from './RoundsChart';
+import { RoundsChart, areaRoundsOf, nthPassAverages } from './RoundsChart';
 import type { AuditArea, AuditRound } from './skulkMap.types';
 
 const rounds: AuditRound[] = [
@@ -26,6 +26,30 @@ describe('RoundsChart', () => {
       'round 1: 7 found and 10.0 estimated in geom.part1',
       'round 2 (live): 2 found and 2.0 estimated in geom.part1',
     ]);
+  });
+
+  it('names the picked area under the chart and keeps the full caption behind an info button', () => {
+    render(<RoundsChart rounds={rounds} area={area} />);
+    expect(screen.getByText('geom.part1').closest('span')!.textContent).toBe('geom.part1, each round that read it');
+    expect(screen.queryByText(/Chapman/)).toBeNull();
+    // Opening it is checked in a browser: React Aria's popover does not open under jsdom.
+    expect(screen.getByRole('button', { name: 'What the rounds chart shows' }).getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('keeps every round for an area with one pass, saying so, and averages each nth pass across areas', () => {
+    const once = { ...area, id: 'menu', passes: [area.passes[0]!] } as AuditArea;
+    render(<RoundsChart rounds={rounds} area={once} areas={[area, once]} />);
+    expect(screen.getByRole('img').getAttribute('aria-label')).toBe('Defects found and estimated per area, by round');
+    expect(screen.getByText('menu').closest('span')!.textContent).toBe('menu has one pass; every round shown');
+    expect(nthPassAverages([area, once])).toEqual([{ mean: 7, of: 2 }, { mean: 2, of: 1 }]);
+  });
+
+  it('draws a gray bar beside each of the area\'s passes for what an area\'s pass in that place found on average', () => {
+    const other = { ...area, id: 'core', passes: [{ ...area.passes[0]!, distinct: 3 }] } as AuditArea;
+    render(<RoundsChart rounds={rounds} area={area} areas={[area, other]} />);
+    const titles = [...document.querySelectorAll('title')].map((t) => t.textContent);
+    expect(titles).toContain("an area's 1st pass found 5.0 on average, over 2 areas");
+    expect(titles).toContain("an area's 2nd pass found 2.0 on average, over 1 areas");
   });
 
   it('turns an area\'s passes into rounds of one area, a live pass pending', () => {

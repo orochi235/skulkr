@@ -10,8 +10,8 @@ type TopTab = 'rounds' | 'next';
 const TABS: readonly { id: TopTab; label: string }[] = [{ id: 'rounds', label: 'Rounds' }, { id: 'next', label: 'Next up' }];
 
 /** The rounds chart and the queue, a tab each beside the run lanes; the viewer's choice is kept. */
-export function TopTabs({ rounds, area, next, onPick, onLight }: {
-  rounds: readonly AuditRound[]; area?: AuditArea | null; next: readonly AuditArea[]; onPick: (id: string) => void;
+export function TopTabs({ rounds, area, areas, next, onPick, onLight }: {
+  rounds: readonly AuditRound[]; area?: AuditArea | null; areas: readonly AuditArea[]; next: readonly AuditArea[]; onPick: (id: string) => void;
   onLight: (id: string | null) => void;
 }) {
   const [tab, setTab, keep] = useViewerPref<TopTab>('topTab', 'rounds', (v) => (v === 'next' ? 'next' : v === 'rounds' ? 'rounds' : undefined));
@@ -20,7 +20,7 @@ export function TopTabs({ rounds, area, next, onPick, onLight }: {
       <TabList aria-label="Rounds and queue" items={TABS}>
         {(t) => <Tab id={t.id}>{t.label}</Tab>}
       </TabList>
-      <TabPanel id="rounds" className={s.panel}><RoundsChart rounds={rounds} area={area} /></TabPanel>
+      <TabPanel id="rounds" className={s.panel}><RoundsChart rounds={rounds} area={area} areas={areas} /></TabPanel>
       <TabPanel id="next" className={s.panel}><NextUp areas={next} onPick={onPick} onLight={onLight} /></TabPanel>
     </Tabs>
   );

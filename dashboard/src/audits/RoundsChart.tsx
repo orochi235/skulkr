@@ -1,9 +1,13 @@
 import { niceDomain, stepTicks, tickStep } from '@weasel-js/scale';
 import { useId } from 'react';
+import { Button, DialogTrigger } from 'react-aria-components';
+import { Icon } from '@weasel-js/ui/components/Icon';
+import { Popover, PopoverDialog } from '@weasel-js/ui/components/Popover';
+import { icon } from '@dash/icons.gen';
 import type { AuditArea, AuditRound } from './skulkMap.types';
 import s from './RoundsChart.module.css';
 
-const W = 272, H = 150;
+const W = 272, H = 190;
 const PENDING_LABEL = { live: 'live', unmerged: 'unmerged' } as const;
 const M = { top: 8, right: 6, bottom: 22, left: 40 };
 
@@ -23,17 +27,36 @@ export const areaRoundsOf = (area: AuditArea): AuditRound[] => area.passes.map((
   ...(p.provisional ? { pending: 'live' as const } : {}),
 }));
 
+/** The fewest passes an area needs before the chart draws it alone rather than every round. */
+export const AREA_CHART_PASSES = 2;
+
+/** What an area's nth pass (index `n`) found on average across every area that has one: `{ mean, of }` for each n. */
+export function nthPassAverages(areas: readonly AuditArea[]): { mean: number; of: number }[] {
+  const out: { sum: number; of: number }[] = [];
+  for (const a of areas) a.passes.forEach((p, n) => { out[n] ??= { sum: 0, of: 0 }; out[n]!.sum += p.distinct; out[n]!.of += 1; });
+  return out.map(({ sum, of }) => ({ mean: of ? sum / of : 0, of }));
+}
+
+const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
+const passesText = (n: number) => (n === 0 ? 'has not been audited yet' : `has ${n === 1 ? 'one pass' : `${n} passes`}; every round shown`);
+
 /** Each round's distinct defects found per area, against Chapman's estimate per area of what its areas held; or,
- *  given an `area`, each of that area's passes. */
-export function RoundsChart({ rounds: all, area }: { rounds: readonly AuditRound[]; area?: AuditArea | null }) {
+ *  given an `area` with at least {@link AREA_CHART_PASSES} passes, each of that area's passes, each beside what an
+ *  area's pass in the same place found on average across `areas`. */
+export function RoundsChart({ rounds: all, area: picked, areas = [] }: {
+  rounds: readonly AuditRound[]; area?: AuditArea | null; areas?: readonly AuditArea[];
+}) {
+  const area = picked && picked.passes.length >= AREA_CHART_PASSES ? picked : null;
   const rounds = area ? areaRoundsOf(area) : all;
+  const averages = area ? nthPassAverages(areas) : [];
   const unit = area ? 'defects' : 'defects per area';
-  const ticks = ticksFor(Math.max(0, ...rounds.map((r) => perArea(Math.max(r.est, r.distinct), r))));
+  const ticks = ticksFor(Math.max(0, ...rounds.map((r) => perArea(Math.max(r.est, r.distinct), r)), ...rounds.map((_, i) => averages[i]?.mean ?? 0)));
   const top = ticks.at(-1) || 1;
   const y = (v: number) => H - M.bottom - ((H - M.top - M.bottom) * v) / top;
   const band = (W - M.left - M.right) / Math.max(1, rounds.length);
-  const bar = band * 0.75;
-  const x = (i: number) => M.left + i * band + (band - bar) / 2;
+  // Beside an average, each of the area's bars takes half its share of the band, interlaced with the average's.
+  const bar = area ? band * 0.4 : band * 0.75;
+  const x = (i: number) => M.left + i * band + (area ? band * 0.08 : (band - bar) / 2);
   const hatch = useId();
   return (
     <>
@@ -61,17 +84,33 @@ export function RoundsChart({ rounds: all, area }: { rounds: readonly AuditRound
                   ? `round ${r.round}${r.pending ? ` (${PENDING_LABEL[r.pending]})` : ''}: ${r.distinct} found and ${r.est.toFixed(1)} estimated in ${area.id}`
                   : `round ${r.round}${r.pending ? ` (${PENDING_LABEL[r.pending]})` : ''}: ${perArea(r.distinct, r).toFixed(1)} found and ${perArea(r.est, r).toFixed(1)} estimated per area; ${r.distinct} and ${r.est} over ${r.areas} areas`}</title>
               </rect>
+              {averages[i] && (
+                <rect className={s.avg} x={x(i) + bar + band * 0.04} width={bar} y={y(averages[i]!.mean)} height={y(0) - y(averages[i]!.mean)}>
+                  <title>{`an area's ${ordinal(i + 1)} pass found ${averages[i]!.mean.toFixed(1)} on average, over ${averages[i]!.of} areas`}</title>
+                </rect>
+              )}
               {r.pending && <text className={s.tag} x={x(i) + bar / 2} y={Math.max(M.top + 6, y(perArea(Math.max(r.est, r.distinct), r)) - 3)} textAnchor="middle">{PENDING_LABEL[r.pending]}</text>}
-              <text className={s.axis} x={x(i) + bar / 2} y={H - 8} textAnchor="middle">{r.round}</text>
+              <text className={s.axis} x={area ? M.left + (i + 0.5) * band : x(i) + bar / 2} y={H - 8} textAnchor="middle">{r.round}</text>
             </g>
           ))}
         </svg>
       )}
-      {area && rounds.length === 0 && <p className={s.hint}>{area.id} has not been audited yet.</p>}
-      <p className={s.hint}>
-        {area ? <><strong>{area.id}</strong>, each round that read it.</> : 'Per area the round read.'} Solid: distinct defects found. Dashed: Chapman&apos;s estimate of what those areas held. Hatched: a round not merged
-        yet, or still running, read from its run&apos;s own results.
-      </p>
+      <div className={s.foot}>
+        <span className={s.scope}>
+          {area ? <><strong>{area.id}</strong>, each round that read it</>
+            : picked ? <><strong>{picked.id}</strong> {passesText(picked.passes.length)}</> : 'per area the round read'}
+        </span>
+        <DialogTrigger>
+          <Button className={s.about} aria-label="What the rounds chart shows"><Icon name={icon('ui:info')} size={14} /></Button>
+          <Popover placement="bottom end" offset={6}>
+            <PopoverDialog aria-label="What the rounds chart shows" className={s.aboutText}>
+              {area ? <><strong>{area.id}</strong>, each round that read it.</> : 'Per area the round read.'} Solid: distinct defects
+              found. Dashed: Chapman&apos;s estimate of what those areas held. Hatched: a round not merged yet, or still running,
+              read from its run&apos;s own results.{area ? ' Gray: what an area\'s pass in the same place (its first, second, …) found on average, across every area.' : ''}
+            </PopoverDialog>
+          </Popover>
+        </DialogTrigger>
+      </div>
     </>
   );
 }

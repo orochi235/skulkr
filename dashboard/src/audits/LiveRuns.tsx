@@ -1,5 +1,5 @@
 import { InlineMarkdown } from '@weasel-js/ui/components/InlineMarkdown';
-import { useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { Checkbox } from '@weasel-js/ui/components/Checkbox';
 import { SegmentedBar } from '@weasel-js/ui/components/Segmented';
 import { SpanStrips, type SpanStripSpan, type SpanStripsRow } from '@weasel-js/ui/components/SpanStrip';
@@ -37,7 +37,7 @@ function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanS
     valueText: view.elapsed ? `${view.phase}, ${view.elapsed} in` : view.phase,
     lead: (
       <button
-        type="button" className={s.name} onClick={() => on.onPick(lane.id)}
+        type="button" className={s.name} data-lane={lane.id} onClick={() => on.onPick(lane.id)}
         onPointerEnter={() => on.onLight(lane.id)} onPointerLeave={() => on.onLight(null)} onFocus={() => on.onLight(lane.id)} onBlur={() => on.onLight(null)}
       >
         {lane.id}
@@ -138,15 +138,22 @@ function RunStrip({ run, now, mode, onMode, hideComplete, onHideComplete, on }: 
 
 /** A strip for every run still running, and for every finished one whose batch has not merged; a merged round lives on
  *  in the rounds chart and the map. */
-export function LiveRuns({ runs, unmerged, now, on }: {
+export function LiveRuns({ runs, unmerged, now, on, focus = null }: {
   runs: readonly AuditRun[]; unmerged: ReadonlySet<number>; now: number; on: AreaHandlers;
+  /** The area picked elsewhere on the page: its lane, where one shows, is brought into view. */
+  focus?: string | null;
 }) {
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!focus) return;
+    root.current?.querySelector(`[data-lane="${CSS.escape(focus)}"]`)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  }, [focus]);
   const [mode, setMode] = useLaneMode();
   const [hideComplete, setHideComplete] = useHideComplete();
   const live = runs.filter((r) => r.running || unmerged.has(r.round));
   if (live.length === 0) return <section className={cx(s.run, s.idle)}><div className={s.what}>No round running</div></section>;
   return (
-    <div className={s.runs} aria-live="polite">
+    <div ref={root} className={s.runs} aria-live="polite">
       {live.map((run) => <RunStrip key={run.round} run={run} now={now} mode={mode} onMode={setMode} hideComplete={hideComplete} onHideComplete={setHideComplete} on={on} />)}
     </div>
   );

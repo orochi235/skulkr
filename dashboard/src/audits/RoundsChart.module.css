@@ -1,7 +1,7 @@
 .chart {
   display: block;
   width: 100%;
-  height: 150px;
+  height: 190px;
 }
 
 .grid { stroke: var(--audit-rule); }
@@ -27,6 +27,9 @@
 
 .found { fill: var(--audit-depth-2); }
 
+/* What an area's pass in the same place found on average, beside the picked area's own. */
+.avg { fill: var(--audit-muted); opacity: 0.55; }
+
 /* A round not merged yet: its bar filled by the hatch pattern (the `fill` attribute), so no `fill` here. */
 .pending {
   stroke: var(--audit-depth-2);
@@ -43,8 +46,39 @@
   fill: var(--audit-muted);
 }
 
-.hint {
-  margin: var(--wzl-space-2) 0 0;
+.foot {
+  display: flex;
+  align-items: center;
+  gap: var(--wzl-space-2);
+  margin-top: var(--wzl-space-1);
   font-size: var(--wzl-font-size-sm);
   color: var(--audit-muted);
+}
+
+.scope {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.about {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--audit-muted);
+  cursor: pointer;
+}
+
+.about[data-hovered],
+.about[data-focus-visible],
+.about[data-pressed] { color: var(--audit-ink); }
+
+.aboutText {
+  max-width: 280px;
+  padding: var(--wzl-space-3);
+  font-size: var(--wzl-font-size-sm);
 }

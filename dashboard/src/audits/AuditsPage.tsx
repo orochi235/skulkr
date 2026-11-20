@@ -83,9 +83,9 @@ function Chart({ map, areaUrl }: { map: SkulkMap; areaUrl: string }) {
     <>
       {probes}
       <div className={s.top}>
-        <div className={s.runs}><LiveRuns runs={map.runs} unmerged={unmerged} now={Date.parse(map.generated)} on={on} /></div>
+        <div className={s.runs}><LiveRuns runs={map.runs} unmerged={unmerged} now={Date.parse(map.generated)} on={on} focus={picked} /></div>
         <ResizeHandle className={s.vseam} value={tabsWidth} min={TABS.min} max={TABS.max} invert onInput={setTabsWidth} onChange={keepTabs} aria-label="Resize the rounds and queue tabs" />
-        <TopTabs rounds={map.rounds} area={pickedArea} next={next} onPick={pick} onLight={setLit} />
+        <TopTabs rounds={map.rounds} area={pickedArea} areas={areas} next={next} onPick={pick} onLight={setLit} />
       </div>
       <ResizeHandle
         className={s.seam} orientation="horizontal" value={topHeight} min={TOP.min} max={TOP.max}
