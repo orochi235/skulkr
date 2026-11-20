@@ -16,6 +16,7 @@
  *   skulk tenants rm <name>
  */
 import { mainCheckout } from '../src/batch.mjs';
+import { exitAfterFlush } from '../src/exit.mjs';
 import { loadConfig } from '../src/config.mjs';
 import { areaDefects } from '../src/defects.mjs';
 import { mapCommand } from '../src/map.mjs';
@@ -119,10 +120,10 @@ const main = async () => {
 
 main().then(
   (code) => {
-    if (code !== undefined) process.exit(code);
+    if (code !== undefined) exitAfterFlush(code);
   },
   (error) => {
     console.error(`skulk: ${error.stack ?? error}`);
-    process.exit(1);
+    exitAfterFlush(1);
   },
 );
