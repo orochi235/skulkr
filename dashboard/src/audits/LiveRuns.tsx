@@ -62,7 +62,7 @@ function useHideComplete(): [boolean, (hide: boolean) => void] {
 }
 
 /** How every round's lanes are drawn: on the clock or as steps, and whether finished lanes hide. */
-export interface LaneView {
+export interface LaneSettings {
   readonly mode: LaneMode;
   readonly hideComplete: boolean;
   readonly setMode: (mode: LaneMode) => void;
@@ -70,14 +70,14 @@ export interface LaneView {
 }
 
 /** The viewer's lane view, kept between visits, for the page to hand every round and its controls. */
-export function useLaneView(): LaneView {
+export function useLaneView(): LaneSettings {
   const [mode, setMode] = useLaneMode();
   const [hideComplete, setHideComplete] = useHideComplete();
   return { mode, hideComplete, setMode, setHideComplete };
 }
 
 /** The lane view's controls, which apply to every round's lanes. */
-export function LaneViewControls({ view }: { view: LaneView }) {
+export function LaneViewControls({ view }: { view: LaneSettings }) {
   return (
     <div className={s.view}>
       <Checkbox isSelected={view.hideComplete} onChange={view.setHideComplete}>Hide complete</Checkbox>
@@ -175,7 +175,7 @@ function RunStrip({ run, now, mode, hideComplete, on }: {
 export function LiveRuns({ runs, unmerged, now, on, view, focus = null }: {
   runs: readonly AuditRun[]; unmerged: ReadonlySet<number>; now: number; on: AreaHandlers;
   /** How every round's lanes are drawn; the page holds it, and its controls, so one setting covers them all. */
-  view: LaneView;
+  view: LaneSettings;
   /** The area picked elsewhere on the page: its lane, where one shows, is brought into view. */
   focus?: string | null;
 }) {

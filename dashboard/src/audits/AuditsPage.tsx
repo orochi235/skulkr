@@ -6,7 +6,7 @@ import { Shell } from '@dash/Shell';
 import { AreaDefects } from './AreaDefects';
 import { AreaDetail } from './AreaDetail';
 import { JobsFeed } from './JobsFeed';
-import { LaneViewControls, LiveRuns, useLaneView, type LaneView } from './LiveRuns';
+import { LaneViewControls, LiveRuns, useLaneView, type LaneSettings } from './LiveRuns';
 import { Stats } from './Stats';
 import { TopTabs } from './TopTabs';
 import { Treemap } from './Treemap';
@@ -47,7 +47,7 @@ function AreaNote({ map }: { map: SkulkMap | null }) {
   return <>Each area is a directory of at most {partition.maxFiles} source files (<code>{partition.path}</code>).</>;
 }
 
-function Chart({ map, areaUrl, view }: { map: SkulkMap; areaUrl: string; view: LaneView }) {
+function Chart({ map, areaUrl, view }: { map: SkulkMap; areaUrl: string; view: LaneSettings }) {
   const [scene] = useState(createAuditScene);
   const selection = useSelection({ scene, mode: 'single' });
   const [hovered, setHovered] = useState<string | null>(null);
