@@ -6,7 +6,7 @@ import { Shell } from '@dash/Shell';
 import { AreaDefects } from './AreaDefects';
 import { AreaDetail } from './AreaDetail';
 import { JobsFeed } from './JobsFeed';
-import { LiveRuns } from './LiveRuns';
+import { LaneViewControls, LiveRuns, useLaneView, type LaneView } from './LiveRuns';
 import { Stats } from './Stats';
 import { TopTabs } from './TopTabs';
 import { Treemap } from './Treemap';
@@ -46,7 +46,7 @@ function AreaNote({ map }: { map: SkulkMap | null }) {
   return <>Each area is a directory of at most {partition.maxFiles} source files (<code>{partition.path}</code>).</>;
 }
 
-function Chart({ map, areaUrl }: { map: SkulkMap; areaUrl: string }) {
+function Chart({ map, areaUrl, view }: { map: SkulkMap; areaUrl: string; view: LaneView }) {
   const [scene] = useState(createAuditScene);
   const selection = useSelection({ scene, mode: 'single' });
   const [hovered, setHovered] = useState<string | null>(null);
@@ -83,7 +83,7 @@ function Chart({ map, areaUrl }: { map: SkulkMap; areaUrl: string }) {
     <>
       {probes}
       <div className={s.top}>
-        <div className={s.runs}><LiveRuns runs={map.runs} unmerged={unmerged} now={Date.parse(map.generated)} on={on} focus={picked} /></div>
+        <div className={s.runs}><LiveRuns runs={map.runs} unmerged={unmerged} now={Date.parse(map.generated)} on={on} view={view} focus={picked} /></div>
         <ResizeHandle className={s.vseam} value={tabsWidth} min={TABS.min} max={TABS.max} invert onInput={setTabsWidth} onChange={keepTabs} aria-label="Resize the rounds and queue tabs" />
         <TopTabs rounds={map.rounds} area={pickedArea} areas={areas} next={next} onPick={pick} onLight={setLit} />
       </div>
@@ -127,7 +127,8 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
   const [tenant, choose] = useTenantChoice(names);
   const state = useSkulkMap({ url: tenant === null ? null : `${base}${tenantMapPath(tenant)}`, everyMs, dev });
   const map = state.status === 'ready' ? state.map : null;
-  const header = map ? <span className={s.stamp}>{stampOf(map)}</span> : null;
+  const view = useLaneView();
+  const header = map ? <><LaneViewControls view={view} /><span className={s.stamp}>{stampOf(map)}</span></> : null;
   const heading = tenant !== null ? <TenantTitle names={names} current={tenant} onChoose={choose} /> : undefined;
   const noServer = tenants.status === 'no-server' || state.status === 'no-server';
   const failed = tenants.status === 'failed' ? `Couldn't read the tenants: ${tenants.error}`
@@ -147,7 +148,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
         {state.status === 'ready' && tenant !== null && (
           <>
             {state.error && <p className={s.note}>The last refresh failed ({state.error}); showing the map before it.</p>}
-            <Chart key={tenant} map={state.map} areaUrl={`${base}${tenantAreaPath(tenant)}`} />
+            <Chart key={tenant} map={state.map} areaUrl={`${base}${tenantAreaPath(tenant)}`} view={view} />
           </>
         )}
         <p className={s.foot}>

@@ -61,6 +61,31 @@ function useHideComplete(): [boolean, (hide: boolean) => void] {
   return [hide, (next) => { setHide(next); keep(next); }];
 }
 
+/** How every round's lanes are drawn: on the clock or as steps, and whether finished lanes hide. */
+export interface LaneView {
+  readonly mode: LaneMode;
+  readonly hideComplete: boolean;
+  readonly setMode: (mode: LaneMode) => void;
+  readonly setHideComplete: (hide: boolean) => void;
+}
+
+/** The viewer's lane view, kept between visits, for the page to hand every round and its controls. */
+export function useLaneView(): LaneView {
+  const [mode, setMode] = useLaneMode();
+  const [hideComplete, setHideComplete] = useHideComplete();
+  return { mode, hideComplete, setMode, setHideComplete };
+}
+
+/** The lane view's controls, which apply to every round's lanes. */
+export function LaneViewControls({ view }: { view: LaneView }) {
+  return (
+    <div className={s.view}>
+      <Checkbox isSelected={view.hideComplete} onChange={view.setHideComplete}>Hide complete</Checkbox>
+      <SegmentedBar aria-label="Lane view" size="sm" items={MODES} value={view.mode} onChange={(v) => v && view.setMode(v)} />
+    </div>
+  );
+}
+
 const STEPS_WINDOW = { from: 0, to: STEP_COLUMN_COUNT };
 const SHARED_WINDOW = { from: 0, to: 3 };
 
@@ -100,9 +125,8 @@ function Lanes({ run, now, mode, hideComplete, on }: { run: AuditRun; now: numbe
 }
 
 /** One run's strip: what it is doing and what it has spent, its last line, and a lane per area in flight. */
-function RunStrip({ run, now, mode, onMode, hideComplete, onHideComplete, on }: {
-  run: AuditRun; now: number; mode: LaneMode; onMode: (mode: LaneMode) => void;
-  hideComplete: boolean; onHideComplete: (hide: boolean) => void; on: AreaHandlers;
+function RunStrip({ run, now, mode, hideComplete, on }: {
+  run: AuditRun; now: number; mode: LaneMode; hideComplete: boolean; on: AreaHandlers;
 }) {
   return (
     <section className={cx(s.run, !run.running && s.idle)} aria-label={`Round ${run.round}`}>
@@ -112,10 +136,6 @@ function RunStrip({ run, now, mode, onMode, hideComplete, onHideComplete, on }: 
         {run.started && <span className={s.started}>{startedText(run.started, now)}</span>}
       </div>
       <div className={s.line} title={lastLineOf(run)}><InlineMarkdown text={lastLineOf(run)} /></div>
-      <div className={s.view}>
-        <Checkbox isSelected={hideComplete} onChange={onHideComplete}>Hide complete</Checkbox>
-        <SegmentedBar aria-label="Lane view" size="sm" items={MODES} value={mode} onChange={(v) => v && onMode(v)} />
-      </div>
       <div className={s.spend}>{spendOf(run)}</div>
       {run.lanes.length > 0 && (
         <div className={s.lanes} data-mode={mode}>
@@ -138,8 +158,10 @@ function RunStrip({ run, now, mode, onMode, hideComplete, onHideComplete, on }: 
 
 /** A strip for every run still running, and for every finished one whose batch has not merged; a merged round lives on
  *  in the rounds chart and the map. */
-export function LiveRuns({ runs, unmerged, now, on, focus = null }: {
+export function LiveRuns({ runs, unmerged, now, on, view, focus = null }: {
   runs: readonly AuditRun[]; unmerged: ReadonlySet<number>; now: number; on: AreaHandlers;
+  /** How every round's lanes are drawn; the page holds it, and its controls, so one setting covers them all. */
+  view: LaneView;
   /** The area picked elsewhere on the page: its lane, where one shows, is brought into view. */
   focus?: string | null;
 }) {
@@ -148,13 +170,11 @@ export function LiveRuns({ runs, unmerged, now, on, focus = null }: {
     if (!focus) return;
     root.current?.querySelector(`[data-lane="${CSS.escape(focus)}"]`)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   }, [focus]);
-  const [mode, setMode] = useLaneMode();
-  const [hideComplete, setHideComplete] = useHideComplete();
   const live = runs.filter((r) => r.running || unmerged.has(r.round));
   if (live.length === 0) return <section className={cx(s.run, s.idle)}><div className={s.what}>No round running</div></section>;
   return (
     <div ref={root} className={s.runs} aria-live="polite">
-      {live.map((run) => <RunStrip key={run.round} run={run} now={now} mode={mode} onMode={setMode} hideComplete={hideComplete} onHideComplete={setHideComplete} on={on} />)}
+      {live.map((run) => <RunStrip key={run.round} run={run} now={now} mode={view.mode} hideComplete={view.hideComplete} on={on} />)}
     </div>
   );
 }
