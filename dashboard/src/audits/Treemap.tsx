@@ -114,7 +114,8 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
           in a live run:
           <span className={s.phaseRamp}>
             <i className={s.phaseBar} />
-            <span className={s.phaseNames}>{SWEEP.map((p) => <span key={p}>{PHASE_LABEL[p]}</span>)}</span>
+            {/* Every step keeps its place under the ramp; the one between review and match goes uncaptioned. */}
+            <span className={s.phaseNames}>{SWEEP.map((p) => <span key={p}>{p === 'reviewed' ? '' : PHASE_LABEL[p]}</span>)}</span>
           </span>
           {OFF_PIPELINE.map((p) => <span key={p} className={phaseClass(p)}><i className={`${s.key} ${s.live}`} />{PHASE_LABEL[p]}</span>)}
         </span>
