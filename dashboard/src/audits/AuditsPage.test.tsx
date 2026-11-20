@@ -31,6 +31,12 @@ afterEach(() => {
 });
 
 describe('AuditsPage', () => {
+  it('says in the lanes header when rounds run continuously, and what the night has left', async () => {
+    serve(200, { ...fixture, continuous: { until: '2026-11-17T12:00:00.000Z', next: 'round 41 is in its model steps', nightUsd: 200, spentUsd: 62, leftUsd: 138 } });
+    renderPage();
+    expect(await screen.findByText('continuous · $138 of $200 left tonight')).toHaveAttribute('title', 'round 41 is in its model steps');
+  });
+
   it('shows every run, the stats, the queue and the jobs from the map', async () => {
     const fetch = serve(200, fixture);
     renderPage();

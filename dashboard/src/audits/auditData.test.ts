@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { heatScaleOf, labelIn, nextUpOf, runHolding, staleFadeOf, statsFor, toneOf, wrapAtDots } from './areaData';
-import { headlineOf, parseJob, recentJobsOf, spendOf, stepText } from './runData';
-import { inSharedSteps, leadsWithNode, sharedSpansOf } from './phases';
+import { continuousText, headlineOf, parseJob, recentJobsOf, spendOf, stepText } from './runData';
+import { inSharedSteps, leadsWithNode, sharedSpansOf, stageCountsOf } from './phases';
 import { ticksFor } from './RoundsChart';
 import { layoutMap, squarify } from './mapLayout';
 import { areaTree, leavesOf, type AreaTreeNode } from './areaTree';
@@ -52,9 +52,20 @@ describe('lanes', () => {
     expect(again.map((s) => [s.id, s.state, s.fill])).toEqual([['batch', 'done', 1], ['fleet-tests', 'active', 0.25], ['fleet-build', 'done', 1]]);
   });
 
+  it('counts a round\'s areas done and in each stage', () => {
+    const c = stageCountsOf(live.lanes);
+    expect(c.total).toBe(live.lanes.length);
+    expect(c.done + c.stages.reduce((n, st) => n + st.n, 0)).toBe(c.total);
+    expect(stageCountsOf([])).toEqual({ done: 0, total: 0, stages: [] });
+  });
+
   it('heads each run with its round, step and spend', () => {
     expect(headlineOf(live)).toBe('Round 41 running · fix · 2 areas');
     expect(headlineOf(finished)).toBe('Round 40 finished · 8 areas merged');
+    expect(headlineOf({ ...live, step: 'fleet-wait', behind: 'weasel round 40' })).toBe('Round 41 running · waiting for the fleet, behind weasel round 40 · 2 areas');
+    expect(headlineOf({ ...live, step: 'merge-wait' })).toBe('Round 41 running · waiting to merge · 2 areas');
+    expect(continuousText(undefined)).toBeNull();
+    expect(continuousText({ until: '', next: 'starts now', nightUsd: 200, spentUsd: 57.4, leftUsd: 142.6 })).toBe('continuous · $143 of $200 left tonight');
     expect(spendOf(live)).toBe('$12.50 of $80');
     expect(spendOf({ ...live, capUsd: null })).toBe('$12.50');
   });

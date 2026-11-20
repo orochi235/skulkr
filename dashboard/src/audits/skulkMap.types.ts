@@ -85,6 +85,8 @@ export interface AuditRun {
   readonly started?: string;
   readonly ended: string | null;
   readonly step: string;
+  /** What a run waiting for the merge lock or the fleet waits behind: `round 51`, `weasel round 51`. */
+  readonly behind?: string;
   readonly costUsd: number;
   readonly capUsd: number | null;
   readonly report: string | null;
@@ -122,6 +124,15 @@ export interface AuditPartition {
   readonly maxFiles: number;
 }
 
+export interface AuditContinuous {
+  readonly until: string;
+  /** `starts now`, or why the next round has not started. */
+  readonly next: string;
+  readonly nightUsd: number;
+  readonly spentUsd: number;
+  readonly leftUsd: number;
+}
+
 export interface SkulkMap {
   readonly generated: string;
   readonly head: string;
@@ -132,6 +143,8 @@ export interface SkulkMap {
   readonly partition?: AuditPartition;
   /** How many areas a round takes unless told otherwise. */
   readonly areasPerRound?: number;
+  /** Continuous mode, while it is on: until when, what the next round waits on, and the night's spend. */
+  readonly continuous?: AuditContinuous;
   readonly runs: readonly AuditRun[];
   readonly areas: readonly AuditArea[];
   readonly rounds: readonly AuditRound[];

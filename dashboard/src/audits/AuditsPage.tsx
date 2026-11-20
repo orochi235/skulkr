@@ -13,6 +13,7 @@ import { Treemap } from './Treemap';
 import { NEXT_UP_ROUNDS, nextUpOf, runHolding, statsFor } from './areaData';
 import { createAuditScene } from './auditScene';
 import { liveEstimatesOf, phasesOf, withLivePasses } from './phases';
+import { continuousText } from './runData';
 import { useAuditPalette } from './useAuditPalette';
 import { useSkulkMap } from './useSkulkMap';
 import { TENANTS_PATH, tenantAreaPath, tenantMapPath } from '@shared/routes';
@@ -128,7 +129,14 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
   const state = useSkulkMap({ url: tenant === null ? null : `${base}${tenantMapPath(tenant)}`, everyMs, dev });
   const map = state.status === 'ready' ? state.map : null;
   const view = useLaneView();
-  const header = map ? <><LaneViewControls view={view} /><span className={s.stamp}>{stampOf(map)}</span></> : null;
+  const continuous = continuousText(map?.continuous);
+  const header = map ? (
+    <>
+      <LaneViewControls view={view} />
+      {continuous && <span className={s.continuous} title={map.continuous?.next}>{continuous}</span>}
+      <span className={s.stamp}>{stampOf(map)}</span>
+    </>
+  ) : null;
   const heading = tenant !== null ? <TenantTitle names={names} current={tenant} onChoose={choose} /> : undefined;
   const noServer = tenants.status === 'no-server' || state.status === 'no-server';
   const failed = tenants.status === 'failed' ? `Couldn't read the tenants: ${tenants.error}`

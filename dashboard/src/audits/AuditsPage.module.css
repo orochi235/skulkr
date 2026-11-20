@@ -16,6 +16,12 @@
   color: var(--audit-muted);
 }
 
+.continuous {
+  composes: numeric from '@weasel-js/theme/numeric.module.css';
+  font-size: var(--wzl-font-size-sm);
+  color: var(--audit-live);
+}
+
 .root > * { flex: none; }
 
 .main {

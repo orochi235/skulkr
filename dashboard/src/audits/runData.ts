@@ -1,5 +1,5 @@
 /** What the audit page says about runs: each one's headline, its lanes, and the jobs its log reports. */
-import type { AuditRun, LaneStep, LaneStepName } from './skulkMap.types';
+import type { AuditContinuous, AuditRun, LaneStep, LaneStepName } from './skulkMap.types';
 
 /**
  * `m` minutes as a lane says them, `<1 min`, `8.2 min` or `12 min`, a tenth shown under ten. Spelled out: the lanes
@@ -31,8 +31,14 @@ export function stepText(step: LaneStepName, s: LaneStep, now: number): string {
   return `${s.commits ?? 0} applied`;
 }
 
+/** What a running round's headline calls a step where it waits its turn. */
+const WAITS: Readonly<Record<string, string>> = { 'merge-wait': 'waiting to merge', 'fleet-wait': 'waiting for the fleet' };
+
 export function headlineOf(run: AuditRun): string {
-  if (run.running) return `Round ${run.round} running · ${run.step} · ${plural(run.areas.length, 'area')}`;
+  if (run.running) {
+    const step = WAITS[run.step] ? `${WAITS[run.step]}${run.behind ? `, behind ${run.behind}` : ''}` : run.step;
+    return `Round ${run.round} running · ${step} · ${plural(run.areas.length, 'area')}`;
+  }
   const summary = run.report?.split(';')[0];
   return summary ? `Round ${run.round} finished · ${summary}` : `Round ${run.round} finished`;
 }
@@ -43,6 +49,12 @@ export function startedText(iso: string, now: number): string {
   const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   if (at.toDateString() === new Date(now).toDateString()) return `started ${time}`;
   return `started ${at.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
+}
+
+/** The lanes header's word on continuous mode: on, and the night's budget left; null while it is off. */
+export function continuousText(continuous: AuditContinuous | undefined): string | null {
+  if (!continuous) return null;
+  return `continuous · $${Math.round(continuous.leftUsd)} of $${Math.round(continuous.nightUsd)} left tonight`;
 }
 
 export function spendOf(run: AuditRun): string {
