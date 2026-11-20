@@ -148,7 +148,11 @@ export const runGate = (cfg, { root, batch, logPath }) =>
 
 /** Merges `main` into the batch checked out at `tree` unless it already holds it. Answers whether it moved, the new tip, or a conflict.
  *  A conflict only in `ledger` (the config's `record.ledger`, which every round appends a row to) is two rounds' rows
- *  at one spot: it takes main's copy and appends the batch's own rows to it again. */
+ *  at one spot: it takes main's copy and appends the batch's own rows to it again.
+ * @param {string} tree
+ * @param {string} [main]
+ * @param {{ path: string, section?: string } | null} [ledger]
+ */
 export const catchUpWithMain = (tree, main = 'main', ledger = null) => {
   const git = gitIn(tree);
   if (tryGit(git, 'merge-base', '--is-ancestor', main, 'HEAD').ok) return { moved: false };
