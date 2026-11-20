@@ -62,7 +62,8 @@ export default {
   },
 
   // `test:batch` checks the ref out into a throwaway worktree itself, so it runs from the main checkout.
-  gate: { name: 'test:batch', command: ['npm', 'run', 'test:batch', '--', '{ref}'], cwd: 'root' },
+  // Its two parallel runs: the tests, with unprefixed progress lines, and test:fleet:postbuild, prefixed `postbuild| `.
+  gate: { name: 'test:batch', command: ['npm', 'run', 'test:batch', '--', '{ref}'], cwd: 'root', progress: { tests: '', build: 'postbuild\\| ' } },
 
   setup: {
     prelude: NVM,

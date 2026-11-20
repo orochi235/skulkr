@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { nightLanes, nightRoundOf, nightStages, nightsOf, readRuns, withPasses } from './map.mjs';
+import { fleetProgressOf, nightLanes, nightRoundOf, nightStages, nightsOf, readRuns, withPasses } from './map.mjs';
+import { weaselConfig } from '../test/weaselConfig.ts';
 import { claimRound, writeStatus, writeSummary } from './runs.mjs';
 
 const dirs: string[] = [];
@@ -127,6 +128,7 @@ describe('nightRoundOf', () => {
     expect(bar!.est).toBeCloseTo(5 + 3);
     expect(nightRoundOf({ round: 41, running: false, nightDir })?.pending).toBe('unmerged');
     expect(nightRoundOf({ round: 40, running: false, nightDir: null })).toBeNull();
+    expect(nightRoundOf({ round: 43, running: true, started: '2026-11-20T03:23:24Z', nightDir: null })).toMatchObject({ round: 43, areas: 0, distinct: 0, pending: 'live' });
   });
 });
 
@@ -160,5 +162,17 @@ describe('readRuns', () => {
     expect(runs[1].lines).toEqual(['patch b: 1 commits on audit42-b']);
     expect(runs[2].lanes).toEqual([{ id: 'old', steps: expect.objectContaining({ A: { state: 'waiting' } }) }]);
     expect(runs[2].nightDir).toBe(join(state, 'nights', 'r40'));
+  });
+});
+
+describe('fleetProgressOf', () => {
+  it('reads each gate run\'s last progress line from the gate log, by its prefix', () => {
+    const night = mkdtempSync(join(tmpdir(), 'skulk-map-'));
+    dirs.push(night);
+    const gate = weaselConfig().gate;
+    expect(fleetProgressOf(night, gate)).toBeNull();
+    writeFileSync(join(night, 'batch-2026-11-20-audit50.test-batch.log'),
+      'onto: progress 3/90\npostbuild| onto: progress 1/4\n\x1b[2monto: progress 7/90\x1b[0m\n');
+    expect(fleetProgressOf(night, gate)).toEqual({ tests: { done: 7, total: 90 }, build: { done: 1, total: 4 } });
   });
 });

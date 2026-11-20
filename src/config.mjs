@@ -82,8 +82,12 @@ export const DEFAULTS = {
   /** Brief templates, paths relative to the config file; unset uses the shipped default. */
   briefs: { reviewer: undefined, matcher: undefined, fixer: undefined },
 
-  /** How a batch is tested. `{ref}` in the command is the batch branch; `cwd` is `root` or `batch` (its worktree). */
-  gate: { name: 'gate', command: ['npm', 'test'], cwd: 'batch' },
+  /**
+   * How a batch is tested. `{ref}` in the command is the batch branch; `cwd` is `root` or `batch` (its worktree).
+   * `progress` names the gate's parallel runs by the prefix their `onto: progress N/M` lines carry in its log
+   * (a regex source; '' for unprefixed lines), for the dashboard.
+   */
+  gate: { name: 'gate', command: ['npm', 'test'], cwd: 'batch', progress: { tests: '' } },
 
   /** How the fixer readies a node tree: a shell line before every job, and an install when the lockfile changes. */
   setup: {
@@ -186,6 +190,7 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
     /** The repository paths a finding's `where` line cites. */
     citedRe: tops.length ? new RegExp(`((?:${tops.map(escape).join('|')})\\/[\\w./@-]+\\.\\w+)`, 'g') : /([\w@-][\w.@-]*\/[\w./@-]+\.\w+)/g,
     briefPath,
+    gate: { ...c.gate, logSuffix: `.${c.gate.name.replace(/[^\w.-]+/g, '-')}.log` },
     names: {
       area: (round, area) => `${prefix}${round}-${area}`,
       batch: (date, round) => `${batchPrefix}/${date}-${prefix}${round}`,

@@ -122,10 +122,40 @@ const fixReports = (nightDir, ids) => new Map(nightDir ? ids.flatMap((id) => {
 }) : []);
 
 /**
- * What one run, live (`running`) or finished, says about its areas; `jobs` are the runner's jobs, running and
- * finished; `sweepId` the config's sweep, whose running job marks `sweepRunning`.
+ * How far each of the batch gate's parallel runs has got, from the last progress line each wrote to the gate's log in
+ * `nightDir` (`gate`, the config's: its `logSuffix` and `progress` prefixes): `{ <run>: { done, total } | null }`, or
+ * null before the gate has a log.
  */
-export const readRun = (found, running, jobs = [], state, { names = NAMES, sweepId } = {}) => {
+export const fleetProgressOf = (nightDir, gate) => {
+  const file = nightDir ? readdirSafe(nightDir).find((f) => f.endsWith(gate.logSuffix)) : undefined;
+  if (!file) return null;
+  const lines = readFileSync(join(nightDir, file), 'utf8').replace(/\x1b\[[0-9;]*m/g, '').split('\n');
+  const last = (prefix) => {
+    const progress = new RegExp(`^${prefix}onto: progress (\\d+)\\/(\\d+)`);
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const m = progress.exec(lines[i]);
+      if (m) return { done: Number(m[1]), total: Number(m[2]) };
+    }
+    return null;
+  };
+  return Object.fromEntries(Object.entries(gate.progress ?? {}).map(([run, prefix]) => [run, last(prefix)]));
+};
+
+const readdirSafe = (dir) => {
+  try {
+    return readdirSync(dir);
+  } catch {
+    return [];
+  }
+};
+
+const DEFAULT_GATE = resolveConfig().gate;
+
+/**
+ * What one run, live (`running`) or finished, says about its areas; `jobs` are the runner's jobs, running and
+ * finished; `sweepId` the config's sweep, whose running job marks `sweepRunning`; `gate` the config's, for `fleet`.
+ */
+export const readRun = (found, running, jobs = [], state, { names = NAMES, sweepId, gate = DEFAULT_GATE } = {}) => {
   const run = { ...found, nightDir: nightDirOf(found, state) };
   const logPath = run.nightDir ? join(run.nightDir, 'night.log') : null;
   const log = logPath && existsSync(logPath) ? readFileSync(logPath, 'utf8') : '';
@@ -149,6 +179,7 @@ export const readRun = (found, running, jobs = [], state, { names = NAMES, sweep
     nightDir: run.nightDir ?? null,
     lastLine: lines.at(-1) ?? null,
     lines: lines.slice(-40),
+    fleet: running ? fleetProgressOf(run.nightDir, gate) : null,
   };
 };
 
@@ -156,7 +187,7 @@ export const readRun = (found, running, jobs = [], state, { names = NAMES, sweep
  * Every live run, then the one that finished last. `jobs` are the runner's jobs, or `listJobs(sinceIso)` is asked
  * for them (the runner's `jobs`); `opts` is `readRun`'s.
  */
-/** @param {string} state @param {any[] | null} [jobs] @param {{ listJobs?: (since: string) => any[], names?: any, sweepId?: string }} [opts] */
+/** @param {string} state @param {any[] | null} [jobs] @param {{ listJobs?: (since: string) => any[], names?: any, sweepId?: string, gate?: any }} [opts] */
 export const readRuns = (state, jobs = null, { listJobs = () => [], ...opts } = {}) => {
   const legacy = !existsSync(join(state, 'runs'));
   const current = legacy ? readJson(join(state, 'current.json')) : null;
@@ -193,7 +224,8 @@ export const nightResults = (nightDir) => {
  *  run that has finished no area. */
 export const nightRoundOf = (run) => {
   const results = nightResults(run.nightDir);
-  if (results.length === 0) return null;
+  // A live round has a bar from its start, empty until its first area reports; a finished one with no results has none.
+  if (results.length === 0 && !run.running) return null;
   const sum = (key) => results.reduce((n, r) => n + r[key], 0);
   return {
     round: run.round, date: (run.started ?? '').slice(0, 10), areas: results.length,
@@ -230,11 +262,12 @@ export const buildMap = (cfg, root, runner) => {
   const areas = partitionAt(cfg, root, 'HEAD');
   const passes = readPasses(root, cfg.record.dir);
   const { picked, settled } = pickAreas({ areas, passes, touched: gitTouched(git), count: Infinity });
-  const queue = new Map(picked.map((id, i) => [id, i + 1]));
   const settledSet = new Set(settled);
-  const runs = readRuns(cfg.state, null, { listJobs: (since) => runner.jobs(since), names: cfg.names, sweepId: cfg.sweep?.id });
+  const runs = readRuns(cfg.state, null, { listJobs: (since) => runner.jobs(since), names: cfg.names, sweepId: cfg.sweep?.id, gate: cfg.gate });
   /** The live run holding each area. */
   const holder = new Map(runs.filter((r) => r.running).flatMap((r) => r.areas.map((id) => [id, r])));
+  // A live run's areas are being audited, not waiting, so the queue counts from 1 past them.
+  const queue = new Map(picked.filter((id) => !holder.has(id)).map((id, i) => [id, i + 1]));
 
   const out = areas.map((area) => {
     const history = (passes.get(area.id) ?? []).map((p) => passOf(p.round, p.date, p.a, p.b, p.m, p.distinct));
@@ -275,6 +308,7 @@ export const buildMap = (cfg, root, runner) => {
     branch: git('rev-parse', '--abbrev-ref', 'HEAD'),
     partition: { path: cfg.partition.path, maxFiles: cfg.partition.maxFiles },
     head,
+    areasPerRound: cfg.areasPerRound,
     runs,
     areas: out,
     rounds: [...rounds.values()].sort((x, y) => x.round - y.round).map((r) => ({ ...r, est: Math.round(r.est) })),

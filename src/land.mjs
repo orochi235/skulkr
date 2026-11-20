@@ -69,7 +69,7 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip }) => {
   if (merge && catchUp().conflict) return { report: `untested: merging ${main} into the batch conflicts: ${kept}` };
   for (let pass = 1; ; pass++) {
     const suffix = pass === 1 ? '' : `.${pass}`;
-    const log = join(nightDir, `${logName}${suffix}.${gate.replace(/[^\w.-]+/g, '-')}.log`);
+    const log = join(nightDir, `${logName}${suffix}${cfg.gate.logSuffix}`);
     const status = await runGate(cfg, { root, batch, logPath: log });
     say(`gate: ${gate} ${status === 0 ? 'passed' : `failed (${status}); its log is ${log}`}`);
     if (status !== 0) return { report: `red: ${batch.name} and its branches kept; worktree ${batch.tree}; logs in ${nightDir}` };
