@@ -8,8 +8,9 @@ import { join } from 'node:path';
 import { gitIn } from './batch.mjs';
 import { resolveConfig } from './config.mjs';
 import { fixTallyOf } from './findings.mjs';
+import { fleetOf } from './gate.mjs';
 import { partitionAt } from './partition.mjs';
-import { chapman, gitTouched, pickAreas, readPasses } from './rounds.mjs';
+import { COVERED, areaStats, chapman, gitTouched, pickAreas, readPasses } from './rounds.mjs';
 import { lastFinished, liveRuns, readJson } from './runs.mjs';
 import { parseEnvelope } from './usage.mjs';
 
@@ -123,101 +124,7 @@ const fixReports = (nightDir, ids) => new Map(nightDir ? ids.flatMap((id) => {
   return existsSync(file) ? [[id, parseEnvelope(readFileSync(file, 'utf8')).reply]] : [];
 }) : []);
 
-/**
- * How far each of the batch gate's parallel runs has got, from the last progress line each wrote to the gate's log in
- * `nightDir` (`gate`, the config's: its `logSuffix` and `progress` prefixes): `{ <run>: { done, total } | null }`, or
- * null before the gate has a log.
- */
-export const fleetProgressOf = (nightDir, gate) => {
-  const file = nightDir ? readdirSafe(nightDir).find((f) => f.endsWith(gate.logSuffix)) : undefined;
-  if (!file) return null;
-  const lines = readFileSync(join(nightDir, file), 'utf8').replace(/\x1b\[[0-9;]*m/g, '').split('\n');
-  const last = (prefix) => {
-    const progress = new RegExp(`^${prefix}onto: progress (\\d+)\\/(\\d+)`);
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const m = progress.exec(lines[i]);
-      if (m) return { done: Number(m[1]), total: Number(m[2]) };
-    }
-    return null;
-  };
-  return Object.fromEntries(Object.entries(gate.progress ?? {}).map(([run, prefix]) => [run, last(prefix)]));
-};
-
-const readdirSafe = (dir) => {
-  try {
-    return readdirSync(dir);
-  } catch {
-    return [];
-  }
-};
-
-/**
- * How each of a finished batch's gate runs ended: `{ <run>: 'passed' | 'failed' | null }`. A run the config's
- * `gate.outcome` names is read from the last `<name> passed|failed` in the gate's log; any other from the night log's
- * `gate: <gate name> passed|failed` line, the gate as a whole. Null where neither says.
- */
-export const gateOutcomesOf = (nightDir, gate) => {
-  const file = nightDir ? readdirSafe(nightDir).find((f) => f.endsWith(gate.logSuffix)) : undefined;
-  const text = file ? readFileSync(join(nightDir, file), 'utf8').replace(/\x1b\[[0-9;]*m/g, '') : '';
-  const lastIn = (body, name) => {
-    const m = [...body.matchAll(new RegExp(`\\b${escapeRe(name)} (passed|failed)\\b`, 'g'))].at(-1);
-    return m ? m[1] : null;
-  };
-  const nightLog = nightDir && existsSync(join(nightDir, 'night.log')) ? readFileSync(join(nightDir, 'night.log'), 'utf8') : '';
-  const whole = () => lastIn(nightLog.split('\n').filter((l) => l.startsWith('gate: ')).join('\n'), gate.name);
-  return Object.fromEntries(Object.keys(gate.progress ?? {}).map((run) => [run, gate.outcome?.[run] ? lastIn(text, gate.outcome[run]) : whole()]));
-};
-
-const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-/**
- * Each gate run's running jobs of round `round`'s batch, by run: a run whose `gate.jobs` pattern matches a job's
- * task takes it, and a run with no pattern takes the jobs no other run's pattern matches.
- */
-const gateJobsOf = (round, jobs, gate, names) => {
-  const own = jobs.filter((j) => !j.finished && names.batchJobOf(round).test(j.task ?? ''));
-  const runs = Object.keys(gate.progress ?? {});
-  const patterns = Object.fromEntries(runs.filter((r) => gate.jobs?.[r]).map((r) => [r, new RegExp(gate.jobs[r])]));
-  const claimed = (j) => Object.values(patterns).some((re) => re.test(j.task));
-  return Object.fromEntries(runs.map((r) => [r, own.filter((j) => (patterns[r] ? patterns[r].test(j.task) : !claimed(j)))]));
-};
-
-/** The nodes running each of a round's gate runs now, `{ <run>: nodes joined | null }`. */
-export const gateNodesOf = (round, jobs, gate, names = NAMES) => {
-  const names_ = (js) => [...new Set(js.map((j) => j.node).filter(Boolean))].join(' + ') || null;
-  return Object.fromEntries(Object.entries(gateJobsOf(round, jobs, gate, names)).map(([r, js]) => [r, names_(js)]));
-};
-
-/**
- * A finished round's batch run again: each gate run's jobs running now, `{ <run>: { done, total } }` summing their
- * progress, null before any reports, or undefined where none runs; null when no job of the round's batch runs.
- */
-export const rerunOf = (round, jobs, gate, names = NAMES) => {
-  const by = gateJobsOf(round, jobs, gate, names);
-  if (!Object.values(by).some((js) => js.length)) return null;
-  const sum = (js) => {
-    if (!js.length) return undefined;
-    const counted = js.filter((j) => j.progress);
-    return counted.length ? counted.reduce((t, j) => ({ done: t.done + j.progress.done, total: t.total + j.progress.total }), { done: 0, total: 0 }) : null;
-  };
-  return Object.fromEntries(Object.entries(by).map(([r, js]) => [r, sum(js)]));
-};
-
-/** A run's gate runs: `fleet`, how far each has got while it runs; `gates`, each one's state ('running', 'passed',
- *  'failed', or null before it starts); and the nodes running them. A finished round whose batch runs again reads as running. */
-const fleetOf = (run, running, jobs, gate, names) => {
-  if (running) return { fleet: fleetProgressOf(run.nightDir, gate), gates: null, rerun: false, gateNodes: gateNodesOf(run.round, jobs, gate, names) };
-  const again = rerunOf(run.round, jobs, gate, names);
-  const ended = gateOutcomesOf(run.nightDir, gate);
-  if (!again) return { fleet: null, gates: ended, rerun: false, gateNodes: null };
-  const each = (f) => Object.fromEntries(Object.keys(again).map((r) => [r, f(r)]));
-  return {
-    fleet: each((r) => again[r] ?? null),
-    gates: each((r) => (again[r] !== undefined ? 'running' : ended[r] ?? null)),
-    rerun: true,
-    gateNodes: gateNodesOf(run.round, jobs, gate, names),
-  };
-};
+export { fleetProgressOf, gateNodesOf, gateOutcomesOf, rerunOf } from './gate.mjs';
 
 const DEFAULT_GATE = resolveConfig().gate;
 
@@ -323,10 +230,17 @@ export const nightsOf = (runs, state) => {
   return [...latest.values()];
 };
 
-/** A pass as the map draws it: the reviews' counts, Chapman's estimate of what the area held, and what is left. */
-const passOf = (round, date, a, b, shared, distinct) => {
+/**
+ * A pass as the map draws it: the reviews' counts, Chapman's estimate of what the area held, and what is left, the
+ * last two scaled by `share`, the part of the pass's files the area holds (marked when under 1).
+ */
+const passOf = (round, date, a, b, shared, distinct, share = 1) => {
   const est = chapman(a, b, shared);
-  return { round, date, a, b, shared, distinct, est: Math.round(est * 10) / 10, left: Math.max(0, Math.round((est - distinct) * 10) / 10) };
+  const r = (n) => Math.round(n * 10) / 10;
+  return {
+    round, date, a, b, shared, distinct, est: r(est * share), left: Math.max(0, r((est - distinct) * share)),
+    ...(share < 1 ? { share: Math.round(share * 1000) / 1000 } : {}),
+  };
 };
 
 /** The whole map for the project at `root` under `cfg`, its runs' jobs asked of `runner`. */
@@ -334,8 +248,8 @@ export const buildMap = (cfg, root, runner) => {
   const git = gitIn(root);
   const head = git('rev-parse', '--short', 'HEAD');
   const areas = partitionAt(cfg, root, 'HEAD');
-  const passes = readPasses(root, cfg.record.dir);
-  const { picked, settled } = pickAreas({ areas, passes, touched: gitTouched(git), count: Infinity });
+  const { history: passes, covered, staleLines } = areaStats(cfg, git, areas, readPasses(root, cfg.record.dir), root);
+  const { picked, settled } = pickAreas({ areas, passes, covered, staleLines, touched: gitTouched(git), count: Infinity });
   const settledSet = new Set(settled);
   const runs = readRuns(cfg.state, null, { listJobs: (since) => runner.jobs(since), listProgress: () => runner.progress?.() ?? new Map(), names: cfg.names, sweepId: cfg.sweep?.id, gate: cfg.gate });
   /** The live run holding each area. */
@@ -344,9 +258,12 @@ export const buildMap = (cfg, root, runner) => {
   const queue = new Map(picked.filter((id) => !holder.has(id)).map((id, i) => [id, i + 1]));
 
   const out = areas.map((area) => {
-    const history = (passes.get(area.id) ?? []).map((p) => passOf(p.round, p.date, p.a, p.b, p.m, p.distinct));
+    const own = passes.get(area.id) ?? [];
+    const history = own.map((p) => passOf(p.round, p.date, p.a, p.b, p.m, p.distinct, p.share));
     const run = holder.get(area.id);
-    const status = run ? 'tonight' : settledSet.has(area.id) ? 'settled' : history.length ? 'due' : 'unaudited';
+    const audited = history.length > 0 && (covered.get(area.id) ?? 1) >= COVERED;
+    const status = run ? 'tonight' : settledSet.has(area.id) ? 'settled' : audited ? 'due' : 'unaudited';
+    const stale = history.length ? staleLines.get(area.id) ?? 0 : 0;
     return {
       id: area.id,
       group: area.id.split('.')[0],
@@ -355,19 +272,29 @@ export const buildMap = (cfg, root, runner) => {
       queue: queue.get(area.id) ?? null,
       passes: history,
       stage: run ? run.stages[area.id] ?? 'queued' : null,
+      ...(stale ? { staleLines: stale } : {}),
+      _raw: own,
     };
   });
 
+  // Each round's passes count once, as recorded, however many areas share one; their estimates by the shares inherited.
   const rounds = new Map();
+  const counted = new Set();
   for (const a of out) {
-    for (const p of a.passes) {
+    a._raw.forEach((raw, i) => {
+      const p = a.passes[i];
       const r = rounds.get(p.round) ?? { round: p.round, date: p.date, areas: 0, files: 0, distinct: 0, est: 0 };
-      r.areas += 1;
-      r.files += a.files;
-      r.distinct += p.distinct;
+      const key = `${raw.round}\n${raw.id}`;
+      if (!counted.has(key)) {
+        counted.add(key);
+        r.areas += 1;
+        r.files += raw.files?.length ?? a.files;
+        r.distinct += p.distinct;
+      }
       r.est += p.est;
       rounds.set(p.round, r);
-    }
+    });
+    delete a._raw;
   }
 
   // A round whose record is not on this branch yet is drawn from its night directory, marked as such.

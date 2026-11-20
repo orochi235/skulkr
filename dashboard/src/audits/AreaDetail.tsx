@@ -17,9 +17,9 @@ function Passes({ area }: { area: AuditArea }) {
         <tr><th>round</th><th className={s.vennCell}><Venn a="A" both={<abbr title="found by both">∩</abbr>} b="B" /></th><th>found</th><th>est.</th><th>left</th></tr>
       </thead>
       <tbody>
-        {area.passes.map((p) => (
-          <tr key={p.round}>
-            <td>{p.round}</td><td className={s.vennCell}><Venn a={p.a - p.shared} both={p.shared} b={p.b - p.shared} /></td><td>{p.distinct}</td>
+        {area.passes.map((p, i) => (
+          <tr key={`${p.round}-${i}`}>
+            <td>{p.round}{p.share !== undefined && <abbr className={s.share} title="the part of that pass's files this area holds; est. and left are scaled by it"> {Math.round(p.share * 100)}%</abbr>}</td><td className={s.vennCell}><Venn a={p.a - p.shared} both={p.shared} b={p.b - p.shared} /></td><td>{p.distinct}</td>
             <td>{p.est.toFixed(1)}</td><td>{p.left.toFixed(1)}</td>
           </tr>
         ))}
@@ -56,6 +56,7 @@ export function AreaDetail({ area, holder }: { area: AuditArea | undefined; hold
             {area.queue !== null && <DetailRow label="queue position">{area.queue}</DetailRow>}
             {area.stage && <DetailRow label="this run">{stageLabelOf(area.stage)}</DetailRow>}
             {last && <DetailRow label={`left after round ${last.round}`}>{last.left.toFixed(1)}</DetailRow>}
+            {area.staleLines ? <DetailRow label="lines changed since">{area.staleLines.toLocaleString()}</DetailRow> : null}
           </DetailList>
           <Passes area={area} />
         </div>

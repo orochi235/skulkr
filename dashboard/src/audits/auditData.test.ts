@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { heatScaleOf, labelIn, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
+import { heatScaleOf, labelIn, nextUpOf, runHolding, staleFadeOf, statsFor, toneOf, wrapAtDots } from './areaData';
 import { headlineOf, parseJob, recentJobsOf, spendOf, stepText } from './runData';
 import { inSharedSteps, leadsWithNode, sharedSpansOf } from './phases';
 import { ticksFor } from './RoundsChart';
@@ -144,6 +144,24 @@ describe('areas', () => {
       { value: '≈13', label: 'estimated still in audited areas' },
       { value: '1', label: 'areas settled' },
     ]);
+  });
+
+  it('says how much of what is left rests on areas changed since their pass, and counts a shared pass once', () => {
+    const due = map.areas.find((a) => a.status === 'due' && a.passes.length)!;
+    const stale = map.areas.map((a) => (a.id === due.id ? { ...a, staleLines: 120 } : a));
+    expect(statsFor(stale)[3]!.label).toBe(`estimated still in audited areas, ≈${Math.round(due.passes.at(-1)!.left)} of it in areas changed since`);
+    const half = { ...due, passes: [{ ...due.passes[0]!, distinct: 4, share: 0.5 }] };
+    const split = [half, { ...half, id: 'other' }];
+    expect(statsFor(split)[2]!.value).toBe('4');
+    // An area holding too little of the passes it inherited is still unaudited.
+    expect(toneOf({ ...due, status: 'unaudited' })).toBe('unaudited');
+  });
+
+  it('fades a changed area more the more lines changed, never past 0.6', () => {
+    expect(staleFadeOf(undefined)).toBe(0);
+    expect(staleFadeOf(10)).toBeCloseTo(0.3);
+    expect(staleFadeOf(1000)).toBeCloseTo(0.5);
+    expect(staleFadeOf(1e9)).toBe(0.6);
   });
 
   it('queues by place, leaving out areas a live run holds', () => {

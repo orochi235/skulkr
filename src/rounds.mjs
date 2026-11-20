@@ -4,6 +4,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { churnCacheOf, churnSince } from './churn.mjs';
 
 /** A pass that found at most this many distinct defects counts toward settling its area. */
 export const QUIET_PASS = 1;
@@ -23,6 +24,8 @@ export const readPasses = (root, recordDir) => {
       const at = join(roundDir, area.name, 'area.json');
       if (!area.isDirectory() || !existsSync(at)) continue;
       const pass = { round, ...JSON.parse(readFileSync(at, 'utf8')) };
+      const listed = join(roundDir, area.name, 'files.txt');
+      if (!Array.isArray(pass.files) && existsSync(listed)) pass.files = readFileSync(listed, 'utf8').split('\n').filter(Boolean);
       // A pass a reviewer never ran or never finished is no pass: the area comes back as if it had not been audited.
       if (pass.incomplete?.length) continue;
       if (!passes.has(pass.id)) passes.set(pass.id, []);
@@ -31,6 +34,50 @@ export const readPasses = (root, recordDir) => {
   }
   return passes;
 };
+
+/** An area counts as audited once at least this share of its files were read by some pass. */
+export const COVERED = 0.5;
+
+/**
+ * Each area's history from the passes whose files overlap its own, so a history follows its files across a recut of
+ * the partition: a pass is inherited by every area holding any of its files, with `share`, the part of the pass's
+ * files that area holds, by which its estimates are scaled (`scaledOf`). A renamed area keeps its whole history; a
+ * split one passes each part its share. A pass with no file list goes to the area of its own id, whole. `raw` is
+ * `readPasses`'. Answers `{ history, covered }`: Maps by area id of its passes oldest first, and the share of its files
+ * any of them read.
+ */
+export const inheritPasses = (areas, raw) => {
+  const byFile = new Map();
+  const unlisted = new Map();
+  for (const pass of [...raw.values()].flat()) {
+    if (!pass.files?.length) {
+      unlisted.set(pass.id, [...(unlisted.get(pass.id) ?? []), pass]);
+      continue;
+    }
+    for (const f of pass.files) byFile.set(f, [...(byFile.get(f) ?? []), pass]);
+  }
+  const history = new Map();
+  const covered = new Map();
+  for (const area of areas) {
+    const overlap = new Map();
+    let read = 0;
+    for (const f of area.files) {
+      const passes = byFile.get(f);
+      if (!passes) continue;
+      read += 1;
+      for (const p of passes) overlap.set(p, (overlap.get(p) ?? 0) + 1);
+    }
+    const own = (unlisted.get(area.id) ?? []).map((p) => ({ ...p, share: 1 }));
+    const inherited = [...overlap].map(([p, n]) => ({ ...p, share: n / p.files.length }));
+    const list = [...own, ...inherited].sort((x, y) => x.round - y.round || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
+    history.set(area.id, list);
+    covered.set(area.id, own.length ? 1 : area.files.length ? read / area.files.length : 0);
+  }
+  return { history, covered };
+};
+
+/** A pass's estimate and what it left, scaled by the share of its files the area holds. */
+export const scaledOf = (pass) => ({ chapman: pass.chapman * (pass.share ?? 1), unfound: pass.unfound * (pass.share ?? 1) });
 
 /**
  * The round after every number already used: round directories, the ledger's text ("round 12",
@@ -77,25 +124,26 @@ export const areasInFlight = (unmergedBranches, areaOf = /^audit\d+-(.+)$/) =>
   new Set(unmergedBranches.flatMap((b) => areaOf.exec(b)?.[1] ?? []));
 
 /**
- * Tonight's areas: never audited first, in partition order, then the longest since their last pass;
- * settled areas, and areas an unlanded round still holds (`inFlight`), are skipped. Answers
- * `{ picked, settled }`, each a list of ids.
+ * Tonight's areas: never audited first, in partition order, then the due ones, most lines changed since their last
+ * pass first (`staleLines`, by id), then the longest since their last pass; settled areas, and areas an unlanded
+ * round still holds (`inFlight`), are skipped. An area counts as never audited when its `covered` share is under
+ * COVERED. `passes` is each area's history (`inheritPasses`'). Answers `{ picked, settled }`, each a list of ids.
  */
-export const pickAreas = ({ areas, passes, touched, count, inFlight = new Set() }) => {
+export const pickAreas = ({ areas, passes, touched, count, inFlight = new Set(), covered = new Map(), staleLines = new Map() }) => {
   const settled = [];
   const fresh = [];
   const seen = [];
   for (const area of areas) {
     if (inFlight.has(area.id)) continue;
     const history = passes.get(area.id) ?? [];
-    if (history.length === 0) {
+    if (history.length === 0 || (covered.get(area.id) ?? 1) < COVERED) {
       fresh.push(area.id);
       continue;
     }
     if (isSettled(area, history, touched)) settled.push(area.id);
-    else seen.push({ id: area.id, last: history.at(-1).round });
+    else seen.push({ id: area.id, last: history.at(-1).round, stale: staleLines.get(area.id) ?? 0 });
   }
-  seen.sort((x, y) => x.last - y.last || (x.id < y.id ? -1 : 1));
+  seen.sort((x, y) => y.stale - x.stale || x.last - y.last || (x.id < y.id ? -1 : 1));
   return { picked: [...fresh, ...seen.map((s) => s.id)].slice(0, count), settled };
 };
 
@@ -110,4 +158,18 @@ export const gitTouched = (git) => (files, from, exclude) => {
   }
   const skip = new Set(exclude);
   return out.split('\n').some((sha) => sha && !skip.has(sha));
+};
+
+/**
+ * What the plan and the map read of each area's past for `cfg`'s project: its inherited `history` and `covered`
+ * share (`inheritPasses`), and `staleLines`, the lines of its files changed since its last pass, its fixes aside.
+ */
+export const areaStats = (cfg, git, areas, raw, root) => {
+  const { history, covered } = inheritPasses(areas, raw);
+  const entries = areas.flatMap((area) => {
+    const last = history.get(area.id)?.at(-1);
+    return last?.commit ? [{ id: area.id, files: area.files, commit: last.commit, exclude: last.fixCommits ?? [] }] : [];
+  });
+  const staleLines = churnSince(git, entries, { keep: cfg.partition.isSource, cacheFile: churnCacheOf(cfg.name), root });
+  return { history, covered, staleLines };
 };

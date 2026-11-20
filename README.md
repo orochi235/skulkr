@@ -138,10 +138,25 @@ file is regenerated, and the ledger, when the config names one, gets a row.
 | `--cap-usd N` | `budget.capUsd` | list-price dollars the run may spend |
 | `--budget-review`, `--budget-match`, `--budget-fix` | `budget.*` | each job's `--max-budget-usd` |
 
-**Which areas.** Never-audited areas go first, in partition order, then the longest since their last pass. An
-area is *settled*, and skipped, after two consecutive passes that each found at most one distinct defect, on the
-same file list, with nothing but those passes' own fixes changing its files since. What is due comes only from
-the `area.json` files of earlier rounds.
+**Which areas.** Never-audited areas go first, in partition order. Then the due ones: most lines of their files
+changed since their last pass first, then the longest since that pass. An area is *settled*, and skipped, after
+two consecutive passes that each found at most one distinct defect, on the same file list, with nothing but those
+passes' own fixes changing its files since. What is due comes only from the `area.json` files of earlier rounds and
+git.
+
+**History follows files.** A pass belongs to the files it read (its `files.txt`, also `files` in its `area.json`),
+not to its area's name, so a recut partition keeps what was learned. An area inherits every pass that read any of
+its files now, with a *share*: the part of that pass's files the area holds. The pass's Chapman estimate and its
+"left" are scaled by that share, so a pass split across two areas is counted once between them, and a renamed area,
+holding all of its pass's files, keeps its whole history. An area counts as audited only once passes have read at
+least half its files now (`COVERED` in `src/rounds.mjs`); below that it queues as never audited, its inherited
+passes still shown.
+
+**Stale estimates.** An area whose files changed since its last pass carries `staleLines` in the map: lines added
+plus deleted in those files (`git log --numstat`, merges left out) by every commit since the pass's commit but that
+pass's own fixes. The plan prints it, the queue weighs it, and the dashboard fades the area and says how much of
+"≈ left" sits in such areas. Each commit's counts are cached in `~/.cache/skulk/<name>/churn.json`, so a map
+rebuild asks git only about commits it has not seen.
 
 **Limits.** Each job's model is stopped at `claude.timeoutMin` and the runner stops the job ten minutes later, so
 what it wrote still comes home. A run starts no new area after `schedule.stopAt`, nor when the areas running plus
@@ -245,6 +260,7 @@ map at `api/t/<name>/map` and an area's defects at `api/t/<name>/area?id=<area>`
 |---|---|---|
 | A run's log, job outputs, and runner logs | `<state>/nights/<start>-round<N>/` | the newest `keepNights`; older ones are deleted when a run starts |
 | A run's claim, status, stop request, and summary | `<state>/runs/<N>/`: the directory is the claim; `status.json` (with its pid) while it runs, `stop` when asked, `summary.json` when it ends | the newest `keepNights`, never a live one; pruned when a run starts |
+| Each commit's lines changed, for `staleLines` | `~/.cache/skulk/<name>/churn.json` | only the commits after the oldest pass any area last had; rewritten without the rest on each build that adds one |
 | Node tree leases | `<state>/slots/<node>/<tree>` | deleted as each job ends; one whose pid is dead is taken back |
 | Locks | `<state>/plan.lock`, `<state>/merge.lock` | one file each, deleted on release |
 | Worktrees | `.worktrees/audit<N>-frozen-night`, `audit<N>-am-<area>`, `batch-<date>-audit<N>` in the project checkout | removed when the run ends, except a red batch's, which the report names |

@@ -14,7 +14,7 @@ import { createSlots, runUntilFree } from './jobs.mjs';
 import { batchAndTest, patchAreas, patchSweep } from './land.mjs';
 import { waitForLease } from './lease.mjs';
 import { partitionAt } from './partition.mjs';
-import { areasInFlight, gitTouched, nextRound, pickAreas, readPasses } from './rounds.mjs';
+import { areaStats, areasInFlight, gitTouched, inheritPasses, nextRound, pickAreas, readPasses, scaledOf } from './rounds.mjs';
 import { claimRound, claimedRounds, clearStatus, clearStop, liveRuns, planLock, pruneRuns, readJson, runDir, stopRequested, writeStatus, writeSummary } from './runs.mjs';
 import { fixSweep, runSweep, sweepLine } from './sweep.mjs';
 import { mayStartArea } from './usage.mjs';
@@ -97,7 +97,7 @@ const plan = (cfg, root, args) => {
   const hardening = ledger && existsSync(ledger) ? readFileSync(ledger, 'utf8') : '';
   const round = nextRound({ roundDirs, hardening, branches, claimed: claimedRounds(cfg.state), roundIn: cfg.names.roundIn });
   const areas = partitionAt(cfg, root, commit);
-  const passes = readPasses(root, cfg.record.dir);
+  const { history: passes, covered, staleLines } = areaStats(cfg, git, areas, readPasses(root, cfg.record.dir), root);
   const running = liveRuns(cfg.state);
   const held = new Set(running.flatMap((r) => r.areas ?? []));
   const byId = new Map(areas.map((a) => [a.id, a]));
@@ -108,10 +108,10 @@ const plan = (cfg, root, args) => {
   const picked = args.only
     ? args.only.slice(0, args.areas)
     : pickAreas({
-      areas, passes, touched: gitTouched(git), count: args.areas,
+      areas, passes, covered, staleLines, touched: gitTouched(git), count: args.areas,
       inFlight: new Set([...areasInFlight(git('for-each-ref', `--no-merged=${main}`, '--format=%(refname:short)', 'refs/heads').split('\n'), cfg.names.areaOf), ...held]),
     }).picked;
-  return { commit, round, picked: picked.map((id) => byId.get(id)), passes, running };
+  return { commit, round, picked: picked.map((id) => byId.get(id)), passes, staleLines, running };
 };
 
 const printPlan = (cfg, p, args, say) => {
@@ -119,7 +119,9 @@ const printPlan = (cfg, p, args, say) => {
   say(`budget: ${usd(args.capUsd)} tonight; per job $${args.budget.review} review, $${args.budget.match} match, $${args.budget.fix} fix`);
   for (const area of p.picked) {
     const last = p.passes.get(area.id)?.at(-1);
-    say(`  ${area.id}: ${area.files.length} files${last ? `, last pass round ${last.round} (${last.distinct} distinct, ~${last.unfound} left)` : ', never audited'}`);
+    const stale = p.staleLines?.get(area.id) ?? 0;
+    const left = last && Math.round(scaledOf(last).unfound * 10) / 10;
+    say(`  ${area.id}: ${area.files.length} files${last ? `, last pass round ${last.round} (${last.distinct} distinct, ~${left} left${stale ? `; ${stale} lines changed since` : ''})` : ', never audited'}`);
     say(`    ${area.files.slice(0, 4).join(' ')}${area.files.length > 4 ? ' …' : ''}`);
   }
   if (cfg.sweep) say(args.sweep ? `${sweepName(cfg)}: one job at the frozen commit beside the reviews, and a fixer for what it finds` : `${sweepName(cfg)}: off (it runs only with --sweep)`);
@@ -168,7 +170,8 @@ const reviewAreas = async ({ ctx, git, picked, passes, args, status, deadline, r
       ctx.say(`not starting ${area.id}: ${why}`);
       continue;
     }
-    const previous = passes.get(area.id)?.at(-1);
+    const last = passes.get(area.id)?.at(-1);
+    const previous = last && { ...last, ...scaledOf(last) };
     const job = runArea(ctx, area, { previous, changedSince: changedSince(git, area.files, previous?.commit, previous?.fixCommits ?? []) })
       .then((summary) => results.push(summary))
       .catch((error) => ctx.say(`area ${area.id} failed: ${error.stack ?? error}`))
@@ -271,7 +274,7 @@ const resume = (cfg, root, args, say) => {
   const landed = new Set((prior.areas ?? []).flatMap((a) => (typeof a === 'object' && (a.patches ?? 0) > 0 && inMain(a.id) ? [a.id] : [])));
   const ids = (prior.planned ?? prior.areas ?? []).map((a) => (typeof a === 'string' ? a : a.id)).filter((id) => !landed.has(id));
   clearStop(round, state);
-  const p = { commit, round, picked: ids.flatMap((id) => (byId.has(id) ? [byId.get(id)] : [])), passes: readPasses(root, cfg.record.dir), running: liveRuns(state) };
+  const p = { commit, round, picked: ids.flatMap((id) => (byId.has(id) ? [byId.get(id)] : [])), passes: inheritPasses([...byId.values()], readPasses(root, cfg.record.dir)).history, running: liveRuns(state) };
   const started = new Date(prior.started);
   const status = { round, commit, started: prior.started, resumed: new Date().toISOString(), step: 'freeze', areas: ids, nightDir: prior.nightDir, weightedTokens: 0, costUsd: 0, capUsd: args.capUsd, args };
   writeStatus(round, status, state);

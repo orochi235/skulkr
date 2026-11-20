@@ -23,7 +23,14 @@ weasel cutover.
 ## Rules
 
 - weasel must keep behaving as it did: a change to `src/` keeps `examples/weasel.config.mjs` producing the same
-  partition, plan, record, and map as weasel's own `scripts/skulk` until weasel cuts over.
+  partition, plan, record, and map as weasel's own `scripts/skulk` until weasel cuts over, except where area stats
+  now survive code changing outside the audits (2026-11-20, README "History follows files" and "Stale estimates"):
+  - the queue's order among due areas (most lines changed since their last pass first) and the plan's listing of it;
+  - which passes an area's history holds (by overlapping files, not id), so its passes' `est` and `left`, the
+    record's "last left", and "never audited" for an area passes cover under half of;
+  - the map's `staleLines` and pass `share`, and the rounds chart's sums, which count each pass once with its
+    recorded file count.
+  Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.
 

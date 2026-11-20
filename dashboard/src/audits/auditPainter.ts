@@ -6,7 +6,7 @@ import { framePadOf } from './mapLayout';
 export interface AuditCellData {
   readonly kind: 'audit-cell';
   readonly fill: PosedPaint;
-  /** Drawn over `fill`: the hatch on ground nobody has audited. */
+  /** Drawn over `fill`: the hatch on ground nobody has audited, or the wash fading one whose files changed since. */
   readonly over?: PosedPaint;
   readonly edge: string;
   readonly ink: string;

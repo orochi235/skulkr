@@ -12,6 +12,8 @@ export interface AuditPass {
   readonly distinct: number;
   readonly est: number;
   readonly left: number;
+  /** The part of the pass's files this area holds, when it holds only some: `est` and `left` are scaled by it. */
+  readonly share?: number;
   /** A live run's pass, its area's pass done and its round's record not yet landed. */
   readonly provisional?: boolean;
 }
@@ -24,6 +26,8 @@ export interface AuditArea {
   readonly queue: number | null;
   readonly passes: readonly AuditPass[];
   readonly stage: string | null;
+  /** Lines of its files changed since its last pass, that pass's own fixes aside; absent when none. */
+  readonly staleLines?: number;
 }
 
 export type LaneStepName = 'A' | 'B' | 'match' | 'fix' | 'patch';

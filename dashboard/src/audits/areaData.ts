@@ -31,9 +31,15 @@ export const lastPassOf = (area: AuditArea): AuditPass | null => area.passes.at(
 
 export function toneOf(area: AuditArea): AreaTone {
   if (area.status === 'settled') return 'settled';
+  if (area.status === 'unaudited') return 'unaudited';
   const pass = lastPassOf(area);
   return pass ? { left: pass.left } : 'unaudited';
 }
+
+/** How strongly an area whose files changed since its last pass is faded: none unchanged, more the more lines changed,
+ *  never so much its tone is lost. */
+export const staleFadeOf = (lines: number | undefined): number =>
+  !lines || lines <= 0 ? 0 : Math.min(0.6, 0.2 + 0.1 * Math.log10(lines));
 
 /** How near the top, as a share of the bar, a round tick gives way to the top's own. */
 const TOP_ROOM = 0.12;
@@ -83,16 +89,21 @@ export interface Stat {
 /** The headline numbers over every area. */
 export function statsFor(areas: readonly AuditArea[]): Stat[] {
   const files = areas.reduce((n, a) => n + a.files, 0);
-  const audited = areas.filter((a) => a.passes.length > 0);
+  const audited = areas.filter((a) => a.passes.length > 0 && a.status !== 'unaudited');
   const auditedFiles = audited.reduce((n, a) => n + a.files, 0);
   const left = audited.reduce((n, a) => n + (lastPassOf(a)?.left ?? 0), 0);
-  const found = areas.reduce((n, a) => n + a.passes.reduce((m, p) => m + p.distinct, 0), 0);
+  const staleLeft = audited.reduce((n, a) => n + (a.staleLines ? lastPassOf(a)?.left ?? 0 : 0), 0);
+  // A pass several areas inherited counts once over them, by each one's share.
+  const found = Math.round(areas.reduce((n, a) => n + a.passes.reduce((m, p) => m + p.distinct * (p.share ?? 1), 0), 0));
   const settled = areas.filter((a) => a.status === 'settled').length;
   return [
     { value: `${formatCount(audited.length)} / ${formatCount(areas.length)}`, label: 'areas audited at least once' },
     { value: `${files ? Math.round((100 * auditedFiles) / files) : 0}%`, label: `of ${formatCount(files)} source files charted` },
     { value: formatCount(found), label: 'defects found and fixed, all rounds' },
-    { value: `≈${formatCount(Math.round(left))}`, label: 'estimated still in audited areas' },
+    {
+      value: `≈${formatCount(Math.round(left))}`,
+      label: staleLeft >= 0.5 ? `estimated still in audited areas, ≈${formatCount(Math.round(staleLeft))} of it in areas changed since` : 'estimated still in audited areas',
+    },
     { value: formatCount(settled), label: 'areas settled' },
   ];
 }

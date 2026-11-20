@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { areasInFlight, chapman, isSettled, nextRound, pickAreas, readPasses } from './rounds.mjs';
+import { areasInFlight, chapman, inheritPasses, isSettled, nextRound, pickAreas, readPasses, scaledOf } from './rounds.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -99,5 +99,45 @@ describe('pickAreas', () => {
     const seen: unknown[] = [];
     isSettled(area('a'), passes.get('a'), (files: string[], from: string, exclude: string[]) => (seen.push({ files, from, exclude }), false));
     expect(seen).toEqual([{ files: ['a.ts'], from: 'base', exclude: ['fix1'] }]);
+  });
+});
+
+describe('inheritPasses', () => {
+  const pass = (round: number, id: string, files: string[], est = 10, left = 4) => ({ round, id, files, a: 3, b: 3, m: 1, distinct: 5, chapman: est, unfound: left });
+
+  it('keeps a renamed area\'s whole history and gives a split area\'s parts their shares', () => {
+    const raw = new Map([
+      ['old', [pass(1, 'old', ['x/1.ts', 'x/2.ts', 'x/3.ts', 'x/4.ts'])]],
+      ['gone', [pass(2, 'gone', ['y/1.ts', 'y/2.ts'])]],
+    ]);
+    const areas = [
+      { id: 'renamed', files: ['x/1.ts', 'x/2.ts', 'x/3.ts', 'x/4.ts'] },
+      { id: 'left', files: ['y/1.ts', 'z/9.ts', 'z/8.ts'] },
+      { id: 'right', files: ['y/2.ts'] },
+      { id: 'new', files: ['n/1.ts'] },
+    ];
+    const { history, covered } = inheritPasses(areas, raw);
+    expect(history.get('renamed')!.map((p) => [p.round, p.share])).toEqual([[1, 1]]);
+    expect(history.get('left')!.map((p) => [p.id, p.share])).toEqual([['gone', 0.5]]);
+    expect(scaledOf(history.get('left')![0]!)).toEqual({ chapman: 5, unfound: 2 });
+    expect(history.get('new')).toEqual([]);
+    expect(Object.fromEntries(covered)).toEqual({ renamed: 1, left: 1 / 3, right: 1, new: 0 });
+  });
+
+  it('gives a pass with no file list to the area of its own id', () => {
+    const { history } = inheritPasses([{ id: 'a', files: ['a/1.ts'] }], new Map([['a', [{ ...pass(1, 'a', []), files: undefined }]]]));
+    expect(history.get('a')!.map((p) => p.share)).toEqual([1]);
+  });
+});
+
+describe('pickAreas with churn', () => {
+  const area = (id: string) => ({ id, files: [`${id}/x.ts`] });
+  const pass = (round: number, id: string) => ({ round, id, files: [`${id}/x.ts`], distinct: 5, commit: 'c', fixCommits: [] });
+  it('puts never-audited areas first, then the most lines changed, then the oldest pass', () => {
+    const passes = new Map([['a', [pass(3, 'a')]], ['b', [pass(1, 'b')]], ['c', [pass(2, 'c')]], ['d', [pass(4, 'd')]], ['e', [pass(5, 'e')]]]);
+    const covered = new Map([['e', 0.2]]);
+    const staleLines = new Map([['a', 40], ['d', 400]]);
+    const { picked } = pickAreas({ areas: ['a', 'b', 'c', 'd', 'e', 'f'].map(area), passes, covered, staleLines, touched: () => true, count: 9 });
+    expect(picked).toEqual(['e', 'f', 'd', 'a', 'b', 'c']);
   });
 });
