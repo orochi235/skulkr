@@ -73,7 +73,7 @@ describe('fixTallyOf', () => {
       'Extra defects found while fixing:', 'fixed 9c0d1e2f | an extra (sweep)', 'Checks:', '- vitest: fixed 3 files, pass',
     ].join('\n');
     expect(fixTallyOf(report)).toEqual({ fixed: 2, of: 3, extra: 1, deferred: 0, dismissed: 1 });
-    expect(fixTallyOf('fixed 1a2b3c4d | a thing (A)\nquestion: which way? | another (B)\nnot fixed: filed | a third (A)').deferred).toBe(2);
+    expect(fixTallyOf('fixed 1a2b3c4d | a thing (A)\nquestion: which way? | another (B)\nnot fixed: filed | a third (A)')!.deferred).toBe(2);
   });
 });
 

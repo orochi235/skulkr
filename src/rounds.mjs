@@ -46,6 +46,7 @@ export const COVERED = 0.5;
  * `readPasses`'. Answers `{ history, covered }`: Maps by area id of its passes oldest first, and the share of its files
  * any of them read.
  */
+/** @param {{ id: string, files: string[] }[]} areas @param {Map<string, any[]>} raw @returns {{ history: Map<string, any[]>, covered: Map<string, number> }} */
 export const inheritPasses = (areas, raw) => {
   const byFile = new Map();
   const unlisted = new Map();

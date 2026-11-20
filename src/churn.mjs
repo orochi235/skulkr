@@ -64,6 +64,7 @@ const CHUNK = 400;
  * worth counting; `cacheFile` holds the counts between builds, or null for none. Answers a Map id → lines; an entry
  * whose commit git does not know counts 0.
  */
+/** @param {(...args: string[]) => string} git @param {{ id: string, files: string[], commit: string, exclude?: string[] }[]} entries @param {{ keep?: (path: string) => boolean, cacheFile?: string | null, root?: string | null }} [opts] */
 export const churnSince = (git, entries, { keep = () => true, cacheFile = null, root = null } = {}) => {
   const out = new Map(entries.map((e) => [e.id, 0]));
   const asked = [...new Set(entries.map((e) => e.commit).filter(Boolean))];
