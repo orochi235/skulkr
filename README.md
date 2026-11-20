@@ -36,6 +36,7 @@ export default {
     name: 'test',
     command: ['npm', 'test'],         // `{ref}` anywhere in it is the batch branch
     cwd: 'batch',                     // 'batch' runs it in the batch's worktree; 'root' in the main checkout
+    progress: { tests: '' },          // its parallel runs, by the prefix of their `onto: progress` log lines (dashboard)
   },
 
   checks: {                           // what the default fixer brief tells the fixer to run
