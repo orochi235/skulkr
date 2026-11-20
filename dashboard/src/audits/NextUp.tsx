@@ -1,6 +1,6 @@
 import { Icon } from '@weasel-js/ui/components/Icon';
 import { icon } from '@dash/icons.gen';
-import type { AuditArea } from './skulkMap.types';
+import type { AuditArea } from './skulkrMap.types';
 import s from './NextUp.module.css';
 
 /** The areas a run would pick next, in queue order; each picks its cell on the map, and lights it while hovered. */

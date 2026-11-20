@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AuditAreaRound } from './skulkMap.types';
+import type { AuditAreaRound } from './skulkrMap.types';
 
 export type AreaDefectsState =
   | { readonly status: 'loading' }

@@ -94,7 +94,7 @@ describe('withPasses', () => {
 
 describe('nightRoundOf', () => {
   it("finds a run's night directory by its round where its record names none", () => {
-    const state = mkdtempSync(join(tmpdir(), 'skulk-map-'));
+    const state = mkdtempSync(join(tmpdir(), 'skulkr-map-'));
     dirs.push(state);
     mkdirSync(join(state, 'nights', '2026-11-20T01-31-25-262Z-round41'), { recursive: true });
     writeFileSync(join(state, 'last.json'), JSON.stringify({ round: 41, started: 's', ended: 'e', areas: [] }));
@@ -102,7 +102,7 @@ describe('nightRoundOf', () => {
   });
 
   it('finds every round in the nights directory, the latest night of each, live where a run still holds it', () => {
-    const state = mkdtempSync(join(tmpdir(), 'skulk-map-'));
+    const state = mkdtempSync(join(tmpdir(), 'skulkr-map-'));
     dirs.push(state);
     for (const name of ['2026-11-19T22-49-35-217Z-round40', '2026-11-20T03-23-24-845Z-round42', '2026-11-20T04-00-00-000Z-round42', 'scratch']) {
       mkdirSync(join(state, 'nights', name), { recursive: true });
@@ -115,7 +115,7 @@ describe('nightRoundOf', () => {
   });
 
   it('leaves out a round whose night was abandoned', () => {
-    const state = mkdtempSync(join(tmpdir(), 'skulk-map-'));
+    const state = mkdtempSync(join(tmpdir(), 'skulkr-map-'));
     dirs.push(state);
     for (const name of ['2026-11-20T19-14-32-392Z-round51', '2026-11-20T20-10-16-686Z-round52']) mkdirSync(join(state, 'nights', name), { recursive: true });
     writeFileSync(join(state, 'nights', '2026-11-20T20-10-16-686Z-round52', 'abandoned'), 'stopped while moving services\n');
@@ -123,7 +123,7 @@ describe('nightRoundOf', () => {
   });
 
   it("draws a round with no committed record from its night directory's finished areas", () => {
-    const nightDir = mkdtempSync(join(tmpdir(), 'skulk-night-'));
+    const nightDir = mkdtempSync(join(tmpdir(), 'skulkr-night-'));
     dirs.push(nightDir);
     const area = (id: string, a: number, b: number, pairs: number, files: number) => {
       mkdirSync(join(nightDir, 'areas', id), { recursive: true });
@@ -144,7 +144,7 @@ describe('nightRoundOf', () => {
 
 describe('readRuns', () => {
   it('lists every live run with its own stages, lanes and lines, then the last finished', () => {
-    const state = mkdtempSync(join(tmpdir(), 'skulk-map-'));
+    const state = mkdtempSync(join(tmpdir(), 'skulkr-map-'));
     dirs.push(state);
     const night = (round: number, lines: string[]) => {
       const dir = join(state, 'nights', `r${round}`);
@@ -177,7 +177,7 @@ describe('readRuns', () => {
 
 describe('fleetProgressOf', () => {
   it('reads each gate run\'s last progress line from the gate log, by its prefix', () => {
-    const night = mkdtempSync(join(tmpdir(), 'skulk-map-'));
+    const night = mkdtempSync(join(tmpdir(), 'skulkr-map-'));
     dirs.push(night);
     const gate = weaselConfig().gate;
     expect(fleetProgressOf(night, gate)).toBeNull();
@@ -190,7 +190,7 @@ describe('fleetProgressOf', () => {
 describe('gate outcomes and reruns', () => {
   const cfg = weaselConfig();
   it('reads each gate run\'s end from its closing line, or the whole gate\'s from the night log', () => {
-    const night = mkdtempSync(join(tmpdir(), 'skulk-map-'));
+    const night = mkdtempSync(join(tmpdir(), 'skulkr-map-'));
     dirs.push(night);
     writeFileSync(join(night, 'batch-2026-11-20-audit49.test-batch.log'), 'test:fleet failed\ntest:fleet:postbuild passed\n');
     expect(gateOutcomesOf(night, cfg.gate)).toEqual({ tests: 'failed', build: 'passed' });
@@ -200,7 +200,7 @@ describe('gate outcomes and reruns', () => {
   });
 
   it('says what each gate run failed: how many, in which files, each test with its error', () => {
-    const night = mkdtempSync(join(tmpdir(), 'skulk-map-'));
+    const night = mkdtempSync(join(tmpdir(), 'skulkr-map-'));
     dirs.push(night);
     writeFileSync(join(night, 'batch-2026-11-20-audit54.test-batch.log'), [
       'fleet-fail: core packages/a/x.test.ts :: x > one',
@@ -221,7 +221,7 @@ describe('gate outcomes and reruns', () => {
   });
 
   it('reads every run of a capstone going again as running, the one with no job placed yet too', () => {
-    const night = mkdtempSync(join(tmpdir(), 'skulk-map-'));
+    const night = mkdtempSync(join(tmpdir(), 'skulkr-map-'));
     dirs.push(night);
     writeFileSync(join(night, 'batch-2026-11-20-audit49.test-batch.log'), 'test:fleet failed\ntest:fleet:postbuild passed\n');
     const jobs = [{ task: 'postbuild-batch-2026-11-20-audit49', node: 'teitou', finished: false, progress: { done: 1, total: 17 } }];

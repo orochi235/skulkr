@@ -27,7 +27,7 @@ describe('briefs', () => {
   });
 
   it('resolve a project brief against the config file\'s directory', () => {
-    const cfg = resolveConfig({ briefs: { fixer: './rules/fix.md' } }, { file: '/p/skulk.config.mjs' });
+    const cfg = resolveConfig({ briefs: { fixer: './rules/fix.md' } }, { file: '/p/skulkr.config.mjs' });
     expect(cfg.briefPath('fixer')).toBe('/p/rules/fix.md');
   });
 });

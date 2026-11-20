@@ -4,7 +4,7 @@ import { Badge } from '@weasel-js/ui/components/Badge';
 import { SidebarPanel } from '@weasel-js/ui/components/SidebarPanel';
 import type { Grade } from '@weasel-js/theme';
 import { recentJobsOf, type Job, type RunJob } from './runData';
-import type { AuditRun } from './skulkMap.types';
+import type { AuditRun } from './skulkrMap.types';
 import s from './JobsFeed.module.css';
 
 function gradeOf(job: Job): Grade | undefined {

@@ -15,12 +15,12 @@ import { createAuditScene } from './auditScene';
 import { liveEstimatesOf, phasesOf, withLivePasses } from './phases';
 import { continuousText } from './runData';
 import { useAuditPalette } from './useAuditPalette';
-import { useSkulkMap } from './useSkulkMap';
+import { useSkulkrMap } from './useSkulkrMap';
 import { TENANTS_PATH, tenantAreaPath, tenantMapPath } from '@shared/routes';
 import { TenantTitle } from '@dash/tenants/TenantTitle';
 import { useTenantChoice, useTenants } from '@dash/tenants/useTenants';
 import { readSize, useViewerPref } from './viewerPref';
-import type { SkulkMap } from './skulkMap.types';
+import type { SkulkrMap } from './skulkrMap.types';
 import palette from './palette.module.css';
 import s from './AuditsPage.module.css';
 
@@ -32,22 +32,22 @@ const JOBS = { key: 'jobs', min: 80, max: 900, initial: 220 } as const;
 /** A pane's size the viewer dragged it to, kept between visits. */
 const usePaneSize = ({ key, initial }: { key: string; initial: number }) => useViewerPref(key, initial, readSize);
 
-function stampOf(map: SkulkMap): string {
+function stampOf(map: SkulkrMap): string {
   const when = new Date(map.generated).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   return `${map.branch ? `${map.branch} ` : ''}${map.head} · updated ${when}`;
 }
 
 /** The page's title: the project's name where the map gives one. */
-const titleOf = (map: SkulkMap | null): string => (map?.project ? `${map.project} audits` : 'Audits');
+const titleOf = (map: SkulkrMap | null): string => (map?.project ? `${map.project} audits` : 'Audits');
 
 /** What an area is, from the map's partition where it says. */
-function AreaNote({ map }: { map: SkulkMap | null }) {
+function AreaNote({ map }: { map: SkulkrMap | null }) {
   const partition = map?.partition;
   if (!partition) return <>Each area is a directory of source files.</>;
   return <>Each area is a directory of at most {partition.maxFiles} source files (<code>{partition.path}</code>).</>;
 }
 
-function Chart({ map, areaUrl, view }: { map: SkulkMap; areaUrl: string; view: LaneSettings }) {
+function Chart({ map, areaUrl, view }: { map: SkulkrMap; areaUrl: string; view: LaneSettings }) {
   const [scene] = useState(createAuditScene);
   const selection = useSelection({ scene, mode: 'single' });
   const [hovered, setHovered] = useState<string | null>(null);
@@ -118,7 +118,7 @@ export interface AuditsSource {
   readonly dev?: boolean;
 }
 
-/** The audit chart: every live skulk run, the partition as a treemap shaded by what audits estimate is left, the
+/** The audit chart: every live skulkr run, the partition as a treemap shaded by what audits estimate is left, the
  *  queue, the rounds, and the jobs coming back, for the tenant the title's menu picks. Reads the dashboard's dev
  *  server: `api/tenants`, then `api/t/<tenant>/map`. */
 export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
@@ -126,7 +126,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
   const tenants = useTenants({ url: `${base}${TENANTS_PATH}`, dev });
   const names = tenants.status === 'ready' ? tenants.names : [];
   const [tenant, choose] = useTenantChoice(names);
-  const state = useSkulkMap({ url: tenant === null ? null : `${base}${tenantMapPath(tenant)}`, everyMs, dev });
+  const state = useSkulkrMap({ url: tenant === null ? null : `${base}${tenantMapPath(tenant)}`, everyMs, dev });
   const map = state.status === 'ready' ? state.map : null;
   const view = useLaneView();
   const continuous = continuousText(map?.continuous);
@@ -140,7 +140,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
   const heading = tenant !== null ? <TenantTitle names={names} current={tenant} onChoose={choose} /> : undefined;
   const noServer = tenants.status === 'no-server' || state.status === 'no-server';
   const failed = tenants.status === 'failed' ? `Couldn't read the tenants: ${tenants.error}`
-    : tenants.status === 'ready' && !names.length ? 'The dev server reads no tenant: register one with skulk tenants add.'
+    : tenants.status === 'ready' && !names.length ? 'The dev server reads no tenant: register one with skulkr tenants add.'
     : state.status === 'failed' ? `Couldn't read the audit map: ${state.error}` : null;
   return (
     <Shell title={tenant !== null ? `${tenant} audits` : titleOf(map)} heading={heading} header={header}>
@@ -149,7 +149,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
         {noServer && (
           <p className={s.note}>
             This page reads the audit map from the dashboard&apos;s dev server, which serves <code>/api/tenants</code>.
-            Start it with <code>npm run dev</code> in <code>dashboard/</code>, with a tenant registered or the project in <code>SKULK_CONFIG</code>, and open this page there.
+            Start it with <code>npm run dev</code> in <code>dashboard/</code>, with a tenant registered or the project in <code>SKULKR_CONFIG</code>, and open this page there.
           </p>
         )}
         {!noServer && failed && <p className={s.note}>{failed}</p>}
@@ -162,7 +162,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
         <p className={s.foot}>
           <AreaNote map={map} /> Two reviewers read it
           blind; the overlap of their lists gives Chapman&apos;s estimate of what it held, and &ldquo;left&rdquo; is that estimate
-          less what they found. An area settles after two quiet passes on unchanged files. Data from <code>skulk map</code>.
+          less what they found. An area settles after two quiet passes on unchanged files. Data from <code>skulkr map</code>.
         </p>
       </div>
     </Shell>

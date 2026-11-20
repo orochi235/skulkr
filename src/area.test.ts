@@ -6,7 +6,7 @@ import { cameHome } from './area.mjs';
 
 const dirs: string[] = [];
 const job = (files: Record<string, string>) => {
-  const to = mkdtempSync(join(tmpdir(), 'skulk-job-'));
+  const to = mkdtempSync(join(tmpdir(), 'skulkr-job-'));
   dirs.push(to);
   mkdirSync(to, { recursive: true });
   for (const [name, text] of Object.entries(files)) writeFileSync(join(to, name), text);

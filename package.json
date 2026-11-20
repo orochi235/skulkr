@@ -1,12 +1,12 @@
 {
-  "name": "x-skulk",
+  "name": "skulkr",
   "private": true,
   "version": "0.0.1",
   "type": "module",
   "license": "MIT",
   "description": "Nightly blind-pair audit rounds over any git repository, driven by a config file in that repository.",
   "bin": {
-    "skulk": "bin/skulk.mjs"
+    "skulkr": "bin/skulkr.mjs"
   },
   "engines": {
     "node": ">=24"

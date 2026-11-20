@@ -1,7 +1,7 @@
 import { Button, DialogTrigger } from 'react-aria-components';
 import { Popover, PopoverDialog } from '@weasel-js/ui/components/Popover';
 import type { ReactNode } from 'react';
-import type { GateFailures as Failures } from './skulkMap.types';
+import type { GateFailures as Failures } from './skulkrMap.types';
 import s from './GateFailures.module.css';
 
 /** A button opening what a failed capstone run failed, by file, each test with the first line of its error. */

@@ -9,7 +9,7 @@ import { weaselConfig } from '../test/weaselConfig.ts';
 import { resolveConfig } from './config.mjs';
 
 const SCRIPT = join(import.meta.dirname, 'progress.mjs');
-const ROOT = '/nodes/trees/weasel-skulk-r1';
+const ROOT = '/nodes/trees/weasel-skulkr-r1';
 const FILES = ['packages/core/src/a.ts', 'packages/core/src/b.ts', 'package.json'];
 const read = (id: string, path: string) => JSON.stringify({
   type: 'assistant',
@@ -53,7 +53,7 @@ describe('createProgress', () => {
 describe('progress.mjs', () => {
   it('prints progress and writes the envelope parseEnvelope reads, the same as --output-format json', () => {
     // The filter resolves against process.cwd(), which is the real path; macOS's tmpdir() is behind /var -> /private/var.
-    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'skulk-progress-')));
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'skulkr-progress-')));
     dirs.push(dir);
     writeFileSync(join(dir, 'files.txt'), `${FILES.join('\n')}\n`);
     const stream = STREAM.map((l) => l.replaceAll(ROOT, dir)).join('\n');
@@ -67,7 +67,7 @@ describe('progress.mjs', () => {
   });
 
   it('leaves an empty result file when the stream ends without a result, as a killed json run does', () => {
-    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'skulk-progress-')));
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'skulkr-progress-')));
     dirs.push(dir);
     writeFileSync(join(dir, 'files.txt'), 'a.ts\n');
     const run = spawnSync(process.execPath, [SCRIPT, 'files.txt', 'claude.json'], { cwd: dir, input: '', encoding: 'utf8' });

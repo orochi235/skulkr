@@ -3,7 +3,7 @@
  * is its directory's path (through the config's `areaId`), so regenerating keeps the id of every directory whose
  * shape did not change.
  *
- *   skulk partition [--ref <commit>]   # writes <record.dir>/partition.json
+ *   skulkr partition [--ref <commit>]   # writes <record.dir>/partition.json
  */
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -68,7 +68,7 @@ export const writePartition = (cfg, root, areas) => {
   return at;
 };
 
-/** `skulk partition`: rewrites the partition file at `ref`. */
+/** `skulkr partition`: rewrites the partition file at `ref`. */
 export const partitionCommand = (cfg, root, argv) => {
   const refAt = argv.indexOf('--ref');
   const areas = partitionAt(cfg, root, refAt < 0 ? 'HEAD' : argv[refAt + 1]);

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { SKULK_BIN, createKeptMap, createMapBuilder, createSkulkRunner, listTenants, tenantArgs } from './plugin';
+import { SKULKR_BIN, createKeptMap, createMapBuilder, createSkulkrRunner, listTenants, tenantArgs } from './plugin';
 import { parseTenantPath, tenantMapPath } from '../shared/routes';
 
 describe('createMapBuilder', () => {
@@ -24,7 +24,7 @@ describe('createMapBuilder', () => {
   });
 });
 
-describe('createSkulkRunner', () => {
+describe('createSkulkrRunner', () => {
   type Call = { file: string; args: readonly string[]; opts: { cwd?: string; env?: NodeJS.ProcessEnv } };
   /** An `execFile` that records each call and answers `stdout`, or fails with `stderr`. */
   function fakeExec(answer: { stdout?: string; stderr?: string; fail?: boolean }) {
@@ -38,15 +38,15 @@ describe('createSkulkRunner', () => {
 
   it('runs the bin beside the dashboard in the project root, passing the environment through', async () => {
     const { exec, calls } = fakeExec({ stdout: '[]' });
-    const env = { SKULK_CONFIG: '/p/skulk.config.mjs', SKULK_ROOT: '/p' };
-    expect(await createSkulkRunner({ env, exec })(['defects', 'core.ops'])).toBe('[]');
-    expect(SKULK_BIN).toMatch(/\/bin\/skulk\.mjs$/);
-    expect(calls[0]).toMatchObject({ file: process.execPath, args: [SKULK_BIN, 'defects', 'core.ops'], opts: { cwd: '/p', env } });
+    const env = { SKULKR_CONFIG: '/p/skulkr.config.mjs', SKULKR_ROOT: '/p' };
+    expect(await createSkulkrRunner({ env, exec })(['defects', 'core.ops'])).toBe('[]');
+    expect(SKULKR_BIN).toMatch(/\/bin\/skulkr\.mjs$/);
+    expect(calls[0]).toMatchObject({ file: process.execPath, args: [SKULKR_BIN, 'defects', 'core.ops'], opts: { cwd: '/p', env } });
   });
 
   it("fails with the CLI's own complaint", async () => {
-    const { exec } = fakeExec({ fail: true, stderr: 'no skulk.config.mjs in /x\n' });
-    await expect(createSkulkRunner({ env: {}, cwd: '/x', exec })(['map'])).rejects.toThrow('no skulk.config.mjs in /x');
+    const { exec } = fakeExec({ fail: true, stderr: 'no skulkr.config.mjs in /x\n' });
+    await expect(createSkulkrRunner({ env: {}, cwd: '/x', exec })(['map'])).rejects.toThrow('no skulkr.config.mjs in /x');
   });
 });
 
@@ -67,7 +67,7 @@ describe('tenants', () => {
   });
 
   it('reads a tenant route back from its path', () => {
-    expect(parseTenantPath(`/base/${tenantMapPath('x-skulk.demo')}`)).toEqual({ tenant: 'x-skulk.demo', what: 'map' });
+    expect(parseTenantPath(`/base/${tenantMapPath('skulkr.demo')}`)).toEqual({ tenant: 'skulkr.demo', what: 'map' });
     expect(parseTenantPath('/base/api/t/a/area')).toEqual({ tenant: 'a', what: 'area' });
     expect(parseTenantPath('/base/api/tenants')).toBeNull();
   });
@@ -100,7 +100,7 @@ describe('createKeptMap', () => {
   });
 
   it('starts from the copy kept on disk, and writes each fresh build there', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'skulk-kept-'));
+    const dir = mkdtempSync(join(tmpdir(), 'skulkr-kept-'));
     const file = join(dir, 'weasel', 'map.json');
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, 'map from disk');

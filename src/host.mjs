@@ -22,7 +22,7 @@ export const tenantFor = (req, tenants) => {
     return found;
   }
   if (tenants.length === 1) return tenants[0];
-  if (tenants.length === 0) throw new Error('this service hosts no tenant; register one with `skulk tenants add`');
+  if (tenants.length === 0) throw new Error('this service hosts no tenant; register one with `skulkr tenants add`');
   throw new Error(`this service hosts several tenants (${tenants.map((t) => t.name).join(', ')}); name one with "tenant"`);
 };
 

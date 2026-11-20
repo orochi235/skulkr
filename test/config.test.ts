@@ -9,8 +9,8 @@ describe('resolveConfig', () => {
     expect(merge({ a: { b: 1, c: 2 }, l: [1, 2] }, { a: { c: 3 }, l: [9] })).toEqual({ a: { b: 1, c: 3 }, l: [9] });
     const cfg = resolveConfig({ name: 'demo', budget: { capUsd: 20 } });
     expect(cfg.budget).toMatchObject({ capUsd: 20, review: 8, fix: 15 });
-    expect(cfg.state).toMatch(/\.local\/state\/skulk\/demo$/);
-    expect(cfg.names.trees).toEqual({ review: 'demo-skulk-r', fix: 'demo-skulk-f' });
+    expect(cfg.state).toMatch(/\.local\/state\/skulkr\/demo$/);
+    expect(cfg.names.trees).toEqual({ review: 'demo-skulkr-r', fix: 'demo-skulkr-f' });
   });
 
   it('names branches, jobs and worktrees from the naming prefixes, and reads them back', () => {
@@ -32,25 +32,25 @@ describe('resolveConfig', () => {
     const cfg = weaselConfig();
     expect(String(cfg.partition.rootRe)).toBe(String(/^(packages\/[^/]+\/src|apps\/[^/]+)\//));
     expect(cfg.partition.path).toBe('docs/audits/partition.json');
-    expect(cfg.names.trees).toEqual({ review: 'weasel-skulk-r', fix: 'weasel-skulk-f' });
-    expect(cfg.state).toMatch(/\.local\/state\/weasel-skulk$/);
+    expect(cfg.names.trees).toEqual({ review: 'weasel-skulkr-r', fix: 'weasel-skulkr-f' });
+    expect(cfg.state).toMatch(/\.local\/state\/weasel-skulkr$/);
   });
 });
 
 describe('configPath', () => {
-  it('takes --config, then SKULK_CONFIG, then skulk.config.mjs in --root, SKULK_ROOT or the working directory', () => {
-    expect(configPath({ config: '/a/c.mjs', root: '/r' }, { SKULK_CONFIG: '/e.mjs' })).toBe('/a/c.mjs');
-    expect(configPath({ root: '/r' }, { SKULK_CONFIG: '/e.mjs' })).toBe('/e.mjs');
-    expect(configPath({ root: '/r' }, {})).toBe('/r/skulk.config.mjs');
-    expect(configPath({}, { SKULK_ROOT: '/s' })).toBe('/s/skulk.config.mjs');
+  it('takes --config, then SKULKR_CONFIG, then skulkr.config.mjs in --root, SKULKR_ROOT or the working directory', () => {
+    expect(configPath({ config: '/a/c.mjs', root: '/r' }, { SKULKR_CONFIG: '/e.mjs' })).toBe('/a/c.mjs');
+    expect(configPath({ root: '/r' }, { SKULKR_CONFIG: '/e.mjs' })).toBe('/e.mjs');
+    expect(configPath({ root: '/r' }, {})).toBe('/r/skulkr.config.mjs');
+    expect(configPath({}, { SKULKR_ROOT: '/s' })).toBe('/s/skulkr.config.mjs');
   });
 });
 
 describe('runners', () => {
   it('builds onto do as weasel\'s jobs always did', () => {
-    const args = ontoArgs({ kind: 'fix', node: 'studio', tree: 'weasel-skulk-f1', ref: 'abc', timeout: '55m', expect: 'none', task: 't', about: 'a', out: '.skulk/out', to: '/to', env: { K: 'v' }, shell: 'true' });
-    expect(args).toEqual(['do', '--kind', 'fix', '--node', 'studio', '--in', 'weasel-skulk-f1', '--ref', 'abc', '--force', '--timeout', '55m', '--expect', 'none',
-      '--task', 't', '--about', 'a', '--icon', 'wrench.and.screwdriver', '--out', '.skulk/out', '--to', '/to', '--env', 'K=v', '--', 'bash', '-lc', 'true']);
+    const args = ontoArgs({ kind: 'fix', node: 'studio', tree: 'weasel-skulkr-f1', ref: 'abc', timeout: '55m', expect: 'none', task: 't', about: 'a', out: '.skulkr/out', to: '/to', env: { K: 'v' }, shell: 'true' });
+    expect(args).toEqual(['do', '--kind', 'fix', '--node', 'studio', '--in', 'weasel-skulkr-f1', '--ref', 'abc', '--force', '--timeout', '55m', '--expect', 'none',
+      '--task', 't', '--about', 'a', '--icon', 'wrench.and.screwdriver', '--out', '.skulkr/out', '--to', '/to', '--env', 'K=v', '--', 'bash', '-lc', 'true']);
   });
 
   it('takes a runner object from the config, and refuses one missing part of the interface', async () => {

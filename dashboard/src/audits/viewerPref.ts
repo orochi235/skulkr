@@ -1,12 +1,12 @@
 import { useState } from 'react';
 
 /**
- * A view setting the viewer chose, kept in this browser between visits under `skulk.dashboard.<key>`: `[value, set,
+ * A view setting the viewer chose, kept in this browser between visits under `skulkr.dashboard.<key>`: `[value, set,
  * keep]`, where `set` changes it for now and `keep` stores it, so a drag stores only where it ends. Storage that is
  * missing or refuses leaves the setting to last the visit.
  */
 export function useViewerPref<T>(key: string, initial: T, read: (stored: string) => T | undefined): [T, (v: T) => void, (v: T) => void] {
-  const storeKey = `skulk.dashboard.${key}`;
+  const storeKey = `skulkr.dashboard.${key}`;
   const [value, set] = useState<T>(() => {
     try {
       const stored = localStorage.getItem(storeKey);

@@ -1,13 +1,13 @@
 /**
  * Dev-server Vite plugin serving the dashboard's data: the tenants it reads at `<base>api/tenants`, and for each,
- * the JSON `skulk map` prints at `<base>api/t/<name>/map` and one area's defects at `<base>api/t/<name>/area?id=<area>`,
- * from `skulk defects <area>`. It runs the pipeline's CLI in a child process, since building a map asks the runner
+ * the JSON `skulkr map` prints at `<base>api/t/<name>/map` and one area's defects at `<base>api/t/<name>/area?id=<area>`,
+ * from `skulkr defects <area>`. It runs the pipeline's CLI in a child process, since building a map asks the runner
  * for its jobs and may wait seconds on it, and the server must keep answering meanwhile; requests for one tenant's
  * map that arrive while its build runs share it.
  *
- * The tenants are the registry's (`skulk tenants ls`, `SKULK_TENANTS` passing through). With none registered, the
- * one project the CLI finds by itself is the only tenant: `SKULK_CONFIG` and `SKULK_ROOT` from this server's
- * environment, else `skulk.config.mjs` in the directory the child runs in.
+ * The tenants are the registry's (`skulkr tenants ls`, `SKULKR_TENANTS` passing through). With none registered, the
+ * one project the CLI finds by itself is the only tenant: `SKULKR_CONFIG` and `SKULKR_ROOT` from this server's
+ * environment, else `skulkr.config.mjs` in the directory the child runs in.
  */
 import { execFile } from 'node:child_process';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -19,12 +19,12 @@ import type { Plugin } from 'vite';
 import { TENANTS_PATH, parseTenantPath } from '../shared/routes.ts';
 
 /** The pipeline's CLI, beside the dashboard in its repository. */
-export const SKULK_BIN = fileURLToPath(new URL('../../bin/skulk.mjs', import.meta.url));
+export const SKULKR_BIN = fileURLToPath(new URL('../../bin/skulkr.mjs', import.meta.url));
 
 /** Runs the CLI with `args` and answers its stdout. */
-export type SkulkRunner = (args: readonly string[]) => Promise<string>;
+export type SkulkrRunner = (args: readonly string[]) => Promise<string>;
 
-export interface SkulkRunnerOptions {
+export interface SkulkrRunnerOptions {
   readonly bin?: string;
   readonly env?: NodeJS.ProcessEnv;
   readonly cwd?: string;
@@ -35,8 +35,8 @@ export interface SkulkRunnerOptions {
 }
 
 /** A runner for the CLI at `bin`, in `cwd`, with `env`: the server's own unless given. */
-export function createSkulkRunner({ bin = SKULK_BIN, env = process.env, cwd, exec = execFile }: SkulkRunnerOptions = {}): SkulkRunner {
-  const dir = cwd ?? env.SKULK_ROOT ?? process.cwd();
+export function createSkulkrRunner({ bin = SKULKR_BIN, env = process.env, cwd, exec = execFile }: SkulkrRunnerOptions = {}): SkulkrRunner {
+  const dir = cwd ?? env.SKULKR_ROOT ?? process.cwd();
   return (args) => new Promise((done, fail) => {
     exec(process.execPath, [bin, ...args], { cwd: dir, env, maxBuffer: 32 * 1024 * 1024, timeout: 60_000 },
       (error, stdout, stderr) => (error ? fail(new Error(String(stderr).trim() || error.message)) : done(String(stdout))));
@@ -44,7 +44,7 @@ export function createSkulkRunner({ bin = SKULK_BIN, env = process.env, cwd, exe
 }
 
 /** Builds a map JSON with `args` (`['map']`, or a tenant's), one build at a time; a call during a build gets that build's answer. */
-export function createMapBuilder(run: SkulkRunner = createSkulkRunner(), args: readonly string[] = ['map']): () => Promise<string> {
+export function createMapBuilder(run: SkulkrRunner = createSkulkrRunner(), args: readonly string[] = ['map']): () => Promise<string> {
   let pending: Promise<string> | null = null;
   return () => {
     pending ??= run(args).finally(() => {
@@ -58,7 +58,7 @@ export function createMapBuilder(run: SkulkRunner = createSkulkRunner(), args: r
 export const FRESH_MS = 5_000;
 
 /** Where a tenant's last good map is kept between server runs: one file per tenant, overwritten. */
-export const mapCachePath = (tenant: string, home = homedir()) => join(home, '.cache', 'skulk', tenant.replace(/[^\w.-]+/g, '-'), 'map.json');
+export const mapCachePath = (tenant: string, home = homedir()) => join(home, '.cache', 'skulkr', tenant.replace(/[^\w.-]+/g, '-'), 'map.json');
 
 /**
  * `build` with its last good answer kept: a request gets the kept map at once, and starts a build in the background
@@ -106,7 +106,7 @@ export interface DashTenant {
 }
 
 /** The tenants now: the registry's, or the one project the CLI finds by itself when none is registered. */
-export async function listTenants(run: SkulkRunner): Promise<DashTenant[]> {
+export async function listTenants(run: SkulkrRunner): Promise<DashTenant[]> {
   const registered = JSON.parse(await run(['tenants', 'ls', '--json'])) as { name: string }[];
   if (registered.length) return registered.map((t) => ({ name: t.name, registered: true }));
   const cfg = JSON.parse(await run(['config'])) as { name: string };
@@ -122,8 +122,8 @@ export function tenantArgs(tenants: readonly DashTenant[], name: string, what: '
 }
 
 /** The data routes' handler, with its kept tenants and maps. */
-function createRoutes(options: SkulkRunnerOptions) {
-  const run = createSkulkRunner(options);
+function createRoutes(options: SkulkrRunnerOptions) {
+  const run = createSkulkrRunner(options);
   const builds = new Map<string, () => Promise<string>>();
   const keptTenants = createKeptMap(() => listTenants(run).then((list) => JSON.stringify(list)), null);
   const json = (res: ServerResponse, body: Promise<string>) => body.then((text) => {
@@ -159,11 +159,11 @@ function createRoutes(options: SkulkRunnerOptions) {
   };
 }
 
-export function skulkMapPlugin(options: SkulkRunnerOptions = {}): Plugin {
+export function skulkrMapPlugin(options: SkulkrRunnerOptions = {}): Plugin {
   let made: ReturnType<typeof createRoutes> | null = null;
   const routes = () => (made ??= createRoutes(options));
   return {
-    name: 'skulk:map',
+    name: 'skulkr:map',
     // The preview server too: a built page loads its few bundles in a fraction of the time the dev server's
     // unbundled modules take, so a dashboard left open to watch runs as a build.
     configureServer(server) {

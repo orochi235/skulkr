@@ -13,7 +13,7 @@ afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 const state = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'skulk-lease-'));
+  const dir = mkdtempSync(join(tmpdir(), 'skulkr-lease-'));
   dirs.push(dir);
   return dir;
 };
@@ -89,7 +89,7 @@ describe('createSlots over leases', () => {
     const a = createSlots(weaselConfig(dir), ['studio'], { about: { round: 1 } });
     const b = createSlots(weaselConfig(dir), ['studio'], { about: { round: 2 } });
     const taken = [a.take('review'), b.take('review'), a.take('review'), b.take('review'), a.take('review'), b.take('review')];
-    expect(taken.map((s) => s?.tree).sort()).toEqual([1, 2, 3, 4, 5, 6].map((k) => `weasel-skulk-r${k}`));
+    expect(taken.map((s) => s?.tree).sort()).toEqual([1, 2, 3, 4, 5, 6].map((k) => `weasel-skulkr-r${k}`));
     expect(a.take('review')).toBeUndefined();
     expect(b.take('review')).toBeUndefined();
     expect([a.inUse(), b.inUse()]).toEqual([3, 3]);
@@ -103,11 +103,11 @@ describe('createSlots over leases', () => {
     const dir = state();
     writeFileSync(join(dir, 'limits.json'), JSON.stringify({ fix: 1 }));
     mkdirSync(join(dir, 'slots', 'teitou'), { recursive: true });
-    writeFileSync(join(dir, 'slots', 'teitou', 'weasel-skulk-f1'), JSON.stringify({ pid: deadPid(), round: 40 }));
+    writeFileSync(join(dir, 'slots', 'teitou', 'weasel-skulkr-f1'), JSON.stringify({ pid: deadPid(), round: 40 }));
     const a = createSlots(weaselConfig(dir), ['studio', 'teitou']);
     const b = createSlots(weaselConfig(dir), ['studio', 'teitou']);
     expect(a.take('fix')?.node).toBe('studio');
-    expect(b.take('fix')).toMatchObject({ node: 'teitou', tree: 'weasel-skulk-f1' });
+    expect(b.take('fix')).toMatchObject({ node: 'teitou', tree: 'weasel-skulkr-f1' });
     expect(a.take('fix')).toBeUndefined();
   });
 });
@@ -117,10 +117,10 @@ describe('slotsPerNode', () => {
     const dir = state();
     const slots = createSlots(weaselConfig(dir), ['studio'], { about: { round: 1 } });
     writeFileSync(join(dir, 'limits.json'), JSON.stringify({ fix: 1 }));
-    expect(slots.take('fix')?.tree).toBe('weasel-skulk-f1');
+    expect(slots.take('fix')?.tree).toBe('weasel-skulkr-f1');
     expect(slots.take('fix')).toBeUndefined();
     writeFileSync(join(dir, 'limits.json'), JSON.stringify({ fix: 2 }));
-    expect(slots.take('fix')?.tree).toBe('weasel-skulk-f2');
+    expect(slots.take('fix')?.tree).toBe('weasel-skulkr-f2');
   });
 });
 

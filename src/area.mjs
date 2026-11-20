@@ -126,7 +126,7 @@ const reviewedSource = (ctx, id) => fill(
   { commit: ctx.commit, reportA: `${JOB_IN}/${id}/A.md`, reportB: `${JOB_IN}/${id}/B.md` },
 );
 
-/** One fixer job on `area`'s findings, which are already in `.skulk/in/<area>/` in the frozen tree. */
+/** One fixer job on `area`'s findings, which are already in `.skulkr/in/<area>/` in the frozen tree. */
 export const fix = async (ctx, area, findings, source = reviewedSource(ctx, area.id)) => {
   const to = jobDir(ctx.nightDir, area.id, 'fix');
   const vars = { ...projectVars(ctx.cfg, 'fixer'), round: ctx.round, area: area.id, commit: ctx.commit, source };

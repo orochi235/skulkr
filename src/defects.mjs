@@ -2,7 +2,7 @@
  * The defects each round found in one area, for the audit page: from the round's record where it has landed, or else
  * from its night directory, each with what was broken, what became of it and what the fix changed.
  *
- *   skulk defects <area>     the area's rounds as JSON, newest first
+ *   skulkr defects <area>     the area's rounds as JSON, newest first
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';

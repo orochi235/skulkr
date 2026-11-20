@@ -10,7 +10,7 @@ import { HeatLegend } from './HeatLegend';
 import { OFF_PIPELINE, PHASE_LABEL, SWEEP, phaseClass, type AuditPhase } from './phases';
 import { Slider } from '@weasel-js/ui/components/Slider';
 import { useViewerPref } from './viewerPref';
-import type { AuditArea } from './skulkMap.types';
+import type { AuditArea } from './skulkrMap.types';
 import s from './Treemap.module.css';
 
 const FEATURES = [presets.pick];

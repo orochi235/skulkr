@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 /**
- * skulk's one command. Every subcommand reads the project's config (`--config <file>`, or `--tenant <name>` for a
- * registered tenant's, else `SKULK_CONFIG`, else `skulk.config.mjs` in `--root`, `SKULK_ROOT` or the working
+ * skulkr's one command. Every subcommand reads the project's config (`--config <file>`, or `--tenant <name>` for a
+ * registered tenant's, else `SKULKR_CONFIG`, else `skulkr.config.mjs` in `--root`, `SKULKR_ROOT` or the working
  * directory). README.md says what each does.
  *
- *   skulk night [flags]        one run (a round); `--dry` prints its plan
- *   skulk partition [--ref R]  rewrites the partition file
- *   skulk map [--out FILE]     the dashboard's JSON
- *   skulk defects <area>       one area's defects, every round's, as JSON
- *   skulk service              the long-running service (requests on stdin): the config's project, or with
+ *   skulkr night [flags]        one run (a round); `--dry` prints its plan
+ *   skulkr partition [--ref R]  rewrites the partition file
+ *   skulkr map [--out FILE]     the dashboard's JSON
+ *   skulkr defects <area>       one area's defects, every round's, as JSON
+ *   skulkr service              the long-running service (requests on stdin): the config's project, or with
  *                              none named, every registered tenant
- *   skulk config               the resolved config, as JSON
- *   skulk tenants ls [--json]  the registered tenants
- *   skulk tenants add <config> [--name n] [--read-only]
- *   skulk tenants rm <name>
+ *   skulkr config               the resolved config, as JSON
+ *   skulkr tenants ls [--json]  the registered tenants
+ *   skulkr tenants add <config> [--name n] [--read-only]
+ *   skulkr tenants rm <name>
  */
 import { mainCheckout } from '../src/batch.mjs';
 import { exitAfterFlush } from '../src/exit.mjs';
@@ -26,7 +26,7 @@ import { loadRunner } from '../src/runner/index.mjs';
 import { serve } from '../src/service.mjs';
 import { addTenant, readTenants, removeTenant, requireTenant, tenantsPath } from '../src/tenants.mjs';
 
-const USAGE = 'usage: skulk <night|partition|map|defects|service|config|tenants> [--config <file> | --tenant <name>] [--root <dir>] …';
+const USAGE = 'usage: skulkr <night|partition|map|defects|service|config|tenants> [--config <file> | --tenant <name>] [--root <dir>] …';
 
 /** `argv` less `--config`, `--tenant` and `--root` and their values, and those values. */
 const takeOptions = (argv) => {
@@ -43,7 +43,7 @@ const takeOptions = (argv) => {
   return { opts, rest };
 };
 
-/** `skulk tenants ls|add|rm`. */
+/** `skulkr tenants ls|add|rm`. */
 const tenantsCommand = async ([verb, ...args]) => {
   const flag = (name) => {
     const at = args.indexOf(name);
@@ -60,23 +60,23 @@ const tenantsCommand = async ([verb, ...args]) => {
     const name = flag('--name');
     const readOnly = args.includes('--read-only');
     const config = args.find((a) => !a.startsWith('--'));
-    if (!config) throw new Error('usage: skulk tenants add <config> [--name n] [--read-only]');
+    if (!config) throw new Error('usage: skulkr tenants add <config> [--name n] [--read-only]');
     const cfg = await loadConfig({ config });
     const entry = addTenant({ name: name ?? cfg.name, config: cfg.file, readOnly });
     console.log(`added ${entry.name}: ${entry.config}${entry.readOnly ? ' (read-only)' : ''}`);
     return 0;
   }
   if (verb === 'rm') {
-    if (!args[0]) throw new Error('usage: skulk tenants rm <name>');
+    if (!args[0]) throw new Error('usage: skulkr tenants rm <name>');
     removeTenant(args[0]);
     console.log(`removed ${args[0]}`);
     return 0;
   }
-  throw new Error('usage: skulk tenants <ls|add|rm>');
+  throw new Error('usage: skulkr tenants <ls|add|rm>');
 };
 
-/** Whether `skulk service` hosts the registry: no config named and at least one tenant registered. */
-const hostsRegistry = (opts) => opts.config === undefined && opts.root === undefined && !process.env.SKULK_CONFIG && readTenants().length > 0;
+/** Whether `skulkr service` hosts the registry: no config named and at least one tenant registered. */
+const hostsRegistry = (opts) => opts.config === undefined && opts.root === undefined && !process.env.SKULKR_CONFIG && readTenants().length > 0;
 
 const main = async () => {
   const [command, ...args] = process.argv.slice(2);
@@ -123,7 +123,7 @@ main().then(
     if (code !== undefined) exitAfterFlush(code);
   },
   (error) => {
-    console.error(`skulk: ${error.stack ?? error}`);
+    console.error(`skulkr: ${error.stack ?? error}`);
     exitAfterFlush(1);
   },
 );

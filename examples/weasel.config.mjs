@@ -1,6 +1,6 @@
 /**
- * weasel's skulk config: reproduces the nightly audit weasel's own `scripts/skulk` ran up to round 49. At cutover it
- * becomes `skulk.config.mjs` at weasel's root, with `weasel/` beside this file moved to `scripts/audit/` and the
+ * weasel's skulkr config: reproduces the nightly audit weasel's own `scripts/skulk` ran up to round 49. At cutover it
+ * becomes `skulkr.config.mjs` at weasel's root, with `weasel/` beside this file moved to `scripts/audit/` and the
  * three `./weasel/` paths below changed to match (README.md "Moving weasel over").
  */
 import { sweep } from './weasel/sweep.mjs';
@@ -9,9 +9,9 @@ const NVM = 'export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"; . "$NVM_DIR/nvm.sh" >/dev/
 
 export default {
   name: 'weasel',
-  // Kept here in x-skulk, so it names weasel's checkout; at cutover drop it: unset is the repo holding the config.
+  // Kept here in skulkr, so it names weasel's checkout; at cutover drop it: unset is the repo holding the config.
   root: '~/src/weasel',
-  state: '~/.local/state/weasel-skulk',
+  state: '~/.local/state/weasel-skulkr',
   keepNights: 30,
 
   partition: {

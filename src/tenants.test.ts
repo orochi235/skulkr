@@ -10,17 +10,17 @@ afterEach(() => {
 });
 
 const scratch = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'skulk-tenants-'));
+  const dir = mkdtempSync(join(tmpdir(), 'skulkr-tenants-'));
   dirs.push(dir);
-  const config = join(dir, 'skulk.config.mjs');
+  const config = join(dir, 'skulkr.config.mjs');
   writeFileSync(config, 'export default { name: "p" };\n');
   return { dir, config, registry: join(dir, 'conf', 'tenants.json') };
 };
 
 describe('the tenant registry', () => {
-  it('lives at SKULK_TENANTS when set', () => {
-    expect(tenantsPath({ SKULK_TENANTS: '/x/t.json' })).toBe('/x/t.json');
-    expect(tenantsPath({})).toMatch(/\.config\/skulk\/tenants\.json$/);
+  it('lives at SKULKR_TENANTS when set', () => {
+    expect(tenantsPath({ SKULKR_TENANTS: '/x/t.json' })).toBe('/x/t.json');
+    expect(tenantsPath({})).toMatch(/\.config\/skulkr\/tenants\.json$/);
   });
 
   it('adds, finds and removes tenants by name, each config once', () => {

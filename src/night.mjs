@@ -2,7 +2,7 @@
  * One run of blind-pair audit rounds: one round with its parameters. Several may run at once.
  * README.md at the repository root is its documentation.
  *
- *   skulk night [--areas K] [--only <id>,…] [--nodes <a>,…] [--dry] [--no-merge]
+ *   skulkr night [--areas K] [--only <id>,…] [--nodes <a>,…] [--dry] [--no-merge]
  *     [--cap-usd N] [--budget-review USD] [--budget-match USD] [--budget-fix USD] [--sweep]
  */
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';

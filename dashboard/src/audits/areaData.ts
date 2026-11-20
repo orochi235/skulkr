@@ -2,7 +2,7 @@
 import { lerp } from '@weasel-js/geom';
 import { warpScale } from '@weasel-js/scale';
 import { getOwn } from '@weasel-js/registry';
-import type { AreaStatus, AuditArea, AuditPass, AuditRun } from './skulkMap.types';
+import type { AreaStatus, AuditArea, AuditPass, AuditRun } from './skulkrMap.types';
 
 /** How an area is shaded: never read, settled, or by how many defects are estimated to be left in it. */
 export type AreaTone = 'unaudited' | 'settled' | { readonly left: number };
