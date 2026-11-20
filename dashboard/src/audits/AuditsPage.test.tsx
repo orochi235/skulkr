@@ -83,8 +83,9 @@ describe('AuditsPage', () => {
   it('titles the page with its tenant, and stands on a map without a project', async () => {
     serve(200, fixture);
     renderPage();
-    expect(await screen.findByRole('combobox', { name: 'Project' })).toHaveValue('example');
-    expect(screen.getByText('docs/audits/partition.json')).toBeInTheDocument();
+    // The title comes with the tenant list, before the map that names the partition.
+    expect(await screen.findByText('docs/audits/partition.json')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Project' })).toHaveValue('example');
 
     cleanup();
     const { project: _p, branch: _b, partition: _a, ...bare } = fixture;
