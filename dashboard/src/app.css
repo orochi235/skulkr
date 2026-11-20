@@ -1,0 +1,11 @@
+/* The page fills the viewport and never scrolls; every pane scrolls inside itself. */
+html,
+body,
+#root,
+.app-theme {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body { background: var(--wzl-surface); }

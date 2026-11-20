@@ -1,0 +1,61 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-family: var(--wzl-font-ui);
+  font-size: var(--wzl-font-size);
+  font-weight: var(--wzl-font-weight-light);
+  line-height: 1.4;
+  color: var(--wzl-fg);
+  background: var(--wzl-surface);
+}
+
+.shell *,
+.shell *::before,
+.shell *::after { box-sizing: border-box; }
+
+/* Baseline, not center: the title is a size up from the controls beside it. */
+.header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  align-content: center;
+  gap: var(--wzl-space-md);
+  min-height: calc(var(--wzl-tb-height) + 2 * var(--wzl-space-sm) + 1px);
+  padding: var(--wzl-space-sm) var(--wzl-space-md);
+  overflow-x: clip;
+  background: var(--wzl-surface-raised);
+  border-bottom: 1px solid var(--wzl-border);
+  z-index: var(--wzl-z-toolbar);
+}
+
+.title {
+  flex: 1 1 0;
+  min-width: 3em;
+  max-width: max-content;
+  margin: 0;
+  font-size: var(--wzl-font-size-xl);
+  font-weight: var(--wzl-font-weight-bold);
+  white-space: nowrap;
+  overflow-x: clip;
+  text-overflow: ellipsis;
+}
+
+.actions {
+  flex: none;
+  margin-left: auto;
+  /* Its baseline hangs below the title's by its face's descent, into the padding rather than the row. */
+  margin-block-end: calc(-1 * var(--wzl-space-sm));
+  display: flex;
+  align-items: center;
+  gap: var(--wzl-space-sm);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+}

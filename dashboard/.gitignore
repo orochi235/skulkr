@@ -1,0 +1,4 @@
+node_modules/
+dist/
+.alpo.local.json
+tsconfig.alpo.json
