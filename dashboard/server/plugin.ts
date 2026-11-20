@@ -10,6 +10,7 @@
  * environment, else `skulk.config.mjs` in the directory the child runs in.
  */
 import { execFile } from 'node:child_process';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -120,45 +121,56 @@ export function tenantArgs(tenants: readonly DashTenant[], name: string, what: '
   return what === 'map' ? ['map', ...pick] : ['defects', area ?? '', ...pick];
 }
 
+/** The data routes' handler, with its kept tenants and maps. */
+function createRoutes(options: SkulkRunnerOptions) {
+  const run = createSkulkRunner(options);
+  const builds = new Map<string, () => Promise<string>>();
+  const keptTenants = createKeptMap(() => listTenants(run).then((list) => JSON.stringify(list)), null);
+  const json = (res: ServerResponse, body: Promise<string>) => body.then((text) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(text);
+  }, (e: Error) => {
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'text/plain');
+    res.end(e.message);
+  });
+  return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+    const [path, query = ''] = (req.url ?? '').split('?') as [string, string?];
+    const route = parseTenantPath(path);
+    const listing = path.endsWith(`/${TENANTS_PATH}`);
+    if (!route && !listing) return next();
+    if (req.method !== 'GET') {
+      res.statusCode = 405;
+      res.end('GET only');
+      return;
+    }
+    // The registry is kept like a map, so a tenant added while the server runs shows up within FRESH_MS.
+    const tenants = keptTenants().then((text) => JSON.parse(text) as DashTenant[]);
+    if (listing) return void json(res, tenants.then((list) => JSON.stringify(list.map(({ name }) => ({ name })))));
+    void json(res, tenants.then((list) => {
+      const args = tenantArgs(list, route!.tenant, route!.what, new URLSearchParams(query).get('id'));
+      if (!args) throw new Error(`no tenant ${route!.tenant}; this dashboard reads ${list.map((t) => t.name).join(', ')}`);
+      if (route!.what === 'area') return run(args);
+      const key = args.join('\n');
+      if (!builds.has(key)) builds.set(key, createKeptMap(createMapBuilder(run, args), options.cache === false ? null : mapCachePath(route!.tenant)));
+      return builds.get(key)!();
+    }));
+  };
+}
+
 export function skulkMapPlugin(options: SkulkRunnerOptions = {}): Plugin {
+  let made: ReturnType<typeof createRoutes> | null = null;
+  const routes = () => (made ??= createRoutes(options));
   return {
     name: 'skulk:map',
-    apply: 'serve',
+    // The preview server too: a built page loads its few bundles in a fraction of the time the dev server's
+    // unbundled modules take, so a dashboard left open to watch runs as a build.
     configureServer(server) {
-      const run = createSkulkRunner(options);
-      const builds = new Map<string, () => Promise<string>>();
-      const keptTenants = createKeptMap(() => listTenants(run).then((list) => JSON.stringify(list)), null);
-      const json = (res: import('node:http').ServerResponse, body: Promise<string>) => body.then((text) => {
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Cache-Control', 'no-store');
-        res.end(text);
-      }, (e: Error) => {
-        res.statusCode = 500;
-        res.setHeader('Content-Type', 'text/plain');
-        res.end(e.message);
-      });
-      server.middlewares.use((req, res, next) => {
-        const [path, query = ''] = (req.url ?? '').split('?') as [string, string?];
-        const route = parseTenantPath(path);
-        const listing = path.endsWith(`/${TENANTS_PATH}`);
-        if (!route && !listing) return next();
-        if (req.method !== 'GET') {
-          res.statusCode = 405;
-          res.end('GET only');
-          return;
-        }
-        // The registry is kept like a map, so a tenant added while the server runs shows up within FRESH_MS.
-        const tenants = keptTenants().then((text) => JSON.parse(text) as DashTenant[]);
-        if (listing) return void json(res, tenants.then((list) => JSON.stringify(list.map(({ name }) => ({ name })))));
-        void json(res, tenants.then((list) => {
-          const args = tenantArgs(list, route!.tenant, route!.what, new URLSearchParams(query).get('id'));
-          if (!args) throw new Error(`no tenant ${route!.tenant}; this dashboard reads ${list.map((t) => t.name).join(', ')}`);
-          if (route!.what === 'area') return run(args);
-          const key = args.join('\n');
-          if (!builds.has(key)) builds.set(key, createKeptMap(createMapBuilder(run, args), options.cache === false ? null : mapCachePath(route!.tenant)));
-          return builds.get(key)!();
-        }));
-      });
+      server.middlewares.use(routes());
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(routes());
     },
   };
 }

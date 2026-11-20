@@ -121,7 +121,7 @@ export interface AuditsSource {
  *  queue, the rounds, and the jobs coming back, for the tenant the title's menu picks. Reads the dashboard's dev
  *  server: `api/tenants`, then `api/t/<tenant>/map`. */
 export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
-  const { base = import.meta.env.BASE_URL, everyMs, dev = import.meta.env.DEV } = source;
+  const { base = import.meta.env.BASE_URL, everyMs, dev = true } = source;
   const tenants = useTenants({ url: `${base}${TENANTS_PATH}`, dev });
   const names = tenants.status === 'ready' ? tenants.names : [];
   const [tenant, choose] = useTenantChoice(names);

@@ -42,7 +42,8 @@ export interface UseSkulkMapOptions {
   /** A tenant's map route; none yet asks for nothing. */
   readonly url: string | null;
   readonly everyMs?: number;
-  /** Whether a dev server can be there at all; a build has none. */
+  /** Whether a server with the data routes can be there at all: the dev server or the preview of a build. A page
+   *  hosted with neither finds out from the route's answer and says so. */
   readonly dev?: boolean;
 }
 
@@ -52,7 +53,7 @@ export interface UseSkulkMapOptions {
  * viewer last drew from `url`, kept in local storage, so a reload draws at once and the first answer replaces it.
  */
 export function useSkulkMap(options: UseSkulkMapOptions): SkulkMapState {
-  const { url, everyMs = POLL_MS, dev = import.meta.env.DEV } = options;
+  const { url, everyMs = POLL_MS, dev = true } = options;
   const [state, setState] = useState<SkulkMapState>(() => (dev ? startOf(url) : { status: 'no-server' }));
   useEffect(() => {
     if (!dev || url === null) return;

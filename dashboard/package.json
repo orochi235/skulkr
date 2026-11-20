@@ -12,7 +12,8 @@
     "dev": "vite",
     "build": "vite build",
     "test": "vitest run",
-    "typecheck": "node scripts/typecheck.mjs"
+    "typecheck": "node scripts/typecheck.mjs",
+    "serve": "vite build && vite preview"
   },
   "dependencies": {
     "@msb235/blits": "^1.4.0",
