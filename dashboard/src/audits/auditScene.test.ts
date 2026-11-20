@@ -90,12 +90,13 @@ describe('rampAt', () => {
     expect(rampAt(['#000000', '#ffffff'], 0.7)).toBe('#ffffff');
   });
 
-  it('washes a cell whose files changed since its pass, and hatches only the unaudited', () => {
+  it('cuts the corner of a cell whose files changed since its pass, keeping its heat color, and hatches only the unaudited', () => {
     const due = map.areas.find((a) => a.status === 'due')!;
     const areas = map.areas.map((a) => (a.id === due.id ? { ...a, staleLines: 1000 } : a));
     const scene = createAuditScene();
     syncAuditScene(scene, auditNodeSpecs(areas, layoutMap(areas, 900, 400), PALETTE));
-    expect(cellOf(scene, due.id).over).toEqual({ color: PALETTE.panel, opacity: expect.closeTo(0.5, 5) });
+    expect(cellOf(scene, due.id).worn).toBeCloseTo(0.5, 5);
+    expect(cellOf(scene, due.id).over).toBeUndefined();
     const unaudited = map.areas.find((a) => a.status === 'unaudited')!;
     expect(cellOf(scene, unaudited.id).over).toMatchObject({ kind: 'hatch' });
   });

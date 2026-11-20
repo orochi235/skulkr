@@ -6,7 +6,7 @@ import { framePadOf } from './mapLayout';
 export interface AuditCellData {
   readonly kind: 'audit-cell';
   readonly fill: PosedPaint;
-  /** Drawn over `fill`: the hatch on ground nobody has audited, or the wash fading one whose files changed since. */
+  /** Drawn over `fill`: the hatch on ground nobody has audited. */
   readonly over?: PosedPaint;
   readonly edge: string;
   readonly ink: string;
@@ -18,6 +18,8 @@ export interface AuditCellData {
   readonly backing?: string;
   /** Its queue place, in the cell's corner. */
   readonly queue?: number;
+  /** How much its files changed since its last pass, 0 to 0.6: a corner cut off in the edge color, that much larger. */
+  readonly worn?: number;
   /** A check in its corner: no audit is due. */
   readonly settled?: boolean;
   /** One per pass, up to four. */
@@ -84,6 +86,11 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
     ...(d.over ? filled(rect(p), d.over) : []),
     { kind: 'path', path: rect(p), stroke: { paint: { color: d.edge }, width: 0.5 } },
   ];
+  if (d.worn) {
+    const cut = Math.min(Math.min(p.width, p.height) * 0.45, 6 + 30 * d.worn);
+    const x = p.x, y = p.y + p.height;
+    out.push(...filled(pathFromD(`M ${x} ${y} L ${x} ${y - cut} L ${x + cut} ${y} Z`), { color: d.edge }));
+  }
   if (d.live) out.push({ kind: 'path', path: rect(p, 1.5), stroke: { paint: { color: d.live, opacity: d.pulse }, width: 2.5 } });
   // Drawn inward, since a neighbor paints over anything outside the cell.
   if (d.glow) for (const [by, opacity] of GLOW) out.push({ kind: 'path', path: rect(p, by), stroke: { paint: { color: d.glow, opacity }, width: 3 } });

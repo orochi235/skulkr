@@ -36,8 +36,8 @@ export function toneOf(area: AuditArea): AreaTone {
   return pass ? { left: pass.left } : 'unaudited';
 }
 
-/** How strongly an area whose files changed since its last pass is faded: none unchanged, more the more lines changed,
- *  never so much its tone is lost. */
+/** How worn an area whose files changed since its last pass reads, 0 to 0.6: none unchanged, more the more lines
+ *  changed. */
 export const staleFadeOf = (lines: number | undefined): number =>
   !lines || lines <= 0 ? 0 : Math.min(0.6, 0.2 + 0.1 * Math.log10(lines));
 

@@ -113,8 +113,9 @@ function cellData(
   estimate: number | undefined,
 ): AuditCellData {
   const tone = toneOf(area);
-  // An estimate older than its files' last changes is faded toward the panel, by how much changed.
-  const fade = typeof tone === 'object' ? staleFadeOf(area.staleLines) : 0;
+  // An estimate older than its files' last changes wears a cut corner, larger the more changed; its color stays the
+  // heat its estimate gives, since a color washed toward the panel reads as another estimate.
+  const worn = typeof tone === 'object' ? staleFadeOf(area.staleLines) : 0;
   const fill = tone === 'settled' ? palette.settled : tone === 'unaudited' ? palette.uncharted : rampAt(palette.depth, heat.at(tone.left));
   const ink = tone === 'unaudited' ? palette.ink : inkOn(fill, palette);
   const live = area.status === 'tonight';
@@ -125,7 +126,8 @@ function cellData(
     fill: { color: fill },
     ...(tone === 'unaudited' ? {
       over: { kind: 'hatch', color: estimate === undefined ? palette.hatch : rampAt(palette.depth, heat.at(estimate)), size: 6, lineWidth: 1.6 },
-    } : fade > 0 ? { over: { color: palette.panel, opacity: fade } } : {}),
+    } : {}),
+    ...(worn > 0 ? { worn } : {}),
     edge: palette.panel,
     ink,
     ...(labeled ? { label: labelLines(area, cell, palette.font.ui) } : {}),
