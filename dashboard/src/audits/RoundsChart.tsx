@@ -1,5 +1,6 @@
 import { niceDomain, stepTicks, tickStep } from '@weasel-js/scale';
-import { useId } from 'react';
+import { useId, useRef } from 'react';
+import { useElementSize } from '@weasel-js/routing/react';
 import { Button, DialogTrigger } from 'react-aria-components';
 import { Icon } from '@weasel-js/ui/components/Icon';
 import { Popover, PopoverDialog } from '@weasel-js/ui/components/Popover';
@@ -7,7 +8,8 @@ import { icon } from '@dash/icons.gen';
 import type { AuditArea, AuditRound } from './skulkMap.types';
 import s from './RoundsChart.module.css';
 
-const W = 272, H = 190;
+/** The chart's drawing size before its box is measured; it then draws at its box's width, so the bars take the room. */
+const FALLBACK_W = 272, H = 190;
 const PENDING_LABEL = { live: 'live', unmerged: 'unmerged' } as const;
 const M = { top: 8, right: 6, bottom: 22, left: 40 };
 
@@ -46,6 +48,9 @@ const passesText = (n: number) => (n === 0 ? 'has not been audited yet' : `has $
 export function RoundsChart({ rounds: all, area: picked, areas = [] }: {
   rounds: readonly AuditRound[]; area?: AuditArea | null; areas?: readonly AuditArea[];
 }) {
+  const box = useRef<HTMLDivElement>(null);
+  const measured = useElementSize(box).width;
+  const W = measured > 0 ? measured : FALLBACK_W;
   const area = picked && picked.passes.length >= AREA_CHART_PASSES ? picked : null;
   const rounds = area ? areaRoundsOf(area) : all;
   const averages = area ? nthPassAverages(areas) : [];
@@ -60,6 +65,7 @@ export function RoundsChart({ rounds: all, area: picked, areas = [] }: {
   const hatch = useId();
   return (
     <>
+      <div ref={box} className={s.box}>
       {rounds.length > 0 && (
         <svg className={s.chart} viewBox={`0 0 ${W} ${H}`} role="img"
           aria-label={area ? `Defects found and estimated in ${area.id}, by round` : 'Defects found and estimated per area, by round'}>
@@ -95,6 +101,7 @@ export function RoundsChart({ rounds: all, area: picked, areas = [] }: {
           ))}
         </svg>
       )}
+      </div>
       <div className={s.foot}>
         <span className={s.scope}>
           {area ? <><strong>{area.id}</strong>, each round that read it</>
