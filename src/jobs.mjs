@@ -29,24 +29,27 @@ const claudeLine = (cfg, promptFile, budgetUsd, flags, progress) =>
     ...(cfg.claude.configDir ? [`CLAUDE_CONFIG_DIR=${cfg.claude.configDir}`] : []),
     `perl -e 'alarm shift; exec @ARGV' ${cfg.claude.timeoutMin * 60}`,
     'claude -p "$(cat', `${q(promptFile)})"`,
-    `--output-format ${progress ? 'stream-json --verbose' : 'json'} --strict-mcp-config --max-budget-usd ${budgetUsd}`, ...flags,
+    `--output-format ${progress ? 'stream-json --verbose' : 'json'} --strict-mcp-config`,
+    ...(cfg.claude.settingSources ? [`--setting-sources ${cfg.claude.settingSources}`] : []),
+    `--max-budget-usd ${budgetUsd}`, ...flags,
     progress
       ? `2> ${JOB_OUT}/claude.err | node ${PROGRESS_IN} ${progress} ${JOB_OUT}/claude.json; echo "\${PIPESTATUS[0]}" > ${JOB_OUT}/exit`
       : `> ${JOB_OUT}/claude.json 2> ${JOB_OUT}/claude.err; echo $? > ${JOB_OUT}/exit`,
   ].join(' ');
 
 const model = (name) => (name ? ['--model', name] : []);
+const effort = (level) => (level ? ['--effort', level] : []);
 const fresh = `rm -rf ${JOB_OUT} && mkdir -p ${JOB_OUT}`;
 const prelude = (cfg) => (cfg.setup.prelude ? [cfg.setup.prelude] : []);
 
 /** A reviewer, counted through the files listed in `.skulk/in/<area>/files.txt`. */
 export const reviewShell = (cfg, area, budgetUsd) =>
   [...prelude(cfg), fresh, claudeLine(cfg, `${JOB_IN}/${area}/review.md`, budgetUsd, [
-    '--allowedTools', q(cfg.claude.reviewTools.join(',')), '--disallowedTools', q(cfg.claude.reviewDenied.join(',')), ...model(cfg.claude.models.review),
+    '--allowedTools', q(cfg.claude.reviewTools.join(',')), '--disallowedTools', q(cfg.claude.reviewDenied.join(',')), ...model(cfg.claude.models.review), ...effort(cfg.claude.effort?.review),
   ], q(`${JOB_IN}/${area}/files.txt`))].join(' && ');
 
 export const matchShell = (cfg, area, budgetUsd) =>
-  [fresh, claudeLine(cfg, `${JOB_IN}/${area}/match.md`, budgetUsd, ['--disallowedTools', q('Bash,Edit,Write,Task,Agent'), ...model(cfg.claude.models.match)])].join(' && ');
+  [fresh, claudeLine(cfg, `${JOB_IN}/${area}/match.md`, budgetUsd, ['--disallowedTools', q('Bash,Edit,Write,Task,Agent'), ...model(cfg.claude.models.match), ...effort(cfg.claude.effort?.match)])].join(' && ');
 
 /** Installs when the lockfile changed since the tree's last install, or nothing when the config names no install. */
 const installLines = (cfg) => {
@@ -75,7 +78,7 @@ export const fixShell = (cfg, area, budgetUsd, findings) =>
     'BASE=$(git rev-parse HEAD)',
     ...installLines(cfg),
     'set +e',
-    claudeLine(cfg, `${JOB_IN}/${area}/fix.md`, budgetUsd, ['--dangerously-skip-permissions', ...model(cfg.claude.models.fix)], `--commits ${findings} --checks ${CHECKS_IN}`),
+    claudeLine(cfg, `${JOB_IN}/${area}/fix.md`, budgetUsd, ['--dangerously-skip-permissions', ...model(cfg.claude.models.fix), ...effort(cfg.claude.effort?.fix)], `--commits ${findings} --checks ${CHECKS_IN}`),
     `git format-patch --stdout "$BASE..HEAD" > ${JOB_OUT}/fix.mbox`,
     `git status --porcelain > ${JOB_OUT}/uncommitted.txt`,
     'exit 0',

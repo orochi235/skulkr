@@ -78,7 +78,13 @@ export default {
     local: { name: 'orochi', from: '00:00', until: '09:00', fixers: false }, // a node usable only in a window
     reviewSlots: 6, fixSlots: 6,      // jobs at once per node, each in a tree of its own
   },
-  claude: { configDir: '~/.claude-msb', models: { match: 'haiku' }, timeoutMin: 45 },
+  claude: {
+    configDir: '~/.claude-msb',
+    models: { match: 'haiku' },       // per role (review, match, fix); unset takes what the job's settings give
+    effort: {},                       // per role, `--effort`; unset likewise
+    settingSources: 'project,local',  // `--setting-sources`: the node account's own settings stay out; null omits it
+    timeoutMin: 45,
+  },
 
   areasPerRound: 16,
   budget: { review: 8, match: 1, fix: 15, capUsd: 160, areaGuessUsd: 10 }, // list-price dollars

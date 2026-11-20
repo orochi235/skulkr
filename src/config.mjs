@@ -127,7 +127,14 @@ export const DEFAULTS = {
   claude: {
     /** `CLAUDE_CONFIG_DIR` for every job, or unset for the node's default. */
     configDir: undefined,
+    /** Unset: the model and effort the job's settings give, or the account's default. */
     models: { review: undefined, fix: undefined, match: 'haiku' },
+    effort: { review: undefined, fix: undefined, match: undefined },
+    /**
+     * `--setting-sources` for every job: without `user`, the job reads none of the node account's own settings
+     * (its hooks, plugins, and instructions), only the project's. Null leaves the flag off.
+     */
+    settingSources: 'project,local',
     timeoutMin: 45,
     /**
      * A reviewer's `--expect`, drawn only when it prints no progress of its own: weasel's rounds 38–40 ran 6.9 min

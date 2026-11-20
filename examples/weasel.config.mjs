@@ -102,7 +102,9 @@ export default {
 
   claude: {
     configDir: '~/.claude-msb',
-    models: { review: undefined, fix: undefined, match: 'haiku' },
+    // Jobs start without the account's own settings, so the opus at medium effort those gave is named here (2026-11-20).
+    models: { review: 'opus', fix: 'opus', match: 'haiku' },
+    effort: { review: 'medium', fix: 'medium' },
     timeoutMin: 45,
   },
 
