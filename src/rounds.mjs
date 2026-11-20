@@ -1,0 +1,112 @@
+/**
+ * What earlier rounds left on disk, and what that says about tonight. Nothing here keeps its own
+ * ledger: an area's history is the `<record.dir>/round-<N>/<area>/area.json` files that name it.
+ */
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+/** A pass that found at most this many distinct defects counts toward settling its area. */
+export const QUIET_PASS = 1;
+
+/** Chapman's estimate of how many defects the area held, from two lists of `a` and `b` sharing `m`. */
+export const chapman = (a, b, m) => (a + 1) * (b + 1) / (m + 1) - 1;
+
+/** Every pass on disk under `recordDir` (the config's `record.dir`), by area id, oldest first. */
+export const readPasses = (root, recordDir) => {
+  const dir = join(root, recordDir);
+  const passes = new Map();
+  if (!existsSync(dir)) return passes;
+  const rounds = readdirSync(dir).flatMap((name) => /^round-(\d+)$/.exec(name)?.[1] ?? []).map(Number);
+  for (const round of rounds.sort((x, y) => x - y)) {
+    const roundDir = join(dir, `round-${round}`);
+    for (const area of readdirSync(roundDir, { withFileTypes: true })) {
+      const at = join(roundDir, area.name, 'area.json');
+      if (!area.isDirectory() || !existsSync(at)) continue;
+      const pass = { round, ...JSON.parse(readFileSync(at, 'utf8')) };
+      // A pass a reviewer never ran or never finished is no pass: the area comes back as if it had not been audited.
+      if (pass.incomplete?.length) continue;
+      if (!passes.has(pass.id)) passes.set(pass.id, []);
+      passes.get(pass.id).push(pass);
+    }
+  }
+  return passes;
+};
+
+/**
+ * The round after every number already used: round directories, the ledger's text ("round 12",
+ * "rounds 28–30"), branches named for a round (`roundIn`, the config's `names.roundIn`: `audit30-ui`,
+ * `batch/…-audit31`), and the rounds runs have claimed (`claimed`, numbers as strings or numbers).
+ */
+export const nextRound = ({ roundDirs = [], hardening = '', branches = [], claimed = [], roundIn = /(?:^|[/-])audit(\d+)(?:-|$)/ }) => {
+  const used = [0, ...claimed.map(Number)];
+  for (const name of roundDirs) {
+    const m = /^round-(\d+)$/.exec(name);
+    if (m) used.push(Number(m[1]));
+  }
+  for (const m of hardening.matchAll(/\brounds? (\d+)(?:\s*[–-]\s*(\d+))?/g)) used.push(Number(m[1]), Number(m[2] ?? 0));
+  for (const name of branches) {
+    const m = roundIn.exec(name);
+    if (m) used.push(Number(m[1]));
+  }
+  return Math.max(...used) + 1;
+};
+
+const sameFiles = (a, b) => a.length === b.length && a.every((f, i) => f === b[i]);
+
+/**
+ * Whether an area's two latest passes settle it: each found at most QUIET_PASS distinct defects, both
+ * read the same file list as the area has now, and nothing but the passes' own fixes changed those
+ * files since the first of them. `touched(files, from, exclude)` answers whether a commit after
+ * `from` and not in `exclude` changed any of `files`.
+ */
+export const isSettled = (area, passes, touched) => {
+  if (passes.length < 2) return false;
+  const [first, last] = passes.slice(-2);
+  if (first.distinct > QUIET_PASS || last.distinct > QUIET_PASS) return false;
+  if (!sameFiles(first.files, area.files) || !sameFiles(last.files, area.files)) return false;
+  return !touched(area.files, first.commit, [...(first.fixCommits ?? []), ...(last.fixCommits ?? [])]);
+};
+
+/**
+ * The areas an earlier round is still holding: each `audit<N>-<area>` branch not yet merged into `main`
+ * (`areaOf`, the config's `names.areaOf`). Their passes are recorded only on that round's batch branch, so
+ * `readPasses` cannot see them.
+ */
+export const areasInFlight = (unmergedBranches, areaOf = /^audit\d+-(.+)$/) =>
+  new Set(unmergedBranches.flatMap((b) => areaOf.exec(b)?.[1] ?? []));
+
+/**
+ * Tonight's areas: never audited first, in partition order, then the longest since their last pass;
+ * settled areas, and areas an unlanded round still holds (`inFlight`), are skipped. Answers
+ * `{ picked, settled }`, each a list of ids.
+ */
+export const pickAreas = ({ areas, passes, touched, count, inFlight = new Set() }) => {
+  const settled = [];
+  const fresh = [];
+  const seen = [];
+  for (const area of areas) {
+    if (inFlight.has(area.id)) continue;
+    const history = passes.get(area.id) ?? [];
+    if (history.length === 0) {
+      fresh.push(area.id);
+      continue;
+    }
+    if (isSettled(area, history, touched)) settled.push(area.id);
+    else seen.push({ id: area.id, last: history.at(-1).round });
+  }
+  seen.sort((x, y) => x.last - y.last || (x.id < y.id ? -1 : 1));
+  return { picked: [...fresh, ...seen.map((s) => s.id)].slice(0, count), settled };
+};
+
+/** A `touched` for `isSettled` that asks git. */
+export const gitTouched = (git) => (files, from, exclude) => {
+  if (files.length === 0) return false;
+  let out;
+  try {
+    out = git('log', '--no-merges', '--format=%H', `${from}..HEAD`, '--', ...files);
+  } catch {
+    return true;
+  }
+  const skip = new Set(exclude);
+  return out.split('\n').some((sha) => sha && !skip.has(sha));
+};
