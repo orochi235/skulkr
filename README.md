@@ -37,12 +37,21 @@ export default {
     command: ['npm', 'test'],         // `{ref}` anywhere in it is the batch branch
     cwd: 'batch',                     // 'batch' runs it in the batch's worktree; 'root' in the main checkout
     progress: { tests: '' },          // its parallel runs, by the prefix of their `onto: progress` log lines (dashboard)
+    outcome: {},                      // per run, the word of its closing `<word> passed|failed` log line; else the gate's own result
+    jobs: {},                         // per run, a regex on its runner jobs' task names; a run without one takes the rest
   },
 
   checks: {                           // what the default fixer brief tells the fixer to run
     test: 'npx vitest run <file>',
     typecheck: 'npm run typecheck',
     lint: 'npm run lint',
+    tally: {                          // how the fixer's stream shows those checks, for its progress (regex sources)
+      test: String.raw`\bnpm test --.*?\s(\S+\.test\.ts)\b`, // runs one test file (group 1)
+      testPath: String.raw`\.test\.ts$`,  // a committed path that calls for its test file to be run
+      lint: String.raw`\bnpm run lint\b`,  // a lint run (group 1, if any, the part it lints)
+      lintOf: null,                   // a committed path that calls for a lint (group 1 its part)
+      final: String.raw`\bnpm run typecheck\b`, // the last whole check, always expected
+    },
   },
   rules: {                            // Markdown added to the default briefs
     reviewer: 'A finding about generated code under `gen/` is not a defect.',
@@ -161,8 +170,9 @@ weasel's control sweep, `examples/weasel/sweep.mjs`, is the example.
 ## Runners
 
 A runner launches jobs on nodes. `src/runner/onto.mjs` is the onto one and documents the interface:
-`run(job, { cwd, log })` answering `{ status, busy, refused }`, `unavailableNodes()`, and `jobs(sinceIso)` (what
-the dashboard's lanes are drawn from). A config's `runner` may be a module path exporting `createRunner(cfg)`, or
+`run(job, { cwd, log })` answering `{ status, busy, refused }`, `unavailableNodes()`, `jobs(sinceIso)` (what
+the dashboard's lanes are drawn from), and optionally `progress()`, each running job's own count by task (a running
+step's fill). A config's `runner` may be a module path exporting `createRunner(cfg)`, or
 the object itself.
 
 ## The service

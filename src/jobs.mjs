@@ -16,6 +16,8 @@ const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 /** The progress filter, copied into each frozen tree's `.skulk/in` so a node runs the one this run ships. */
 export const progressSource = () => fileURLToPath(new URL('./progress.mjs', import.meta.url));
 export const PROGRESS_IN = `${JOB_IN}/progress.mjs`;
+/** The config's `checks.tally`, beside the filter, for the fixer's checks. */
+export const CHECKS_IN = `${JOB_IN}/checks.json`;
 
 /**
  * Runs `claude -p` on a prompt file, stopped by an alarm before the runner's timeout so what it wrote still comes
@@ -73,7 +75,7 @@ export const fixShell = (cfg, area, budgetUsd, findings) =>
     'BASE=$(git rev-parse HEAD)',
     ...installLines(cfg),
     'set +e',
-    claudeLine(cfg, `${JOB_IN}/${area}/fix.md`, budgetUsd, ['--dangerously-skip-permissions', ...model(cfg.claude.models.fix)], `--commits ${findings}`),
+    claudeLine(cfg, `${JOB_IN}/${area}/fix.md`, budgetUsd, ['--dangerously-skip-permissions', ...model(cfg.claude.models.fix)], `--commits ${findings} --checks ${CHECKS_IN}`),
     `git format-patch --stdout "$BASE..HEAD" > ${JOB_OUT}/fix.mbox`,
     `git status --porcelain > ${JOB_OUT}/uncommitted.txt`,
     'exit 0',

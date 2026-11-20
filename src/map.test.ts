@@ -2,7 +2,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { fleetProgressOf, nightLanes, nightRoundOf, nightStages, nightsOf, readRuns, withPasses } from './map.mjs';
+import { fleetProgressOf, gateNodesOf, gateOutcomesOf, nightLanes, nightRoundOf, nightStages, nightsOf, readRuns, rerunOf, withPasses } from './map.mjs';
+import { progressOfTop } from './runner/onto.mjs';
+import { resolveConfig } from './config.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';
 import { claimRound, writeStatus, writeSummary } from './runs.mjs';
 
@@ -174,5 +176,36 @@ describe('fleetProgressOf', () => {
     writeFileSync(join(night, 'batch-2026-11-20-audit50.test-batch.log'),
       'onto: progress 3/90\npostbuild| onto: progress 1/4\n\x1b[2monto: progress 7/90\x1b[0m\n');
     expect(fleetProgressOf(night, gate)).toEqual({ tests: { done: 7, total: 90 }, build: { done: 1, total: 4 } });
+  });
+});
+
+describe('gate outcomes and reruns', () => {
+  const cfg = weaselConfig();
+  it('reads each gate run\'s end from its closing line, or the whole gate\'s from the night log', () => {
+    const night = mkdtempSync(join(tmpdir(), 'skulk-map-'));
+    dirs.push(night);
+    writeFileSync(join(night, 'batch-2026-11-20-audit49.test-batch.log'), 'test:fleet failed\ntest:fleet:postbuild passed\n');
+    expect(gateOutcomesOf(night, cfg.gate)).toEqual({ tests: 'failed', build: 'passed' });
+    const plain = resolveConfig().gate;
+    writeFileSync(join(night, 'night.log'), 'gate: gate failed (1); its log is x\n');
+    expect(gateOutcomesOf(night, plain)).toEqual({ tests: 'failed' });
+  });
+
+  it('splits a rerun batch\'s running jobs between the gate runs, summing their progress', () => {
+    const jobs = [
+      { task: 'batch-2026-11-20-audit49-s1', node: 'studio', progress: { done: 3, total: 10 } },
+      { task: 'batch-2026-11-20-audit49-s2', node: 'teitou', progress: { done: 1, total: 10 } },
+      { task: 'postbuild-batch-2026-11-20-audit49', node: 'studio' },
+      { task: 'batch-2026-11-20-audit48', node: 'keiei' },
+      { task: 'batch-2026-11-20-audit49-old', node: 'keiei', finished: 'f' },
+    ];
+    expect(rerunOf(49, jobs, cfg.gate, cfg.names)).toEqual({ tests: { done: 4, total: 20 }, build: null });
+    expect(gateNodesOf(49, jobs, cfg.gate, cfg.names)).toEqual({ tests: 'studio + teitou', build: 'studio' });
+    expect(rerunOf(47, jobs, cfg.gate, cfg.names)).toBeNull();
+  });
+
+  it('finds each task\'s first counter in onto top\'s answer', () => {
+    const top = { nodes: [{ name: 'studio', jobs: [{ task: 'audit50-a-A', progress: [{ done: 4, total: 9 }, { done: 1, total: 2 }] }, { task: 'x' }] }] };
+    expect([...progressOfTop(top)]).toEqual([['audit50-a-A', { done: 4, total: 9 }]]);
   });
 });

@@ -32,6 +32,10 @@ export interface LaneStep {
   readonly state: 'waiting' | 'running' | 'done' | 'failed';
   readonly node?: string;
   readonly since?: string;
+  /** A running step's own count of its work, as onto reports it: a reviewer's files read, a fixer's commits of its
+   *  findings. */
+  readonly done?: number;
+  readonly total?: number;
   readonly findings?: number;
   readonly read?: number;
   readonly files?: number;
@@ -45,6 +49,10 @@ export interface LaneStep {
   readonly fixed?: number;
   readonly of?: number;
   readonly extra?: number;
+  /** Of `of`, how many the fixer left for later, filed or waiting on a question, rather than fixed or found sound. */
+  readonly deferred?: number;
+  /** Of `of`, how many the fixer found were no defect. */
+  readonly dismissed?: number;
   readonly why?: string;
   /** When a done step began and ended, from onto's record of the job that ran it. */
   readonly started?: string;
@@ -57,6 +65,9 @@ export interface AuditLane {
   /** The pass this round has made of the area, once matched, as its record will hold it. */
   readonly pass?: AuditPass;
 }
+
+/** One fleet run's state after its round finished. */
+export type GateState = 'running' | 'passed' | 'failed' | null;
 
 /** How far one fleet run has got: `done` of `total`, in whatever unit it counts. */
 export interface FleetProgress {
@@ -82,6 +93,12 @@ export interface AuditRun {
   readonly lines: readonly string[];
   /** How far the batch's two fleet runs have got while they run: its tests, and its postbuild checks. */
   readonly fleet?: { readonly tests: FleetProgress | null; readonly build: FleetProgress | null } | null;
+  /** Each fleet run's state once the run has finished: how it ended, or 'running' while the batch runs again. */
+  readonly gates?: { readonly tests: GateState; readonly build: GateState } | null;
+  /** Whether the finished round's batch is running again. */
+  readonly rerun?: boolean;
+  /** The nodes running each fleet run now, joined where it runs on more than one. */
+  readonly gateNodes?: { readonly tests: string | null; readonly build: string | null } | null;
 }
 
 export interface AuditRound {

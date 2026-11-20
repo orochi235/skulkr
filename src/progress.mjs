@@ -4,7 +4,9 @@
  * would have put it. Runs on the node, from `.skulk/in`, so it imports nothing outside node itself.
  *
  *   node progress.mjs <files.txt> <result.json>      a reviewer: each listed file it first reads
- *   node progress.mjs --commits <n> <result.json>    a fixer: each commit it makes, of its n findings
+ *   node progress.mjs --commits <n> [--checks <checks.json>] <result.json>
+ *       a fixer: each commit it makes, of its n findings, then, given the config's `checks.tally` patterns, each
+ *       check it runs (`checks`) and the tests they pass (`tests`)
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
@@ -58,6 +60,97 @@ const bashCommands = (event) => {
 
 const COMMITS = /\bgit\b(?:\s+-c\s+\S+)*\s+commit\b/;
 
+/** The Bash tool calls the event's assistant message makes: each call's id and command. */
+const bashCalls = (event) => {
+  if (event?.type !== 'assistant' || !Array.isArray(event.message?.content)) return [];
+  return event.message.content
+    .filter((c) => c?.type === 'tool_use' && c.name === 'Bash' && typeof c.input?.command === 'string')
+    .map((c) => ({ id: c.id, command: c.input.command }));
+};
+
+/** The tool results the event carries back: each one's call id and its text. */
+const toolResults = (event) => {
+  if (event?.type !== 'user' || !Array.isArray(event.message?.content)) return [];
+  return event.message.content.filter((c) => c?.type === 'tool_result').map((c) => ({
+    id: c.tool_use_id,
+    error: c.is_error === true,
+    text: typeof c.content === 'string' ? c.content
+      : Array.isArray(c.content) ? c.content.map((p) => (typeof p?.text === 'string' ? p.text : '')).join('\n') : '',
+  }));
+};
+
+/** The paths a `git commit -- <paths>` names. */
+const committedPaths = (command) => {
+  const at = command.search(/\s--\s/);
+  return at === -1 ? [] : command.slice(at + 4).split(/\s+/).filter((p) => p && !p.startsWith('-') && !/[;&|]/.test(p));
+};
+
+/** Which of the fixer brief's checks a command runs, as a key: a test file, a lint, or the final check. */
+const checkOf = (command, p) => {
+  const test = p.test?.exec(command);
+  if (test) return `test ${test[1]}`;
+  const lint = p.lint?.exec(command);
+  if (lint) return lint[1] ? `lint ${lint[1]}` : 'lint';
+  return p.final?.test(command) ? 'final' : null;
+};
+
+const compile = (tally) => Object.fromEntries(Object.entries(tally).map(([k, v]) => [k, v ? new RegExp(v) : null]));
+
+/** What a vitest run's summary says it passed and failed: `Tests  1 failed | 22 passed (23)`. */
+const testTally = (text) => {
+  const line = /^\s*Tests\s+(.*\(\d+\))\s*$/m.exec(text.replace(/\x1b\[[0-9;]*m/g, ''));
+  if (!line) return null;
+  const count = (word) => Number(new RegExp(`(\\d+) ${word}`).exec(line[1])?.[1] ?? 0);
+  return { passed: count('passed'), failed: count('failed') };
+};
+
+/**
+ * The fixer brief's checks, tallied as they run, in onto's own progress protocol: a test file for each test file its
+ * commits touched, a lint for each part they touched, and the final check, told apart by `tally` (the config's
+ * `checks.tally`, regex sources). Answers `see(event)`, which answers the lines
+ * the event moves: the checks run of those expected and the ones whose latest run failed (`checks`), and the test cases
+ * run and failed (`tests`), each test file counted by its latest run, so a fix and a rerun replace a failing one.
+ */
+export const createCheckTally = (tally) => {
+  const p = compile(tally);
+  const expected = new Set(p.final ? ['final'] : []);
+  const latest = new Map();
+  const pending = new Map();
+  const files = new Map();
+  const see = (event) => {
+    const lines = [];
+    for (const { id, command } of bashCalls(event)) {
+      if (COMMITS.test(command)) {
+        for (const path of committedPaths(command)) {
+          if (p.testPath?.test(path)) expected.add(`test ${path}`);
+          const part = p.lintOf?.exec(path);
+          if (part) expected.add(part[1] ? `lint ${part[1]}` : 'lint');
+        }
+      }
+      const check = checkOf(command, p);
+      if (check) pending.set(id, check);
+    }
+    for (const { id, text, error } of toolResults(event)) {
+      const check = pending.get(id);
+      if (!check) continue;
+      pending.delete(id);
+      const tally = check.startsWith('test ') ? testTally(text) : null;
+      if (tally) {
+        files.set(check, tally);
+        const run = [...files.values()].reduce((n, t) => n + t.passed + t.failed, 0);
+        const failed = [...files.values()].reduce((n, t) => n + t.failed, 0);
+        lines.push(`onto: progress ${run}/${run} tests`, `onto: failed ${failed}/${run} tests`);
+      }
+      latest.set(check, error || (tally ? tally.failed > 0 : false));
+      expected.add(check);
+      const bad = [...latest.values()].filter(Boolean).length;
+      lines.push(`onto: progress ${latest.size}/${expected.size} checks`, `onto: failed ${bad}/${expected.size} checks`);
+    }
+    return lines;
+  };
+  return { see };
+};
+
 /** A fixer's verdict that it fixed a finding, `fixed <sha>`, which `findings.mjs` counts too. */
 export const FIXED_MARK = /\bfixed (?:in )?`?[0-9a-f]{7,}/;
 /** Text that reads as a fixer's report: its closing tally line, or a verdict. */
@@ -75,10 +168,11 @@ const assistantText = (event) => {
  * more than that raises the total rather than running past it. Its result keeps the fixer's last report as `report`
  * where its final reply is not one.
  */
-export const createCommitProgress = (findings) => {
+export const createCommitProgress = (findings, tally = null) => {
   let total = Math.max(1, findings);
   let made = 0;
   let report = '';
+  const checks = tally ? createCheckTally(tally) : { see: () => [] };
   const start = `onto: progress 0/${total}`;
   const feed = (line) => {
     let event;
@@ -92,11 +186,14 @@ export const createCommitProgress = (findings) => {
     if (event?.type === 'result') return { result: isReport(String(event.result ?? '')) || !report ? line : JSON.stringify({ ...event, report }) };
     const text = assistantText(event);
     if (isReport(text)) report = text;
+    const lines = checks.see(event);
     const commits = bashCommands(event).filter((c) => COMMITS.test(c)).length;
-    if (commits === 0) return {};
-    made += commits;
-    total = Math.max(total, made);
-    return { progress: `onto: progress ${made}/${total}` };
+    if (commits > 0) {
+      made += commits;
+      total = Math.max(total, made);
+      lines.unshift(`onto: progress ${made}/${total}`);
+    }
+    return lines.length ? { progress: lines.join('\n') } : {};
   };
   return { start, feed };
 };
@@ -104,9 +201,11 @@ export const createCommitProgress = (findings) => {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2);
   const commits = argv[0] === '--commits';
-  const resultPath = commits ? argv[2] : argv[1];
+  const tallyAt = argv.indexOf('--checks');
+  const tally = tallyAt >= 0 ? JSON.parse(readFileSync(argv[tallyAt + 1], 'utf8')) : null;
+  const resultPath = argv.at(-1);
   const { start, feed } = commits
-    ? createCommitProgress(Number(argv[1]))
+    ? createCommitProgress(Number(argv[1]), tally)
     : createProgress(readFileSync(argv[0], 'utf8').split('\n').map((s) => s.trim()).filter(Boolean));
   // An empty file, like the redirect of a `--output-format json` run killed before it printed, until a result arrives.
   writeFileSync(resultPath, '');

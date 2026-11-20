@@ -1,8 +1,8 @@
 /** Where a run has an area: the phase it is in, the color that phase wears, and its lane as spans on the run's clock. */
 import { getOwn } from '@weasel-js/registry';
 import type { SpanState, SpanStripSpan } from '@weasel-js/ui/components/SpanStrip';
-import { minutesText, stepText } from './runData';
-import type { AuditArea, AuditLane, AuditRun, LaneStep, LaneStepName } from './skulkMap.types';
+import { NODE_SEP, minutesText, stepText } from './runData';
+import type { AuditArea, AuditLane, AuditRun, FleetProgress, LaneStep, LaneStepName } from './skulkMap.types';
 import palette from './palette.module.css';
 
 /** Where every area goes, in order, `reviewed` once one of its two reviews is in: their colors run along one sweep,
@@ -138,19 +138,22 @@ export function patchFillOf(lane: AuditLane): number {
 }
 
 /**
- * A patch span split by what its fixer left: the share it fixed, shaded as the patch is, then the share it filed
- * rather than fixed, hatched dark gray. Whole where the fixer fixed everything, has not reported, or gave no tally.
+ * A patch span split by what its fixer left: the share it settled, fixed or found sound, shaded as the patch is,
+ * then the share it left for later, filed or waiting on a question, hatched dark gray. Whole where it left nothing,
+ * has not reported, or gave no tally.
  */
 export function withUnfixed(span: SpanStripSpan, lane: AuditLane): SpanStripSpan[] {
   const { fix } = lane.steps;
-  if (fix.state !== 'done' || fix.fixed === undefined || !fix.of || fix.fixed >= fix.of) return [span];
-  const share = fix.fixed / fix.of;
-  const left = fix.of - fix.fixed;
+  if (fix.state !== 'done' || fix.fixed === undefined || !fix.of) return [span];
+  // A report with only a tally line says nothing of why a finding went unfixed, so all of them count as left.
+  const left = fix.deferred ?? fix.of - fix.fixed;
+  if (left <= 0) return [span];
+  const share = 1 - left / fix.of;
   return [
     { ...span, ms: span.ms * share, fill: 1 },
     {
       ...span, id: `${span.id}-unfixed`, label: '', start: undefined, ms: span.ms * (1 - share), fill: 1, state: 'failed',
-      color: 'var(--audit-filed)', title: `${left} of ${fix.of} filed rather than fixed`, content: undefined,
+      color: 'var(--audit-filed)', title: `${left} of ${fix.of} left for later`, content: undefined,
     },
   ];
 }
@@ -165,7 +168,10 @@ function withInk(span: SpanStripSpan): SpanStripSpan {
  *  extras it fixed besides; before the fixer reports, or where its report gives no tally, what the reviews found. */
 export function tallyOf(lane: AuditLane): string {
   const { match, fix } = lane.steps;
-  if (fix.state === 'done' && fix.fixed !== undefined) return `${fix.fixed} of ${fix.of ?? fix.fixed} fixed${fix.extra ? ` +${fix.extra} extra` : ''}`;
+  if (fix.state === 'done' && fix.fixed !== undefined) {
+    const also = [fix.dismissed ? `${fix.dismissed} FP` : '', fix.deferred ? `${fix.deferred} filed` : ''].filter(Boolean);
+    return `${fix.fixed} of ${fix.of ?? fix.fixed} fixed${also.map((a) => ` · ${a}`).join('')}${fix.extra ? ` +${fix.extra} extra` : ''}`;
+  }
   return match.state === 'done' ? `${(match.a ?? 0) + (match.b ?? 0) - (match.shared ?? 0)} found` : '';
 }
 
@@ -244,8 +250,28 @@ const STEP_COLUMNS: readonly { step: LaneStepName; part: Part; phase: AuditPhase
   { step: 'match', part: 'match', phase: 'match', start: 1, width: 1, trackSpan: 2 },
   { step: 'fix', part: 'fix', phase: 'fix', start: 2, width: 1, trackSpan: 2 },
   // Applying a patch takes no time to speak of; its column is wide enough for its tally.
-  { step: 'patch', part: 'patch', phase: 'patch', start: 3, width: 0.6, trackSpan: 2 },
+  { step: 'patch', part: 'patch', phase: 'patch', start: 3 + 0.25, width: 0.6, trackSpan: 2 },
 ];
+
+/** A narrow track after the fix's own, lit while its fixer runs its checks past its last commit. */
+const CHECKS_COLUMN = { start: 3, width: 0.25 } as const;
+
+/** Whether a fixer has made every commit it set out to and is still running: its checks. */
+const checkingOf = (fix: LaneStep): boolean => fix.state === 'running' && !!fix.total && (fix.done ?? 0) >= fix.total;
+
+/** The fixer's checks: lit while it runs them, carrying the node doing it, and filled once it ends. */
+function checksSpan(fix: LaneStep): SpanStripSpan {
+  const checking = checkingOf(fix);
+  const state = fix.state === 'done' ? 'done' : fix.state === 'failed' ? 'failed' : checking ? 'active' : 'pending';
+  return {
+    id: 'checks', start: CHECKS_COLUMN.start, ms: CHECKS_COLUMN.width, trackSpan: 2, title: 'the fixer\'s checks',
+    label: checking ? fix.node ?? '' : '', state, fill: state === 'pending' ? 0 : 1, color: 'var(--audit-checks)',
+  };
+}
+
+/** The fix span while its fixer runs its checks: no longer active, its node moved onto the checks track. */
+const fixWhileChecking = (span: SpanStripSpan, fix: LaneStep): SpanStripSpan =>
+  (checkingOf(fix) ? { ...span, state: 'done', label: span.label.slice(span.label.indexOf(NODE_SEP) + NODE_SEP.length) } : span);
 
 /** How wide the steps view's window is, in columns. */
 export const STEP_COLUMN_COUNT = Math.max(...STEP_COLUMNS.map((c) => c.start + c.width));
@@ -254,8 +280,9 @@ export const STEP_COLUMN_COUNT = Math.max(...STEP_COLUMNS.map((c) => c.start + c
 const RUNNING_FILL_CAP = 0.9;
 
 /**
- * An area's lane as the steps view draws it: a column of one length per step, filled by its state, a running one as
- * far as its minutes so far go into its typical minutes, short of full until it finishes.
+ * An area's lane as the steps view draws it: a column of one length per step, filled by its state, a running one by its
+ * own count where onto reports one (a fixer's commits of its findings), else as far as its minutes so far go into its
+ * typical minutes, short of full until it finishes.
  */
 export function laneStepsOf(lane: AuditLane, now: number): SpanStripSpan[] {
   return STEP_COLUMNS.map(({ step, part, phase, start, width, track, trackSpan }): SpanStripSpan => {
@@ -263,6 +290,8 @@ export function laneStepsOf(lane: AuditLane, now: number): SpanStripSpan[] {
     const since = s.state === 'running' ? ms(s.since) : null;
     const fill = s.state === 'done' || s.state === 'failed' ? 1
       : step === 'patch' ? patchFillOf(lane)
+      // Its count runs to full: the checks after its last commit light a track of their own.
+      : s.state === 'running' && s.total ? Math.min(1, (s.done ?? 0) / s.total)
       : since !== null ? Math.min(RUNNING_FILL_CAP, (now - since) / (TYPICAL_MINUTES[part] * MIN))
       : 0;
     return {
@@ -270,7 +299,7 @@ export function laneStepsOf(lane: AuditLane, now: number): SpanStripSpan[] {
       label: step === 'patch' && s.state !== 'failed' ? tallyOf(lane) : s.state === 'waiting' ? '' : stepText(step, s, now),
       color: phaseColor(s.state === 'failed' ? 'conflict' : phase),
     };
-  }).flatMap((span) => (span.id === 'patch' && span.state !== 'failed' ? withUnfixed(span, lane) : [span]))
+  }).flatMap((span) => (span.id === 'patch' && span.state !== 'failed' ? withUnfixed(span, lane) : span.id === 'fix' ? [fixWhileChecking(span, lane.steps.fix), checksSpan(lane.steps.fix)] : [span]))
     .map((span) => withInk(span));
 }
 
@@ -285,24 +314,53 @@ const SHARED_STEPS = [
 export const inSharedSteps = (run: AuditRun): boolean =>
   !run.running || SHARED_STEPS.some((s) => (s.steps as readonly string[]).includes(run.step));
 
-/** The two fleet runs a batch's gate starts at once, a lane each. */
-export const GATE_RUNS = [{ id: 'tests', label: 'fleet tests' }, { id: 'build', label: 'postbuild' }] as const;
+/** The two fleet runs a batch's gate starts at once, a stripe each in the fleet column, in two of the ramp's cold
+ *  colors so neither reads as a step of an area's own. */
+export const GATE_RUNS = [
+  { id: 'tests', label: 'fleet tests', phase: 'match' },
+  { id: 'build', label: 'postbuild', phase: 'review' },
+] as const;
 export type GateRun = typeof GATE_RUNS[number]['id'];
 
-/** One of the run's lanes for every area at once: the batch, `gate`'s fleet run, and the merge, a column each, the
- *  fleet run filled by how far it has got. */
-export function sharedSpansOf(run: AuditRun, gate: GateRun = 'tests'): SpanStripSpan[] {
-  const at = run.running ? SHARED_STEPS.findIndex((s) => (s.steps as readonly string[]).includes(run.step)) : SHARED_STEPS.length;
-  return SHARED_STEPS.map((s, i): SpanStripSpan => {
-    const state = i < at ? 'done' : i === at ? 'active' : 'pending';
-    const fleet = s.id === 'fleet' && state === 'active' ? run.fleet?.[gate] ?? null : null;
-    const fill = state === 'done' ? 1 : fleet && fleet.total > 0 ? Math.min(1, fleet.done / fleet.total) : 0;
-    const name = s.id === 'fleet' ? GATE_RUNS.find((g) => g.id === gate)!.label : s.label;
-    const label = fleet ? `${name} · ${Math.round(fill * 100)}%` : name;
-    return {
-      id: s.id, start: i, ms: 1, state, fill, label, color: phaseColor(s.id === 'merge' ? 'patch' : 'fix'),
-      ...(s.id === 'merge' ? { ink: phaseInkOf('patch', fill) } : {}),
-      ...(fleet ? { title: `${fleet.done.toLocaleString()} of ${fleet.total.toLocaleString()} done` } : {}),
-    };
+/** A running fleet run's label: the node running it first, where known, then what it is and how far it has got. */
+const activeGateLabel = (name: string, node: string | null, fleet: FleetProgress | null, fill: number): string =>
+  [...(node ? [node] : []), name, ...(fleet ? [`${Math.round(fill * 100)}%`] : [])].join(NODE_SEP);
+
+/** Whether a shared-lane span's label leads with the node running it, the part that pulses. */
+export const leadsWithNode = (span: SpanStripSpan, run: AuditRun): boolean =>
+  !span.id.startsWith('fleet-') || !!run.gateNodes?.[span.id.slice('fleet-'.length) as GateRun];
+
+const GATE_SPAN_STATE = { running: 'active', passed: 'done', failed: 'failed' } as const;
+
+/** The run's lane for every area at once: the batch, its two fleet runs side by side, and the merge, a column each,
+ *  a fleet run filled by how far it has got. A finished round says how each fleet run ended, and a red round whose
+ *  batch runs again shows it running and the merge still ahead. */
+export function sharedSpansOf(run: AuditRun): SpanStripSpan[] {
+  const red = !run.running && /^red\b/.test(run.report ?? '');
+  const again = !run.running && !!run.rerun;
+  const at = run.running ? SHARED_STEPS.findIndex((s) => (s.steps as readonly string[]).includes(run.step))
+    : red || again ? SHARED_STEPS.findIndex((s) => s.id === 'fleet') : SHARED_STEPS.length;
+  const stepState = (i: number) => (i < at ? 'done' : i === at ? 'active' : 'pending');
+  return SHARED_STEPS.flatMap((s, i): SpanStripSpan[] => {
+    if (s.id !== 'fleet') {
+      const state = stepState(i);
+      const fill = state === 'done' ? 1 : 0;
+      return [{
+        id: s.id, start: i, ms: 1, trackSpan: GATE_RUNS.length, state, fill, label: s.label,
+        color: phaseColor(s.id === 'merge' ? 'patch' : 'fix'), ...(s.id === 'merge' ? { ink: phaseInkOf('patch', fill) } : {}),
+      }];
+    }
+    return GATE_RUNS.map((g, track): SpanStripSpan => {
+      const ended = run.gates?.[g.id] ?? null;
+      const state = !run.running && ended ? GATE_SPAN_STATE[ended] : red && !again ? 'failed' : stepState(i);
+      const fleet = state === 'active' ? run.fleet?.[g.id] ?? null : null;
+      const fill = state === 'done' || state === 'failed' ? 1 : fleet && fleet.total > 0 ? Math.min(1, fleet.done / fleet.total) : 0;
+      return {
+        id: `fleet-${g.id}`, start: i, ms: 1, track, state, fill,
+        label: state === 'active' ? activeGateLabel(g.label, run.gateNodes?.[g.id] ?? null, fleet, fill) : g.label,
+        color: phaseColor(state === 'failed' ? 'conflict' : g.phase),
+        ...(fleet ? { title: `${fleet.done.toLocaleString()} of ${fleet.total.toLocaleString()} done` } : {}),
+      };
+    });
   });
 }

@@ -34,6 +34,22 @@ export const ontoOnce = (args, cwd, log) =>
     child.on('close', (status) => done({ status: status ?? 1, stderr }));
   });
 
+/** Each task's first progress counter anywhere in `onto top --json`'s answer, by task. */
+export const progressOfTop = (top) => {
+  const found = new Map();
+  const walk = (o) => {
+    if (Array.isArray(o)) return o.forEach(walk);
+    if (!o || typeof o !== 'object') return;
+    const first = Array.isArray(o.progress) ? o.progress[0] : null;
+    if (typeof o.task === 'string' && first && Number.isFinite(first.done) && Number.isFinite(first.total)) {
+      found.set(o.task, { done: first.done, total: first.total });
+    }
+    Object.values(o).forEach(walk);
+  };
+  walk(top);
+  return found;
+};
+
 /**
  * The runner interface, as onto answers it:
  *
@@ -46,6 +62,8 @@ export const ontoOnce = (args, cwd, log) =>
  * - `unavailableNodes()` answers the nodes the runner reports as quiet or unavailable now, as a Set.
  * - `jobs(sinceIso)` answers the runner's jobs running now or started since then, each
  *   `{ task, node, state, started, finished? }`, or `[]` when it cannot say.
+ * - `progress()` (optional) answers each running job's own count of its work by its task, a Map of `{ done, total }`
+ *   (its first counter: a reviewer's files read, a fixer's commits of its findings), empty when it cannot say.
  */
 export const createOntoRunner = () => ({
   run: async (job, { cwd, log }) => {
@@ -65,6 +83,14 @@ export const createOntoRunner = () => ({
       return new Set(list.filter((r) => r.quiet || r.available === false || r.online === false).map((r) => r.name ?? r.node));
     } catch {
       return new Set();
+    }
+  },
+  progress: () => {
+    try {
+      const out = execFileSync('onto', ['top', '--json', '--once'], { encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'] });
+      return progressOfTop(JSON.parse(out));
+    } catch {
+      return new Map();
     }
   },
   jobs: (since) => {

@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createCommitProgress, createProgress } from './progress.mjs';
 import { parseEnvelope } from './usage.mjs';
+import { weaselConfig } from '../test/weaselConfig.ts';
+import { resolveConfig } from './config.mjs';
 
 const SCRIPT = join(import.meta.dirname, 'progress.mjs');
 const ROOT = '/nodes/trees/weasel-skulk-r1';
@@ -99,5 +101,60 @@ describe('createCommitProgress', () => {
     expect(feed(bash('git -c user.name=a commit -q -m two')).progress).toBe('onto: progress 2/2');
     expect(feed(bash('git commit -m three')).progress).toBe('onto: progress 3/3');
     expect(feed('{"type":"result","result":"ok"}').result).toBe('{"type":"result","result":"ok"}');
+  });
+});
+
+describe('createCommitProgress checks', () => {
+  const bash = (id: string, command: string) => JSON.stringify({
+    type: 'assistant', message: { content: [{ type: 'tool_use', id, name: 'Bash', input: { command } }] },
+  });
+  const result = (id: string, text: string) => JSON.stringify({
+    type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: text }] },
+  });
+
+  it('reports the checks a fixer runs, of those its commits call for, and their tests, in onto\'s protocol', () => {
+    const { feed } = createCommitProgress(1, weaselConfig().checks.tally);
+    const lines = [
+      bash('c1', 'git commit -m "fix" -- packages/geom/src/a.ts packages/geom/src/a.test.ts'),
+      result('c1', '[main abc1234] fix'),
+      bash('t1', 'npx vitest run --maxWorkers=1 packages/geom/src/a.test.ts'),
+      JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't1', is_error: true, content: ' Test Files  1 failed (1)\n      Tests  1 failed | 22 passed (23)\n' }] } }),
+      bash('t2', 'npx vitest run --maxWorkers=1 packages/geom/src/a.test.ts'),
+      result('t2', '      Tests  23 passed (23)\n'),
+      bash('l1', 'npm run lint -w @weasel-js/geom'),
+      result('l1', 'lint ok'),
+      bash('g1', 'npm run checks:gate'),
+      result('g1', 'all 32 passed'),
+    ].flatMap((line) => (feed(line).progress ?? '').split('\n').filter(Boolean));
+    expect(lines).toEqual([
+      'onto: progress 1/1',
+      'onto: progress 23/23 tests', 'onto: failed 1/23 tests',
+      'onto: progress 1/3 checks', 'onto: failed 1/3 checks',
+      // The rerun replaces the failing run rather than adding to it.
+      'onto: progress 23/23 tests', 'onto: failed 0/23 tests',
+      'onto: progress 1/3 checks', 'onto: failed 0/3 checks',
+      'onto: progress 2/3 checks', 'onto: failed 0/3 checks',
+      'onto: progress 3/3 checks', 'onto: failed 0/3 checks',
+    ]);
+  });
+
+  it('tallies the default checks: a test file, and the typecheck as the final one', () => {
+    const { feed } = createCommitProgress(1, resolveConfig().checks.tally);
+    const lines = [
+      bash('c1', 'git commit -m "fix" -- src/a.ts src/a.test.ts'),
+      result('c1', 'ok'),
+      bash('t1', 'npm test -- src/a.test.ts'),
+      result('t1', '      Tests  4 passed (4)\n'),
+      bash('g1', 'npm run typecheck --if-present'),
+      result('g1', ''),
+    ].flatMap((line) => (feed(line).progress ?? '').split('\n').filter(Boolean));
+    expect(lines.filter((l) => l.endsWith('checks'))).toEqual([
+      'onto: progress 1/2 checks', 'onto: failed 0/2 checks', 'onto: progress 2/2 checks', 'onto: failed 0/2 checks',
+    ]);
+  });
+
+  it('reports only commits without a tally', () => {
+    const { feed } = createCommitProgress(2);
+    expect(feed(bash('t1', 'npx vitest run a.test.ts')).progress).toBeUndefined();
   });
 });

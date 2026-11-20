@@ -76,6 +76,19 @@ export const DEFAULTS = {
     test: 'npm test -- <file>',
     typecheck: 'npm run typecheck --if-present',
     lint: 'npm run lint --if-present',
+    /**
+     * How a fixer's checks are told apart in its stream, for the progress it reports (regex sources): `test` a command
+     * running one test file (group 1), `lint` a lint run (group 1, if any, the part it lints), `final` the last
+     * whole check, always expected. A commit expects a test for each committed path matching `testPath`, and a lint
+     * for each matching `lintOf` (group 1 its part).
+     */
+    tally: {
+      test: String.raw`(?:\bvitest run|\bnpm (?:run )?test\s+--).*?\s([\w./@-]+\.test\.[cm]?[jt]sx?)\b`,
+      testPath: String.raw`\.test\.[cm]?[jt]sx?$`,
+      lint: String.raw`\bnpm run(?: -s)? lint\b`,
+      lintOf: null,
+      final: String.raw`\bnpm run(?: -s)? typecheck\b`,
+    },
   },
   /** Project rules added to the default briefs (a string of Markdown), per brief. */
   rules: { reviewer: '', fixer: '' },
@@ -85,9 +98,11 @@ export const DEFAULTS = {
   /**
    * How a batch is tested. `{ref}` in the command is the batch branch; `cwd` is `root` or `batch` (its worktree).
    * `progress` names the gate's parallel runs by the prefix their `onto: progress N/M` lines carry in its log
-   * (a regex source; '' for unprefixed lines), for the dashboard.
+   * (a regex source; '' for unprefixed lines), for the dashboard. `outcome` names, per run, the word its closing
+   * `<word> passed|failed` line in the gate's log starts with; a run without one takes the whole gate's result.
+   * `jobs` picks, per run, its runner jobs by a regex on their task names; a run without one takes the rest.
    */
-  gate: { name: 'gate', command: ['npm', 'test'], cwd: 'batch', progress: { tests: '' } },
+  gate: { name: 'gate', command: ['npm', 'test'], cwd: 'batch', progress: { tests: '' }, outcome: {}, jobs: {} },
 
   /** How the fixer readies a node tree: a shell line before every job, and an install when the lockfile changes. */
   setup: {
@@ -204,6 +219,8 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
       roundIn: new RegExp(`(?:^|[/-])${pre}(\\d+)(?:-|$)`),
       /** A job of round `round` (any round when omitted), by its task name. */
       jobOf: (round = '\\d+') => new RegExp(`^(?:${pre}|skulk)${round}-`),
+      /** A runner job of round `round`'s batch gate, by its task name. */
+      batchJobOf: (round) => new RegExp(`${escape(batchPrefix)}-\\d{4}-\\d\\d-\\d\\d-(?:${pre}|skulk)${round}(?:-|$)`),
       /** A step's task name → `[area, step]`. */
       step: new RegExp(`^(?:${pre}|skulk)\\d+-(.+)-(A|B|match|fix)$`),
       /** A night log's conflict line → the area. */

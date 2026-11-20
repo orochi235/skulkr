@@ -61,9 +61,26 @@ export default {
     fixer: './weasel/briefs/fixer.md',
   },
 
+  // How the fixer brief's checks show in its stream: one vitest file, a package's lint, and `checks:gate`.
+  checks: {
+    tally: {
+      test: String.raw`\bvitest run\b.*?\s([\w./@-]+\.test\.[cm]?[jt]sx?)\b`,
+      testPath: String.raw`^(?!.*\.browser\.test\.).*\.test\.[cm]?[jt]sx?$`,
+      lint: String.raw`\bnpm run(?: -s)? lint -w (?:@weasel-js\/)?([\w.-]+)`,
+      lintOf: String.raw`^packages\/([^/]+)\/`,
+      final: String.raw`\bnpm run(?: -s)? checks:gate\b`,
+    },
+  },
+
   // `test:batch` checks the ref out into a throwaway worktree itself, so it runs from the main checkout.
-  // Its two parallel runs: the tests, with unprefixed progress lines, and test:fleet:postbuild, prefixed `postbuild| `.
-  gate: { name: 'test:batch', command: ['npm', 'run', 'test:batch', '--', '{ref}'], cwd: 'root', progress: { tests: '', build: 'postbuild\\| ' } },
+  // Its two parallel runs: the tests, with unprefixed progress lines, and test:fleet:postbuild, prefixed `postbuild| `,
+  // whose onto jobs are `postbuild-…`; each closes its log with `<script> passed|failed`.
+  gate: {
+    name: 'test:batch', command: ['npm', 'run', 'test:batch', '--', '{ref}'], cwd: 'root',
+    progress: { tests: '', build: 'postbuild\\| ' },
+    outcome: { tests: 'test:fleet', build: 'test:fleet:postbuild' },
+    jobs: { build: '^postbuild-' },
+  },
 
   setup: {
     prelude: NVM,

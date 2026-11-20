@@ -4,7 +4,7 @@ import { Checkbox } from '@weasel-js/ui/components/Checkbox';
 import { SegmentedBar } from '@weasel-js/ui/components/Segmented';
 import { SpanStrips, type SpanStripSpan, type SpanStripsRow } from '@weasel-js/ui/components/SpanStrip';
 import { clockRuler } from './clock';
-import { GATE_RUNS, STEP_COLUMN_COUNT, inSharedSteps, laneStepsOf, laneViewOf, passDone, runClockOf, sharedSpansOf, type LaneView } from './phases';
+import { STEP_COLUMN_COUNT, leadsWithNode, inSharedSteps, laneStepsOf, laneViewOf, passDone, runClockOf, sharedSpansOf, type LaneView } from './phases';
 import { NODE_SEP, headlineOf, lastLineOf, spendOf, startedText } from './runData';
 import { useViewerPref } from './viewerPref';
 import type { AuditLane, AuditRun } from './skulkMap.types';
@@ -18,11 +18,14 @@ export interface AreaHandlers {
   readonly onLight: (id: string | null) => void;
 }
 
-/** A running span with its node's name marked, so the name alone pulses. */
+/** A running span with its node's name marked, so the name alone pulses: the label up to its separator, or all of it
+ *  where it has none. */
 function withNode(span: SpanStripSpan): SpanStripSpan {
-  const at = span.state === 'active' ? span.label.indexOf(NODE_SEP) : -1;
-  if (at <= 0) return span;
-  return { ...span, content: <><span className={s.node}>{span.label.slice(0, at)}</span>{span.label.slice(at)}</> };
+  if (span.state !== 'active' || span.label === '') return span;
+  const at = span.label.indexOf(NODE_SEP);
+  if (at === 0) return span;
+  const end = at === -1 ? span.label.length : at;
+  return { ...span, content: <><span className={s.node}>{span.label.slice(0, end)}</span>{span.label.slice(end)}</> };
 }
 
 /** An area's lane as a stack row: its name, and `spans`, its steps in the view chosen. */
@@ -77,8 +80,18 @@ function Lanes({ run, now, mode, hideComplete, on }: { run: AuditRun; now: numbe
   });
   if (lanes.length === 0) return null;
   const rows = lanes.map(({ lane, view }) => laneRow(lane, view, on, mode === 'steps' ? laneStepsOf(lane, now) : view.spans));
+  // Anywhere on a lane picks and lights its area, as its name does; the name stays the keyboard's way in.
+  const areaAt = (target: EventTarget) => {
+    const row = target instanceof Element ? target.closest('[role="listitem"]') : null;
+    const index = row?.parentElement ? [...row.parentElement.children].filter((c) => c.getAttribute('role') === 'listitem').indexOf(row) : -1;
+    return index >= 0 ? rows[index]?.id ?? null : null;
+  };
   return (
-    <div ref={ref}>
+    <div
+      ref={ref} className={s.lanesHit}
+      onClick={(e) => { const id = areaAt(e.target); if (id) on.onPick(id); }}
+      onPointerOver={(e) => on.onLight(areaAt(e.target))} onPointerLeave={() => on.onLight(null)}
+    >
       {mode === 'clock'
         ? <SpanStrips aria-label={`Round ${run.round} lanes`} window={clock} at={now} ruler={clockRuler(clock.from)} rows={rows} />
         : <SpanStrips aria-label={`Round ${run.round} lanes`} window={STEPS_WINDOW} rows={rows} />}
@@ -92,7 +105,7 @@ function RunStrip({ run, now, mode, onMode, hideComplete, onHideComplete, on }: 
   hideComplete: boolean; onHideComplete: (hide: boolean) => void; on: AreaHandlers;
 }) {
   return (
-    <section className={s.run} aria-label={`Round ${run.round}`}>
+    <section className={cx(s.run, !run.running && s.idle)} aria-label={`Round ${run.round}`}>
       <div className={s.pulse} aria-hidden="true" />
       <div className={s.what}>
         <span>{headlineOf(run)}</span>
@@ -110,10 +123,11 @@ function RunStrip({ run, now, mode, onMode, hideComplete, onHideComplete, on }: 
           {(inSharedSteps(run) || run.lanes.every(passDone)) && (
             <SpanStrips
               aria-label={`Round ${run.round}, every area`} window={SHARED_WINDOW}
-              rows={GATE_RUNS.map((g) => ({
-                id: g.id, spans: sharedSpansOf(run, g.id).map(withNode), 'aria-label': `all areas, ${g.label}`,
-                lead: <span className={s.nameCell}>{g.id === 'tests' ? 'all areas' : ''}</span>,
-              }))}
+              className={s.shared}
+              rows={[{
+                id: 'all', spans: sharedSpansOf(run).map((span) => (leadsWithNode(span, run) ? withNode(span) : span)), 'aria-label': 'all areas',
+                lead: <span className={s.nameCell}>all areas</span>,
+              }]}
             />
           )}
         </div>
@@ -122,11 +136,14 @@ function RunStrip({ run, now, mode, onMode, hideComplete, onHideComplete, on }: 
   );
 }
 
-/** A strip for every run still running; a finished round lives on in the rounds chart and the map. */
-export function LiveRuns({ runs, now, on }: { runs: readonly AuditRun[]; now: number; on: AreaHandlers }) {
+/** A strip for every run still running, and for every finished one whose batch has not merged; a merged round lives on
+ *  in the rounds chart and the map. */
+export function LiveRuns({ runs, unmerged, now, on }: {
+  runs: readonly AuditRun[]; unmerged: ReadonlySet<number>; now: number; on: AreaHandlers;
+}) {
   const [mode, setMode] = useLaneMode();
   const [hideComplete, setHideComplete] = useHideComplete();
-  const live = runs.filter((r) => r.running);
+  const live = runs.filter((r) => r.running || unmerged.has(r.round));
   if (live.length === 0) return <section className={cx(s.run, s.idle)}><div className={s.what}>No round running</div></section>;
   return (
     <div className={s.runs} aria-live="polite">
