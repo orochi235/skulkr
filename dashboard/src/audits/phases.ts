@@ -95,6 +95,10 @@ export function phasesOf(runs: readonly AuditRun[]): ReadonlyMap<string, AuditPh
   return new Map(runs.filter((r) => r.running).flatMap((r) => r.lanes.map((lane) => [lane.id, passDone(lane) ? 'done' : phaseOf(lane)] as const)));
 }
 
+/** What a live run estimates each of its areas still holds once both reviews are matched, before the pass is done. */
+export const liveEstimatesOf = (runs: readonly AuditRun[]): ReadonlyMap<string, number> =>
+  new Map(runs.filter((r) => r.running).flatMap((r) => r.lanes.flatMap((l) => (l.pass ? [[l.id, l.pass.left] as const] : []))));
+
 /** `areas`, each whose pass a live run has done carrying that pass, provisional until the round's record lands. */
 export function withLivePasses(areas: readonly AuditArea[], runs: readonly AuditRun[]): readonly AuditArea[] {
   const live = new Map(runs.filter((r) => r.running).flatMap((r) => r.lanes.filter((l) => l.pass && passDone(l)).map((l) => [l.id, l.pass!] as const)));
