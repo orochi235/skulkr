@@ -14,7 +14,7 @@ function Passes({ area }: { area: AuditArea }) {
   return (
     <table className={s.table}>
       <thead>
-        <tr><th>round</th><th className={s.vennCell}><Venn a="A" both={<abbr title="found by both">∩</abbr>} b="B" /></th><th>found</th><th>est.</th><th>left</th></tr>
+        <tr><th>round</th><th className={s.vennCell}><Venn a="A" both={<span className={s.cap} role="img" aria-label="found by both">∩</span>} b="B" /></th><th>found</th><th>est.</th><th>left</th></tr>
       </thead>
       <tbody>
         {area.passes.map((p, i) => (

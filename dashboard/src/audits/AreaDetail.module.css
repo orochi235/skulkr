@@ -50,6 +50,12 @@
 
 .both { font-weight: var(--wzl-font-weight-bold); }
 
+/* The intersection sign, which the face draws thin even bold, thickened by a stroke of its own color. */
+.cap {
+  font-weight: var(--wzl-font-weight-bold);
+  -webkit-text-stroke: 0.7px currentColor;
+}
+
 .pillA,
 .pillB {
   position: absolute;
