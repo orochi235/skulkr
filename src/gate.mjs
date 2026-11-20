@@ -53,6 +53,71 @@ export const gateOutcomesOf = (nightDir, gate) => {
   return Object.fromEntries(Object.keys(gate.progress ?? {}).map((run) => [run, gate.outcome?.[run] ? lastIn(text, gate.outcome[run]) : whole()]));
 };
 
+/** How many of a gate failure's files or steps the map names; the count covers the rest. */
+const FAILURES_NAMED = 4;
+/** How many files the map lists a run's failed tests for, and how many tests in each. */
+const FAILED_FILES_LISTED = 30;
+const FAILED_TESTS_LISTED = 12;
+
+/** A vitest report's `FAIL <project> <file> > <test>` line, after any part prefix (`browser| `). */
+const FAIL_LINE = /^(?:[\w:.-]+\| )?\s*FAIL\s+.*?\s(\S+\.(?:test|spec)\.[cm]?[jt]sx?) > (.+)$/;
+
+/** Each failed test in `lines`, with the first line of its error: `{ file, test, error }`. */
+const failedTestsIn = (lines) => {
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = FAIL_LINE.exec(lines[i]);
+    if (!m) continue;
+    let error = '';
+    for (let j = i + 1; j < Math.min(lines.length, i + 6) && !error; j++) {
+      const text = lines[j].replace(/^[\w:.-]+\| ?/, '').trim();
+      if (text && !FAIL_LINE.test(lines[j])) error = text.slice(0, 240);
+    }
+    out.push({ file: m[1], test: m[2].trim(), error });
+  }
+  return out;
+};
+
+/** The failed tests grouped by file, the files and the tests in each capped, each test once. */
+const failedByFile = (tests) => {
+  const by = new Map();
+  for (const t of tests) {
+    const list = by.get(t.file) ?? [];
+    if (!list.some((x) => x.test === t.test)) list.push({ test: t.test, error: t.error });
+    by.set(t.file, list);
+  }
+  return [...by].slice(0, FAILED_FILES_LISTED).map(([file, list]) => ({ file, count: list.length, tests: list.slice(0, FAILED_TESTS_LISTED) }));
+};
+
+/**
+ * What each of the batch gate's runs has failed so far, from its log's `fleet-fail:` lines (`gate.failPrefix`, the
+ * line's start; a run whose `gate.failRun` word follows it takes that line, the others take the rest):
+ * `{ <run>: { count, files, names, list } }`: `count` the distinct failures, `files` the files or steps they are in,
+ * `names` the first few of those, and `list` each file's failed tests with the first line of each error; null where
+ * a run has failed nothing.
+ */
+export const gateFailuresOf = (nightDir, gate) => {
+  const file = nightDir ? readdirSafe(nightDir).find((f) => f.endsWith(gate.logSuffix)) : undefined;
+  if (!file || !gate.failPrefix) return null;
+  const all = readFileSync(join(nightDir, file), 'utf8').replace(/\x1b\[[0-9;]*m/g, '').split('\n');
+  const lines = all.filter((l) => l.startsWith(gate.failPrefix)).map((l) => l.slice(gate.failPrefix.length).trim());
+  const owned = Object.entries(gate.failRun ?? {});
+  const runOf = (line) => owned.find(([, word]) => line.startsWith(`${word} `))?.[0];
+  const runs = Object.keys(gate.progress ?? {});
+  const fallback = runs.find((r) => !gate.failRun?.[r]);
+  return Object.fromEntries(runs.map((run) => {
+    const mine = [...new Set(lines.filter((l) => (runOf(l) ?? fallback) === run))];
+    if (!mine.length) return [run, null];
+    // A test's line names its project, file and test; a step's names its command.
+    const where = (l) => (l.includes(' :: ') ? l.split(' :: ')[0].split(' ').at(-1) : l.replace(/^\S+ /, ''));
+    const files = [...new Set(mine.map(where))];
+    // A test run's failures, by file with each test's error; a run of steps lists the steps alone.
+    const tests = failedTestsIn(all).filter((t) => files.includes(t.file));
+    const list = tests.length ? failedByFile(tests) : files.slice(0, FAILED_FILES_LISTED).map((step) => ({ file: step, count: 1, tests: [] }));
+    return [run, { count: mine.length, files: files.length, names: files.slice(0, FAILURES_NAMED), list }];
+  }));
+};
+
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
@@ -91,16 +156,21 @@ export const rerunOf = (round, jobs, gate, names = NAMES) => {
 /** A run's gate runs: `fleet`, how far each has got while it runs; `gates`, each one's state ('running', 'passed',
  *  'failed', or null before it starts); and the nodes running them. A finished round whose batch runs again reads as running. */
 export const fleetOf = (run, running, jobs, gate, names) => {
-  if (running) return { fleet: fleetProgressOf(run.nightDir, gate), gates: null, rerun: false, gateNodes: gateNodesOf(run.round, jobs, gate, names) };
+  const failures = gateFailuresOf(run.nightDir, gate);
+  if (running) return { fleet: fleetProgressOf(run.nightDir, gate), gates: null, rerun: false, gateNodes: gateNodesOf(run.round, jobs, gate, names), failures };
   const again = rerunOf(run.round, jobs, gate, names);
   const ended = gateOutcomesOf(run.nightDir, gate);
-  if (!again) return { fleet: null, gates: ended, rerun: false, gateNodes: null };
-  const each = (f) => Object.fromEntries(Object.keys(again).map((r) => [r, f(r)]));
+  if (!again) return { fleet: null, gates: ended, rerun: false, gateNodes: null, failures };
+  // Every run of a capstone going again is under way, the ones with no job placed yet too: the past run's outcome is
+  // not this one's.
+  const each = (f) => Object.fromEntries(Object.keys(gate.progress ?? {}).map((r) => [r, f(r)]));
   return {
     fleet: each((r) => again[r] ?? null),
-    gates: each((r) => (again[r] !== undefined ? 'running' : ended[r] ?? null)),
+    gates: each(() => 'running'),
     rerun: true,
     gateNodes: gateNodesOf(run.round, jobs, gate, names),
+    // A run going again has not failed yet this time; the last time's failures are the past run's.
+    failures: null,
   };
 };
 

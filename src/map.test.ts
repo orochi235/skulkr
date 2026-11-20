@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { fleetProgressOf, gateNodesOf, gateOutcomesOf, nightLanes, nightRoundOf, nightStages, nightsOf, readRuns, rerunOf, withPasses } from './map.mjs';
+import { fleetOf, fleetProgressOf, gateFailuresOf, gateNodesOf, gateOutcomesOf, nightLanes, nightRoundOf, nightStages, nightsOf, readRuns, rerunOf, withPasses } from './map.mjs';
 import { progressOfTop } from './runner/onto.mjs';
 import { resolveConfig } from './config.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';
@@ -197,6 +197,38 @@ describe('gate outcomes and reruns', () => {
     const plain = resolveConfig().gate;
     writeFileSync(join(night, 'night.log'), 'gate: gate failed (1); its log is x\n');
     expect(gateOutcomesOf(night, plain)).toEqual({ tests: 'failed' });
+  });
+
+  it('says what each gate run failed: how many, in which files, each test with its error', () => {
+    const night = mkdtempSync(join(tmpdir(), 'skulk-map-'));
+    dirs.push(night);
+    writeFileSync(join(night, 'batch-2026-11-20-audit54.test-batch.log'), [
+      'fleet-fail: core packages/a/x.test.ts :: x > one',
+      'fleet-fail: core packages/a/x.test.ts :: x > two',
+      'fleet-fail: browser:chromium packages/b/y.browser.test.tsx :: y > three',
+      'fleet-fail: postbuild npm run check:unnameable',
+      ' FAIL  core  packages/a/x.test.ts > x > one',
+      'AssertionError: expected 1 to be 2',
+      'browser|  FAIL   browser (chromium)  packages/b/y.browser.test.tsx > y > three',
+      'browser| TypeError: Illegal invocation',
+      'test:fleet failed',
+    ].join('\n'));
+    const failed = gateFailuresOf(night, cfg.gate)!;
+    expect(failed.tests).toMatchObject({ count: 3, files: 2, names: ['packages/a/x.test.ts', 'packages/b/y.browser.test.tsx'] });
+    expect(failed.tests!.list[0]).toEqual({ file: 'packages/a/x.test.ts', count: 1, tests: [{ test: 'x > one', error: 'AssertionError: expected 1 to be 2' }] });
+    expect(failed.tests!.list[1]!.tests[0]!.error).toBe('TypeError: Illegal invocation');
+    expect(failed.build).toMatchObject({ count: 1, files: 1, names: ['npm run check:unnameable'] });
+  });
+
+  it('reads every run of a capstone going again as running, the one with no job placed yet too', () => {
+    const night = mkdtempSync(join(tmpdir(), 'skulk-map-'));
+    dirs.push(night);
+    writeFileSync(join(night, 'batch-2026-11-20-audit49.test-batch.log'), 'test:fleet failed\ntest:fleet:postbuild passed\n');
+    const jobs = [{ task: 'postbuild-batch-2026-11-20-audit49', node: 'teitou', finished: false, progress: { done: 1, total: 17 } }];
+    const run = { round: 49, nightDir: night };
+    const again = fleetOf(run, false, jobs, cfg.gate, cfg.names);
+    expect(again.gates).toEqual({ tests: 'running', build: 'running' });
+    expect(again.failures).toBeNull();
   });
 
   it('splits a rerun batch\'s running jobs between the gate runs, summing their progress', () => {

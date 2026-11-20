@@ -4,6 +4,7 @@ import { Checkbox } from '@weasel-js/ui/components/Checkbox';
 import { SegmentedBar } from '@weasel-js/ui/components/Segmented';
 import { SpanStrips, type SpanStripSpan, type SpanStripsRow } from '@weasel-js/ui/components/SpanStrip';
 import { clockRuler } from './clock';
+import { GateFailures } from './GateFailures';
 import { STEP_COLUMN_COUNT, leadsWithNode, inSharedSteps, laneStepsOf, laneViewOf, passDone, runClockOf, sharedSpansOf, type LaneView, PHASE_LABEL, phaseClass, stageCountsOf } from './phases';
 import { NODE_SEP, headlineOf, lastLineOf, spendOf, startedText } from './runData';
 import { useViewerPref } from './viewerPref';
@@ -26,6 +27,14 @@ function withNode(span: SpanStripSpan): SpanStripSpan {
   if (at === 0) return span;
   const end = at === -1 ? span.label.length : at;
   return { ...span, content: <><span className={s.node}>{span.label.slice(0, end)}</span>{span.label.slice(end)}</> };
+}
+
+/** A capstone run's span with failures: its content opens them. */
+function withFailures(span: SpanStripSpan, run: AuditRun): SpanStripSpan {
+  const id = span.id.startsWith('fleet-') ? (span.id.slice('fleet-'.length) as 'tests' | 'build') : null;
+  const failures = id ? run.failures?.[id] ?? null : null;
+  if (!failures) return span;
+  return { ...span, content: <GateFailures label={span.content ?? span.label} run={span.label.split(NODE_SEP)[0] ?? id!} failures={failures} /> };
 }
 
 /** An area's lane as a stack row: its name, and `spans`, its steps in the view chosen. */
@@ -159,7 +168,7 @@ function RunStrip({ run, now, mode, hideComplete, on }: {
               aria-label={`Round ${run.round}, every area`} window={SHARED_WINDOW}
               className={s.shared}
               rows={[{
-                id: 'all', spans: sharedSpansOf(run).map((span) => (leadsWithNode(span, run) ? withNode(span) : span)), 'aria-label': 'all areas',
+                id: 'all', spans: sharedSpansOf(run).map((span) => withFailures(leadsWithNode(span, run) ? withNode(span) : span, run)), 'aria-label': 'all areas',
                 lead: <span className={s.nameCell}>all areas</span>,
               }]}
             />

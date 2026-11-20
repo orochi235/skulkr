@@ -48,6 +48,11 @@ describe('lanes', () => {
     // A red round says which of its fleet runs failed, and its batch running again reads as running.
     const red = { ...finished, report: 'red: batch kept', gates: { tests: 'failed', build: 'passed' } } as const;
     expect(states(red)).toEqual([['batch', 'done', 1], ['fleet-tests', 'failed', 1], ['fleet-build', 'done', 1]]);
+    // A failed run says how many failed and where, the first few files in its title.
+    const counted = sharedSpansOf({ ...red, failures: { tests: { count: 181, files: 44, names: ['a.test.ts', 'b.test.ts'], list: [] }, build: null } });
+    expect(counted[1]!.label).toBe('fleet tests · 181 failed in 44 files');
+    expect(counted[1]!.title).toBe('a.test.ts\nb.test.ts\nand 42 more');
+    expect(counted[2]!.label).toBe('postbuild');
     const again = sharedSpansOf({ ...red, rerun: true, gates: { tests: 'running', build: 'passed' }, fleet: { tests: { done: 10, total: 40 }, build: null } });
     expect(again.map((s) => [s.id, s.state, s.fill])).toEqual([['batch', 'done', 1], ['fleet-tests', 'active', 0.25], ['fleet-build', 'done', 1]]);
   });

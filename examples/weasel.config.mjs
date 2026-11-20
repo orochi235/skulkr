@@ -81,6 +81,8 @@ export default {
     progress: { tests: '', build: 'postbuild\\| ' },
     outcome: { tests: 'test:fleet', build: 'test:fleet:postbuild' },
     jobs: { build: '^postbuild-' },
+    failPrefix: 'fleet-fail:',
+    failRun: { build: 'postbuild' },
   },
 
   setup: {

@@ -2,7 +2,7 @@
 import { getOwn } from '@weasel-js/registry';
 import type { SpanState, SpanStripSpan } from '@weasel-js/ui/components/SpanStrip';
 import { NODE_SEP, minutesText, stepText } from './runData';
-import type { AuditArea, AuditLane, AuditRun, FleetProgress, LaneStep, LaneStepName } from './skulkMap.types';
+import type { AuditArea, AuditLane, AuditRun, FleetProgress, GateFailures, LaneStep, LaneStepName } from './skulkMap.types';
 import palette from './palette.module.css';
 
 /** Where every area goes, in order, `reviewed` once one of its two reviews is in: their colors run along one sweep,
@@ -345,6 +345,10 @@ export type GateRun = typeof GATE_RUNS[number]['id'];
 const activeGateLabel = (name: string, node: string | null, fleet: FleetProgress | null, fill: number): string =>
   [...(node ? [node] : []), name, ...(fleet ? [`${Math.round(fill * 100)}%`] : [])].join(NODE_SEP);
 
+/** A gate run's failures in a few words: how many failed, and in how many files where that is fewer. */
+const failedText = (f: GateFailures): string =>
+  `${f.count.toLocaleString()} failed${f.files < f.count ? ` in ${f.files.toLocaleString()} file${f.files === 1 ? '' : 's'}` : ''}`;
+
 /** Whether a shared-lane span's label leads with the node running it, the part that pulses. */
 export const leadsWithNode = (span: SpanStripSpan, run: AuditRun): boolean =>
   !span.id.startsWith('fleet-') || !!run.gateNodes?.[span.id.slice('fleet-'.length) as GateRun];
@@ -372,12 +376,18 @@ export function sharedSpansOf(run: AuditRun): SpanStripSpan[] {
       const state = !run.running && ended ? GATE_SPAN_STATE[ended] : red && !again ? 'failed' : stepState(i);
       const fleet = state === 'active' ? run.fleet?.[g.id] ?? null : null;
       const fill = state === 'done' || state === 'failed' ? 1 : fleet && fleet.total > 0 ? Math.min(1, fleet.done / fleet.total) : 0;
+      const failed = run.failures?.[g.id] ?? null;
+      const said = failed ? failedText(failed) : '';
       return {
         id: `fleet-${g.id}`, start: i, ms: 1, track, state, fill,
-        label: state === 'active' ? activeGateLabel(g.label, run.gateNodes?.[g.id] ?? null, fleet, fill)
-          : waiting && i === at ? `${g.label}${NODE_SEP}waiting` : g.label,
+        label: state === 'active' ? `${activeGateLabel(g.label, run.gateNodes?.[g.id] ?? null, fleet, fill)}${said ? `${NODE_SEP}${said}` : ''}`
+          : waiting && i === at ? `${g.label}${NODE_SEP}waiting`
+            : state === 'failed' && said ? `${g.label}${NODE_SEP}${said}` : g.label,
         color: phaseColor(state === 'failed' ? 'conflict' : g.phase),
-        ...(fleet ? { title: `${fleet.done.toLocaleString()} of ${fleet.total.toLocaleString()} done` } : {}),
+        ...(failed || fleet ? { title: [
+          ...(fleet ? [`${fleet.done.toLocaleString()} of ${fleet.total.toLocaleString()} done`] : []),
+          ...(failed ? [...failed.names, ...(failed.files > failed.names.length ? [`and ${failed.files - failed.names.length} more`] : [])] : []),
+        ].join('\n') } : {}),
       };
     });
   });

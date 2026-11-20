@@ -105,6 +105,8 @@ export interface AuditRun {
   readonly rerun?: boolean;
   /** The nodes running each fleet run now, joined where it runs on more than one. */
   readonly gateNodes?: { readonly tests: string | null; readonly build: string | null } | null;
+  /** What each gate run has failed so far: how many tests or steps, in how many files or steps, the first few named. */
+  readonly failures?: { readonly tests: GateFailures | null; readonly build: GateFailures | null } | null;
 }
 
 export interface AuditRound {
@@ -167,4 +169,13 @@ export interface AuditAreaRound {
   readonly items: readonly AuditDefect[];
   /** The subjects of a fixer's commits where it left commits but no report, as one stopped partway does. */
   readonly commits?: readonly string[];
+}
+
+/** A gate run's failures. */
+export interface GateFailures {
+  readonly count: number;
+  readonly files: number;
+  readonly names: readonly string[];
+  /** Each failed file, its count and its first failed tests with the first line of each error; a step alone for a run of steps. */
+  readonly list: readonly { readonly file: string; readonly count: number; readonly tests: readonly { readonly test: string; readonly error: string }[] }[];
 }
