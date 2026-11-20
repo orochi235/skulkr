@@ -87,8 +87,8 @@ export default {
   },
 
   areasPerRound: 16,
-  budget: { review: 8, match: 1, fix: 15, capUsd: 160, areaGuessUsd: 10 }, // list-price dollars
-  schedule: { startAt: '23:00', stopAt: '07:00' },  // the service's start; when a run stops dispatching
+  budget: { review: 8, match: 1, fix: 15, capUsd: 160, areaGuessUsd: 10, nightUsd: undefined }, // list-price dollars
+  schedule: { startAt: '23:00', stopAt: '07:00', continuous: false }, // the service's start; when a run stops dispatching
   state: undefined,                   // default ~/.local/state/skulk/<name>
   sweep: null,                        // an extra check beside the reviews; see "A sweep"
 };
@@ -124,7 +124,7 @@ Each step prints one line as it completes (`review 3/16 …`).
 | match | One job per area pairs the two lists (the matcher brief); the pipeline keeps only one-to-one pairs and computes the estimate. |
 | fix | Per area with findings, one fixer job, permissions bypassed, in the node's synced tree. It first commits the synced tree and checks it hashes to the frozen commit's tree, installs if the lockfile changed, then hands back its commits as an mbox. |
 | patch | Each mbox is applied with `git am` onto `audit<N>-<area>` at the frozen commit. One that does not apply is reported and left out. |
-| batch | Every branch merges into `batch/<date>-audit<N>` (a worktree); a conflicting one is left out and reported. The round's record is committed there. Then the run waits for `merge.lock`, held by one run at a time from its gate through `main`'s fast-forward; holding it, it merges `main` in if another run has landed meanwhile, and runs the gate on the tip. |
+| batch | Every branch merges into `batch/<date>-audit<N>` (a worktree); a conflicting one is left out and reported. The round's record is committed there. Then the run waits for `merge.lock`, held by one run at a time from its gate through `main`'s fast-forward; holding it, it merges `main` in if another run has landed meanwhile, waits its turn in the fleet queue (step `fleet-wait`; see "Continuous rounds"), and runs the gate on the tip. |
 | merge | Green: local `main` fast-forwards to the batch (never pushed), and the branches are deleted. If `main` moved during the gate, it is merged in and the gate runs again, up to twice. Red: the batch worktree and its branches stay, and the report names them. |
 
 The record, in `<record.dir>/round-<N>/`: per area `files.txt`, `A.md`, `B.md`, `match.json`, `fix.md` and
@@ -201,15 +201,17 @@ the object itself.
 `skulk service` runs nights as a long-running service, for the project its config names or, with none named, for
 every registered tenant (see "Tenants"). For each project it starts a run by itself at
 `schedule.startAt` unless one is live or one has started since then that day (one started by hand after midnight
-does not count as that evening's), and answers requests, one JSON object a line on stdin, each echoing its `id`:
+does not count as that evening's), or keeps rounds coming in continuous mode (see "Continuous rounds"), and answers
+requests, one JSON object a line on stdin, each echoing its `id`:
 
 | Request | Reply |
 |---|---|
 | `{"ping":true}` | `pong`, x-skulk's commit (`build`), and the tenants hosted; with `tenant`, that project checkout's commit |
-| `{"status":true}` | `runs`: every live run's round, step, areas, flags, and dollars used against its cap; `last`: the summary of the run that ended last |
+| `{"status":true}` | `runs`: every live run's round, step, areas, flags, dollars used against its cap, and `behind`, what a waiting one waits for; `last`: the summary of the run that ended last; `continuous`: the mode, what the next round waits on (`next`), and `nightUsd`, `spentUsd`, `leftUsd`, and `estimateUsd`; `queues`: the round in its model steps (`model`) and the fleet queue's holder and waiters (`fleet`) |
 | `{"plan":true}` | what a run started now would pick |
 | `{"start":true}` | starts a run now, beside any already running; takes `areas`, `only`, `nodes`, `capUsd`, `budget` (`{review, match, fix}`), `merge: false`, `sweep: true`, and `resume` |
-| `{"stop":true}` | with `round`, that run; without, every live run: no new jobs start, running ones finish, then each run patches, batches, and records what completed |
+| `{"start":true,"continuous":true}` | turns continuous mode on until the night's `stopAt`, and starts its first round if the queues and budget allow; takes no other field. `"continuous":false` turns it off |
+| `{"stop":true}` | with `round`, that run; without, every live run and continuous mode until the night's `stopAt`: no new jobs start, running ones finish, then each run patches, batches, and records what completed |
 
 Every request but a bare `ping` may carry `tenant`, the project it is about, and every reply to one names its
 `tenant`. Without one it means the only tenant, and is refused when there are several.
@@ -225,6 +227,39 @@ Starting or restarting the service never starts a run. Under onto, on the machin
 `SKULK_BIN` makes each run start from the x-skulk checkout rather than the service's synced copy, so a change to
 the pipeline reaches the next run without a sync.
 
+## Continuous rounds
+
+A round's model work (reviews, matches, fixes) is cheap on fleet CPU and bound by spend; its gate is one suite-sized
+fleet run. Continuous mode overlaps the two, keeping a tenant's rounds coming through two queues:
+
+| Queue | Holds | A round waiting on it |
+|---|---|---|
+| model | at most one round per tenant in its model steps (`freeze`, `review`) | the next continuous round starts once the last reaches `patch` |
+| fleet | at most one gate across every tenant and every run, however started | sits at step `fleet-wait`, its status `behind` naming the holder |
+
+The fleet queue is on disk, in `~/.local/state/skulk/fleet/` (`SKULK_FLEET` names another): `gate.lease` is the
+holder, a lease like the slots', and `waiting/` holds a ticket per waiting run, taken oldest first. A run whose
+process has died loses its lease and its ticket.
+
+Continuous mode is on between `startAt` and `stopAt` when the config sets `schedule.continuous: true`, or from a
+`{"start":true,"continuous":true}` request until the night's `stopAt` or a bare `{"stop":true}`, which also turns
+off the config's mode for the rest of that night. A request's mode is kept in `<state>/continuous.json`, so it
+survives the service restarting. It needs `budget.nightUsd`: with none, there is no continuous mode, and a config
+asking for it keeps the plain scheduled start.
+
+Each tick (every 30 seconds) the service starts a tenant's next round when all of these hold:
+
+- the mode is on, and the tenant is not read-only;
+- no round of the tenant is in its model steps, or started and not yet claimed, and no other tenant's is;
+- the night's spend plus the next round's estimate stays within `budget.nightUsd`.
+
+The night, for the budget, runs from one `stopAt` to the next, so a round started in the afternoon counts against
+the coming night. Its spend is every round started in it, from `status.json` while live and `summary.json` after
+(run directories from the last day are never pruned). The estimate is `areasPerRound` times the mean cost per
+finished area of the last five rounds, or `areasPerRound × budget.areaGuessUsd` before any. Each continuous round
+runs with `--cap-usd` set to the night's budget left or `budget.capUsd`, whichever is less. A continuous round that
+claims nothing or fails ends the chain for the night. `stopAt` still stops every run dispatching, as before.
+
 ## Tenants
 
 One x-skulk host can serve several projects, its *tenants*. Each keeps its own config and state; the registry,
@@ -239,11 +274,12 @@ Every command takes `--tenant <name>` beside `--config` to name a tenant's confi
 
 `skulk service` with no config named hosts every tenant in the registry, reread every 30 seconds and before each
 request, so one added while it runs is picked up without a restart. Each tenant keeps its own `schedule.startAt`.
-Rounds of different tenants never run at once, since they share the fleet's slots: a tenant due, or asked to start,
-while another's round runs waits, and its `status` reply lists that under `waiting` (`behind` names the tenant it
-waits on), beside `nextStart`, its next scheduled start. A tenant's own rounds may still run beside each other. A
-tenant added `--read-only` is shown and its live rounds hold the fleet like any other's, but the service never
-starts or stops one: its rounds run under another service.
+Rounds of different tenants never do their model work at once, since they share the fleet's slots: a tenant due, or
+asked to start, while another's round is in its model steps waits until that round reaches its patch step, and its
+`status` reply lists that under `waiting` (`behind` names the tenant it waits on), beside `nextStart`, its next
+scheduled start. Their gates take turns in the fleet queue. A tenant's own rounds may still run beside each other
+when started by hand. A tenant added `--read-only` is shown and its live rounds hold the fleet like any other's, but
+the service never starts or stops one: its rounds run under another service.
 
 weasel is registered read-only (`examples/weasel.config.mjs`, root `~/src/weasel`, state
 `~/.local/state/weasel-skulk`), so the dashboard reads its live state while weasel's own service runs its rounds.
@@ -265,10 +301,12 @@ map at `api/t/<name>/map` and an area's defects at `api/t/<name>/area?id=<area>`
 | What | Where | Bound |
 |---|---|---|
 | A run's log, job outputs, and runner logs | `<state>/nights/<start>-round<N>/` | the newest `keepNights`; older ones are deleted when a run starts |
-| A run's claim, status, stop request, and summary | `<state>/runs/<N>/`: the directory is the claim; `status.json` (with its pid) while it runs, `stop` when asked, `summary.json` when it ends | the newest `keepNights`, never a live one; pruned when a run starts |
+| A run's claim, status, stop request, and summary | `<state>/runs/<N>/`: the directory is the claim; `status.json` (with its pid) while it runs, `stop` when asked, `summary.json` when it ends | the newest `keepNights`, never a live one nor one started in the last day; pruned when a run starts |
 | Each commit's lines changed, for `staleLines` | `~/.cache/skulk/<name>/churn.json` | only the commits after the oldest pass any area last had; rewritten without the rest on each build that adds one |
 | Node tree leases | `<state>/slots/<node>/<tree>` | deleted as each job ends; one whose pid is dead is taken back |
 | Locks | `<state>/plan.lock`, `<state>/merge.lock` | one file each, deleted on release |
+| The fleet queue | `~/.local/state/skulk/fleet/`: `gate.lease` and a ticket per waiting run in `waiting/` | the lease deleted on release, a ticket when its run takes the gate; a dead pid's of either is cleared |
+| Continuous mode asked for | `<state>/continuous.json` | one file, rewritten by each request |
 | Worktrees | `.worktrees/audit<N>-frozen-night`, `audit<N>-am-<area>`, `batch-<date>-audit<N>` in the project checkout | removed when the run ends, except a red batch's, which the report names |
 | Node trees | `<name>-skulk-r<k>`, `<name>-skulk-f<k>` on each node | a fixed set; each job clears its own output |
 

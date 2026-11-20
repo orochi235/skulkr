@@ -11,3 +11,8 @@ Open work on x-skulk. Each entry says when it closes.
 - [ ] (P3) The dashboard's two gate stripes are fixed as weasel's (`GATE_RUNS` in `phases.ts`: "fleet tests" and
   "postbuild"), while the pipeline reads a project's gate runs from `gate.progress`. Closes when the map names the
   gate runs and their labels and the dashboard draws whichever it is given.
+- [ ] (P3) A resumed round's status starts its `costUsd` at 0 (`resume` in `src/night.mjs`), and its summary then holds
+  only the resumed part, so continuous mode's night spend misses what the round spent before it stopped. Left as is
+  for parity with weasel's `scripts/skulk`. Closes when a resumed round carries its earlier spend into `status.json`.
+- [ ] (P3) README "Tenants" still says weasel is registered read-only; `~/.config/skulk/tenants.json` lists it without
+  `readOnly` (2026-11-20). Closes when the paragraph says how weasel is registered now.
