@@ -127,6 +127,7 @@ export function skulkMapPlugin(options: SkulkRunnerOptions = {}): Plugin {
     configureServer(server) {
       const run = createSkulkRunner(options);
       const builds = new Map<string, () => Promise<string>>();
+      const keptTenants = createKeptMap(() => listTenants(run).then((list) => JSON.stringify(list)), null);
       const json = (res: import('node:http').ServerResponse, body: Promise<string>) => body.then((text) => {
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Cache-Control', 'no-store');
@@ -146,8 +147,8 @@ export function skulkMapPlugin(options: SkulkRunnerOptions = {}): Plugin {
           res.end('GET only');
           return;
         }
-        // The registry is read on every request, so a tenant added while the server runs shows up.
-        const tenants = listTenants(run);
+        // The registry is kept like a map, so a tenant added while the server runs shows up within FRESH_MS.
+        const tenants = keptTenants().then((text) => JSON.parse(text) as DashTenant[]);
         if (listing) return void json(res, tenants.then((list) => JSON.stringify(list.map(({ name }) => ({ name })))));
         void json(res, tenants.then((list) => {
           const args = tenantArgs(list, route!.tenant, route!.what, new URLSearchParams(query).get('id'));
