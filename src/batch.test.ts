@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { catchUpWithMain, commitRecord, gitIn, runGate } from './batch.mjs';
+import { catchUpWithMain, commitRecord, gitIn, makeBatch, runGate } from './batch.mjs';
 import { resolveConfig } from './config.mjs';
 
 const dirs: string[] = [];
@@ -48,6 +48,29 @@ describe('catchUpWithMain', () => {
     expect(git('rev-parse', 'HEAD')).toBe(tip);
   });
 
+  it('merges two rounds\' ledger rows at one spot by appending the batch\'s to main\'s', () => {
+    const { dir, git } = repo('base.txt', 'base.txt');
+    git('reset', '-q', '--hard', 'HEAD~1');
+    const table = (rows: string[]) => ['# Ledger', '', '## Record', '', '| round |', '| --- |', ...rows, '', '## After', ''].join('\n');
+    const put = (text: string) => {
+      writeFileSync(join(dir, 'ledger.md'), text);
+      git('add', 'ledger.md');
+      git('commit', '-q', '-m', 'ledger');
+    };
+    git('checkout', '-q', 'main');
+    git('reset', '-q', '--hard', 'HEAD~1');
+    put(table(['| 50 |']));
+    git('checkout', '-q', '-B', 'batch');
+    put(table(['| 50 |', '| 53 |']));
+    git('checkout', '-q', 'main');
+    put(table(['| 50 |', '| 51 |']));
+    git('checkout', '-q', 'batch');
+    const caught = catchUpWithMain(dir, 'main', { path: 'ledger.md', section: 'Record' });
+    expect(caught.moved).toBe(true);
+    expect(readFileSync(join(dir, 'ledger.md'), 'utf8')).toBe(table(['| 50 |', '| 51 |', '| 53 |']));
+    expect(git('status', '--porcelain')).toBe('');
+  });
+
   it('answers a conflict and leaves the batch as it was', () => {
     const { dir, git } = repo('same.txt', 'same.txt');
     const tip = git('rev-parse', 'HEAD');
@@ -60,6 +83,26 @@ describe('catchUpWithMain', () => {
 const area = (id: string) => ({
   id, files: [`src/${id}/a.ts`], a: 2, b: 1, m: 1, distinct: 2, chapman: 2, unfound: 0, read: { A: 1, B: 1 }, patches: 1, questions: 0,
   jobs: { weightedTokens: 1e6, costUsd: 1.5 }, fixCommits: [],
+});
+
+describe('makeBatch', () => {
+  it('builds on main as it is now, leaving out only a branch that conflicts with it', () => {
+    const { dir, git } = repo('main.txt', 'batch.txt');
+    const frozen = git('rev-parse', 'HEAD~1');
+    // Two area branches from the round's frozen commit: one touching a file main has since changed, one not.
+    for (const [branch, file] of [['a-clean', 'clean.txt'], ['a-clash', 'main.txt']]) {
+      git('checkout', '-q', '-b', branch, frozen);
+      writeFileSync(join(dir, file), branch);
+      git('add', file);
+      git('commit', '-q', '-m', branch);
+    }
+    git('checkout', '-q', 'main');
+    git('branch', '-q', '-D', 'batch');
+    const made = makeBatch(resolveConfig({}), dir, { round: 9, date: '2026-11-20', commit: frozen, branches: ['a-clean', 'a-clash'] });
+    expect(made.merged).toEqual(['a-clean']);
+    expect(made.conflicted).toEqual(['a-clash']);
+    expect(gitIn(made.tree)('merge-base', '--is-ancestor', 'main', 'HEAD')).toBe('');
+  });
 });
 
 describe('commitRecord', () => {

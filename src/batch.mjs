@@ -70,7 +70,11 @@ export const applyFix = (cfg, root, { round, area, commit, mbox }) => {
 /** Merges each branch into a new batch branch at `commit`; one that conflicts is left out. */
 export const makeBatch = (cfg, root, { round, date, commit, branches }) => {
   const name = cfg.names.batch(date, round);
-  const tree = addWorktree(root, cfg.names.batchTree(date, round), commit, name);
+  // On main as it is now, so whatever landed since the round froze is in from the start and a branch that conflicts
+  // with it is left out here, alone, rather than failing the whole batch's catch-up later.
+  const main = cfg.git.main;
+  const base = tryGit(gitIn(root), 'merge-base', '--is-ancestor', commit, main).ok ? main : commit;
+  const tree = addWorktree(root, cfg.names.batchTree(date, round), base, name);
   const git = gitIn(tree);
   const merged = [];
   const conflicted = [];
@@ -142,16 +146,40 @@ export const runGate = (cfg, { root, batch, logPath }) =>
     });
   });
 
-/** Merges `main` into the batch checked out at `tree` unless it already holds it. Answers whether it moved, the new tip, or a conflict. */
-export const catchUpWithMain = (tree, main = 'main') => {
+/** Merges `main` into the batch checked out at `tree` unless it already holds it. Answers whether it moved, the new tip, or a conflict.
+ *  A conflict only in `ledger` (the config's `record.ledger`, which every round appends a row to) is two rounds' rows
+ *  at one spot: it takes main's copy and appends the batch's own rows to it again. */
+export const catchUpWithMain = (tree, main = 'main', ledger = null) => {
   const git = gitIn(tree);
   if (tryGit(git, 'merge-base', '--is-ancestor', main, 'HEAD').ok) return { moved: false };
   const run = tryGit(git, 'merge', '--no-edit', '-m', `Merge branch '${main}' into the batch`, main);
   if (!run.ok) {
+    const unmerged = tryGit(git, 'diff', '--name-only', '--diff-filter=U').out?.split('\n').filter(Boolean) ?? [];
+    if (ledger && unmerged.length === 1 && unmerged[0] === ledger.path && rejoinLedger(git, tree, main, ledger)) {
+      return { moved: true, tip: git('rev-parse', 'HEAD') };
+    }
     tryGit(git, 'merge', '--abort');
     return { moved: false, conflict: true };
   }
   return { moved: true, tip: git('rev-parse', 'HEAD') };
+};
+
+/** Mid-merge, writes main's ledger with the rows only the batch added appended, and commits the merge. Answers whether it did. */
+const rejoinLedger = (git, tree, main, ledger) => {
+  const show = (rev) => tryGit(git, 'show', `${rev}:${ledger.path}`).out ?? '';
+  const rows = (text) => new Set(text.split('\n').filter((l) => l.startsWith('|')));
+  const base = rows(show(tryGit(git, 'merge-base', 'HEAD', main).out?.trim() ?? main));
+  const theirs = show(main);
+  const had = rows(theirs);
+  const ours = show('HEAD').split('\n').filter((l) => l.startsWith('|') && !base.has(l) && !had.has(l));
+  try {
+    const joined = ours.reduce((text, row) => appendRecordRow(text, row, ledger), theirs);
+    // `git show` comes back trimmed; a ledger ends with its newline.
+    writeFileSync(join(tree, ledger.path), joined.endsWith('\n') ? joined : `${joined}\n`);
+  } catch {
+    return false;
+  }
+  return tryGit(git, 'add', ledger.path).ok && tryGit(git, 'commit', '--no-edit', '-q').ok;
 };
 
 /**

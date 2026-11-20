@@ -53,48 +53,60 @@ export const patchSweep = ({ cfg, root, round, commit, fixed, branches, outcomes
   return { patches: fixed.patches, commits: applied.commits, report: fixed.report, costUsd: fixed.usage?.costUsd };
 };
 
-/** Tests the batch with the config's gate, merging a moved `main` in first and between passes. Answers the tip to land, or `{ report }`. */
-const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip }) => {
+/** Tests the batch with the config's gate, merging a moved `main` in first and between passes. Where that merge
+ *  conflicts, `rebuild` makes the batch again on the new `main`, leaving out the branches that now conflict, and the
+ *  round goes on with the rest. Answers the batch and the tip to land, or `{ report }`. */
+const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild }) => {
   const logName = batch.name.replace(/\//g, '-');
   const main = cfg.git.main;
   const gate = cfg.gate.name;
   const catchUp = () => {
-    const caught = catchUpWithMain(batch.tree, main);
+    const caught = catchUpWithMain(batch.tree, main, cfg.record.ledger ?? null);
     if (caught.moved) {
       tip = caught.tip;
       say(`batch: ${main} moved; merged it in at ${tip.slice(0, 10)} and testing that`);
+      return true;
     }
-    return caught;
+    if (!caught.conflict) return false;
+    ({ batch, tip } = rebuild());
+    say(`batch: ${main} moved and merging it conflicted; rebuilt the batch on it at ${tip.slice(0, 10)} and testing that`);
+    return true;
   };
-  const kept = `${batch.name} and its branches kept; worktree ${batch.tree}`;
   // Another run may have landed while this one waited for the lock: test with its work in, not twice.
-  if (merge && catchUp().conflict) return { report: `untested: merging ${main} into the batch conflicts: ${kept}` };
+  if (merge) catchUp();
   for (let pass = 1; ; pass++) {
     const suffix = pass === 1 ? '' : `.${pass}`;
     const log = join(nightDir, `${logName}${suffix}${cfg.gate.logSuffix}`);
     const status = await runGate(cfg, { root, batch, logPath: log });
     say(`gate: ${gate} ${status === 0 ? 'passed' : `failed (${status}); its log is ${log}`}`);
     if (status !== 0) return { report: `red: ${batch.name} and its branches kept; worktree ${batch.tree}; logs in ${nightDir}` };
-    if (!merge || pass === MAIN_CATCH_UPS + 1) return { tip };
-    const caught = catchUp();
-    if (caught.conflict) return { report: `green, but ${main} moved and merging it conflicts: ${kept}` };
-    if (!caught.moved) return { tip };
+    if (!merge || pass === MAIN_CATCH_UPS + 1 || !catchUp()) return { batch, tip };
   }
 };
 
 /** Merges the branches into the batch, records the round there, runs the gate on its tip, and merges if green. */
 export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep }) => {
-  const batch = makeBatch(cfg, root, { round, date, commit, branches });
   const idOf = (branch) => branch.replace(cfg.names.area(round, ''), '');
-  for (const branch of batch.merged) outcomes[idOf(branch)] = `\`${branch}\``;
-  for (const branch of batch.conflicted) {
-    outcomes[idOf(branch)] = `\`${branch}\`, left out: merge conflict`;
-    const area = results.find((s) => s.id === idOf(branch));
-    if (area) area.fixCommits = [];
-    say(`batch: ${branch} conflicts; left out`);
-  }
-  const recorded = commitRecord(cfg, batch.tree, { round, commit, date, nightDir, areas: results, sweep, outcomes });
-  say(`record: ${cfg.record.dir}/round-${round}/ committed on ${batch.name} at ${recorded.slice(0, 10)}`);
+  const fixCommits = new Map(results.map((a) => [a.id, a.fixCommits]));
+  /** The batch on main as it is now, with the round's record committed on it. */
+  const build = () => {
+    const made = makeBatch(cfg, root, { round, date, commit, branches });
+    for (const branch of made.merged) {
+      outcomes[idOf(branch)] = `\`${branch}\``;
+      const area = results.find((a) => a.id === idOf(branch));
+      if (area) area.fixCommits = fixCommits.get(area.id);
+    }
+    for (const branch of made.conflicted) {
+      outcomes[idOf(branch)] = `\`${branch}\`, left out: merge conflict`;
+      const area = results.find((a) => a.id === idOf(branch));
+      if (area) area.fixCommits = [];
+      say(`batch: ${branch} conflicts; left out`);
+    }
+    const tip = commitRecord(cfg, made.tree, { round, commit, date, nightDir, areas: results, sweep, outcomes });
+    say(`record: ${cfg.record.dir}/round-${round}/ committed on ${made.name} at ${tip.slice(0, 10)}`);
+    return { batch: made, tip };
+  };
+  let { batch, tip: recorded } = build();
 
   setStep('merge-wait');
   const release = await waitForLease(mergeLock(cfg.state), { round }, {
@@ -115,7 +127,8 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     let tested;
     try {
       setStep('fleet');
-      tested = await testBatch({ cfg, root, batch, nightDir, merge, say, tip: recorded });
+      tested = await testBatch({ cfg, root, batch, nightDir, merge, say, tip: recorded, rebuild: build });
+      if (tested.batch) batch = tested.batch;
     } finally {
       releaseFleet();
     }
