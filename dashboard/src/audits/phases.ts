@@ -132,6 +132,24 @@ export function patchFillOf(lane: AuditLane): number {
   return fix.of ? Math.min(1, fix.fixed / fix.of) : 1;
 }
 
+/**
+ * A patch span split by what its fixer left: the share it fixed, shaded as the patch is, then the share it filed
+ * rather than fixed, hatched red. Whole where the fixer fixed everything, has not reported, or gave no tally.
+ */
+export function withUnfixed(span: SpanStripSpan, lane: AuditLane): SpanStripSpan[] {
+  const { fix } = lane.steps;
+  if (fix.state !== 'done' || fix.fixed === undefined || !fix.of || fix.fixed >= fix.of) return [span];
+  const share = fix.fixed / fix.of;
+  const left = fix.of - fix.fixed;
+  return [
+    { ...span, ms: span.ms * share, fill: 1 },
+    {
+      ...span, id: `${span.id}-unfixed`, label: '', start: undefined, ms: span.ms * (1 - share), fill: 1, state: 'failed',
+      color: phaseColor('conflict'), title: `${left} of ${fix.of} filed rather than fixed`, content: undefined,
+    },
+  ];
+}
+
 /** The area's tally, its patch segment's caption: how many of the findings its fixer answered it fixed, and the
  *  extras it fixed besides; before the fixer reports, or where its report gives no tally, what the reviews found. */
 export function tallyOf(lane: AuditLane): string {
@@ -194,7 +212,7 @@ export function laneViewOf(lane: AuditLane, now: number, roundStart: number): La
       id: p.part, label: partLabel(lane, p, now), start, ms: Math.max(0, end - start), color: phaseColor(phase), state: SPAN_STATE[p.state], title,
       ...(waitsForBatch ? { fill: patchFillOf(lane) } : p.state === 'waiting' ? { fill: 0 } : {}),
     };
-  });
+  }).flatMap((span) => (span.id === 'patch' ? withUnfixed(span, lane) : [span]));
   return { phase: phaseOf(lane), finished: isFinished(lane), spans, elapsed, ended };
 }
 
@@ -206,13 +224,18 @@ export function runClockOf(run: AuditRun, now: number): { from: number; to: numb
 }
 
 /** The steps view's columns, one per step, each the color of the phase it stands for. */
-const STEP_COLUMNS: readonly { step: LaneStepName; part: Part; phase: AuditPhase }[] = [
-  { step: 'A', part: 'review', phase: 'review' },
-  { step: 'B', part: 'review', phase: 'reviewed' },
-  { step: 'match', part: 'match', phase: 'match' },
-  { step: 'fix', part: 'fix', phase: 'fix' },
-  { step: 'patch', part: 'patch', phase: 'patch' },
+/** The steps view's columns: the two blind reviews run side by side, A over B, in the first, and every later step
+ *  covers both stripes. */
+const STEP_COLUMNS: readonly { step: LaneStepName; part: Part; phase: AuditPhase; column: number; track?: number; trackSpan?: number }[] = [
+  { step: 'A', part: 'review', phase: 'review', column: 0 },
+  { step: 'B', part: 'review', phase: 'reviewed', column: 0, track: 1 },
+  { step: 'match', part: 'match', phase: 'match', column: 1, trackSpan: 2 },
+  { step: 'fix', part: 'fix', phase: 'fix', column: 2, trackSpan: 2 },
+  { step: 'patch', part: 'patch', phase: 'patch', column: 3, trackSpan: 2 },
 ];
+
+/** How many columns the steps view's window holds. */
+export const STEP_COLUMN_COUNT = 1 + Math.max(...STEP_COLUMNS.map((c) => c.column));
 
 /** How full a running step is drawn at most, until it finishes. */
 const RUNNING_FILL_CAP = 0.9;
@@ -222,7 +245,7 @@ const RUNNING_FILL_CAP = 0.9;
  * far as its minutes so far go into its typical minutes, short of full until it finishes.
  */
 export function laneStepsOf(lane: AuditLane, now: number): SpanStripSpan[] {
-  return STEP_COLUMNS.map(({ step, part, phase }): SpanStripSpan => {
+  return STEP_COLUMNS.map(({ step, part, phase, column, track, trackSpan }): SpanStripSpan => {
     const s = lane.steps[step];
     const since = s.state === 'running' ? ms(s.since) : null;
     const fill = s.state === 'done' || s.state === 'failed' ? 1
@@ -230,9 +253,9 @@ export function laneStepsOf(lane: AuditLane, now: number): SpanStripSpan[] {
       : since !== null ? Math.min(RUNNING_FILL_CAP, (now - since) / (TYPICAL_MINUTES[part] * MIN))
       : 0;
     return {
-      id: step, ms: 1, fill, state: SPAN_STATE[s.state], title: `${step}: ${stepText(step, s, now)}`,
+      id: step, start: column, ms: 1, track, trackSpan, fill, state: SPAN_STATE[s.state], title: `${step}: ${stepText(step, s, now)}`,
       label: step === 'patch' && s.state !== 'failed' ? tallyOf(lane) : s.state === 'waiting' ? '' : stepText(step, s, now),
       color: phaseColor(s.state === 'failed' ? 'conflict' : phase),
     };
-  });
+  }).flatMap((span) => (span.id === 'patch' && span.state !== 'failed' ? withUnfixed(span, lane) : [span]));
 }
