@@ -216,7 +216,8 @@ export const nightRoundOf = (run) => {
 
 /**
  * Every round's night directory under `state`'s `nights/` (`<started>-round<N>`), the latest where a round has more
- * than one, each `running` while a live run in `runs` holds its round.
+ * than one, each `running` while a live run in `runs` holds its round. A night holding an `abandoned` file (its reason)
+ * is a round given up for good, which never lands: it is left out.
  */
 export const nightsOf = (runs, state) => {
   const dir = join(state, 'nights');
@@ -225,7 +226,8 @@ export const nightsOf = (runs, state) => {
   const latest = new Map();
   for (const name of readdirSync(dir).sort()) {
     const m = /^(\d{4}-\d{2}-\d{2})T.*-round(\d+)$/.exec(name);
-    if (m) latest.set(Number(m[2]), { round: Number(m[2]), started: m[1], nightDir: join(dir, name), running: live.has(Number(m[2])) });
+    if (m && existsSync(join(dir, name, 'abandoned'))) latest.delete(Number(m[2]));
+    else if (m) latest.set(Number(m[2]), { round: Number(m[2]), started: m[1], nightDir: join(dir, name), running: live.has(Number(m[2])) });
   }
   return [...latest.values()];
 };

@@ -114,6 +114,14 @@ describe('nightRoundOf', () => {
     expect(nightsOf([], join(state, 'missing'))).toEqual([]);
   });
 
+  it('leaves out a round whose night was abandoned', () => {
+    const state = mkdtempSync(join(tmpdir(), 'skulk-map-'));
+    dirs.push(state);
+    for (const name of ['2026-11-20T19-14-32-392Z-round51', '2026-11-20T20-10-16-686Z-round52']) mkdirSync(join(state, 'nights', name), { recursive: true });
+    writeFileSync(join(state, 'nights', '2026-11-20T20-10-16-686Z-round52', 'abandoned'), 'stopped while moving services\n');
+    expect(nightsOf([], state).map((n) => n.round)).toEqual([51]);
+  });
+
   it("draws a round with no committed record from its night directory's finished areas", () => {
     const nightDir = mkdtempSync(join(tmpdir(), 'skulk-night-'));
     dirs.push(nightDir);
