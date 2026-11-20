@@ -5,7 +5,7 @@ import { GateFailures } from './GateFailures';
 afterEach(cleanup);
 
 describe('GateFailures', () => {
-  it('turns a failed capstone run\'s label into a button that opens what failed', () => {
+  it('opens what a failed capstone run failed from a button', () => {
     render(<GateFailures label="fleet tests · 3 failed in 2 files" run="fleet tests" failures={{
       count: 3, files: 2, names: ['a.test.ts', 'b.test.ts'],
       list: [{ file: 'a.test.ts', count: 2, tests: [{ test: 'x > one', error: 'AssertionError: expected 1 to be 2' }, { test: 'x > two', error: '' }] }, { file: 'b.test.ts', count: 1, tests: [] }],

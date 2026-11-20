@@ -1,6 +1,9 @@
 .trigger {
   all: unset;
+  margin-inline-start: var(--wzl-space-2);
   cursor: pointer;
+  font-size: var(--wzl-font-size-xs);
+  color: var(--wzl-danger);
   text-decoration: underline dotted;
   text-underline-offset: 2px;
 }

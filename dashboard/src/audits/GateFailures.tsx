@@ -4,8 +4,7 @@ import type { ReactNode } from 'react';
 import type { GateFailures as Failures } from './skulkMap.types';
 import s from './GateFailures.module.css';
 
-/** A failed capstone run's span content: its label as a button opening what failed, by file, each test with the first
- *  line of its error. */
+/** A button opening what a failed capstone run failed, by file, each test with the first line of its error. */
 export function GateFailures({ label, run, failures }: { label: ReactNode; run: string; failures: Failures }) {
   const shown = failures.list.reduce((n, f) => n + f.count, 0);
   return (
