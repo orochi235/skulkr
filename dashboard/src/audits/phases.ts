@@ -86,6 +86,18 @@ function partPhase(p: PartState): AuditPhase {
   return p.part;
 }
 
+/** A round's areas counted by phase: how many are done of all of them, then how many sit in each phase that has any,
+ *  in pipeline order, a conflict last. */
+export function stageCountsOf(lanes: readonly AuditLane[]): { done: number; total: number; stages: { phase: AuditPhase; n: number }[] } {
+  const by = new Map<AuditPhase, number>();
+  for (const lane of lanes) {
+    const phase = phaseOf(lane);
+    by.set(phase, (by.get(phase) ?? 0) + 1);
+  }
+  const stages = [...PIPELINE, 'conflict' as const].flatMap((phase) => (by.get(phase) ? [{ phase, n: by.get(phase)! }] : []));
+  return { done: by.get('done') ?? 0, total: lanes.length, stages };
+}
+
 /** Whether the round's pass over an area is done: it is through, or its fixer has finished and only its patch, which
  *  lands with the round's batch, is left. */
 export const passDone = (lane: AuditLane): boolean => isFinished(lane) || lane.steps.fix.state === 'done';

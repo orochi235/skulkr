@@ -43,6 +43,27 @@
   white-space: nowrap;
 }
 
+.counts {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--wzl-space-1) var(--wzl-space-3);
+  font-size: var(--wzl-font-size-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--audit-muted);
+}
+
+.count { white-space: nowrap; }
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-inline-end: 4px;
+  border-radius: 50%;
+  background: var(--audit-phase);
+}
+
 .started {
   margin-inline-start: var(--wzl-space-2);
   font-weight: var(--wzl-font-weight-normal);

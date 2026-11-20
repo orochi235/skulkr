@@ -4,7 +4,7 @@ import { Checkbox } from '@weasel-js/ui/components/Checkbox';
 import { SegmentedBar } from '@weasel-js/ui/components/Segmented';
 import { SpanStrips, type SpanStripSpan, type SpanStripsRow } from '@weasel-js/ui/components/SpanStrip';
 import { clockRuler } from './clock';
-import { STEP_COLUMN_COUNT, leadsWithNode, inSharedSteps, laneStepsOf, laneViewOf, passDone, runClockOf, sharedSpansOf, type LaneView } from './phases';
+import { STEP_COLUMN_COUNT, leadsWithNode, inSharedSteps, laneStepsOf, laneViewOf, passDone, runClockOf, sharedSpansOf, type LaneView, PHASE_LABEL, phaseClass, stageCountsOf } from './phases';
 import { NODE_SEP, headlineOf, lastLineOf, spendOf, startedText } from './runData';
 import { useViewerPref } from './viewerPref';
 import type { AuditLane, AuditRun } from './skulkMap.types';
@@ -124,6 +124,19 @@ function Lanes({ run, now, mode, hideComplete, on }: { run: AuditRun; now: numbe
   );
 }
 
+/** How many of a round's areas are done, and how many sit in each stage, in the legend's colors. */
+function StageCounts({ run }: { run: AuditRun }) {
+  const { done, total, stages } = stageCountsOf(run.lanes);
+  return (
+    <div className={s.counts} aria-label={`Round ${run.round} areas by stage`}>
+      <span className={s.count}>{done} of {total} done</span>
+      {stages.map(({ phase, n }) => (
+        <span key={phase} className={cx(s.count, phaseClass(phase))}><i className={s.dot} aria-hidden="true" />{n} {PHASE_LABEL[phase]}</span>
+      ))}
+    </div>
+  );
+}
+
 /** One run's strip: what it is doing and what it has spent, its last line, and a lane per area in flight. */
 function RunStrip({ run, now, mode, hideComplete, on }: {
   run: AuditRun; now: number; mode: LaneMode; hideComplete: boolean; on: AreaHandlers;
@@ -137,6 +150,7 @@ function RunStrip({ run, now, mode, hideComplete, on }: {
       </div>
       <div className={s.line} title={lastLineOf(run)}><InlineMarkdown text={lastLineOf(run)} /></div>
       <div className={s.spend}>{spendOf(run)}</div>
+      {run.lanes.length > 0 && <StageCounts run={run} />}
       {run.lanes.length > 0 && (
         <div className={s.lanes} data-mode={mode}>
           <Lanes run={run} now={now} mode={mode} hideComplete={hideComplete} on={on} />
