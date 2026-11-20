@@ -87,7 +87,7 @@ export function LaneViewControls({ view }: { view: LaneView }) {
 }
 
 const STEPS_WINDOW = { from: 0, to: STEP_COLUMN_COUNT };
-const SHARED_WINDOW = { from: 0, to: 3 };
+const SHARED_WINDOW = { from: 0, to: 2 };
 
 /** The run's areas, on the run's clock or as a grid of steps; a finished one stays, filled, until the run ends, unless
  *  the viewer hides those whose pass is done, as the map shows them. */

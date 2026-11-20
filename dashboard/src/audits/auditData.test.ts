@@ -24,31 +24,32 @@ describe('lanes', () => {
     expect(stepText('patch', { state: 'failed', why: 'conflicts; left out of the batch' }, now)).toBe('conflicts; left out of the batch');
   });
 
-  it('runs the shared lane through batch, both fleet runs side by side, and merge, each fleet run filled by its count', () => {
+  it('runs the shared lane through batch and both fleet runs side by side, each fleet run filled by its count', () => {
     const states = (run: typeof live) => sharedSpansOf(run).map((s) => [s.id, s.state, s.fill]);
     expect(inSharedSteps(live)).toBe(false);
-    expect(states({ ...live, step: 'batch' })).toEqual([
-      ['batch', 'active', 0], ['fleet-tests', 'pending', 0], ['fleet-build', 'pending', 0], ['merge', 'pending', 0],
-    ]);
+    expect(states({ ...live, step: 'batch' })).toEqual([['batch', 'active', 0], ['fleet-tests', 'pending', 0], ['fleet-build', 'pending', 0]]);
     const running = sharedSpansOf({ ...live, step: 'fleet', fleet: { tests: { done: 250, total: 1000 }, build: { done: 30, total: 40 } } });
     expect(running.map((s) => [s.id, s.state, s.fill, s.track ?? 0, s.trackSpan ?? 1])).toEqual([
-      ['batch', 'done', 1, 0, 2], ['fleet-tests', 'active', 0.25, 0, 1], ['fleet-build', 'active', 0.75, 1, 1], ['merge', 'pending', 0, 0, 2],
+      ['batch', 'done', 1, 0, 2], ['fleet-tests', 'active', 0.25, 0, 1], ['fleet-build', 'active', 0.75, 1, 1],
     ]);
-    expect(running.map((s) => s.label)).toEqual(['batch', 'fleet tests · 25%', 'postbuild · 75%', 'merge']);
+    expect(running.map((s) => s.label)).toEqual(['batch', 'fleet tests · 25%', 'postbuild · 75%']);
     // The node running each, where known, leads its label, and only that part pulses.
     const placed = { ...live, step: 'fleet', fleet: { tests: { done: 1, total: 4 }, build: null }, gateNodes: { tests: 'studio', build: null } } as const;
     const spans = sharedSpansOf(placed);
-    expect(spans.map((s) => s.label)).toEqual(['batch', 'studio · fleet tests · 25%', 'postbuild', 'merge']);
-    expect(spans.map((s) => leadsWithNode(s, placed))).toEqual([true, true, false, true]);
-    expect(states({ ...live, step: 'merge-wait' }).map(([, state]) => state)).toEqual(['done', 'done', 'done', 'active']);
+    expect(spans.map((s) => s.label)).toEqual(['batch', 'studio · fleet tests · 25%', 'postbuild']);
+    expect(spans.map((s) => leadsWithNode(s, placed))).toEqual([true, true, false]);
+    // Waiting for the merge lock or the fleet is the fleet column's, not a column of its own.
+    for (const step of ['merge-wait', 'fleet-wait']) {
+      const waits = sharedSpansOf({ ...live, step });
+      expect(waits.map((s) => [s.id, s.state])).toEqual([['batch', 'done'], ['fleet-tests', 'pending'], ['fleet-build', 'pending']]);
+      expect(waits[1]!.label).toBe('fleet tests · waiting');
+    }
     expect(states(finished).every(([, state]) => state === 'done')).toBe(true);
     // A red round says which of its fleet runs failed, and its batch running again reads as running.
     const red = { ...finished, report: 'red: batch kept', gates: { tests: 'failed', build: 'passed' } } as const;
-    expect(states(red)).toEqual([['batch', 'done', 1], ['fleet-tests', 'failed', 1], ['fleet-build', 'done', 1], ['merge', 'pending', 0]]);
+    expect(states(red)).toEqual([['batch', 'done', 1], ['fleet-tests', 'failed', 1], ['fleet-build', 'done', 1]]);
     const again = sharedSpansOf({ ...red, rerun: true, gates: { tests: 'running', build: 'passed' }, fleet: { tests: { done: 10, total: 40 }, build: null } });
-    expect(again.map((s) => [s.id, s.state, s.fill])).toEqual([
-      ['batch', 'done', 1], ['fleet-tests', 'active', 0.25], ['fleet-build', 'done', 1], ['merge', 'pending', 0],
-    ]);
+    expect(again.map((s) => [s.id, s.state, s.fill])).toEqual([['batch', 'done', 1], ['fleet-tests', 'active', 0.25], ['fleet-build', 'done', 1]]);
   });
 
   it('heads each run with its round, step and spend', () => {

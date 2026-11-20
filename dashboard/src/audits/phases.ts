@@ -307,14 +307,17 @@ export function laneStepsOf(lane: AuditLane, now: number): SpanStripSpan[] {
     .map((span) => withInk(span));
 }
 
-/** The steps every area shares once its own lane is done, in order. */
+/** The steps every area shares once its own lane is done, in order. The fleet run's column also holds the waits before
+ *  it (for the merge lock, then for the fleet) and the fast-forward after it, which is instant. */
 const SHARED_STEPS = [
   { id: 'batch', label: 'batch', steps: ['batch'] },
-  { id: 'fleet', label: 'fleet run', steps: ['fleet'] },
-  { id: 'merge', label: 'merge', steps: ['merge-wait', 'merge'] },
+  { id: 'fleet', label: 'fleet run', steps: ['merge-wait', 'fleet-wait', 'fleet', 'merge'] },
 ] as const;
 
-/** Whether the run has reached the steps its areas share: the batch, the fleet run and the merge. */
+/** The steps where the fleet run's column is waiting for its turn rather than running. */
+const FLEET_WAITS: readonly string[] = ['merge-wait', 'fleet-wait'];
+
+/** Whether the run has reached the steps its areas share: the batch and the fleet run. */
 export const inSharedSteps = (run: AuditRun): boolean =>
   !run.running || SHARED_STEPS.some((s) => (s.steps as readonly string[]).includes(run.step));
 
@@ -336,23 +339,21 @@ export const leadsWithNode = (span: SpanStripSpan, run: AuditRun): boolean =>
 
 const GATE_SPAN_STATE = { running: 'active', passed: 'done', failed: 'failed' } as const;
 
-/** The run's lane for every area at once: the batch, its two fleet runs side by side, and the merge, a column each,
- *  a fleet run filled by how far it has got. A finished round says how each fleet run ended, and a red round whose
- *  batch runs again shows it running and the merge still ahead. */
+/** The run's lane for every area at once: the batch, then its two fleet runs side by side, a fleet run filled by how
+ *  far it has got, or saying it waits for its turn. A finished round says how each fleet run ended, and a red round
+ *  whose batch runs again shows it running. */
 export function sharedSpansOf(run: AuditRun): SpanStripSpan[] {
   const red = !run.running && /^red\b/.test(run.report ?? '');
   const again = !run.running && !!run.rerun;
   const at = run.running ? SHARED_STEPS.findIndex((s) => (s.steps as readonly string[]).includes(run.step))
     : red || again ? SHARED_STEPS.findIndex((s) => s.id === 'fleet') : SHARED_STEPS.length;
-  const stepState = (i: number) => (i < at ? 'done' : i === at ? 'active' : 'pending');
+  const waiting = run.running && FLEET_WAITS.includes(run.step);
+  const stepState = (i: number) => (i < at ? 'done' : i === at ? (waiting ? 'pending' : 'active') : 'pending');
   return SHARED_STEPS.flatMap((s, i): SpanStripSpan[] => {
     if (s.id !== 'fleet') {
       const state = stepState(i);
       const fill = state === 'done' ? 1 : 0;
-      return [{
-        id: s.id, start: i, ms: 1, trackSpan: GATE_RUNS.length, state, fill, label: s.label,
-        color: phaseColor(s.id === 'merge' ? 'patch' : 'fix'), ...(s.id === 'merge' ? { ink: phaseInkOf('patch', fill) } : {}),
-      }];
+      return [{ id: s.id, start: i, ms: 1, trackSpan: GATE_RUNS.length, state, fill, label: s.label, color: phaseColor('fix') }];
     }
     return GATE_RUNS.map((g, track): SpanStripSpan => {
       const ended = run.gates?.[g.id] ?? null;
@@ -361,7 +362,8 @@ export function sharedSpansOf(run: AuditRun): SpanStripSpan[] {
       const fill = state === 'done' || state === 'failed' ? 1 : fleet && fleet.total > 0 ? Math.min(1, fleet.done / fleet.total) : 0;
       return {
         id: `fleet-${g.id}`, start: i, ms: 1, track, state, fill,
-        label: state === 'active' ? activeGateLabel(g.label, run.gateNodes?.[g.id] ?? null, fleet, fill) : g.label,
+        label: state === 'active' ? activeGateLabel(g.label, run.gateNodes?.[g.id] ?? null, fleet, fill)
+          : waiting && i === at ? `${g.label}${NODE_SEP}waiting` : g.label,
         color: phaseColor(state === 'failed' ? 'conflict' : g.phase),
         ...(fleet ? { title: `${fleet.done.toLocaleString()} of ${fleet.total.toLocaleString()} done` } : {}),
       };
