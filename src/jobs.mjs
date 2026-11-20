@@ -1,7 +1,7 @@
 /**
  * Model jobs on the fleet. Each job runs through the runner from the frozen tree, so the node's tree is the
- * frozen commit plus `.skulk/in`, in a tree name of its own (a slot) so jobs on one node never
- * share a tree. What a job writes under `.skulk/out` comes back to a local directory.
+ * frozen commit plus `.skulkr/in`, in a tree name of its own (a slot) so jobs on one node never
+ * share a tree. What a job writes under `.skulkr/out` comes back to a local directory.
  */
 import { createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -13,7 +13,7 @@ export const BUSY_WAIT_MS = 30_000;
 
 const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 
-/** The progress filter, copied into each frozen tree's `.skulk/in` so a node runs the one this run ships. */
+/** The progress filter, copied into each frozen tree's `.skulkr/in` so a node runs the one this run ships. */
 export const progressSource = () => fileURLToPath(new URL('./progress.mjs', import.meta.url));
 export const PROGRESS_IN = `${JOB_IN}/progress.mjs`;
 /** The config's `checks.tally`, beside the filter, for the fixer's checks. */
@@ -42,7 +42,7 @@ const effort = (level) => (level ? ['--effort', level] : []);
 const fresh = `rm -rf ${JOB_OUT} && mkdir -p ${JOB_OUT}`;
 const prelude = (cfg) => (cfg.setup.prelude ? [cfg.setup.prelude] : []);
 
-/** A reviewer, counted through the files listed in `.skulk/in/<area>/files.txt`. */
+/** A reviewer, counted through the files listed in `.skulkr/in/<area>/files.txt`. */
 export const reviewShell = (cfg, area, budgetUsd) =>
   [...prelude(cfg), fresh, claudeLine(cfg, `${JOB_IN}/${area}/review.md`, budgetUsd, [
     '--allowedTools', q(cfg.claude.reviewTools.join(',')), '--disallowedTools', q(cfg.claude.reviewDenied.join(',')), ...model(cfg.claude.models.review), ...effort(cfg.claude.effort?.review),
@@ -56,7 +56,7 @@ const installLines = (cfg) => {
   const install = cfg.setup.install;
   if (!install?.command) return [];
   if (!install.lockfile) return [`${install.command} > ${JOB_OUT}/install.log 2>&1`];
-  const marker = install.marker ?? 'node_modules/.skulk-lock';
+  const marker = install.marker ?? 'node_modules/.skulkr-lock';
   return [
     `LOCK=$(shasum ${q(install.lockfile)} | cut -d" " -f1)`,
     `if [ "$(cat ${marker} 2>/dev/null)" != "$LOCK" ]; then ${install.command} > ${JOB_OUT}/npm-ci.log 2>&1 && echo "$LOCK" > ${marker}; fi`,
@@ -71,9 +71,9 @@ const installLines = (cfg) => {
 export const fixShell = (cfg, area, budgetUsd, findings) =>
   [
     'set -e', ...prelude(cfg), fresh,
-    'grep -qx ".skulk/" .git/info/exclude 2>/dev/null || echo ".skulk/" >> .git/info/exclude',
+    'grep -qx ".skulkr/" .git/info/exclude 2>/dev/null || echo ".skulkr/" >> .git/info/exclude',
     'git add -A',
-    'git -c user.name=skulk -c user.email=skulk@localhost commit -q --no-verify --allow-empty -m "skulk: frozen tree"',
+    'git -c user.name=skulkr -c user.email=skulkr@localhost commit -q --no-verify --allow-empty -m "skulkr: frozen tree"',
     `if [ "$(git rev-parse 'HEAD^{tree}')" != "$FROZEN_TREE" ]; then echo "synced tree $(git rev-parse 'HEAD^{tree}') is not the frozen tree $FROZEN_TREE" > ${JOB_OUT}/tree-mismatch; exit 0; fi`,
     'BASE=$(git rev-parse HEAD)',
     ...installLines(cfg),

@@ -22,7 +22,7 @@ const fleet = { holder: null, waiting: [] };
 
 describe('continuousOf', () => {
   it('reads the night\'s spend, the estimate and the mode from the state on disk', () => {
-    const state = mkdtempSync(join(tmpdir(), 'skulk-cont-'));
+    const state = mkdtempSync(join(tmpdir(), 'skulkr-cont-'));
     dirs.push(state);
     const cfg = resolveConfig({ name: 'p', state, areasPerRound: 4, budget: { nightUsd: 100 } });
     write(state, 40, 'summary.json', { started: at('06:00').toISOString(), ended: at('06:50').toISOString(), costUsd: 70, areas: [1, 2] });

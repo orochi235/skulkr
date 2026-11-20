@@ -2,7 +2,7 @@
 import { getOwn } from '@weasel-js/registry';
 import type { SpanState, SpanStripSpan } from '@weasel-js/ui/components/SpanStrip';
 import { NODE_SEP, minutesText, stepText } from './runData';
-import type { AuditArea, AuditLane, AuditRun, FleetProgress, LaneStep, LaneStepName } from './skulkMap.types';
+import type { AuditArea, AuditLane, AuditRun, FleetProgress, LaneStep, LaneStepName } from './skulkrMap.types';
 import palette from './palette.module.css';
 
 /** Where every area goes, in order, `reviewed` once one of its two reviews is in: their colors run along one sweep,

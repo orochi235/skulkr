@@ -6,10 +6,10 @@ import { ticksFor } from './RoundsChart';
 import { layoutMap, squarify } from './mapLayout';
 import { areaTree, leavesOf, type AreaTreeNode } from './areaTree';
 import fixture from './fixture.map.json';
-import type { SkulkMap } from './skulkMap.types';
+import type { SkulkrMap } from './skulkrMap.types';
 
-const map = fixture as unknown as SkulkMap;
-const [live, finished] = map.runs as [SkulkMap['runs'][0], SkulkMap['runs'][0]];
+const map = fixture as unknown as SkulkrMap;
+const [live, finished] = map.runs as [SkulkrMap['runs'][0], SkulkrMap['runs'][0]];
 const now = Date.parse(map.generated);
 
 describe('lanes', () => {

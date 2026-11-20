@@ -6,9 +6,9 @@ import { layoutMap } from './mapLayout';
 import { phasesOf } from './phases';
 import { rampAt } from './heat';
 import fixture from './fixture.map.json';
-import type { SkulkMap } from './skulkMap.types';
+import type { SkulkrMap } from './skulkrMap.types';
 
-const map = fixture as unknown as SkulkMap;
+const map = fixture as unknown as SkulkrMap;
 const PALETTE: AuditPalette = {
   panel: '#ffffff', band: '#eeeeee', ink: '#111111', inkInverse: '#ffffff', uncharted: '#dddddd', hatch: '#aaaaaa',
   depth: ['#eef4fa', '#c6dcef', '#8fb6d9', '#3f78a8', '#173f63'], settled: '#6fae84', live: '#e0457b',

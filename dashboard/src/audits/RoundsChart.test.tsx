@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { RoundsChart, areaRoundsOf, nthPassAverages } from './RoundsChart';
-import type { AuditArea, AuditRound } from './skulkMap.types';
+import type { AuditArea, AuditRound } from './skulkrMap.types';
 
 const rounds: AuditRound[] = [
   { round: 1, date: '2026-11-01', areas: 16, files: 400, distinct: 80, est: 120 },

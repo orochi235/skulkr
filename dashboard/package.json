@@ -1,10 +1,10 @@
 {
-  "name": "x-skulk-dashboard",
+  "name": "skulkr-dashboard",
   "private": true,
   "version": "0.0.1",
   "type": "module",
   "license": "MIT",
-  "description": "Live dashboard of a project's skulk audit rounds: areas, running lanes, rounds, jobs, and defects.",
+  "description": "Live dashboard of a project's skulkr audit rounds: areas, running lanes, rounds, jobs, and defects.",
   "engines": {
     "node": ">=24"
   },

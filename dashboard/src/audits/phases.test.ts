@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { STEP_COLUMN_COUNT, CLOCK_AHEAD_MINUTES, TYPICAL_MINUTES, isFinished, laneStepsOf, laneViewOf, passDone, phaseColor, phaseOf, phasesOf, runClockOf, withLivePasses } from './phases';
 import fixture from './fixture.map.json';
-import type { AuditLane, AuditRun, LaneStep, LaneStepName, SkulkMap } from './skulkMap.types';
+import type { AuditLane, AuditRun, LaneStep, LaneStepName, SkulkrMap } from './skulkrMap.types';
 
-const map = fixture as unknown as SkulkMap;
+const map = fixture as unknown as SkulkrMap;
 const MIN = 60_000;
 const START = Date.parse('2026-11-19T21:00:00.000Z');
 const NOW = Date.parse('2026-11-19T21:30:00.000Z');

@@ -1,5 +1,5 @@
 /**
- * weasel's control sweep as a skulk sweep: `scripts/control-sweep.mjs` on one fleet node with a browser, at the
+ * weasel's control sweep as a skulkr sweep: `scripts/control-sweep.mjs` on one fleet node with a browser, at the
  * frozen commit, beside the reviews. Each dead control becomes a finding for one fixer. The sweep's own code stays
  * in weasel (`scripts/control-sweep/`); this reads its fleet helper from the project root at run time.
  */
@@ -64,7 +64,7 @@ export const sweep = {
     const run = `night-round${ctx.round}`;
     await ctx.runFree({
       gui: true, kind: 'test', icon: 'slider.horizontal.3', tree: fleet.SWEEP_TREE, ref: ctx.base,
-      task: `skulk${ctx.round}-control-sweep`,
+      task: `skulkr${ctx.round}-control-sweep`,
       about: `Control sweep for audit round ${ctx.round}: operates every demo control at ${ctx.commit.slice(0, 10)} and lists each that changes nothing.`,
       expect: fleet.EXPECT, timeout: fleet.TIMEOUT, out: `${fleet.NODE_OUT}/${run}`, to, shell: fleet.sweepShell(run),
     }, join(dir, 'onto.log'));

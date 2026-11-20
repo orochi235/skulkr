@@ -1,5 +1,5 @@
 /**
- * A project's settings: the defaults below, overlaid by the project's `skulk.config.mjs`, and the values
+ * A project's settings: the defaults below, overlaid by the project's `skulkr.config.mjs`, and the values
  * derived from them (regular expressions, names, paths) that the rest of the pipeline reads. Nothing else
  * in `src/` holds a project-specific value. README.md "The config file" says what each setting does.
  */
@@ -8,11 +8,11 @@ import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const CONFIG_FILE = 'skulk.config.mjs';
+export const CONFIG_FILE = 'skulkr.config.mjs';
 
 /** Inside the frozen tree and every node tree: what a job reads, and what it hands back. */
-export const JOB_IN = '.skulk/in';
-export const JOB_OUT = '.skulk/out';
+export const JOB_IN = '.skulkr/in';
+export const JOB_OUT = '.skulkr/out';
 
 const DEFAULT_BRIEFS = new URL('../briefs/', import.meta.url);
 
@@ -21,7 +21,7 @@ export const DEFAULTS = {
   name: undefined,
   /** The main checkout. Unset: the main worktree of the repository holding the config file. */
   root: undefined,
-  /** Where runs keep their logs, claims and leases. Unset: `~/.local/state/skulk/<name>`. */
+  /** Where runs keep their logs, claims and leases. Unset: `~/.local/state/skulkr/<name>`. */
   state: undefined,
   keepNights: 30,
 
@@ -108,7 +108,7 @@ export const DEFAULTS = {
   setup: {
     prelude: '',
     /** `marker` is where the installed lockfile's hash is kept; it must survive between jobs and stay out of git. */
-    install: { lockfile: 'package-lock.json', command: 'npm ci --no-audit --no-fund', marker: 'node_modules/.skulk-lock' },
+    install: { lockfile: 'package-lock.json', command: 'npm ci --no-audit --no-fund', marker: 'node_modules/.skulkr-lock' },
   },
 
   /** The job runner: `'onto'`, a module path exporting `createRunner(cfg)`, or a runner object. */
@@ -208,7 +208,7 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
     name,
     file,
     root: root ?? (c.root ? resolve(base, expandHome(c.root)) : undefined),
-    state: c.state ? resolve(base, expandHome(c.state)) : join(homedir(), '.local', 'state', 'skulk', name),
+    state: c.state ? resolve(base, expandHome(c.state)) : join(homedir(), '.local', 'state', 'skulkr', name),
     partition: {
       ...p,
       rootRe,
@@ -232,14 +232,14 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
       /** A round number in any branch named for one: `audit30-ui`, `batch/…-audit31`. */
       roundIn: new RegExp(`(?:^|[/-])${pre}(\\d+)(?:-|$)`),
       /** A job of round `round` (any round when omitted), by its task name. */
-      jobOf: (round = '\\d+') => new RegExp(`^(?:${pre}|skulk)${round}-`),
+      jobOf: (round = '\\d+') => new RegExp(`^(?:${pre}|skulkr)${round}-`),
       /** A runner job of round `round`'s batch gate, by its task name. */
-      batchJobOf: (round) => new RegExp(`${escape(batchPrefix)}-\\d{4}-\\d\\d-\\d\\d-(?:${pre}|skulk)${round}(?:-|$)`),
+      batchJobOf: (round) => new RegExp(`${escape(batchPrefix)}-\\d{4}-\\d\\d-\\d\\d-(?:${pre}|skulkr)${round}(?:-|$)`),
       /** A step's task name → `[area, step]`. */
-      step: new RegExp(`^(?:${pre}|skulk)\\d+-(.+)-(A|B|match|fix)$`),
+      step: new RegExp(`^(?:${pre}|skulkr)\\d+-(.+)-(A|B|match|fix)$`),
       /** A night log's conflict line → the area. */
       conflict: new RegExp(`^batch: ${pre}\\d+-(\\S+) conflicts`),
-      trees: { review: `${name}-skulk-r`, fix: `${name}-skulk-f` },
+      trees: { review: `${name}-skulkr-r`, fix: `${name}-skulkr-f` },
     },
   };
 };
@@ -275,22 +275,22 @@ export const nodesAt = (cfg, date) => {
 export const noFixers = (cfg) => [...cfg.nodes.noFixers, ...(cfg.nodes.local && !cfg.nodes.local.fixers ? [cfg.nodes.local.name] : [])];
 
 /**
- * The config file for these options: `config`, else `SKULK_CONFIG`, else `skulk.config.mjs` in `root`,
- * `SKULK_ROOT` or the working directory.
+ * The config file for these options: `config`, else `SKULKR_CONFIG`, else `skulkr.config.mjs` in `root`,
+ * `SKULKR_ROOT` or the working directory.
  */
 export const configPath = ({ config, root } = {}, env = process.env) => {
-  const at = config ?? env.SKULK_CONFIG;
+  const at = config ?? env.SKULKR_CONFIG;
   if (at) return resolve(expandHome(at));
-  return join(resolve(expandHome(root ?? env.SKULK_ROOT ?? process.cwd())), CONFIG_FILE);
+  return join(resolve(expandHome(root ?? env.SKULKR_ROOT ?? process.cwd())), CONFIG_FILE);
 };
 
-/** Reads and resolves a project's config; `root` (or `SKULK_ROOT`) overrides the root it names. */
+/** Reads and resolves a project's config; `root` (or `SKULKR_ROOT`) overrides the root it names. */
 export const loadConfig = async ({ config, root } = {}, env = process.env) => {
   const file = configPath({ config, root }, env);
   if (!existsSync(file)) throw new Error(`no config at ${file}; write a ${CONFIG_FILE} (README.md says how) or pass --config`);
   const mod = await import(pathToFileURL(file).href);
   const user = typeof mod.default === 'function' ? await mod.default() : mod.default;
-  const rootAt = root ?? env.SKULK_ROOT;
+  const rootAt = root ?? env.SKULKR_ROOT;
   return resolveConfig(user ?? {}, { file, root: rootAt ? resolve(expandHome(rootAt)) : undefined });
 };
 

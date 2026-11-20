@@ -12,7 +12,7 @@ import { ThemeProvider } from '@weasel-js/theme/react';
 import { AuditsPage } from '@dash/audits/AuditsPage';
 import { ICONS } from '@dash/icons';
 
-const theme = defineTheme({ name: 'skulk-dashboard' });
+const theme = defineTheme({ name: 'skulkr-dashboard' });
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Missing #root element');

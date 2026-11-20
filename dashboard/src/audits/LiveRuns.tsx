@@ -7,7 +7,7 @@ import { clockRuler } from './clock';
 import { STEP_COLUMN_COUNT, leadsWithNode, inSharedSteps, laneStepsOf, laneViewOf, passDone, runClockOf, sharedSpansOf, type LaneView, PHASE_LABEL, phaseClass, stageCountsOf } from './phases';
 import { NODE_SEP, headlineOf, lastLineOf, spendOf, startedText } from './runData';
 import { useViewerPref } from './viewerPref';
-import type { AuditLane, AuditRun } from './skulkMap.types';
+import type { AuditLane, AuditRun } from './skulkrMap.types';
 import s from './LiveRuns.module.css';
 
 const cx = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(' ');

@@ -5,7 +5,7 @@ import { Button, DialogTrigger } from 'react-aria-components';
 import { Icon } from '@weasel-js/ui/components/Icon';
 import { Popover, PopoverDialog } from '@weasel-js/ui/components/Popover';
 import { icon } from '@dash/icons.gen';
-import type { AuditArea, AuditRound } from './skulkMap.types';
+import type { AuditArea, AuditRound } from './skulkrMap.types';
 import s from './RoundsChart.module.css';
 
 /** The chart's drawing size before its box is measured; it then draws at its box's width, so the bars take the room. */

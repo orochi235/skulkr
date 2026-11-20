@@ -9,7 +9,7 @@
   the current commit: your commits on top of it are what the controller takes back, as patches.
 - Read the repository's own instructions first (`CLAUDE.md`, `AGENTS.md`, or `CONTRIBUTING.md` at the root, if
   there is one).
-- Leave `.skulk/` alone and out of every commit.
+- Leave `.skulkr/` alone and out of every commit.
 - Every call rereads everything before it, so read in few, targeted calls: the findings and the files they cite
   together, a function rather than a whole file, and a check's verdict rather than its log (`… | tail -5`, or
   `grep -E "Tests |×|error"`).

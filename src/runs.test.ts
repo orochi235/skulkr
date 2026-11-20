@@ -14,7 +14,7 @@ afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 const state = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'skulk-runs-'));
+  const dir = mkdtempSync(join(tmpdir(), 'skulkr-runs-'));
   dirs.push(dir);
   return dir;
 };

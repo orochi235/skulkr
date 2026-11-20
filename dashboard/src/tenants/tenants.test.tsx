@@ -27,7 +27,7 @@ describe('useTenantChoice', () => {
   it('takes the tenant the hash names, else the one chosen last, else the first', () => {
     const names = ['weasel', 'demo'];
     expect(renderHook(() => useTenantChoice(names)).result.current[0]).toBe('weasel');
-    localStorage.setItem('skulk.dashboard.tenant', 'demo');
+    localStorage.setItem('skulkr.dashboard.tenant', 'demo');
     expect(renderHook(() => useTenantChoice(names)).result.current[0]).toBe('demo');
     window.location.hash = '#weasel';
     expect(renderHook(() => useTenantChoice(names)).result.current[0]).toBe('weasel');
@@ -41,7 +41,7 @@ describe('useTenantChoice', () => {
     act(() => result.current[1]('demo'));
     expect(result.current[0]).toBe('demo');
     expect(window.location.hash).toBe('#demo');
-    expect(localStorage.getItem('skulk.dashboard.tenant')).toBe('demo');
+    expect(localStorage.getItem('skulkr.dashboard.tenant')).toBe('demo');
     act(() => {
       window.location.hash = '#weasel';
       window.dispatchEvent(new HashChangeEvent('hashchange'));

@@ -1,7 +1,7 @@
 /**
  * A job's `claude -p --output-format stream-json --verbose` on stdin, turned into onto progress on stdout,
  * and the stream's `result` event, verbatim, written to the result file, where `--output-format json`
- * would have put it. Runs on the node, from `.skulk/in`, so it imports nothing outside node itself.
+ * would have put it. Runs on the node, from `.skulkr/in`, so it imports nothing outside node itself.
  *
  *   node progress.mjs <files.txt> <result.json>      a reviewer: each listed file it first reads
  *   node progress.mjs --commits <n> [--checks <checks.json>] <result.json>

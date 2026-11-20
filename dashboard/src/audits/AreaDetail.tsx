@@ -4,7 +4,7 @@ import { DetailList, DetailRow } from '@weasel-js/ui/components/DetailList';
 import { SidebarPanel } from '@weasel-js/ui/components/SidebarPanel';
 import type { Grade } from '@weasel-js/theme';
 import { STATUS_LABEL, lastPassOf, stageLabelOf } from './areaData';
-import type { AreaStatus, AuditArea, AuditRun } from './skulkMap.types';
+import type { AreaStatus, AuditArea, AuditRun } from './skulkrMap.types';
 import s from './AreaDetail.module.css';
 
 const GRADE: Readonly<Record<AreaStatus, Grade | undefined>> = { unaudited: undefined, due: 'info', settled: 'success', tonight: 'danger' };

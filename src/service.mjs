@@ -17,10 +17,10 @@ import { lastFinished, lastStartedAt, liveRuns, requestStop, writeContinuous } f
 import { readTenants, tenantsPath } from './tenants.mjs';
 
 /**
- * The skulk each run starts: `SKULK_BIN` (a checkout's `bin/skulk.mjs`, so runs pick up its latest code without the
+ * The skulkr each run starts: `SKULKR_BIN` (a checkout's `bin/skulkr.mjs`, so runs pick up its latest code without the
  * service's tree being synced), else this one.
  */
-const BIN = process.env.SKULK_BIN ?? fileURLToPath(new URL('../bin/skulk.mjs', import.meta.url));
+const BIN = process.env.SKULKR_BIN ?? fileURLToPath(new URL('../bin/skulkr.mjs', import.meta.url));
 const log = (line) => process.stderr.write(`${new Date().toISOString()} ${line}\n`);
 /** How often the host rereads the registry and checks each tenant's schedule. */
 const TICK_MS = 30_000;
@@ -33,13 +33,13 @@ const commitIn = (dir) => {
   }
 };
 
-/** One tenant as the host drives it: `cfg`'s project, each run `skulk night` from its main checkout. */
+/** One tenant as the host drives it: `cfg`'s project, each run `skulkr night` from its main checkout. */
 export const createTenant = (name, cfg, { readOnly = false } = {}) => {
   const root = mainCheckout(cfg);
   const state = cfg.state;
   /** Every run starts from the same config and checkout as this tenant. */
   const base = ['--config', cfg.file, '--root', root];
-  const env = { ...process.env, SKULK_CONFIG: cfg.file, SKULK_ROOT: root };
+  const env = { ...process.env, SKULKR_CONFIG: cfg.file, SKULKR_ROOT: root };
   const say = (line) => log(`${name}: ${line}`);
 
   /** The runs this service started that have not exited, by pid, with the last line each printed. */
@@ -59,7 +59,7 @@ export const createTenant = (name, cfg, { readOnly = false } = {}) => {
     const child = spawn(process.execPath, [BIN, 'night', ...base, ...args], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
     const entry = { lastLine: '' };
     children.set(child.pid, entry);
-    say(`run started: skulk night ${args.join(' ')} (pid ${child.pid})`);
+    say(`run started: skulkr night ${args.join(' ')} (pid ${child.pid})`);
     for (const stream of [child.stdout, child.stderr]) {
       createInterface({ input: stream }).on('line', (line) => {
         entry.lastLine = line;

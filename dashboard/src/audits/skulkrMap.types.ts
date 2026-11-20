@@ -1,4 +1,4 @@
-/** The JSON `skulk map` prints, which `api/t/<tenant>/map` serves. */
+/** The JSON `skulkr map` prints, which `api/t/<tenant>/map` serves. */
 
 /** `tonight` is an area a live run holds. */
 export type AreaStatus = 'unaudited' | 'due' | 'settled' | 'tonight';
@@ -133,7 +133,7 @@ export interface AuditContinuous {
   readonly leftUsd: number;
 }
 
-export interface SkulkMap {
+export interface SkulkrMap {
   readonly generated: string;
   readonly head: string;
   /** The audited project's name, for the page's title. */

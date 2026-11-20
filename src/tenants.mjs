@@ -1,14 +1,14 @@
 /**
- * The tenants one x-skulk host serves: a registry of projects, each by its name and the absolute path of its config,
- * in `~/.config/skulk/tenants.json` (`SKULK_TENANTS` overrides it). A tenant marked `readOnly` is shown and counted
+ * The tenants one skulkr host serves: a registry of projects, each by its name and the absolute path of its config,
+ * in `~/.config/skulkr/tenants.json` (`SKULKR_TENANTS` overrides it). A tenant marked `readOnly` is shown and counted
  * but never started here: its rounds run under another service.
  */
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 
-/** The registry's path: `SKULK_TENANTS`, else `~/.config/skulk/tenants.json`. */
-export const tenantsPath = (env = process.env) => env.SKULK_TENANTS ?? join(homedir(), '.config', 'skulk', 'tenants.json');
+/** The registry's path: `SKULKR_TENANTS`, else `~/.config/skulkr/tenants.json`. */
+export const tenantsPath = (env = process.env) => env.SKULKR_TENANTS ?? join(homedir(), '.config', 'skulkr', 'tenants.json');
 
 /** The registered tenants, `[{ name, config, readOnly? }]`; empty when there is no registry. Throws on a malformed one. */
 export const readTenants = (path = tenantsPath()) => {

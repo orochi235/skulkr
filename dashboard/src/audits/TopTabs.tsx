@@ -4,7 +4,7 @@ import { useRef } from 'react';
 import { NextUp } from './NextUp';
 import { RoundsChart } from './RoundsChart';
 import { useViewerPref } from './viewerPref';
-import type { AuditArea, AuditRound } from './skulkMap.types';
+import type { AuditArea, AuditRound } from './skulkrMap.types';
 import s from './TopTabs.module.css';
 
 type TopTab = 'rounds' | 'next';

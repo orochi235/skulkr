@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { after } from '@weasel-js/registry';
-import type { SkulkMap } from './skulkMap.types';
+import type { SkulkrMap } from './skulkrMap.types';
 
-export type SkulkMapState =
+export type SkulkrMapState =
   | { readonly status: 'loading' }
-  | { readonly status: 'ready'; readonly map: SkulkMap; readonly error?: string }
+  | { readonly status: 'ready'; readonly map: SkulkrMap; readonly error?: string }
   | { readonly status: 'failed'; readonly error: string }
   /** No dev server answers the route: a build, or a server without the plugin. */
   | { readonly status: 'no-server' };
@@ -12,19 +12,19 @@ export type SkulkMapState =
 /** How often the page asks again. Each ask runs `map.mjs`, which asks onto for its running jobs. */
 export const POLL_MS = 15_000;
 
-const KEPT = 'skulk-map:';
+const KEPT = 'skulkr-map:';
 
 /** The map this viewer last drew from `url`, so a reload draws at once; none where storage is empty or refused. */
-export function keptMapOf(url: string): SkulkMap | null {
+export function keptMapOf(url: string): SkulkrMap | null {
   try {
     const text = localStorage.getItem(KEPT + url);
-    return text ? (JSON.parse(text) as SkulkMap) : null;
+    return text ? (JSON.parse(text) as SkulkrMap) : null;
   } catch {
     return null;
   }
 }
 
-function keepMap(url: string, map: SkulkMap): void {
+function keepMap(url: string, map: SkulkrMap): void {
   try {
     localStorage.setItem(KEPT + url, JSON.stringify(map));
   } catch {
@@ -33,12 +33,12 @@ function keepMap(url: string, map: SkulkMap): void {
 }
 
 /** Where a tenant's map starts: the copy this viewer kept, or loading. */
-const startOf = (url: string | null): SkulkMapState => {
+const startOf = (url: string | null): SkulkrMapState => {
   const kept = url ? keptMapOf(url) : null;
   return kept ? { status: 'ready', map: kept } : { status: 'loading' };
 };
 
-export interface UseSkulkMapOptions {
+export interface UseSkulkrMapOptions {
   /** A tenant's map route; none yet asks for nothing. */
   readonly url: string | null;
   readonly everyMs?: number;
@@ -52,9 +52,9 @@ export interface UseSkulkMapOptions {
  * once when it becomes visible again. A failed ask keeps the last map it had and says why. It starts from the map this
  * viewer last drew from `url`, kept in local storage, so a reload draws at once and the first answer replaces it.
  */
-export function useSkulkMap(options: UseSkulkMapOptions): SkulkMapState {
+export function useSkulkrMap(options: UseSkulkrMapOptions): SkulkrMapState {
   const { url, everyMs = POLL_MS, dev = true } = options;
-  const [state, setState] = useState<SkulkMapState>(() => (dev ? startOf(url) : { status: 'no-server' }));
+  const [state, setState] = useState<SkulkrMapState>(() => (dev ? startOf(url) : { status: 'no-server' }));
   useEffect(() => {
     if (!dev || url === null) return;
     // Another tenant's map is not this one's: start from the copy kept for this one, or from loading.
@@ -71,7 +71,7 @@ export function useSkulkMap(options: UseSkulkMapOptions): SkulkMapState {
         // Vite answers a route no plugin serves with its index.html fallback, not a 404.
         if (res.status === 404 || res.headers.get('content-type')?.includes('text/html')) return noServer();
         if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
-        const map = (await res.json()) as SkulkMap;
+        const map = (await res.json()) as SkulkrMap;
         if (!live) return;
         keepMap(url, map);
         setState({ status: 'ready', map });

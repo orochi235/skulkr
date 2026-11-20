@@ -5,7 +5,7 @@ import { SidebarPanel } from '@weasel-js/ui/components/SidebarPanel';
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { Grade } from '@weasel-js/theme';
 import { useAreaDefects } from './useAreaDefects';
-import type { AuditDefect } from './skulkMap.types';
+import type { AuditDefect } from './skulkrMap.types';
 import s from './AreaDefects.module.css';
 
 const GRADE: Readonly<Record<AuditDefect['verdict'], Grade | undefined>> = {

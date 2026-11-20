@@ -1,5 +1,5 @@
 /** What the audit page says about runs: each one's headline, its lanes, and the jobs its log reports. */
-import type { AuditContinuous, AuditRun, LaneStep, LaneStepName } from './skulkMap.types';
+import type { AuditContinuous, AuditRun, LaneStep, LaneStepName } from './skulkrMap.types';
 
 /**
  * `m` minutes as a lane says them, `<1 min`, `8.2 min` or `12 min`, a tenth shown under ten. Spelled out: the lanes

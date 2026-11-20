@@ -8,7 +8,7 @@
   node_modules installed. Work only here. Never `git stash`, never switch branches, never reset or rebase
   past the current commit: your commits on top of it are what the controller takes back, as patches.
 - Read root `CLAUDE.md` first, and the `docs/traps/*.md` file its table names for what you touch.
-- Leave `.skulk/` alone and out of every commit.
+- Leave `.skulkr/` alone and out of every commit.
 - Every call rereads everything before it, so read in few, targeted calls: the findings and the files they cite
   together, a function rather than a whole file, and a check's verdict rather than its log (`… | tail -5`, or
   `grep -E "Tests |×|error"`).

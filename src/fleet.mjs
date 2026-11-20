@@ -13,8 +13,8 @@ import { leaseAt, pidAlive, takeLease } from './lease.mjs';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** The fleet queue's directory: `SKULK_FLEET`, else `~/.local/state/skulk/fleet`, beside the tenants' own state. */
-export const fleetDir = (env = process.env) => env.SKULK_FLEET ?? join(homedir(), '.local', 'state', 'skulk', 'fleet');
+/** The fleet queue's directory: `SKULKR_FLEET`, else `~/.local/state/skulkr/fleet`, beside the tenants' own state. */
+export const fleetDir = (env = process.env) => env.SKULKR_FLEET ?? join(homedir(), '.local', 'state', 'skulkr', 'fleet');
 
 const leasePath = (dir) => join(dir, 'gate.lease');
 const waitingDir = (dir) => join(dir, 'waiting');

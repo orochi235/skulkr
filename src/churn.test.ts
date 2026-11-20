@@ -13,7 +13,7 @@ afterEach(() => {
 
 /** A repository whose commits each write `files` (path → line count), answering each commit's sha. */
 const repo = () => {
-  const root = mkdtempSync(join(tmpdir(), 'skulk-churn-'));
+  const root = mkdtempSync(join(tmpdir(), 'skulkr-churn-'));
   dirs.push(root);
   const run = (...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
   run('init', '-q', '-b', 'main');

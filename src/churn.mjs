@@ -3,7 +3,7 @@
  * that is not one of the pass's own fixes, counted as `git log --numstat` counts them (added plus deleted). Merges are
  * left out, so a change counts once, in the commit that made it.
  *
- * A commit's counts never change, so they are kept in `~/.cache/skulk/<name>/churn.json` (outside the project's state,
+ * A commit's counts never change, so they are kept in `~/.cache/skulkr/<name>/churn.json` (outside the project's state,
  * which another service may own) and git is asked only for commits not there yet; the file holds only commits after
  * the oldest pass asked about, rewritten on each build that adds one.
  */
@@ -128,4 +128,4 @@ const commitsKnown = (root, shas) => {
 };
 
 /** Where project `name`'s churn counts are kept. */
-export const churnCacheOf = (name) => join(homedir(), '.cache', 'skulk', name, 'churn.json');
+export const churnCacheOf = (name) => join(homedir(), '.cache', 'skulkr', name, 'churn.json');

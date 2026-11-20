@@ -1,6 +1,6 @@
 /**
  * The audit map's data: every area of the partition with its passes, whether it is settled, where it sits in
- * the queue, and how far the live run holding it has taken it. `skulk map [--out <file>]` prints or writes the JSON
+ * the queue, and how far the live run holding it has taken it. `skulkr map [--out <file>]` prints or writes the JSON
  * the dashboard reads. Functions taking `names` take the config's `names`; the default is the default config's.
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -328,7 +328,7 @@ const continuousOfMap = (cfg) => {
   return { continuous: { until: mode.until, next: next.start ? 'starts now' : next.why, nightUsd: budget.nightUsd, spentUsd: budget.spentUsd, leftUsd: budget.leftUsd } };
 };
 
-/** `skulk map [--out <file>]`: prints or writes the map. */
+/** `skulkr map [--out <file>]`: prints or writes the map. */
 export const mapCommand = (cfg, root, runner, argv) => {
   const at = argv.indexOf('--out');
   const json = JSON.stringify(buildMap(cfg, root, runner));

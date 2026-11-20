@@ -6,7 +6,7 @@ import { heatScaleOf, labelIn, staleFadeOf, toneOf, wrapAtDots, type HeatScale }
 import { rampAt } from './heat';
 import type { MapCell, MapFrame } from './mapLayout';
 import type { AuditPhase } from './phases';
-import type { AuditArea } from './skulkMap.types';
+import type { AuditArea } from './skulkrMap.types';
 
 /** The colors the map paints in, read off the page's theme. */
 export interface AuditPalette {

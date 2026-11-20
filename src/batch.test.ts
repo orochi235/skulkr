@@ -12,12 +12,12 @@ afterEach(() => {
 
 /** A repo on `batch` branched from `main`, each with a commit of its own touching `file`s. */
 const repo = (mainFile: string, batchFile: string) => {
-  const dir = mkdtempSync(join(tmpdir(), 'skulk-batch-'));
+  const dir = mkdtempSync(join(tmpdir(), 'skulkr-batch-'));
   dirs.push(dir);
   const git = gitIn(dir);
   git('init', '-q', '-b', 'main');
-  git('config', 'user.email', 'skulk@example.invalid');
-  git('config', 'user.name', 'skulk');
+  git('config', 'user.email', 'skulkr@example.invalid');
+  git('config', 'user.name', 'skulkr');
   const commit = (file: string, text: string) => {
     writeFileSync(join(dir, file), text);
     git('add', file);
@@ -113,7 +113,7 @@ describe('commitRecord', () => {
     git('add', '.');
     git('commit', '-q', '-m', 'src');
     const head = git('rev-parse', 'HEAD');
-    const night = mkdtempSync(join(tmpdir(), 'skulk-night-'));
+    const night = mkdtempSync(join(tmpdir(), 'skulkr-night-'));
     dirs.push(night);
     const plain = resolveConfig({ record: { dir: 'audit-log' } });
     commitRecord(plain, dir, { round: 3, commit: head, date: '2026-11-20', nightDir: night, areas: [area('x')], outcomes: {}, sweep: undefined });
