@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { after } from '@weasel-js/registry';
 import { STALE_HEADER } from '@shared/routes';
 import type { SkulkrMap } from './skulkrMap.types';
@@ -55,11 +55,13 @@ export interface UseSkulkrMapOptions {
  */
 export function useSkulkrMap(options: UseSkulkrMapOptions): SkulkrMapState {
   const { url, everyMs = POLL_MS, dev = true } = options;
-  const [state, setState] = useState<SkulkrMapState>(() => (dev ? startOf(url) : { status: 'no-server' }));
+  // Another tenant's map is not this one's: state is held by url, and a url with none yet starts from its kept copy.
+  const start = useMemo(() => startOf(url), [url]);
+  const [held, setHeld] = useState<{ url: string | null; state: SkulkrMapState }>(() => ({ url, state: start }));
   useEffect(() => {
     if (!dev || url === null) return;
-    // Another tenant's map is not this one's: start from the copy kept for this one, or from loading.
-    setState(startOf(url));
+    const setState = (next: SkulkrMapState | ((was: SkulkrMapState) => SkulkrMapState)) =>
+      setHeld((h) => ({ url, state: typeof next === 'function' ? next(h.url === url ? h.state : startOf(url)) : next }));
     let live = true;
     let stop = () => {};
     let asking = false;
@@ -104,5 +106,6 @@ export function useSkulkrMap(options: UseSkulkrMapOptions): SkulkrMapState {
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [url, everyMs, dev]);
-  return state;
+  if (!dev) return { status: 'no-server' };
+  return held.url === url ? held.state : start;
 }

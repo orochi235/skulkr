@@ -45,6 +45,19 @@ describe('useSkulkrMap', () => {
     await waitFor(() => expect(result.current).toMatchObject({ status: 'ready', error: 'map.mjs: TypeError: x is undefined' }));
   });
 
+  it("never answers one url's map for another, not even for the render before its effect runs", async () => {
+    serve(json, () => new Promise<Response>(() => {}) as unknown as Response);
+    const seen: { url: string; status: string }[] = [];
+    const { result, rerender } = renderHook(({ url }) => {
+      const state = useSkulkrMap({ url, everyMs: 60_000, dev: true });
+      seen.push({ url, status: state.status });
+      return state;
+    }, { initialProps: { url: URL } });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    rerender({ url: '/test/__skulkr/other' });
+    expect(seen.filter((s) => s.url !== URL).map((s) => s.status)).not.toContain('ready');
+  });
+
   it('asks at once when the page is shown again, though no ask came due while it was hidden', async () => {
     const fetch = serve(json);
     const { result } = renderHook(() => useSkulkrMap({ url: URL, everyMs: 60_000, dev: true }));
