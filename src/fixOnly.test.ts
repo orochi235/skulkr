@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fixOnlyArg, planFixOnly } from './fixOnly.mjs';
-import { parseArgs } from './night.mjs';
+import { parseArgs } from './args.mjs';
 import { startArgs } from './serviceCore.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';
 
