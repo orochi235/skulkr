@@ -101,6 +101,11 @@ describe('pickAreas', () => {
     expect(pickAreas({ areas, passes, touched: never, count: 5 }).settled).toEqual([]);
   });
 
+  it('does not settle, or throw, on two quiet passes that recorded no file list', () => {
+    const passes = new Map([['a', [{ round: 31, id: 'a', distinct: 0 }, { round: 32, id: 'a', distinct: 0 }]]]);
+    expect(pickAreas({ areas: [area('a')], passes, touched: never, count: 5 })).toEqual({ picked: ['a'], settled: [] });
+  });
+
   it('ignores the passes\' own fix commits when asking whether files changed', () => {
     const passes = readPasses(fixture([
       { round: 31, id: 'a', distinct: 1, files: ['a.ts'], commit: 'base', fixCommits: ['fix1'] },

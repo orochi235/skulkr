@@ -182,7 +182,7 @@ export const nextRound = ({ roundDirs = [], hardening = '', branches = [], claim
   return Math.max(...used) + 1;
 };
 
-const sameFiles = (a, b) => a.length === b.length && a.every((f, i) => f === b[i]);
+const sameFiles = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((f, i) => f === b[i]);
 
 /**
  * Whether an area's two latest passes settle it: each found at most QUIET_PASS distinct defects, both
