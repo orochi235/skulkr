@@ -3,9 +3,13 @@
  * `<state>/runs/<N>/` by creating it, keeps `status.json` there while it runs, and leaves `summary.json`
  * when it ends. Any number of runs may be live at once; one whose pid has died is not.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { readJson, writeJson as writeJsonAt } from './json.mjs';
 import { pidAlive } from './lease.mjs';
+
+// night.mjs still imports readJson from here.
+export { readJson };
 
 export const runsDir = (state) => join(state, 'runs');
 export const runDir = (round, state) => join(runsDir(state), String(round));
@@ -14,20 +18,7 @@ export const mergeLock = (state) => join(state, 'merge.lock');
 /** Held from reading what other runs hold through writing this run's status, so two plans never pick one area. */
 export const planLock = (state) => join(state, 'plan.lock');
 
-export const readJson = (path) => {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8'));
-  } catch {
-    return undefined;
-  }
-};
-
-/** Writes beside and renames, so a reader never sees half a file. */
-const writeJson = (path, value) => {
-  const tmp = `${path}.${process.pid}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(value, null, 1)}\n`);
-  renameSync(tmp, path);
-};
+const writeJson = (path, value) => writeJsonAt(path, value, 1);
 
 /** The round numbers claimed on disk, as directory names, for `nextRound`. */
 export const claimedRounds = (state) =>
@@ -113,10 +104,7 @@ export const pruneRuns = (keep, state, now = new Date()) => {
 /** What a `start` with `continuous` or a `stop` left for continuous mode: `{ on, until, at }`, or undefined. */
 const continuousFile = (state) => join(state, 'continuous.json');
 export const readContinuous = (state) => readJson(continuousFile(state));
-export const writeContinuous = (state, value) => {
-  mkdirSync(state, { recursive: true });
-  writeJson(continuousFile(state), value);
-};
+export const writeContinuous = (state, value) => writeJson(continuousFile(state), value);
 
 /** The night directories of every other run at `commit`, newest first, from each run's status or summary. */
 export const nightsAt = (commit, state, except) => rounds(state).filter((r) => r !== except).reverse().flatMap((r) => {

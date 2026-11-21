@@ -3,9 +3,9 @@
  * writes under `out` brought back to `to`. onto's own README covers `do`, `status` and `jobs`.
  */
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
+import { readJson, writeJson } from '../json.mjs';
 
 const BUSY = /working tree .* is busy/;
 const REFUSED = /\bquiet\b|refuses|is offline|not reachable|unavailable/i;
@@ -117,18 +117,10 @@ export const memoryStore = () => {
  * its own exit. One file, overwritten on every good listing.
  */
 export const fileStore = (path) => ({
-  read: () => {
-    try {
-      return JSON.parse(readFileSync(path, 'utf8'));
-    } catch {
-      return null;
-    }
-  },
+  read: () => readJson(path) ?? null,
   write: (v) => {
     try {
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(`${path}.tmp`, JSON.stringify(v));
-      renameSync(`${path}.tmp`, path);
+      writeJson(path, v);
     } catch {
       // A listing that cannot be kept is still answered.
     }

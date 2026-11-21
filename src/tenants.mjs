@@ -3,9 +3,10 @@
  * in `~/.config/skulkr/tenants.json` (`SKULKR_TENANTS` overrides it). A tenant marked `readOnly` is shown and counted
  * but never started here: its rounds run under another service.
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
+import { writeJson } from './json.mjs';
 
 /** The registry's path: `SKULKR_TENANTS`, else `~/.config/skulkr/tenants.json`. */
 export const tenantsPath = (env = process.env) => env.SKULKR_TENANTS ?? join(homedir(), '.config', 'skulkr', 'tenants.json');
@@ -20,12 +21,7 @@ export const readTenants = (path = tenantsPath()) => {
   return list;
 };
 
-const writeTenants = (list, path) => {
-  mkdirSync(dirname(path), { recursive: true });
-  const tmp = `${path}.${process.pid}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(list, null, 2)}\n`);
-  renameSync(tmp, path);
-};
+const writeTenants = (list, path) => writeJson(path, list, 2);
 
 const NAME = /^[\w.-]+$/;
 

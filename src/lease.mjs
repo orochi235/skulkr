@@ -3,10 +3,10 @@
  * one process, and a lease whose process has died is taken back. Node tree slots, the merge lock and the
  * plan lock are all leases.
  */
-import { linkSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeSync, closeSync } from 'node:fs';
+import { linkSync, mkdirSync, openSync, renameSync, rmSync, writeSync, closeSync } from 'node:fs';
 import { dirname } from 'node:path';
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+import { sleep } from './after.mjs';
+import { readJson } from './json.mjs';
 
 /** Whether process `pid` is alive. EPERM means it is, owned by someone else. */
 export const pidAlive = (pid) => {
@@ -20,13 +20,7 @@ export const pidAlive = (pid) => {
 };
 
 /** What a lease file says, or `undefined` when it is gone or unreadable. */
-export const leaseAt = (path) => {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8'));
-  } catch {
-    return undefined;
-  }
-};
+export const leaseAt = readJson;
 
 const create = (path, holder) => {
   const fd = openSync(path, 'wx');

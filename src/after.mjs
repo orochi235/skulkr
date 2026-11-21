@@ -17,3 +17,6 @@ export const after = (ms, fn) => {
     clearTimeout(timer);
   };
 };
+
+/** A promise that settles after `ms`. */
+export const sleep = (ms) => new Promise((resolve) => after(ms, resolve));

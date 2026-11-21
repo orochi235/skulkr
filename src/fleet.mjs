@@ -9,9 +9,8 @@
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { sleep } from './after.mjs';
 import { leaseAt, pidAlive, takeLease } from './lease.mjs';
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** The fleet queue's directory: `SKULKR_FLEET`, else `~/.local/state/skulkr/fleet`, beside the tenants' own state. */
 export const fleetDir = (env = process.env) => env.SKULKR_FLEET ?? join(homedir(), '.local', 'state', 'skulkr', 'fleet');

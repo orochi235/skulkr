@@ -8,9 +8,9 @@
  * the oldest pass asked about, rewritten on each build that adds one.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
+import { readJson, writeJson } from './json.mjs';
 
 /** `git log --format=%H %P` lines → each commit's parents. */
 const parentsOf = (text) => new Map(text.split('\n').filter(Boolean).map((line) => {
@@ -48,13 +48,7 @@ export const parseNumstat = (text, keep = () => true) => {
   return out;
 };
 
-const readCache = (path) => {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8'));
-  } catch {
-    return {};
-  }
-};
+const readCache = (path) => readJson(path) ?? {};
 
 const CHUNK = 400;
 
@@ -92,9 +86,7 @@ export const churnSince = (git, entries, { keep = () => true, cacheFile = null, 
   }
   if (cacheFile && (missing.length || Object.keys(cache).length > wanted.length)) {
     const kept = Object.fromEntries(wanted.map((sha) => [sha, cache[sha] ?? {}]));
-    mkdirSync(dirname(cacheFile), { recursive: true });
-    writeFileSync(`${cacheFile}.tmp`, JSON.stringify(kept));
-    renameSync(`${cacheFile}.tmp`, cacheFile);
+    writeJson(cacheFile, kept);
   }
 
   // Per pass commit, every later commit's lines summed by path; a pass's own fixes are taken back out after.
