@@ -2,10 +2,9 @@
  * What earlier rounds left on disk, and what that says about tonight. Nothing here keeps its own
  * ledger: an area's history is the `<record.dir>/round-<N>/<area>/area.json` files that name it.
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { calibrationOf, correctedLeftOf } from './calibration.mjs';
 import { churnCacheOf, churnSince } from './churn.mjs';
+import { diskRecords, recordsFor } from './recordFiles.mjs';
 
 /** A pass that found at most this many distinct defects counts toward settling its area. */
 export const QUIET_PASS = 1;
@@ -13,84 +12,41 @@ export const QUIET_PASS = 1;
 /** Chapman's estimate of how many defects the area held, from two lists of `a` and `b` sharing `m`. */
 export const chapman = (a, b, m) => (a + 1) * (b + 1) / (m + 1) - 1;
 
-/** Every pass on disk under `recordDir` (the config's `record.dir`), by area id, oldest first. */
-export const readPasses = (root, recordDir) => {
-  const dir = join(root, recordDir);
-  const passes = new Map();
-  if (!existsSync(dir)) return passes;
-  const rounds = readdirSync(dir).flatMap((name) => /^round-(\d+)$/.exec(name)?.[1] ?? []).map(Number);
-  for (const round of rounds.sort((x, y) => x - y)) {
-    const roundDir = join(dir, `round-${round}`);
-    for (const area of readdirSync(roundDir, { withFileTypes: true })) {
-      const at = join(roundDir, area.name, 'area.json');
-      if (!area.isDirectory() || !existsSync(at)) continue;
-      const pass = { round, ...JSON.parse(readFileSync(at, 'utf8')) };
-      const listed = join(roundDir, area.name, 'files.txt');
-      if (!Array.isArray(pass.files) && existsSync(listed)) pass.files = readFileSync(listed, 'utf8').split('\n').filter(Boolean);
-      // A pass a reviewer never ran or never finished is no pass: the area comes back as if it had not been audited.
-      if (pass.incomplete?.length || pass.fixOnly) continue;
-      if (!passes.has(pass.id)) passes.set(pass.id, []);
-      passes.get(pass.id).push(pass);
-    }
-  }
-  return passes;
+/** A record's pass (`recordFiles.mjs`): its `area.json` with its `round`, and its `files.txt` where that lists no files. */
+const passOfRecord = (rec) => {
+  const pass = { round: rec.round, ...JSON.parse(rec.read('area.json')) };
+  const listed = Array.isArray(pass.files) ? null : rec.read('files.txt');
+  if (listed !== null) pass.files = listed.split('\n').filter(Boolean);
+  return pass;
 };
 
 /**
- * `passes` (`readPasses`') with the passes recorded on each of `refs` for rounds not on disk: a batch that has not
- * landed holds its round's record, and its areas were audited all the same. Keeps each round from the first ref
- * holding it; a pass marked incomplete is skipped, as on disk.
+ * Each record's pass (`recordFiles.mjs`' records) by area id, oldest first. A pass a reviewer never ran or never
+ * finished is no pass, nor is a fix-only round's: the area comes back as if it had not been audited.
  */
-export const withBatchPasses = (passes, git, recordDir, refs) => {
-  const known = new Set([...passes.values()].flat().map((p) => p.round));
-  const area = new RegExp(`^${recordDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/round-(\\d+)/([^/]+)/area\\.json$`);
-  const added = new Set();
-  for (const ref of refs) {
-    const found = new Set();
-    for (const path of git('ls-tree', '-r', '--name-only', ref, '--', recordDir).split('\n')) {
-      const m = area.exec(path);
-      if (!m || known.has(Number(m[1])) || added.has(Number(m[1]))) continue;
-      const round = Number(m[1]);
-      found.add(round);
-      const pass = { round, ...JSON.parse(git('show', `${ref}:${path}`)) };
-      if (!Array.isArray(pass.files)) {
-        try {
-          pass.files = git('show', `${ref}:${path.replace(/area\.json$/, 'files.txt')}`).split('\n').filter(Boolean);
-        } catch {}
-      }
-      if (pass.incomplete?.length || pass.fixOnly) continue;
-      if (!passes.has(pass.id)) passes.set(pass.id, []);
-      passes.get(pass.id).push(pass);
-    }
-    for (const r of found) added.add(r);
+export const passesFrom = (records) => {
+  const passes = new Map();
+  for (const rec of records) {
+    const pass = passOfRecord(rec);
+    if (pass.incomplete?.length || pass.fixOnly) continue;
+    if (!passes.has(pass.id)) passes.set(pass.id, []);
+    passes.get(pass.id).push(pass);
   }
   for (const list of passes.values()) list.sort((x, y) => x.round - y.round);
   return passes;
 };
 
-/** The batch branches not yet merged into `main`, newest name first. */
-export const unlandedBatches = (git, batchPrefix, main) =>
-  git('for-each-ref', `--no-merged=${main}`, '--sort=-refname', '--format=%(refname:short)', `refs/heads/${batchPrefix}/`)
-    .split('\n').filter(Boolean);
+/** Every pass on disk under `recordDir` (the config's `record.dir`), by area id, oldest first. */
+export const readPasses = (root, recordDir) => passesFrom(diskRecords(root, recordDir));
 
-/** Every pass the project holds: on disk under `recordDir`, and on the batches `main` has not merged. */
-export const passesIn = (cfg, git, root) =>
-  withBatchPasses(readPasses(root, cfg.record.dir), git, cfg.record.dir, unlandedBatches(git, cfg.naming.batchPrefix, cfg.git.main));
+/** Every pass the project holds: on disk, and on the batches `main` has not merged (`recordsFor`). */
+export const passesIn = (cfg, git, root, records = recordsFor(cfg, git, root)) => passesFrom(records);
 
-/** How many areas each round under `recordDir` recorded incomplete, by round: passes `readPasses` leaves out. */
-export const incompleteByRound = (root, recordDir) => {
-  const dir = join(root, recordDir);
+/** How many areas each round of `records` recorded incomplete, by round: passes `passesFrom` leaves out. */
+export const incompleteByRound = (records) => {
   const counts = new Map();
-  if (!existsSync(dir)) return counts;
-  for (const name of readdirSync(dir)) {
-    const round = Number(/^round-(\d+)$/.exec(name)?.[1]);
-    if (!round) continue;
-    for (const area of readdirSync(join(dir, name), { withFileTypes: true })) {
-      const at = join(dir, name, area.name, 'area.json');
-      if (area.isDirectory() && existsSync(at) && JSON.parse(readFileSync(at, 'utf8')).incomplete?.length) {
-        counts.set(round, (counts.get(round) ?? 0) + 1);
-      }
-    }
+  for (const rec of records) {
+    if (JSON.parse(rec.read('area.json')).incomplete?.length) counts.set(rec.round, (counts.get(rec.round) ?? 0) + 1);
   }
   return counts;
 };
@@ -103,7 +59,7 @@ export const COVERED = 0.5;
  * the partition: a pass is inherited by every area holding any of its files, with `share`, the part of the pass's
  * files that area holds, by which its estimates are scaled (`scaledOf`). A renamed area keeps its whole history; a
  * split one passes each part its share. A pass with no file list goes to the area of its own id, whole. Each pass also
- * carries `covers`, the part of the area's files its round's passes read together. `raw` is `readPasses`'. Answers `{ history, covered }`: Maps by area id of its passes oldest first, and the share of its files
+ * carries `covers`, the part of the area's files its round's passes read together. `raw` is `passesFrom`'. Answers `{ history, covered }`: Maps by area id of its passes oldest first, and the share of its files
  * any of them read.
  */
 /** @param {{ id: string, files: string[] }[]} areas @param {Map<string, any[]>} raw @returns {{ history: Map<string, any[]>, covered: Map<string, number> }} */

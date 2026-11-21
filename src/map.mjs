@@ -14,6 +14,7 @@ import { partitionAt } from './partition.mjs';
 import { correctedLeftOf } from './calibration.mjs';
 import { COVERED, areaStats, areasInFlightFor, calibrationFor, chapman, drawnPassOf, gitTouched, incompleteByRound, passOf, passesIn, pickAreas } from './rounds.mjs';
 import { openFindingsIn } from './carryRecords.mjs';
+import { recordsFor } from './recordFiles.mjs';
 import { continuousOf } from './continuousOf.mjs';
 import { lastFinished, liveRuns, readJson } from './runs.mjs';
 import { parseEnvelope } from './usage.mjs';
@@ -281,7 +282,8 @@ export const buildMap = (cfg, root, runner) => {
   const git = gitIn(root);
   const head = git('rev-parse', '--short', 'HEAD');
   const areas = partitionAt(cfg, root, 'HEAD');
-  const { history: passes, covered, staleLines, pairLines } = areaStats(cfg, git, areas, passesIn(cfg, git, root), root);
+  const records = recordsFor(cfg, git, root);
+  const { history: passes, covered, staleLines, pairLines } = areaStats(cfg, git, areas, passesIn(cfg, git, root, records), root);
   const calibration = calibrationFor(passes, pairLines);
   const corrected = (p) => ({ ...p, leftCorrected: correctedLeftOf(p, calibration) });
   const { picked, settled } = pickAreas({ areas, passes, covered, staleLines, calibration, touched: gitTouched(git), count: Infinity, inFlight: areasInFlightFor(cfg, git) });
@@ -293,7 +295,7 @@ export const buildMap = (cfg, root, runner) => {
   // A live run's areas are being audited, not waiting, so the queue counts from 1 past them.
   const queue = new Map(picked.filter((id) => !holder.has(id)).map((id, i) => [id, i + 1]));
   const icons = areaIcons(iconsFor(cfg, root), areas);
-  const open = openFindingsIn(cfg, git, root);
+  const open = openFindingsIn(cfg, git, root, records);
 
   const out = areas.map((area) => {
     const own = passes.get(area.id) ?? [];
@@ -338,7 +340,7 @@ export const buildMap = (cfg, root, runner) => {
   }
 
   // A round whose areas came back incomplete says how many, so a bar drawn from the few that finished reads as that.
-  for (const [round, incomplete] of incompleteByRound(root, cfg.record.dir)) {
+  for (const [round, incomplete] of incompleteByRound(records.filter((r) => !r.ref))) {
     const r = rounds.get(round) ?? { round, date: null, areas: 0, files: 0, distinct: 0, est: 0 };
     rounds.set(round, { ...r, incomplete });
   }

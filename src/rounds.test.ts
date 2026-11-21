@@ -5,7 +5,8 @@ import { gitIn } from './batch.mjs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { weaselConfig } from '../test/weaselConfig.ts';
-import { areaStats, areasInFlight, areasInFlightFor, calibrationFor, chapman, drawnRoundOf, inheritPasses, lastPassIn, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf, withBatchPasses } from './rounds.mjs';
+import { areaStats, areasInFlight, areasInFlightFor, calibrationFor, chapman, drawnRoundOf, inheritPasses, lastPassIn, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf } from './rounds.mjs';
+import { diskRecords } from './recordFiles.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -258,26 +259,6 @@ describe('areaStats', () => {
   });
 });
 
-describe('withBatchPasses', () => {
-  const tree = {
-    'b/new:docs/audits/round-5/ui/area.json': JSON.stringify({ id: 'ui', a: 2, b: 1, m: 1, distinct: 2, files: ['x.ts'] }),
-    'b/new:docs/audits/round-4/ui/area.json': JSON.stringify({ id: 'ui', a: 9, b: 9, m: 9, distinct: 9 }),
-    'b/new:docs/audits/round-5/gone/area.json': JSON.stringify({ id: 'gone', incomplete: ['B'] }),
-  };
-  const git = (...args: string[]) => {
-    if (args[0] === 'show') return tree[args[1] as keyof typeof tree];
-    const ref = args[3];
-    return Object.keys(tree).filter((k) => k.startsWith(`${ref}:`)).map((k) => k.slice(ref.length + 1)).join('\n');
-  };
-
-  it("adds an unlanded batch's passes for rounds not on disk, in round order, skipping incomplete ones", () => {
-    const passes = new Map([['ui', [{ round: 4, id: 'ui', distinct: 3 }]]]);
-    withBatchPasses(passes, git, 'docs/audits', ['b/new']);
-    expect(passes.get('ui')!.map((p) => [p.round, p.distinct])).toEqual([[4, 3], [5, 2]]);
-    expect(passes.has('gone')).toBe(false);
-  });
-});
-
 describe('incompleteByRound', () => {
   it('counts the areas each round recorded incomplete, which readPasses leaves out', () => {
     const root = fixture([
@@ -286,7 +267,7 @@ describe('incompleteByRound', () => {
       { round: 56, id: 'Badge', distinct: 13, files: ['c.ts'] },
       { round: 55, id: 'ui', distinct: 4, files: ['a.ts'] },
     ]);
-    expect([...incompleteByRound(root, 'docs/audits')]).toEqual([[56, 2]]);
+    expect([...incompleteByRound(diskRecords(root, 'docs/audits'))]).toEqual([[56, 2]]);
     expect(readPasses(root, 'docs/audits').get('ui')!.map((p: { round: number }) => p.round)).toEqual([55]);
   });
 });
