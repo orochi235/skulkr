@@ -52,6 +52,11 @@ export default {
       lintOf: null,                   // a committed path that calls for a lint (group 1 its part)
       final: String.raw`\bnpm run typecheck\b`, // the last whole check, always expected
     },
+    verify: {                         // what skulkr runs itself on each fix; see "Verify and repair"
+      command: 'npx vitest related --run --maxWorkers=4 {files}',
+      gui: null,                      // or { probe, command } for tests that need a GUI node
+      timeoutMin: 20,
+    },
   },
   rules: {                            // Markdown added to the default briefs
     reviewer: 'A finding about generated code under `gen/` is not a defect.',
@@ -106,7 +111,8 @@ the config, unless the config's `root` or `--root` says otherwise. `skulkr confi
 
 **Briefs.** The shipped briefs in `briefs/` are generic and fill `{{project}}`, `{{rules}}`, `{{test}}`,
 `{{typecheck}}`, and `{{lint}}` from the config, beside their own variables (`{{round}}`, `{{area}}`,
-`{{commit}}`, `{{files}}`, `{{out}}` for a reviewer; `{{source}}` for a fixer). A project's own brief may use the
+`{{commit}}`, `{{files}}`, `{{out}}` for a reviewer; `{{source}}` for a fixer; `{{attempt}}`, `{{command}}`,
+`{{failures}}`, and `{{log}}` for a repair). A project's own brief may use the
 same ones. The reviewer brief's closing `<!-- done: … -->` line, its `## Files read` section, and the fixer
 brief's `tally:` line are read back by the pipeline, so a replacement must keep them.
 
@@ -123,9 +129,11 @@ Each step prints one line as it completes (`review 3/16 …`).
 | review | Per area, two reviewer jobs from the frozen tree with the reviewer brief and the area's file list. Reviewers may read, search, and run `git log/show/diff/blame`, and write only `.skulkr/out/`. Each lists the files it read; its stream goes through `src/progress.mjs`, so the runner shows how many of the area's files it has opened. |
 | match | One job per area pairs the two lists (the matcher brief); the pipeline keeps only one-to-one pairs and computes the estimate. |
 | fix | Per area with findings, one fixer job, permissions bypassed, in the node's synced tree. It first commits the synced tree and checks it hashes to the frozen commit's tree, installs if the lockfile changed, then hands back its commits as an mbox. |
+| verify | Per fixer with commits, the config's `checks.verify` over the files they changed, run by skulkr, never read from the fixer's report; see "Verify and repair". |
+| repair | Per area whose verify fails, up to two repair jobs on its commits, each verified again; an area still failing is left out of the batch. |
 | patch | Each mbox is applied with `git am` onto `audit<N>-<area>` at the frozen commit. One that does not apply is reported and left out. |
 | batch | Every branch merges into `batch/<date>-audit<N>` (a worktree); a conflicting one is left out and reported. The round's record is committed there. Then the run waits for `merge.lock`, held by one run at a time from its gate through `main`'s fast-forward; holding it, it merges `main` in if another run has landed meanwhile, waits its turn in the fleet queue (step `fleet-wait`; see "Continuous rounds"), and runs the gate on the tip. |
-| merge | Green: local `main` fast-forwards to the batch (never pushed), and the branches are deleted. If `main` moved during the gate, it is merged in and the gate runs again, up to twice. Red: the batch worktree and its branches stay, and the report names them. |
+| merge | Green: local `main` fast-forwards to the batch (never pushed), and the branches are deleted. If `main` moved during the gate, it is merged in and the gate runs again, up to twice. Red: one capstone repair cycle (see "Verify and repair"), and the gate once more; still red, the batch worktree and its branches stay, and the report names them and what was tried. |
 
 The record, in `<record.dir>/round-<N>/`: per area `files.txt`, `A.md`, `B.md`, `match.json`, `fix.md` and
 `area.json` (counts, estimate, the previous pass's estimate this one tests, findings in files changed since, fix
@@ -171,6 +179,27 @@ would pass the dollar cap. An area whose reviewers ran always gets its matcher a
 reports unavailable is skipped; a dispatch a node refuses moves to another node and keeps that one out for
 `nodes.refusedCooldownMin`. `<state>/limits.json` (`{ "review": n, "fix": n }`) changes the slots per node for
 runs already going.
+
+## Verify and repair
+
+A fixer runs checks of its own, but chooses which, and reads their verdict itself. skulkr does not take its word:
+with `checks.verify` set, it runs the project's verify step itself on what each fixer committed.
+
+| Part | What happens |
+|---|---|
+| `command` | Runs at the end of the fixer's own job, after the model exits, on the committed tree (uncommitted edits are dropped first). `{files}` is the files the fixer's commits changed; `{related}` is the same as one `--related=<file>` each. Bounded by `timeoutMin` (default 20). |
+| `gui` | `{ probe, command }` for tests that need a node's GUI session. `probe` runs beside `command` and prints the test files the GUI part would run, one a line; when it lists one, or fails, `command` runs in an `onto do --gui` job of its own on the area's commits. With no `probe`, the GUI part runs for any change. |
+| verdict | The command's exit status and vitest's `Test Files` counts: it passes only on exit 0 with no file failed, so a file whose setup or teardown throws fails even when every test in it passes. |
+| repair | A failing verdict goes, verbatim, to a repair job (`briefs/repair.md`, or the config's `briefs.repair`) on the area's commits, told to make it pass without weakening a test. Its commits are verified the same way. After two repairs that still fail, the area is left out of the batch, as a conflicting branch is. A run that timed out is not repaired: the area lands, and the capstone checks it. |
+| capstone | A red gate's `fleet-fail:` files are laid at the area branches whose commits changed each file, else changed a file it reaches by relative imports, else changed a workspace package it imports; a file none reaches is unattributed. Each such branch gets one repair job given the gate's lines about its files, which its verify step checks beside its own changes. Repaired branches are patched again, the rest are left out, the batch is rebuilt, and the gate runs once more. One cycle per round. |
+
+The night log prints a `verify` line per area and a `repair` line per repair; each area's `area.json` and the run's
+`summary.json` keep `verify` (`ok`, `why`, `repairs`, `testFiles`, `failedFiles`), and the closing `night:` line counts
+the areas that passed, passed after a repair, timed out, or were left out. The dashboard draws the repair as a lane
+step after the fix.
+
+weasel's config runs `npx vitest related --run` from the tree root over every project but `gate` and the browser
+ones, with four workers, and the browser projects with two on a GUI node.
 
 ## A sweep
 
