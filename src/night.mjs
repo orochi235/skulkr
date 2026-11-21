@@ -6,7 +6,7 @@
  *     [--cap-usd N] [--budget-review USD] [--budget-match USD] [--budget-fix USD] [--sweep] [--fix-only [a,…]]
  */
 import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { runArea } from './area.mjs';
 import { parseArgs } from './args.mjs';
 import { capstoneRepairer } from './capstone.mjs';
@@ -21,7 +21,7 @@ import { batchAndTest, patchAreas, patchSweep } from './land.mjs';
 import { begin, localDate, plan, printPlan } from './plan.mjs';
 import { resume } from './resume.mjs';
 import { scaledOf } from './rounds.mjs';
-import { clearStatus, nightsAt, pruneRuns, stopRequested, writeStatus, writeSummary } from './runs.mjs';
+import { claimedRounds, clearStatus, nightsAt, pruneRuns, readJson, runDir, stopRequested, writeStatus, writeSummary } from './runs.mjs';
 import { fixSweep, runSweep, sweepLine } from './sweep.mjs';
 import { verifyLine, verifyOf } from './verify.mjs';
 
@@ -33,11 +33,19 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 /** When a run stops starting areas: the first `schedule.stopAt` after it started, or after it was resumed. */
 export const deadlineOf = (cfg, status) => nextClock(new Date(status.resumed ?? status.started), cfg.schedule.stopAt);
 
-const pruneNights = (cfg) => {
+/**
+ * Deletes the oldest night directories past the newest `keepNights`, never one a run's status or summary still names:
+ * a live run writes there, and `--resume` picks a stopped one back up from it.
+ */
+export const pruneNights = (cfg) => {
   const dir = join(cfg.state, 'nights');
   if (!existsSync(dir)) return;
+  const named = new Set(claimedRounds(cfg.state).flatMap((round) => ['status.json', 'summary.json']
+    .flatMap((file) => readJson(join(runDir(round, cfg.state), file))?.nightDir ?? []).map((night) => basename(night))));
   const nights = readdirSync(dir).sort();
-  for (const old of nights.slice(0, Math.max(0, nights.length - cfg.keepNights))) rmSync(join(dir, old), { recursive: true, force: true });
+  for (const old of nights.slice(0, Math.max(0, nights.length - cfg.keepNights))) {
+    if (!named.has(old)) rmSync(join(dir, old), { recursive: true, force: true });
+  }
 };
 
 /** The files of `files` some commit after `from`, other than `exclude`, changed. */
@@ -158,8 +166,8 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
   mkdirSync(cfg.state, { recursive: true });
   const { p, status } = args.resume === undefined ? await begin(cfg, root, args, say) : await resume(cfg, root, args, say);
   if (!status) return { round: p.round, dry: true };
-  pruneNights(cfg);
   pruneRuns(cfg.keepNights, cfg.state);
+  pruneNights(cfg);
   const echo = say;
   say = (line) => {
     echo(line);

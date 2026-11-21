@@ -206,7 +206,7 @@ what it wrote still comes home. A run starts no new area after `schedule.stopAt`
 one more, each expected to cost the mean of this run's finished areas (`budget.areaGuessUsd` before any has),
 would pass the dollar cap, nor once a stop is requested; a fix-only round's fixers start under the same checks. An area whose reviewers ran always gets its matcher and fixer. Where skulkr picks
 nodes (a pinned run, or a runner that does not place jobs), a node the runner reports unavailable is skipped, and a
-dispatch a node refuses moves to another node and keeps that one out for `nodes.refusedCooldownMin`.
+dispatch a node refuses moves to another node and keeps that one out for `nodes.refusedCooldownMin`. Under a placing runner a refused job is launched again each minute, up to 120 times; a refusal after a stop request is not retried.
 `<state>/limits.json` (`{ "review": n, "fix": n }`) changes the slots per node, or under a placing runner the jobs at
 once, for runs already going.
 
@@ -428,7 +428,7 @@ Its wording comes from `skulkr menu` (`src/menu.mjs`), which asks the service fo
 
 | What | Where | Bound |
 |---|---|---|
-| A run's log, job outputs, and runner logs | `<state>/nights/<start>-round<N>/` | the newest `keepNights`; older ones are deleted when a run starts |
+| A run's log, job outputs, and runner logs | `<state>/nights/<start>-round<N>/` | the newest `keepNights`, and any a run's status or summary still names; older ones are deleted when a run starts |
 | A run's claim, status, stop request, and summary | `<state>/runs/<N>/`: the directory is the claim; `status.json` (with its pid) while it runs, `stop` when asked, `summary.json` when it ends | the newest `keepNights`, never a live one nor one started in the last day; pruned when a run starts |
 | Each commit's lines changed, for `staleLines` and calibration's `lines` | `~/.cache/skulkr/<name>/churn.json` | only the commits after the oldest pass asked about: any area's last pass, or the first of a pair of passes; rewritten without the rest on each build that adds one |
 | Node tree leases | `<state>/slots/<node>/<tree>` | deleted as each job ends; one whose pid is dead is taken back |

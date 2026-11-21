@@ -17,6 +17,8 @@ const RELAUNCH_WAIT_MS = 60_000;
 /** How many minutes a job waits, one launch a minute, for a node to make room for its tree: a refusal for room
  *  never counts toward {@link LAUNCHES}, since no node being free is not the job failing. */
 const ROOM_WAITS = 120;
+/** How many times a placing runner may turn a job away, one launch a minute, before it is recorded not launched. */
+const REFUSALS = 120;
 
 /** Roles that run in fixer slots, never on a node that takes no fixers: each runs the project's code. */
 const FIX_ROLES = new Set(['fix', 'repair', 'verify']);
@@ -78,6 +80,7 @@ export const dispatch = async (ctx, area, role, spec) => {
     return { status: 0, launched: true, node: 'earlier', minutes: 0, reply, usage };
   }
   let roomWaits = 0;
+  let refusals = 0;
   for (let launches = 1; ; launches++) {
     const slot = await ctx.acquire(FIX_ROLES.has(role) ? 'fix' : 'review');
     const t0 = Date.now();
@@ -87,23 +90,30 @@ export const dispatch = async (ctx, area, role, spec) => {
     } finally {
       slot.release();
     }
+    let gaveUp = false;
     if (result.refused) {
       ctx.refuse(slot.node);
-      ctx.say(`${role} ${area.id} refused by ${result.node ?? slot.node}, trying ${slot.placed ? 'again' : 'another node'}`);
-      if (slot.placed) await sleep(RELAUNCH_WAIT_MS);
-      continue;
+      refusals += 1;
+      const stopped = Boolean(ctx.stopped?.());
+      gaveUp = stopped || (slot.placed && refusals >= REFUSALS);
+      if (!gaveUp) {
+        ctx.say(`${role} ${area.id} refused by ${result.node ?? slot.node}, trying ${slot.placed ? 'again' : 'another node'}`);
+        if (slot.placed) await sleep(RELAUNCH_WAIT_MS);
+        continue;
+      }
+      ctx.say(`${role} ${area.id} refused by ${result.node ?? slot.node}; ${stopped ? 'stop requested' : `refused ${refusals} times`}, so not launched`);
     }
     const node = result.node ?? slot.node;
     const exit = readIf(join(spec.to, model ? 'exit' : 'verify.exit')).trim();
     // No exit file: the job never ran on the node, so there is no reply to read, only another launch to try.
-    if (result.status !== 0 && !exit && roomWaits < ROOM_WAITS && result.noRoom) {
+    if (!gaveUp && result.status !== 0 && !exit && roomWaits < ROOM_WAITS && result.noRoom) {
       roomWaits += 1;
       launches -= 1;
       if (roomWaits === 1 || roomWaits % 10 === 0) ctx.say(`${role} ${area.id}: no node has room for its tree (${roomWaits} min waited); waiting`);
       await sleep(RELAUNCH_WAIT_MS);
       continue;
     }
-    if (result.status !== 0 && !exit && launches < LAUNCHES) {
+    if (!gaveUp && result.status !== 0 && !exit && launches < LAUNCHES) {
       ctx.say(`${role} ${area.id} did not launch${slot.placed ? '' : ` on ${slot.node}`} (launch ${launches} of ${LAUNCHES}); trying again`);
       await sleep(RELAUNCH_WAIT_MS);
       continue;
