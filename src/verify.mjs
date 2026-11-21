@@ -65,7 +65,7 @@ export const failedFilesIn = (text) =>
  */
 export const verdictOf = (exitText, log) => {
   const exit = Number.parseInt(String(exitText).trim(), 10);
-  if (!Number.isInteger(exit)) return { ok: false, unrun: true, why: 'no verdict came home' };
+  if (!Number.isInteger(exit)) return { ok: false, unrun: true, exit: undefined, counts: undefined, failedFiles: [], why: 'no verdict came home' };
   const counts = fileCountsOf(log);
   const failedFiles = failedFilesIn(log);
   const ok = exit === 0 && !(counts?.failed > 0);

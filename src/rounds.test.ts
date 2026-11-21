@@ -171,6 +171,6 @@ describe('incompleteByRound', () => {
       { round: 55, id: 'ui', distinct: 4, files: ['a.ts'] },
     ]);
     expect([...incompleteByRound(root, 'docs/audits')]).toEqual([[56, 2]]);
-    expect(readPasses(root, 'docs/audits').get('ui')!.map((p) => p.round)).toEqual([55]);
+    expect(readPasses(root, 'docs/audits').get('ui')!.map((p: { round: number }) => p.round)).toEqual([55]);
   });
 });
