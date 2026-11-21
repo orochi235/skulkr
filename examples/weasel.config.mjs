@@ -37,7 +37,7 @@ export default {
       '"Read" is how many listed files each reviewer says it read. "Est." is Chapman\'s estimate of what the area held,',
       '"left" that less the distinct findings, and "last left" the previous pass\'s figure, which this pass tests.',
       '"New code" counts findings citing a file changed since that pass. "Commits" is what the fixer committed.',
-      '"Weighted tokens" counts each kind of token at its price against an input token (`TOKEN_WEIGHTS` in skulkr's `src/usage.mjs`); "cost" is list price.',
+      '"Weighted tokens" counts each kind of token at its price against an input token (`TOKEN_WEIGHTS` in skulkr\'s `src/usage.mjs`); "cost" is list price.',
       'One record per job is in `usage.jsonl`. The shas in `fix.md` are the fixer\'s, on its node; the same commits',
       'as applied here are `fixCommits` in `area.json`.',
     ],
