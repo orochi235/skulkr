@@ -302,7 +302,7 @@ Cutting over drops `--read-only` (see "Moving weasel over").
 
 ## The dashboard
 
-`dashboard/` is a standalone Vite app that draws the treemap of areas, the live runs' lanes, the rounds chart, the
+`dashboard/` is a standalone Vite app that draws the treemap of areas, the live runs' lanes, the rounds and calibration charts, the
 jobs feed, the queue, and an area's defects. Its dev server lists the tenants at `api/tenants` (`skulkr tenants ls`,
 or with none registered the one project `SKULKR_CONFIG` or the working directory names), and serves each tenant's
 map at `api/t/<name>/map` and an area's defects at `api/t/<name>/area?id=<area>`, by running `skulkr map` and
