@@ -200,8 +200,9 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     if (result.startsWith(`${cfg.git.main} fast-forwarded`)) {
       onLanded({ tip: tested.tip, areas: batch.merged.filter((b) => !earlier.has(b)).map(idOf) });
       // Another round may have landed and deleted a branch both took from the left-out record. A branch the capstone
-      // dropped goes too, as a verify failure leaves no branch: kept, it would hold its area out of every later plan.
-      for (const b of [...batch.merged, batch.name, ...(cycle?.dropped ?? [])]) tryDelete(git, b);
+      // dropped goes too, as a verify failure leaves no branch: kept, it would hold its area out of every later plan,
+      // and an earlier round's one it blamed would be retried, and fail the gate, in every later round's batch.
+      for (const b of [...batch.merged, batch.name, ...(cycle?.dropped ?? []), ...(cycle?.unrepairable ?? [])]) tryDelete(git, b);
     }
     return `${result}${tried}`;
   } finally {

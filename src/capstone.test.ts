@@ -6,6 +6,7 @@ import { gitIn } from './batch.mjs';
 import { excerptFor } from './capstone.mjs';
 import { resolveConfig } from './config.mjs';
 import { batchAndTest } from './land.mjs';
+import { leftOutIn } from './leftOut.mjs';
 
 const dirs: string[] = [];
 const scratch = () => {
@@ -129,6 +130,9 @@ describe('a red capstone', () => {
     expect(said).toContain('repair audit4-src capstone: left out, not repairable this round');
     expect(report).toMatch(/^main fast-forwarded to \w+; .*capstone repair: left out audit4-src, not repairable this round; the capstone ran again green$/);
     expect(report).not.toContain('still failed');
+    // Kept and recorded, every later round would merge it, go red, and run a capstone and a second gate over it.
+    expect(r.git('branch', '--list', 'audit4-src')).toBe('');
+    expect(leftOutIn(state)).toEqual([]);
   });
 
   it('stays red with no repair given, as before', async () => {
