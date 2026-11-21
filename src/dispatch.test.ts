@@ -57,6 +57,27 @@ describe('dispatch', () => {
   });
 });
 
+describe('dispatch of a model job cut off mid-run', () => {
+  it('counts a job that started and left no exit as run, and never launches it again', async () => {
+    const spec = { ...job({}), kind: 'review', shell: 'true', task: 't', timeoutMin: 5 };
+    let runs = 0;
+    const usages: unknown[] = [];
+    const ctx = {
+      cfg: {}, frozen: '/nowhere', base: 'b', say: () => {}, usage: (u: unknown) => usages.push(u), refuse: () => {}, budget: { match: 1 },
+      acquire: async () => ({ node: 'placed', placed: true, release: () => {} }),
+      runner: { run: async () => {
+        runs += 1;
+        writeFileSync(join(spec.to, 'started'), '2026-11-21T00:00:00Z\n');
+        return { status: 124 };
+      } },
+    };
+    const got = await dispatch(ctx, { id: 'a' }, 'match', { ...spec, logPath: join(spec.to, 'j.log') });
+    expect(runs).toBe(1);
+    expect(got).toMatchObject({ status: 124, launched: true });
+    expect(usages).toHaveLength(1);
+  }, 10_000);
+});
+
 describe('earlierReview', () => {
   /** A night directory with area `x`'s file list and, when `done`, its finished reviewer A. */
   const night = (files: string, done: boolean) => {

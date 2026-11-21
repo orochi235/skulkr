@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ontoArgs } from './runner/onto.mjs';
 import { resolveConfig } from './config.mjs';
-import { fixShell, installLines, matchShell, repairShell, reviewShell, stoppedBeforeModel, timeoutOf, verifyShell } from './jobs.mjs';
+import { STARTED, fixShell, installLines, matchShell, repairShell, reviewShell, stoppedBeforeModel, timeoutOf, verifyShell } from './jobs.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';
 
 const claudeOf = (shell: string) => shell.split(/ && |\n/).find((part) => part.includes('claude -p'))!;
@@ -29,6 +29,17 @@ describe('job command lines', () => {
     expect(claudeOf(matchShell(cfg, 'core', 1))).toContain('CLAUDE_CODE_PROMPT_CACHE_TTL=5m');
     expect(claudeOf(fixShell(cfg, 'core', 15, 3))).not.toContain('CLAUDE_CODE_PROMPT_CACHE_TTL');
     expect(claudeOf(reviewShell(resolveConfig({ claude: { cacheTtl: { review: null } } }), 'core', 8))).not.toContain('CACHE_TTL');
+  });
+
+  it('mark every model job started just before claude runs, and no job that runs no model', () => {
+    const cfg = weaselConfig();
+    for (const shell of [reviewShell(cfg, 'core', 8), matchShell(cfg, 'core', 1), fixShell(cfg, 'core', 15, 3), repairShell(cfg, 'core', 15)]) {
+      const at = shell.indexOf(`> .skulkr/out/${STARTED} &&`);
+      expect(at).toBeGreaterThan(-1);
+      expect(shell.indexOf('claude -p')).toBeGreaterThan(at);
+      expect(shell.slice(at, shell.indexOf('claude -p'))).not.toMatch(/\n/);
+    }
+    expect(verifyShell(cfg, 'core')).not.toContain(STARTED);
   });
 
   it('leave the model, effort, and setting sources to the node where the config leaves them unset', () => {

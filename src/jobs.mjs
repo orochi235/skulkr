@@ -21,13 +21,17 @@ export const PROGRESS_IN = `${JOB_IN}/progress.mjs`;
 /** The config's `checks.tally`, beside the filter, for the fixer's checks. */
 export const CHECKS_IN = `${JOB_IN}/checks.json`;
 
+/** The file a model job writes just before `claude` starts: a job with it and no `exit` ran and was cut off. */
+export const STARTED = 'started';
+
 /**
  * Runs `claude -p` on a prompt file, stopped by an alarm before the runner's timeout so what it wrote still comes
- * home. With `progress` (the progress filter's arguments before the result path), it streams through the
- * filter, which prints onto progress lines and writes the same result envelope to `claude.json`.
+ * home, after writing {@link STARTED}. With `progress` (the progress filter's arguments before the result path), it
+ * streams through the filter, which prints onto progress lines and writes the same result envelope to `claude.json`.
  */
 const claudeLine = (cfg, role, promptFile, budgetUsd, flags, progress) =>
   [
+    `date -u +%FT%TZ > ${JOB_OUT}/${STARTED} &&`,
     ...(cfg.claude.configDir ? [`CLAUDE_CONFIG_DIR=${cfg.claude.configDir}`] : []),
     ...(cfg.claude.cacheTtl?.[role] ? [`CLAUDE_CODE_PROMPT_CACHE_TTL=${cfg.claude.cacheTtl[role]}`] : []),
     `perl -e 'alarm shift; exec @ARGV' ${cfg.claude.timeoutMin * 60}`,

@@ -2,11 +2,11 @@
  * Launching one job of an area: on whichever slot frees first, moving to another node when one turns it away, waiting
  * while no node has room, and reusing a resumed round's result that already came home.
  */
-import { cpSync, existsSync, readFileSync } from 'node:fs';
+import { cpSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { sleep } from './after.mjs';
 import { isFinished, reviewText } from './findings.mjs';
-import { runJob } from './jobs.mjs';
+import { STARTED, runJob } from './jobs.mjs';
 import { parseEnvelope } from './usage.mjs';
 
 const readIf = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : '');
@@ -84,6 +84,7 @@ export const dispatch = async (ctx, area, role, spec) => {
   for (let launches = 1; ; launches++) {
     const slot = await ctx.acquire(FIX_ROLES.has(role) ? 'fix' : 'review');
     const t0 = Date.now();
+    if (model) rmSync(join(spec.to, STARTED), { force: true });
     let result;
     try {
       result = await runJob({ ...spec, cfg: ctx.cfg, runner: ctx.runner, frozen: ctx.frozen, base: ctx.base, slot });
@@ -105,15 +106,18 @@ export const dispatch = async (ctx, area, role, spec) => {
     }
     const node = result.node ?? slot.node;
     const exit = readIf(join(spec.to, model ? 'exit' : 'verify.exit')).trim();
-    // No exit file: the job never ran on the node, so there is no reply to read, only another launch to try.
-    if (!gaveUp && result.status !== 0 && !exit && roomWaits < ROOM_WAITS && result.noRoom) {
+    // A model that started and left no exit was cut off, by a timeout or a kill: it ran (and was paid for), so it is
+    // never launched again.
+    const ran = Boolean(exit) || (model && existsSync(join(spec.to, STARTED)));
+    // Neither: the job never ran on the node, so there is no reply to read, only another launch to try.
+    if (!gaveUp && result.status !== 0 && !ran && roomWaits < ROOM_WAITS && result.noRoom) {
       roomWaits += 1;
       launches -= 1;
       if (roomWaits === 1 || roomWaits % 10 === 0) ctx.say(`${role} ${area.id}: no node has room for its tree (${roomWaits} min waited); waiting`);
       await sleep(RELAUNCH_WAIT_MS);
       continue;
     }
-    if (!gaveUp && result.status !== 0 && !exit && launches < LAUNCHES) {
+    if (!gaveUp && result.status !== 0 && !ran && launches < LAUNCHES) {
       ctx.say(`${role} ${area.id} did not launch${slot.placed ? '' : ` on ${slot.node}`} (launch ${launches} of ${LAUNCHES}); trying again`);
       await sleep(RELAUNCH_WAIT_MS);
       continue;
@@ -123,6 +127,6 @@ export const dispatch = async (ctx, area, role, spec) => {
     const usage = { area: area.id, role, node, ...record, exit };
     ctx.usage(usage);
     if (usage.budgetHit) ctx.say(`${role} ${area.id} stopped at its $${ctx.budget[budgetRole(role)]} ceiling`);
-    return { status: result.status, launched: Boolean(exit), node, minutes: minutesSince(t0), reply, usage };
+    return { status: result.status, launched: ran, node, minutes: minutesSince(t0), reply, usage };
   }
 };
