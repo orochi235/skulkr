@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resolveConfig } from './config.mjs';
 import { createTenant, lastLineOf, registryTenants } from './service.mjs';
 
@@ -93,5 +93,28 @@ describe('skulkr service', () => {
       expect.objectContaining({ id: 2, pong: true }),
     ]);
     expect(out.status).toBe(0);
+  });
+});
+
+describe('the registry\'s tenants, refreshed twice at once', () => {
+  it('load a new entry once, so its tenant and its runs are one', async () => {
+    const dir = tmp();
+    const config = join(dir, 'skulkr.config.mjs');
+    writeFileSync(config, `export default { name: 'p', root: ${JSON.stringify(dir)}, state: ${JSON.stringify(join(dir, 'state'))} };`);
+    const registry = join(dir, 'tenants.json');
+    writeFileSync(registry, JSON.stringify([{ name: 'p', config }]));
+    const source = registryTenants(registry);
+    const logged: string[] = [];
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation((line) => (logged.push(String(line)), true));
+    try {
+      await Promise.all([source.refresh(), source.refresh()]);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(logged.filter((l) => l.includes('tenants: hosting p'))).toHaveLength(1);
+    const first = source.current()[0];
+    first.runtime.children.set(4242, { lastLine: 'x' });
+    await source.refresh();
+    expect(source.current()[0].running()).toBe(true);
   });
 });

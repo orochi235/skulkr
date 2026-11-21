@@ -175,7 +175,7 @@ export const registryTenants = (path) => {
   /** By tenant name: `{ key, tenant, failed? }`, `failed` the key that last failed to load. */
   const known = new Map();
   let list = [];
-  const refresh = async () => {
+  const reload = async () => {
     let entries;
     try {
       entries = readTenants(path);
@@ -208,7 +208,15 @@ export const registryTenants = (path) => {
     for (const name of [...known.keys()]) if (!entries.some((e) => e.name === name)) known.delete(name);
     list = next;
   };
-  return { refresh, current: () => list };
+  /** A refresh asked for while one runs (the tick's and a request's) joins it, so no entry is loaded twice. */
+  let inFlight;
+  const once = () => {
+    inFlight ??= reload().finally(() => {
+      inFlight = undefined;
+    });
+    return inFlight;
+  };
+  return { refresh: once, current: () => list };
 };
 
 /**
