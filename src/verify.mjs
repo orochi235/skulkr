@@ -45,6 +45,8 @@ export const verifyLines = (verify, { command = verify.command, probe = verify.g
 
 /** A test file's path in a line of runner output. */
 const TEST_PATH = /([\w@./-]+\.(?:test|spec)\.[cm]?[jt]sx?)\b/;
+/** Whether `path` is a test file's path, rather than a step's name or another file. */
+export const isTestPath = (path) => TEST_PATH.exec(path)?.[1] === path;
 
 /** vitest's file-level counts in `text`: its last `Test Files  1 failed | 2 passed (3)` line, or undefined. */
 export const fileCountsOf = (text) => {

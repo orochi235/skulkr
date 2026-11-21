@@ -9,18 +9,16 @@ import { attribute, changedBy, reachOf, workspacesIn } from './attribute.mjs';
 import { applyFix, gitIn } from './batch.mjs';
 import { failedWhereIn } from './gate.mjs';
 import { checkedIn, repairJob, summaryOf } from './repair.mjs';
-import { verdictText } from './verify.mjs';
+import { isTestPath, verdictText } from './verify.mjs';
 import { stripAnsi } from './ansi.mjs';
 
-/** A failure the gate names by a test file, rather than a step. */
-export const TEST_PATH = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
 /** How many lines of the log a failing file's excerpt keeps after each line naming it; a failed step, whose output
  *  is all there is to go on, keeps more. */
 const AFTER = 25;
 const STEP_AFTER = 150;
 
 /** The gate log's lines about `files`, verbatim: each line naming one, and the lines after it up to the next. */
-export const excerptFor = (text, files, after = files.some((f) => !TEST_PATH.test(f)) ? STEP_AFTER : AFTER) => {
+export const excerptFor = (text, files, after = files.some((f) => !isTestPath(f)) ? STEP_AFTER : AFTER) => {
   const lines = stripAnsi(text).split('\n');
   const keep = new Set();
   lines.forEach((line, i) => {
@@ -72,8 +70,8 @@ export const capstoneRepairer = (ctx, { root, results, mboxOf = () => undefined 
 export const repairCapstone = async ({ cfg, root, round, commit, batch, logPath, repair, say }) => {
   const text = readFileSync(logPath, 'utf8');
   const where = failedWhereIn(text, cfg.gate);
-  const failing = where.filter((w) => TEST_PATH.test(w));
-  const steps = where.filter((w) => !TEST_PATH.test(w));
+  const failing = where.filter(isTestPath);
+  const steps = where.filter((w) => !isTestPath(w));
   const changed = changedBy(gitIn(root), commit, batch.merged);
   const workspaces = workspacesIn(batch.tree, (dir) => {
     try {

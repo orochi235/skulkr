@@ -7,12 +7,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { applyFix, catchUpWithMain, commitRecord, fastForwardMain, makeBatch, removeWorktree, runGate } from './batch.mjs';
-import { TEST_PATH, capstoneText, repairCapstone } from './capstone.mjs';
+import { capstoneText, repairCapstone } from './capstone.mjs';
 import { failedWhereIn } from './gate.mjs';
 import { fleetDir, waitForFleet } from './fleet.mjs';
 import { leftOutIn, leftOutWhy, recordLeftOut, retryable } from './leftOut.mjs';
 import { waitForLease } from './lease.mjs';
 import { mergeLock } from './runs.mjs';
+import { isTestPath } from './verify.mjs';
 /** How many times a green batch merges a moved main in and tests again before leaving the fast-forward to fail. */
 const MAIN_CATCH_UPS = 2;
 
@@ -220,7 +221,7 @@ const tryDelete = (git, branch) => {
  */
 const alreadyFailing = async (cfg, logPath, baseline) => {
   const where = failedWhereIn(readFileSync(logPath, 'utf8'), cfg.gate);
-  if (!where.length || where.some((w) => !TEST_PATH.test(w))) return null;
+  if (!where.length || where.some((w) => !isTestPath(w))) return null;
   const old = await baseline(where);
   return where.every((w) => old.includes(w)) ? where : null;
 };

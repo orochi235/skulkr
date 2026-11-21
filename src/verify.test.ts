@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { TIMED_OUT, failedFilesIn, failureExcerpt, fileCountsOf, needsGui, verdictOf, verifyLine, verifyLines } from './verify.mjs';
+import { TIMED_OUT, failedFilesIn, failureExcerpt, fileCountsOf, isTestPath, needsGui, verdictOf, verifyLine, verifyLines } from './verify.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -52,6 +52,16 @@ describe('fileCountsOf and failedFilesIn', () => {
     const log = ' Test Files  1 failed (1)\n FAIL  a/x.test.ts > one\n FAIL  a/x.test.ts > two\n FAIL  b/y.pbt.test.ts > p\n Test Files  2 failed | 5 passed (7)';
     expect(fileCountsOf(log)).toEqual({ failed: 2, passed: 5, total: 7 });
     expect(failedFilesIn(log)).toEqual(['a/x.test.ts', 'b/y.pbt.test.ts']);
+  });
+});
+
+describe('isTestPath', () => {
+  it('tells a test file the runner names from a step or another file, by the pattern failing lines are read with', () => {
+    for (const path of ['src/a.test.ts', 'packages/ui/src/Bar.browser.test.tsx', '@scope/x.spec.mjs']) {
+      expect(isTestPath(path)).toBe(true);
+      expect(failedFilesIn(` FAIL  ${path} > works`)).toEqual([path]);
+    }
+    for (const step of ['npm run check:x', 'src/a.ts', 'src/a.test.ts.snap', 'run src/a.test.ts']) expect(isTestPath(step)).toBe(false);
   });
 });
 
