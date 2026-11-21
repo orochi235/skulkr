@@ -20,7 +20,7 @@ const r1 = (n) => Math.round(n * 10) / 10;
 const r2 = (n) => Math.round(n * 100) / 100;
 
 /**
- * One row per pair of consecutive passes on one area, provisional ones skipped: pass k's counts and what it left,
+ * One row per pair of consecutive passes of different rounds on one area, provisional ones skipped: pass k's counts and what it left,
  * and what pass k+1 found (its `distinct`, scaled by its `share` as `left` is). `histories` iterates
  * `[areaId, passes]` with passes as the map draws them, oldest first; `lines`, keyed `<area>\n<round k>`, gives the
  * lines of the area's files changed between the two passes, pass k's fixes aside, where known.
@@ -31,6 +31,7 @@ export const calibrationPairs = (histories, lines = new Map()) => {
     const done = passes.filter((p) => !p.provisional);
     for (let i = 0; i + 1 < done.length; i++) {
       const [k, next] = [done[i], done[i + 1]];
+      if (k.round === next.round) continue;
       const changed = lines.get(`${area}\n${k.round}`);
       pairs.push({
         area, round: k.round, next: next.round, a: k.a, b: k.b, shared: k.shared, est: k.est, left: k.left,

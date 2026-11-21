@@ -34,7 +34,17 @@ weasel cutover.
     recorded file count.
   - the queue's order among due areas by corrected defects left first (README "Which areas"), and the map's
     `leftCorrected` and `calibration` (README "Calibration"), from 2026-11-20.
+  - an area's history taken by round, and only its covering rounds (README "History follows files"): the queue's
+    order, `staleLines`, settling, calibration's pairs and factors, and the record's "last left" (2026-11-21).
+  - the map's queue numbers, which skip areas held by unmerged `audit<N>-<area>` branches as the plan does (2026-11-21).
+  - an abandoned round's batch left out of history, carry, and calibration, and a round read from a batch marked
+    `pending: 'unmerged'` on the rounds chart (2026-11-21).
   - the map's `gateRuns`, each gate run's id and its `gate.labels` label, for the dashboard (2026-11-21).
+  - the map's run `leftOut` and a left-out lane's patch `why`, read from `land.mjs`'s `left out:` lines (2026-11-21).
+  - reports the parsers used to misread (2026-11-21): a capitalized `Fixed <sha>` verdict counts as fixed;
+    only a `##` section with a `where:` line counts as a finding, and a `## Files Read:` heading lists files read;
+    `area.json`'s `questions` counts question verdicts, not the word;
+    a matcher reply with braces in its prose still yields its pairs.
   - a branch the batch leaves out: its outcome names the conflicting paths or git's message, a merge that meets a
     lock is retried, and later rounds' batches try it again (README "batch" step, 2026-11-21).
   - `turns`, each job's model turns, on its `usage.jsonl` record (2026-11-21).

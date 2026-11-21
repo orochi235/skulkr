@@ -141,7 +141,7 @@ Each step prints one line as it completes (`review 3/16 …`).
 | verify | Per fixer with commits, the config's `checks.verify` over the files they changed, run by skulkr, never read from the fixer's report; see "Verify and repair". |
 | repair | Per area whose verify fails, up to two repair jobs on its commits, each verified again; an area still failing is left out of the batch. |
 | patch | Each mbox is applied with `git am` onto `audit<N>-<area>` at the frozen commit. One that does not apply is reported and left out. |
-| batch | Every branch merges into `batch/<date>-audit<N>` (a worktree), then every branch an earlier round left out. A merge that meets another git's lock (`index.lock': File exists`) is retried after 0.5, 1 and 2 seconds. One that still fails is left out, its outcome reading `left out: merge conflict in <paths>` or `left out: merge failed: <git's message>`, and recorded in the state directory's `left-out.json` until `main` holds it or the branch is deleted. The round's record is committed there. Then the run waits for `merge.lock`, held by one run at a time from its gate through `main`'s fast-forward; holding it, it merges `main` in if another run has landed meanwhile, waits its turn in the fleet queue (step `fleet-wait`; see "Continuous rounds"), and runs the gate on the tip. |
+| batch | Every branch merges into `batch/<date>-audit<N>` (a worktree), then every branch an earlier round left out. A merge that meets another git's lock (`index.lock': File exists`) is retried after 0.5, 1 and 2 seconds. One that still fails is left out, its outcome reading `left out: merge conflict in <paths>` or `left out: merge failed: <git's message>`, and recorded in the state directory's `left-out.json` until `main` holds it or the branch is deleted; the map gives each run `leftOut`, an `{ area, round, why }` per branch its log says was left out, and fails that area's patch step with the why. The round's record is committed there. Then the run waits for `merge.lock`, held by one run at a time from its gate through `main`'s fast-forward; holding it, it merges `main` in if another run has landed meanwhile, waits its turn in the fleet queue (step `fleet-wait`; see "Continuous rounds"), and runs the gate on the tip. |
 | merge | Green: local `main` fast-forwards to the batch (never pushed), and the branches are deleted. If `main` moved during the gate, it is merged in and the gate runs again, up to twice. Red: one capstone repair cycle (see "Verify and repair"), and the gate once more; still red, the batch worktree and its branches stay, and the report names them and what was tried. |
 
 The record, in `<record.dir>/round-<N>/`: per area `files.txt`, `A.md`, `B.md`, `match.json`, `fix.md` and
@@ -168,7 +168,9 @@ code changed under a zero estimate still competes. Ties go to the most lines cha
 longest since that pass (`rankOf` and `pickAreas` in `src/rounds.mjs`). An area is *settled*, and skipped, after
 two consecutive passes that each found at most one distinct defect, on the same file list, with nothing but those
 passes' own fixes changing its files since. What is due comes only from the `area.json` files of earlier rounds and
-git.
+git: on disk, and on batches `main` has not merged, less those of a round abandoned for good (its latest night holds an
+`abandoned` file); the rounds chart marks a round read from a batch `pending: 'unmerged'`. An area a live run holds, or an unmerged `audit<N>-<area>` branch, is skipped, and the map's queue numbers skip it
+too.
 
 **History follows files.** A pass belongs to the files it read (its `files.txt`, also `files` in its `area.json`),
 not to its area's name, so a recut partition keeps what was learned. An area inherits every pass that read any of
@@ -176,7 +178,10 @@ its files now, with a *share*: the part of that pass's files the area holds. The
 "left" are scaled by that share, so a pass split across two areas is counted once between them, and a renamed area,
 holding all of its pass's files, keeps its whole history. An area counts as audited only once passes have read at
 least half its files now (`COVERED` in `src/rounds.mjs`); below that it queues as never audited, its inherited
-passes still shown.
+passes still shown. An area's passes of one round count as one pass, its left the sum of theirs by share and its fixes
+all of theirs; and only a round whose passes read at least half the area's files (a *covering* round) stands for it:
+its last covering round is its "last pass" for the queue, staleness and settling, so a later pass that held one
+boundary file of it neither replaces its estimate nor tests it.
 
 **Stale estimates.** An area whose files changed since its last pass carries `staleLines` in the map: lines added
 plus deleted in those files (`git log --numstat`, merges left out) by every commit since the pass's commit but that
@@ -186,7 +191,7 @@ rebuild asks git only about commits it has not seen.
 
 **Calibration.** Chapman's estimate assumes the two reviewers find defects independently; two runs of one model
 are positively correlated, so "left" runs low. `src/calibration.mjs` checks it against what happened: for each pair
-of consecutive passes on one area (provisional ones skipped), what pass k left against the distinct defects pass
+of consecutive covering rounds on one area (provisional ones skipped; see "History follows files"), what pass k left against the distinct defects pass
 k+1 found, scaled by pass k+1's share as "left" is by pass k's. The pooled factor, found over predicted, is taken
 overall and by pass k's shared count (0, 1–2, 3 or more); a pass's corrected left is its left times its bucket's
 factor, or the overall one while the bucket has fewer than 5 pairs, never under 1. What pass k+1 found is a lower
@@ -388,7 +393,7 @@ own `skulk` service is down (2026-11-21). What is left of the cutover is in "Mov
 jobs feed, the queue, and an area's defects. Its dev server lists the tenants at `api/tenants` (`skulkr tenants ls`,
 or with none registered the one project `SKULKR_CONFIG` or the working directory names), and serves each tenant's
 map at `api/t/<name>/map` and an area's defects at `api/t/<name>/area?id=<area>`, by running `skulkr map` and
-`skulkr defects` with `--tenant`. The page's title is a menu of the tenants; the one shown is in the URL hash
+`skulkr defects` with `--tenant` (which refuses an id not in the partition). The page's title is a menu of the tenants; the one shown is in the URL hash
 (`#weasel`), and each viewer's last choice is remembered. `dashboard/README.md` says how to start it.
 
 A frozen copy of it, over weasel's audits, is at [michaelbaker.tech/skulkr](https://michaelbaker.tech/skulkr/).
@@ -438,7 +443,7 @@ LaunchAgent, so install from a shell where `node` and `onto` resolve, and set ei
 |---|---|---|
 | A run's log, job outputs, and runner logs | `<state>/nights/<start>-round<N>/` | the newest `keepNights`; older ones are deleted when a run starts |
 | A run's claim, status, stop request, and summary | `<state>/runs/<N>/`: the directory is the claim; `status.json` (with its pid) while it runs, `stop` when asked, `summary.json` when it ends | the newest `keepNights`, never a live one nor one started in the last day; pruned when a run starts |
-| Each commit's lines changed, for `staleLines` and calibration's `lines` | `~/.cache/skulkr/<name>/churn.json` | only the commits after the oldest pass asked about: any area's last pass, or the first of a pair of passes; rewritten without the rest on each build that adds one |
+| Each commit's lines changed, for `staleLines` and calibration's `lines` | `~/.cache/skulkr/<name>/churn.json` | only the commits after the oldest pass asked about: any area's last pass, or the first of a pair of passes; rewritten without the rest on each build that adds one, and dropped when the partition's `roots`, `extensions` or `exclude` change |
 | Node tree leases | `<state>/slots/<node>/<tree>` | deleted as each job ends; one whose pid is dead is taken back |
 | The local runner's clones | `<state>/trees/t<k>` and a lease beside each | one per job running at once; reused, never more than the most jobs ever run at once |
 | The local runner's job records, for the dashboard | `<state>/local-jobs/`, a file per job | deleted after 7 days, as each job starts and as `jobs()` reads them |

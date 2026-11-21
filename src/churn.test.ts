@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { gitIn } from './batch.mjs';
-import { churnSince, commitsAfter, parseNumstat } from './churn.mjs';
+import { churnSince, commitsAfter, parseNumstat, reachedBy } from './churn.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -44,24 +44,41 @@ describe('churnSince', () => {
       { id: 'lost', files: ['src/a.ts'], commit: 'f'.repeat(40), exclude: [] },
     ];
     const keep = (p: string) => p.startsWith('src/');
-    const lines = churnSince(gitIn(root), entries, { keep, cacheFile, root });
+    const lines = churnSince(gitIn(root), entries, { keep, cacheKey: 'src', cacheFile, root });
     // a: the third commit rewrote 2 lines into 4 (2 deleted, 4 added); the fix is not counted.
     expect(Object.fromEntries(lines)).toEqual({ a: 6, b: 4, late: 6, lost: 0 });
     expect(existsSync(cacheFile)).toBe(true);
     const cached = JSON.parse(readFileSync(cacheFile, 'utf8'));
-    expect(Object.keys(cached)).toHaveLength(2);
-    expect(Object.values(cached).some((c) => 'docs/x.md' in (c as object))).toBe(false);
+    expect(cached.key).toBe('src');
+    expect(Object.keys(cached.commits)).toHaveLength(2);
+    expect(Object.values(cached.commits).some((c) => 'docs/x.md' in (c as object))).toBe(false);
     // A second build reads the counts back rather than asking git for them.
     const noShow = (...args: string[]) => {
       if (args[0] === 'show') throw new Error('asked git for counts the cache holds');
       return gitIn(root)(...args);
     };
-    expect(Object.fromEntries(churnSince(noShow, entries.slice(0, 2), { keep, cacheFile, root }))).toEqual({ a: 6, b: 4 });
+    expect(Object.fromEntries(churnSince(noShow, entries.slice(0, 2), { keep, cacheKey: 'src', cacheFile, root }))).toEqual({ a: 6, b: 4 });
+    // Counts kept under another filter are dropped, not read back: docs/ is counted once the filter takes it.
+    const all = churnSince(gitIn(root), [{ id: 'docs', files: ['docs/x.md'], commit: pass, exclude: [] }], { cacheKey: 'all', cacheFile, root });
+    expect(all.get('docs')).toBe(50);
+    expect(JSON.parse(readFileSync(cacheFile, 'utf8')).key).toBe('all');
   });
 
   it('reads numstat output and walks a commit graph', () => {
     expect(parseNumstat('@abc\n3\t1\tsrc/a.ts\n-\t-\timg.png\n@def\n1\t0\tsrc/b.ts\n')).toEqual({ abc: { 'src/a.ts': 4, 'img.png': 0 }, def: { 'src/b.ts': 1 } });
     const graph = new Map([['d', ['c', 'b']], ['c', ['a']], ['b', ['a']], ['a', []]]);
     expect(commitsAfter(graph, 'b').sort()).toEqual(['c', 'd']);
+  });
+
+  it('marks in one walk which of many commits reach each commit, past one word of bits', () => {
+    // c39 → c38 → … → c0, newest first; c_i reaches every c_j with j <= i.
+    const chain = Array.from({ length: 40 }, (_, i) => `c${39 - i}`);
+    const graph = new Map(chain.map((sha, i) => [sha, i + 1 < chain.length ? [chain[i + 1]!] : []]));
+    const from = [...chain].reverse();
+    const { masks } = reachedBy(graph, from);
+    const reaching = (sha: string) => from.filter((_, k) => masks.get(sha)![k >> 5]! & (1 << (k & 31)));
+    expect(reaching('c0')).toHaveLength(40);
+    expect(reaching('c35')).toEqual(['c35', 'c36', 'c37', 'c38', 'c39']);
+    expect(reaching('c39')).toEqual(['c39']);
   });
 });

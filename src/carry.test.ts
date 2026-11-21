@@ -72,6 +72,11 @@ describe('givenIn and fixOf', () => {
     ]);
   });
 
+  it("finds each claim's where when the match leaves the report's heading out", () => {
+    const rec = { round: 4, A: section('one', 'a/b.ts:1'), B: '## Summary\nOne defect.\n\n' + section('two', 'a/c.ts:3'), match: { pairs: [], a: ['one'], b: ['two'] } };
+    expect(givenIn(rec).fresh.map((f: any) => [f.claim, f.where])).toEqual([['one', 'a/b.ts:1'], ['two', 'a/c.ts:3']]);
+  });
+
   it('reads a report with only a tally line as work, and a usage-limit reply as none', () => {
     expect(fixOf({ fix: 'tally: 0 of 3 fixed, 0 extra fixed' }).worked).toBe(true);
     expect(fixOf({ fix: "You've hit your weekly limit", area: { patches: 0 } }).worked).toBe(false);

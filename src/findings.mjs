@@ -1,20 +1,20 @@
 /** Reading a reviewer's findings file and checking the matcher's answer against the two lists. */
 import { FIXED_MARK } from './progress.mjs';
 
-/** The `##` sections of a findings file, each `{ claim, where, body }`. */
-export const parseFindings = (text) => {
-  const sections = text.split(/^## /m).slice(1);
-  return sections.map((section) => {
-    const [claim, ...rest] = section.split('\n');
-    const body = rest.join('\n').replace(/<!--[\s\S]*?-->/g, '').trim();
-    const where = /^- where:\s*(.+)$/m.exec(body)?.[1].trim() ?? '';
-    return { claim: claim.trim(), where, body };
-  }).filter((f) => f.claim.length > 0 && f.claim.toLowerCase() !== 'files read');
-};
+/** Every `##` section of a findings file, each `{ claim, where, body }`, `where` empty where it has no `where:` line. */
+export const parseSections = (text) => text.split(/^## /m).slice(1).map((section) => {
+  const [claim, ...rest] = section.split('\n');
+  const body = rest.join('\n').replace(/<!--[\s\S]*?-->/g, '').trim();
+  const where = /^[-*]\s*(?:\*\*)?where(?::\*\*|\*\*:|:)\s*(.+)$/im.exec(body)?.[1].trim() ?? '';
+  return { claim: claim.trim(), where, body };
+});
+
+/** The findings of a findings file: its `##` sections that cite a `where:`; a summary or the files-read list is not one. */
+export const parseFindings = (text) => parseSections(text).filter((f) => f.claim.length > 0 && f.where.length > 0);
 
 /** The files a reviewer says it read: the lines under a `## Files read` heading. */
 export const parseFilesRead = (text) => {
-  const m = /^## Files read\s*\n([\s\S]*?)(?=^## |<!--|$(?![\s\S]))/im.exec(text);
+  const m = /^## Files read:?[ \t]*\n([\s\S]*?)(?=^## |<!--|$(?![\s\S]))/im.exec(text);
   if (!m) return [];
   return m[1].split('\n').map((line) => line.replace(/^[-*]\s*/, '').replace(/`/g, '').trim()).filter(Boolean);
 };
@@ -57,12 +57,45 @@ export const validPairs = (pairs, a, b) => {
   return kept;
 };
 
-/** The first JSON object in a model's reply, which may wrap it in prose or a code fence. */
+/** The text from the `{` at `start` to the `}` that closes it, strings skipped over; null when it never closes. */
+const balancedAt = (text, start) => {
+  let depth = 0;
+  let quoted = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '\\') i += 1;
+      else if (c === '"') quoted = false;
+    } else if (c === '"') quoted = true;
+    else if (c === '{') depth += 1;
+    else if (c === '}' && --depth === 0) return text.slice(start, i + 1);
+  }
+  return null;
+};
+
+const parsed = (text) => {
+  try {
+    return { value: JSON.parse(text) };
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * The first JSON object in a model's reply, which may wrap it in prose or a code fence: a fenced block's object if one
+ * parses, else the first balanced `{…}` that parses, so braces in the prose around it do not spoil it.
+ */
 export const firstJson = (text) => {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start < 0 || end < start) throw new Error('no JSON object in the reply');
-  return JSON.parse(text.slice(start, end + 1));
+  for (const m of text.matchAll(/```(?:json)?\s*\n([\s\S]*?)```/g)) {
+    const got = parsed(m[1].trim());
+    if (got && typeof got.value === 'object' && got.value !== null) return got.value;
+  }
+  for (let at = text.indexOf('{'); at >= 0; at = text.indexOf('{', at + 1)) {
+    const candidate = balancedAt(text, at);
+    const got = candidate && parsed(candidate);
+    if (got) return got.value;
+  }
+  throw new Error('no JSON object in the reply');
 };
 
 /** The matcher's prompt: both lists, numbered from 0, claim and location only. */
@@ -75,7 +108,7 @@ export const matchPrompt = (brief, a, b) => {
 const DUPLICATE = /^\(?duplicate\b/i;
 
 const TALLY = /^tally: (\d+) of (\d+) fixed, (\d+) extra fixed\s*$/im;
-const VERDICT = /\bfixed (?:in )?`?[0-9a-f]{7,}|\bnot a defect\b|\bquestion\b|\bduplicate of\b|\bnot fixed\b|\bdeclined\b/i;
+const VERDICT = new RegExp(`${FIXED_MARK.source}|\\bnot a defect\\b|\\bquestion\\b|\\bduplicate of\\b|\\bnot fixed\\b|\\bdeclined\\b`, 'i');
 const EXTRAS = /^\W*(?:any )?extra\b/i;
 const CHECKS = /^\W*checks\b/i;
 const SOURCE = /\((A\+B|A|B|sweep|carried)\)|,\s*(A\+B|A|B|sweep|carried)\s*:/;
@@ -129,6 +162,9 @@ export const reportItems = (report) => {
   const cut = body.findIndex((p) => EXTRAS.test(p));
   return body.flatMap((p, i) => (VERDICT.test(p) && !/^tally: /i.test(p) && !EXTRAS.test(p) ? [itemOf(p, cut !== -1 && i > cut)] : []));
 };
+
+/** How many findings a fixer's report answers with a question ({@link reportItems}). */
+export const questionsIn = (report) => reportItems(report ?? '').filter((i) => i.verdict === 'question').length;
 
 /**
  * What a fixer's report says it did: of the `of` findings it answered, how many it `fixed`, the `extra` defects nobody

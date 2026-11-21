@@ -256,6 +256,8 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
   const tops = topDirs(p.roots);
   const { prefix, batchPrefix } = c.naming;
   const pre = escape(prefix);
+  const leftOutRe = new RegExp(`^batch: ${pre}\\d+-(\\S+?)(?: \\(round (\\d+)\\))? left out: (.+)$`);
+  const oldConflictRe = new RegExp(`^batch: ${pre}\\d+-(\\S+) conflicts`);
   const briefPath = (role) => (c.briefs[role] ? resolve(base, c.briefs[role]) : new URL(`${role}.md`, DEFAULT_BRIEFS).pathname);
   return {
     ...c,
@@ -271,6 +273,8 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
       pathspec: tops,
       path: `${c.record.dir}/partition.json`,
       isSource: (path) => rootRe.test(path) && sourceRe.test(path) && !exclude.some((re) => re.test(path)),
+      /** Names what `isSource` accepts, so counts cached under another filter are not read back. */
+      sourceKey: JSON.stringify([p.roots, p.extensions, p.exclude.map(String)]),
     },
     /** The repository paths a finding's `where` line cites. */
     citedRe: tops.length ? new RegExp(`((?:${tops.map(escape).join('|')})\\/[\\w./@-]+\\.\\w+)`, 'g') : /([\w@-][\w.@-]*\/[\w./@-]+\.\w+)/g,
@@ -293,8 +297,15 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
       batchJobOf: (round) => new RegExp(`${escape(batchPrefix)}-\\d{4}-\\d\\d-\\d\\d-(?:${pre}|skulkr)${round}(?:-|$)`),
       /** A step's task name → `[area, step]`. */
       step: new RegExp(`^(?:${pre}|skulkr)\\d+-(.+)-(A|B|match|fix|repair|verify)$`),
-      /** A night log's conflict line → the area. */
-      conflict: new RegExp(`^batch: ${pre}\\d+-(\\S+) conflicts`),
+      /**
+       * A night log's line for a branch the batch left out → `{ area, why, earlier }`, `earlier` the round of a branch an
+       * earlier round left out, retried here; null for any other line. Reads the old `… conflicts; left out` form too.
+       */
+      leftOut: (line) => {
+        const m = leftOutRe.exec(line) ?? oldConflictRe.exec(line);
+        if (!m) return null;
+        return { area: m[1], why: m[3] ?? 'merge conflict', ...(m[2] ? { earlier: Number(m[2]) } : {}) };
+      },
       trees: { review: `${name}-skulkr-r`, fix: `${name}-skulkr-f` },
     },
   };

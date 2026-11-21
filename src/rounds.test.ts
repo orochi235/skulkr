@@ -4,7 +4,9 @@ import { tmpdir } from 'node:os';
 import { gitIn } from './batch.mjs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { areaStats, areasInFlight, chapman, inheritPasses, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf, withBatchPasses } from './rounds.mjs';
+import { weaselConfig } from '../test/weaselConfig.ts';
+import { areaStats, areasInFlight, areasInFlightFor, calibrationFor, chapman, drawnRoundOf, inheritPasses, lastPassIn, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf } from './rounds.mjs';
+import { diskRecords } from './recordFiles.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -35,7 +37,7 @@ describe('nextRound', () => {
   it('follows the highest number used by a round directory, the hardening record, or a branch', () => {
     expect(nextRound({ roundDirs: ['round-12', 'partition.json'] })).toBe(13);
     expect(nextRound({ hardening: '| rounds 28–30; method below |\n| (audit round 15) |' })).toBe(31);
-    expect(nextRound({ branches: ['main', 'audit30-ui', 'batch/2026-11-17-audit33', 'skulkr'] })).toBe(34);
+    expect(nextRound({ branches: ['main', 'audit30-ui', 'batch/2026-11-17-audit33', 'skulkr'], roundIn: weaselConfig().names.roundIn })).toBe(34);
     expect(nextRound({ roundDirs: ['round-12'], claimed: ['14', '13'] })).toBe(15);
     expect(nextRound({})).toBe(1);
   });
@@ -55,10 +57,18 @@ describe('pickAreas', () => {
   });
 
   it('skips an area an unlanded round still holds on an audit branch', () => {
-    const inFlight = areasInFlight(['audit37-b', 'audit37-core.animation', 'batch/2026-11-18-audit37', 'feature-x']);
+    const inFlight = areasInFlight(['audit37-b', 'audit37-core.animation', 'batch/2026-11-18-audit37', 'feature-x'], weaselConfig().names.areaOf);
     expect([...inFlight].sort()).toEqual(['b', 'core.animation']);
     const picked = pickAreas({ areas: ['a', 'b', 'c'].map((id) => area(id)), passes: new Map(), touched: never, count: 3, inFlight }).picked;
     expect(picked).toEqual(['a', 'c']);
+  });
+
+  it("asks git for the branches main has not merged, under the config's names", () => {
+    const cfg = weaselConfig();
+    const asked: string[][] = [];
+    const git = (...args: string[]) => (asked.push(args), 'audit37-b\nbatch/2026-11-18-audit37\n');
+    expect([...areasInFlightFor(cfg, git)]).toEqual(['b']);
+    expect(asked[0]).toContain(`--no-merged=${cfg.git.main}`);
   });
 
   it('picks an area again as never audited when its only pass had a reviewer that never ran', () => {
@@ -99,6 +109,11 @@ describe('pickAreas', () => {
     ]), 'docs/audits');
     const areas = [area('one'), area('loud'), area('moved', ['moved.ts', 'new.ts'])];
     expect(pickAreas({ areas, passes, touched: never, count: 5 }).settled).toEqual([]);
+  });
+
+  it('does not settle, or throw, on two quiet passes that recorded no file list', () => {
+    const passes = new Map([['a', [{ round: 31, id: 'a', distinct: 0 }, { round: 32, id: 'a', distinct: 0 }]]]);
+    expect(pickAreas({ areas: [area('a')], passes, touched: never, count: 5 })).toEqual({ picked: ['a'], settled: [] });
   });
 
   it('ignores the passes\' own fix commits when asking whether files changed', () => {
@@ -179,6 +194,37 @@ describe('pickAreas by corrected defects left', () => {
   });
 });
 
+describe('history by round', () => {
+  const pass = (round: number, id: string, files: string[], a: number, b: number, m: number, distinct: number, extra = {}) =>
+    ({ round, id, files, a, b, m, distinct, commit: `c${round}`, fixCommits: [], ...extra });
+
+  it("neither ranks nor calibrates an area by a later pass that read only a boundary file of it", () => {
+    const raw = new Map([
+      ['x', [pass(10, 'x', ['x/1.ts', 'x/2.ts', 'x/3.ts'], 12, 12, 1, 23)]], // left 60.5
+      ['y', [pass(11, 'y', ['y/1.ts', 'y/2.ts', 'y/3.ts', 'y/4.ts'], 0, 0, 0, 0)]],
+      ['z', [pass(9, 'z', ['z/1.ts'], 3, 3, 1, 5)]], // left 2
+    ]);
+    const areas = [{ id: 'x', files: ['x/1.ts', 'x/2.ts', 'x/3.ts', 'y/4.ts'] }, { id: 'z', files: ['z/1.ts'] }];
+    const { history, covered } = inheritPasses(areas, raw);
+    expect(history.get('x')!.map((p) => p.round)).toEqual([10, 11]);
+    expect(pickAreas({ areas, passes: history, covered, touched: () => true, count: 2 }).picked).toEqual(['x', 'z']);
+    expect(calibrationFor(history).pairs).toEqual([]);
+    expect(lastPassIn(history.get('x'))!.round).toBe(10);
+  });
+
+  it('takes two passes of one round in a merged area as one: left summed, fixes joined, no pair between them', () => {
+    const raw = new Map([
+      ['p', [pass(5, 'p', ['p/1.ts'], 3, 3, 1, 5, { chapman: 7, unfound: 2, fixCommits: ['f1'] })]],
+      ['q', [pass(5, 'q', ['q/1.ts'], 3, 3, 1, 5, { chapman: 7, unfound: 2, fixCommits: ['f2'] })]],
+    ]);
+    const { history } = inheritPasses([{ id: 'pq', files: ['p/1.ts', 'q/1.ts'] }], raw);
+    const last = lastPassIn(history.get('pq'))!;
+    expect([last.unfound, last.fixCommits]).toEqual([4, ['f1', 'f2']]);
+    expect(drawnRoundOf(history.get('pq')!)).toMatchObject({ round: 5, distinct: 10, est: 14, left: 4 });
+    expect(calibrationFor(history).pairs).toEqual([]);
+  });
+});
+
 describe('areaStats', () => {
   it("gives each pair of passes the lines changed from the first to the second, the first's fixes aside", () => {
     const root = mkdtempSync(join(tmpdir(), 'skulkr-stats-'));
@@ -213,26 +259,6 @@ describe('areaStats', () => {
   });
 });
 
-describe('withBatchPasses', () => {
-  const tree = {
-    'b/new:docs/audits/round-5/ui/area.json': JSON.stringify({ id: 'ui', a: 2, b: 1, m: 1, distinct: 2, files: ['x.ts'] }),
-    'b/new:docs/audits/round-4/ui/area.json': JSON.stringify({ id: 'ui', a: 9, b: 9, m: 9, distinct: 9 }),
-    'b/new:docs/audits/round-5/gone/area.json': JSON.stringify({ id: 'gone', incomplete: ['B'] }),
-  };
-  const git = (...args: string[]) => {
-    if (args[0] === 'show') return tree[args[1] as keyof typeof tree];
-    const ref = args[3];
-    return Object.keys(tree).filter((k) => k.startsWith(`${ref}:`)).map((k) => k.slice(ref.length + 1)).join('\n');
-  };
-
-  it("adds an unlanded batch's passes for rounds not on disk, in round order, skipping incomplete ones", () => {
-    const passes = new Map([['ui', [{ round: 4, id: 'ui', distinct: 3 }]]]);
-    withBatchPasses(passes, git, 'docs/audits', ['b/new']);
-    expect(passes.get('ui')!.map((p) => [p.round, p.distinct])).toEqual([[4, 3], [5, 2]]);
-    expect(passes.has('gone')).toBe(false);
-  });
-});
-
 describe('incompleteByRound', () => {
   it('counts the areas each round recorded incomplete, which readPasses leaves out', () => {
     const root = fixture([
@@ -241,7 +267,7 @@ describe('incompleteByRound', () => {
       { round: 56, id: 'Badge', distinct: 13, files: ['c.ts'] },
       { round: 55, id: 'ui', distinct: 4, files: ['a.ts'] },
     ]);
-    expect([...incompleteByRound(root, 'docs/audits')]).toEqual([[56, 2]]);
+    expect([...incompleteByRound(diskRecords(root, 'docs/audits'))]).toEqual([[56, 2]]);
     expect(readPasses(root, 'docs/audits').get('ui')!.map((p: { round: number }) => p.round)).toEqual([55]);
   });
 });

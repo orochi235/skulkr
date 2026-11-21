@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { citedPaths, firstJson, fixTallyOf, isFinished, reportItems, parseFilesRead, parseFindings, reviewText, validPairs } from './findings.mjs';
+import { citedPaths, firstJson, fixTallyOf, isFinished, questionsIn, reportItems, parseFilesRead, parseFindings, reviewText, validPairs } from './findings.mjs';
 import { appendRecordRow } from './record.mjs';
 import { mayStartArea, parseEnvelope } from './usage.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';
@@ -32,6 +32,13 @@ describe('parseFindings', () => {
     expect(parseFilesRead(REPORT)).toEqual(['packages/core/src/cache.ts', 'packages/core/src/view.ts']);
   });
 
+  it('counts only sections citing a where, so a clean pass has no findings, and reads any files-read heading', () => {
+    const clean = '# Audit\n\n## Summary\nNo defects.\n\n## Files Read:\n- a.ts\n- b.ts\n\n<!-- done: 0 findings, files read: 2 -->\n';
+    expect(parseFindings(clean)).toEqual([]);
+    expect(parseFilesRead(clean)).toEqual(['a.ts', 'b.ts']);
+    expect(parseFindings('## A leak\n- **where:** a.ts:1\n')[0]).toMatchObject({ claim: 'A leak', where: 'a.ts:1' });
+  });
+
   it('answers nothing for an empty report', () => {
     expect(parseFindings('')).toEqual([]);
     expect(parseFilesRead('')).toEqual([]);
@@ -47,6 +54,9 @@ describe('validPairs', () => {
   it('reads the first JSON object out of a fenced reply', () => {
     expect(firstJson('```json\n{"pairs": [[0, 1]]}\n```')).toEqual({ pairs: [[0, 1]] });
     expect(() => firstJson('no pairs')).toThrow();
+    expect(firstJson('Pairs: {"pairs": [[0, 1]]}. Note {a} and {b} differ in kind.')).toEqual({ pairs: [[0, 1]] });
+    expect(firstJson('Given {x}, the answer:\n```json\n{"pairs": [[1, 0]], "why": "a } in a string"}\n```\nDone {y}.')).toEqual({ pairs: [[1, 0]], why: 'a } in a string' });
+    expect(firstJson('I compared {A} to {B}: {"pairs": []}')).toEqual({ pairs: [] });
   });
 });
 
@@ -78,6 +88,12 @@ describe('fixTallyOf', () => {
 });
 
 describe('reportItems', () => {
+  it('counts question verdicts, not the word', () => {
+    const report = 'A leak (A): question: which owner frees it?\nA race (B): fixed 1a2b3c4d. No question remains.\n\nChecks: the question of flakes';
+    expect(questionsIn(report)).toBe(1);
+    expect(questionsIn(undefined)).toBe(0);
+  });
+
   it('reads what was broken and what the fix changed from either way a fixer writes a line', () => {
     const report = [
       'Held routes go stale after undo (A+B): fixed b34f6924a4. The pass now drops them on every write.',

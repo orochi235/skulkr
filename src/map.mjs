@@ -12,8 +12,9 @@ import { fleetOf } from './gate.mjs';
 import { areaIcons, iconsFor } from './icons.mjs';
 import { partitionAt } from './partition.mjs';
 import { correctedLeftOf } from './calibration.mjs';
-import { COVERED, areaStats, calibrationFor, chapman, drawnPassOf, gitTouched, incompleteByRound, passOf, passesIn, pickAreas } from './rounds.mjs';
+import { COVERED, areaStats, areasInFlightFor, calibrationFor, chapman, drawnPassOf, gitTouched, incompleteByRound, passOf, passesIn, pickAreas } from './rounds.mjs';
 import { openFindingsIn } from './carryRecords.mjs';
+import { abandonedRounds, recordsFor } from './recordFiles.mjs';
 import { continuousOf } from './continuousOf.mjs';
 import { readJson } from './json.mjs';
 import { lastFinished, liveRuns } from './runs.mjs';
@@ -35,7 +36,7 @@ export const nightStages = (log, names = NAMES) => {
     } else if ((m = /^match \d+\/\d+ (\S+):/.exec(line))) set(m[1], 'matched');
     else if ((m = /^fix \d+\/\d+ (\S+) on /.exec(line))) set(m[1], 'fixed');
     else if ((m = /^patch (\S+): /.exec(line))) set(m[1], 'patched');
-    else if ((m = names.conflict.exec(line))) set(m[1], 'conflict');
+    else if ((m = names.leftOut(line)) && !m.earlier) set(m.area, 'conflict');
   }
   return stages;
 };
@@ -95,8 +96,8 @@ export const nightLanes = (log, areas, jobs = [], reports = new Map(), names = N
       Object.assign(at(m[1], 'patch') ?? {}, { state: 'failed', why: m[2] });
     } else if ((m = /^(?:verify|repair) ([^\s:]+)/.exec(line)) && lanes.has(m[1])) {
       repairStep(lanes.get(m[1]), line);
-    } else if ((m = names.conflict.exec(line))) {
-      Object.assign(at(m[1], 'patch') ?? {}, { state: 'failed', why: 'conflicts; left out of the batch' });
+    } else if ((m = names.leftOut(line)) && !m.earlier) {
+      Object.assign(at(m.area, 'patch') ?? {}, { state: 'failed', why: `${m.why}; left out of the batch` });
     }
   }
   // A reviewer who found nothing leaves nothing to pair, so no matcher runs and no match line is written.
@@ -134,6 +135,15 @@ export const nightLanes = (log, areas, jobs = [], reports = new Map(), names = N
   }
   return [...lanes].map(([id, steps]) => ({ id, steps }));
 };
+
+/**
+ * Every branch a night's log says its batch left out: `{ area, round, why }`, `round` the branch's own, earlier than
+ * `round` for a branch an earlier round left out and this one retried.
+ */
+export const nightLeftOut = (log, round, names = NAMES) => log.split('\n').flatMap((line) => {
+  const m = names.leftOut(line);
+  return m ? [{ area: m.area, round: m.earlier ?? round, why: m.why }] : [];
+});
 
 /** A run's night directory: the one its record names, or else the one `night.mjs` named for its round. */
 const nightDirOf = (run, state) => {
@@ -186,6 +196,7 @@ export const readRun = (found, running, jobs = [], state, { names = NAMES, sweep
     report: run.report ?? null,
     areas: areaIds,
     stages: Object.fromEntries(nightStages(log, names)),
+    leftOut: nightLeftOut(log, run.round, names),
     lanes: withPasses(nightLanes(log, areaIds, running ? own : own.filter((j) => j.finished), fixReports(run.nightDir, areaIds), names), run),
     sweepRunning: Boolean(running && sweepId && jobs.some((j) => !j.finished && (j.task ?? '').endsWith(sweepId))),
     nightDir: run.nightDir ?? null,
@@ -258,13 +269,13 @@ export const nightsOf = (runs, state) => {
   const dir = join(state, 'nights');
   if (!existsSync(dir)) return [];
   const live = new Set(runs.filter((r) => r.running).map((r) => r.round));
+  const abandoned = abandonedRounds(state);
   const latest = new Map();
   for (const name of readdirSync(dir).sort()) {
     const m = /^(\d{4}-\d{2}-\d{2})T.*-round(\d+)$/.exec(name);
-    if (m && existsSync(join(dir, name, 'abandoned'))) latest.delete(Number(m[2]));
-    else if (m) latest.set(Number(m[2]), { round: Number(m[2]), started: m[1], nightDir: join(dir, name), running: live.has(Number(m[2])) });
+    if (m) latest.set(Number(m[2]), { round: Number(m[2]), started: m[1], nightDir: join(dir, name), running: live.has(Number(m[2])) });
   }
-  return [...latest.values()];
+  return [...latest.values()].filter((n) => !abandoned.has(n.round));
 };
 
 /** The whole map for the project at `root` under `cfg`, its runs' jobs asked of `runner`. */
@@ -272,10 +283,11 @@ export const buildMap = (cfg, root, runner) => {
   const git = gitIn(root);
   const head = git('rev-parse', '--short', 'HEAD');
   const areas = partitionAt(cfg, root, 'HEAD');
-  const { history: passes, covered, staleLines, pairLines } = areaStats(cfg, git, areas, passesIn(cfg, git, root), root);
+  const records = recordsFor(cfg, git, root);
+  const { history: passes, covered, staleLines, pairLines } = areaStats(cfg, git, areas, passesIn(cfg, git, root, records), root);
   const calibration = calibrationFor(passes, pairLines);
   const corrected = (p) => ({ ...p, leftCorrected: correctedLeftOf(p, calibration) });
-  const { picked, settled } = pickAreas({ areas, passes, covered, staleLines, calibration, touched: gitTouched(git), count: Infinity });
+  const { picked, settled } = pickAreas({ areas, passes, covered, staleLines, calibration, touched: gitTouched(git), count: Infinity, inFlight: areasInFlightFor(cfg, git) });
   const settledSet = new Set(settled);
   const runs = readRuns(cfg.state, null, { listJobs: (since) => runner.jobs(since), listProgress: () => runner.progress?.() ?? new Map(), names: cfg.names, sweepId: cfg.sweep?.id, gate: cfg.gate })
     .map((r) => ({ ...r, lanes: r.lanes.map((l) => (l.pass ? { ...l, pass: corrected(l.pass) } : l)) }));
@@ -284,7 +296,7 @@ export const buildMap = (cfg, root, runner) => {
   // A live run's areas are being audited, not waiting, so the queue counts from 1 past them.
   const queue = new Map(picked.filter((id) => !holder.has(id)).map((id, i) => [id, i + 1]));
   const icons = areaIcons(iconsFor(cfg, root), areas);
-  const open = openFindingsIn(cfg, git, root);
+  const open = openFindingsIn(cfg, git, root, records);
 
   const out = areas.map((area) => {
     const own = passes.get(area.id) ?? [];
@@ -315,6 +327,7 @@ export const buildMap = (cfg, root, runner) => {
     a._raw.forEach((raw, i) => {
       const p = a.passes[i];
       const r = rounds.get(p.round) ?? { round: p.round, date: p.date, areas: 0, files: 0, distinct: 0, est: 0 };
+      if (raw.unmerged) r.pending = 'unmerged';
       const key = `${raw.round}\n${raw.id}`;
       if (!counted.has(key)) {
         counted.add(key);
@@ -329,7 +342,7 @@ export const buildMap = (cfg, root, runner) => {
   }
 
   // A round whose areas came back incomplete says how many, so a bar drawn from the few that finished reads as that.
-  for (const [round, incomplete] of incompleteByRound(root, cfg.record.dir)) {
+  for (const [round, incomplete] of incompleteByRound(records.filter((r) => !r.ref))) {
     const r = rounds.get(round) ?? { round, date: null, areas: 0, files: 0, distinct: 0, est: 0 };
     rounds.set(round, { ...r, incomplete });
   }

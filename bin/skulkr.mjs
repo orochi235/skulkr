@@ -19,7 +19,7 @@
 import { mainCheckout } from '../src/batch.mjs';
 import { exitAfterFlush, tolerateClosedOutput } from '../src/exit.mjs';
 import { loadConfig } from '../src/config.mjs';
-import { areaDefects } from '../src/defects.mjs';
+import { defectsFor } from '../src/defects.mjs';
 import { initCommand } from '../src/init.mjs';
 import { mapCommand } from '../src/map.mjs';
 import { runNight } from '../src/night.mjs';
@@ -120,7 +120,7 @@ const main = async () => {
       mapCommand(cfg, root(), await loadRunner(cfg), rest);
       return 0;
     case 'defects':
-      process.stdout.write(`${JSON.stringify(areaDefects(root(), rest[0] ?? '', cfg.state, cfg.record.dir))}\n`);
+      process.stdout.write(`${JSON.stringify(defectsFor(cfg, root(), rest[0] ?? ''))}\n`);
       return 0;
     case 'service':
       await serve(cfg);
