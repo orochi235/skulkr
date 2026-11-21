@@ -72,10 +72,10 @@ export const createTenant = (name, cfg, { readOnly = false, runtime = { children
     return [...children.keys()].filter((pid) => !live.has(pid)).length;
   };
 
-  /** Starts no continuous round until the night's stop time, after one that `why`. */
-  const idle = (why) => {
+  /** Starts no continuous round until the stop time of the night the round started at `at` belongs to, after one that `why`. */
+  const idle = (why, at = new Date()) => {
     const now = new Date();
-    const until = nextClock(now, cfg.schedule.stopAt).toISOString();
+    const until = nextClock(at, cfg.schedule.stopAt).toISOString();
     writeIdle(state, { until, why, at: now.toISOString() });
     say(`continuous: that round ${why}; no more start until ${until}`);
   };
@@ -86,7 +86,7 @@ export const createTenant = (name, cfg, { readOnly = false, runtime = { children
     const failed = (why) => {
       const message = `run could not start: skulkr night ${args.join(' ')}: ${why}`;
       say(message);
-      if (continuous) idle('could not start');
+      if (continuous) idle('could not start', at);
       throw new Error(message);
     };
     let child;
@@ -117,7 +117,7 @@ export const createTenant = (name, cfg, { readOnly = false, runtime = { children
       children.delete(child.pid);
       const claimed = (lastStartedAt(state) ?? 0) >= at;
       // A continuous round that found nothing to do, or failed, would only be followed by another like it.
-      if (continuous && (!claimed || code !== 0)) idle(claimed ? 'failed' : 'found nothing to do');
+      if (continuous && (!claimed || code !== 0)) idle(claimed ? 'failed' : 'found nothing to do', at);
     });
     return args;
   };
@@ -196,7 +196,7 @@ export const registryTenants = (path) => {
       const had = known.get(e.name);
       if (had?.key !== key && had?.failed !== key) {
         try {
-          const tenant = createTenant(e.name, await loadConfig({ config: e.config, fresh: true }), { readOnly: Boolean(e.readOnly), runtime: had?.tenant.runtime });
+          const tenant = createTenant(e.name, await loadConfig({ config: e.config, fresh: true }), { readOnly: Boolean(e.readOnly), runtime: had?.tenant?.runtime });
           known.set(e.name, { key, tenant });
           log(`tenants: ${had ? 'reloaded' : 'hosting'} ${e.name}${e.readOnly ? ' (read-only)' : ''} from ${e.config}`);
         } catch (error) {

@@ -81,6 +81,13 @@ describe('createOntoOutput', () => {
     expect(launchOf(r)).toMatchObject({ node: 'studio', noRoom: false, refused: false });
   });
 
+  it('reads the node only from a complete job line, even when a chunk ends inside it', () => {
+    const out = createOntoOutput();
+    out.add('  job 1a2b on stu');
+    out.add('dio\nrunning\n');
+    expect(launchOf({ status: 0, ...out.result() })).toMatchObject({ node: 'studio' });
+  });
+
   it('keeps only the end of stderr, cut at a line, so onto\'s last error still reads', () => {
     const out = createOntoOutput();
     for (let i = 0; i < 500; i++) out.add(`job noise ${i} onto do: fake refuses\n`, { err: true });

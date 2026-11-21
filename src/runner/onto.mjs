@@ -84,7 +84,8 @@ export const createOntoOutput = () => {
       if (err) stderr = lastOf(stderr + text, TAIL);
       if (launched) return;
       launch = (launch + text).slice(0, LAUNCH_MAX);
-      const line = /^\s*job\s+\S+\s+on\s+\S+.*$/m.exec(launch);
+      // Only complete lines: a chunk cut inside the job line would otherwise cut the node's name short.
+      const line = /^\s*job\s+\S+\s+on\s+\S+.*$/m.exec(launch.slice(0, launch.lastIndexOf('\n') + 1));
       if (line) {
         launched = true;
         launch = launch.slice(0, line.index + line[0].length);

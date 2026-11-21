@@ -97,6 +97,27 @@ describe('skulkr service', () => {
 });
 
 describe('the registry\'s tenants, refreshed twice at once', () => {
+  it('load a new entry whose first config failed, once that config is fixed', async () => {
+    const dir = tmp();
+    const config = join(dir, 'skulkr.config.mjs');
+    writeFileSync(config, 'export default {');
+    utimesSync(config, 1_000_000, 1_000_000);
+    const registry = join(dir, 'tenants.json');
+    writeFileSync(registry, JSON.stringify([{ name: 'p', config }]));
+    const source = registryTenants(registry);
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      await source.refresh();
+      expect(source.current()).toHaveLength(0);
+      writeFileSync(config, `export default { name: 'p', root: ${JSON.stringify(dir)}, state: ${JSON.stringify(join(dir, 'state'))} };`);
+      utimesSync(config, 2_000_000, 2_000_000);
+      await source.refresh();
+    } finally {
+      spy.mockRestore();
+    }
+    expect(source.current().map((t) => t.name)).toEqual(['p']);
+  });
+
   it('load a new entry once, so its tenant and its runs are one', async () => {
     const dir = tmp();
     const config = join(dir, 'skulkr.config.mjs');

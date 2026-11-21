@@ -76,6 +76,25 @@ describe('dispatch of a model job cut off mid-run', () => {
     expect(got).toMatchObject({ status: 124, launched: true });
     expect(usages).toHaveLength(1);
   }, 10_000);
+
+  it("never reads an earlier launch's exit and reply as the answer of a relaunch that did not run", async () => {
+    const refusal = JSON.stringify({ type: 'result', is_error: true, result: 'usage limit', total_cost_usd: 2 });
+    const spec = { ...job({ exit: '1', 'claude.json': refusal }), kind: 'review', shell: 'true', task: 't', timeoutMin: 5 };
+    let stopped = false;
+    const usages: unknown[] = [];
+    const ctx = {
+      cfg: {}, frozen: '/nowhere', base: 'b', say: () => {}, usage: (u: unknown) => usages.push(u), refuse: () => {}, budget: { match: 1 },
+      stopped: () => stopped,
+      acquire: async () => ({ node: 'placed', placed: true, release: () => {} }),
+      runner: { run: async () => {
+        stopped = true;
+        return { status: 1, refused: true };
+      } },
+    };
+    const got = await dispatch(ctx, { id: 'a' }, 'match', { ...spec, logPath: join(spec.to, 'j.log') });
+    expect(got).toMatchObject({ launched: false, reply: '' });
+    expect(usages).toMatchObject([{ costUsd: 0, terminalReason: 'no envelope' }]);
+  });
 });
 
 describe('earlierReview', () => {

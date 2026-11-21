@@ -84,7 +84,8 @@ export const dispatch = async (ctx, area, role, spec) => {
   for (let launches = 1; ; launches++) {
     const slot = await ctx.acquire(FIX_ROLES.has(role) ? 'fix' : 'review');
     const t0 = Date.now();
-    if (model) rmSync(join(spec.to, STARTED), { force: true });
+    // What an earlier launch left would otherwise read as this one's answer if this one never runs.
+    if (model) for (const f of [STARTED, 'exit', 'claude.json', 'fix.mbox']) rmSync(join(spec.to, f), { force: true });
     let result;
     try {
       result = await runJob({ ...spec, cfg: ctx.cfg, runner: ctx.runner, frozen: ctx.frozen, base: ctx.base, slot });
