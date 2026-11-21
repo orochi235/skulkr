@@ -9,6 +9,7 @@ import { gitIn } from './batch.mjs';
 import { resolveConfig } from './config.mjs';
 import { fixTallyOf } from './findings.mjs';
 import { fleetOf } from './gate.mjs';
+import { areaIcons, iconsFor } from './icons.mjs';
 import { partitionAt } from './partition.mjs';
 import { COVERED, areaStats, chapman, gitTouched, incompleteByRound, passesIn, pickAreas } from './rounds.mjs';
 import { continuousOf } from './continuousOf.mjs';
@@ -260,6 +261,7 @@ export const buildMap = (cfg, root, runner) => {
   const holder = new Map(runs.filter((r) => r.running).flatMap((r) => r.areas.map((id) => [id, r])));
   // A live run's areas are being audited, not waiting, so the queue counts from 1 past them.
   const queue = new Map(picked.filter((id) => !holder.has(id)).map((id, i) => [id, i + 1]));
+  const icons = areaIcons(iconsFor(cfg, root), areas);
 
   const out = areas.map((area) => {
     const own = passes.get(area.id) ?? [];
@@ -277,6 +279,7 @@ export const buildMap = (cfg, root, runner) => {
       passes: history,
       stage: run ? run.stages[area.id] ?? 'queued' : null,
       ...(stale ? { staleLines: stale } : {}),
+      ...(icons.byArea.has(area.id) ? { icon: icons.byArea.get(area.id) } : {}),
       _raw: own,
     };
   });
@@ -323,6 +326,7 @@ export const buildMap = (cfg, root, runner) => {
     ...continuousOfMap(cfg),
     runs,
     areas: out,
+    ...(Object.keys(icons.glyphs).length ? { icons: icons.glyphs } : {}),
     rounds: [...rounds.values()].sort((x, y) => x.round - y.round).map((r) => ({ ...r, est: Math.round(r.est) })),
   };
 };

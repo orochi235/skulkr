@@ -163,6 +163,13 @@ export const DEFAULTS = {
 
   /** An extra check run beside the reviews whose findings go to one fixer; see README "A sweep". */
   sweep: null,
+
+  /**
+   * The map's area icons, or a function of `{ root }` answering them; see README "Area icons". `areas` maps an area id
+   * or a group's id prefix to an icon name; `packageOf(file)` names a file's package and `packages` (a table or a
+   * function) that package's icon; `glyph(name)` answers an icon's SVG body on a 20×20 viewBox.
+   */
+  icons: null,
 };
 
 const isPlain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) && !(v instanceof RegExp) && Object.getPrototypeOf(v) === Object.prototype;
