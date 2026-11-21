@@ -32,13 +32,14 @@ export const excerptFor = (text, files) => {
 
 /**
  * A repair of one area's branch for a red capstone, through `ctx`'s jobs: given the failing files and the log's
- * lines about them, it checks those files beside the area's own, and on a pass patches the branch again. Answers
- * `{ ok, commits?, verify }`.
+ * lines about them, it checks those files beside the area's own, and on a pass patches the branch again. `mboxOf`
+ * answers the commits of a branch that is not an area's, the sweep's. Answers `{ ok, commits?, verify }`.
  */
-export const capstoneRepairer = (ctx, { root, results }) => async (id, files, log) => {
+export const capstoneRepairer = (ctx, { root, results, mboxOf = () => undefined }) => async (id, files, log) => {
   const { cfg, nightDir, round, commit } = ctx;
   const own = join(nightDir, 'areas', id, 'fix.mbox');
-  const mbox = existsSync(own) ? own : join(nightDir, 'jobs', id, 'fix', 'fix.mbox');
+  const mbox = existsSync(own) ? own : mboxOf(id);
+  if (!mbox) return { ok: false };
   const area = { id };
   const run = await repairJob(ctx, area, { mbox, log, label: 'capstone', attempt: 'capstone', extra: files });
   const verdict = await checkedIn(ctx, area, run.to, run.mbox, 'repair-capstone', files);

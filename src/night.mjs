@@ -325,7 +325,8 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     const branches = patchAreas({ ...landing, nightDir: status.nightDir, results });
     if (sweepFixed) sweep.fix = { ...patchSweep({ ...landing, fixed: sweepFixed, branches }), ...(sweepFixed.verify ? { verify: sweepFixed.verify } : {}) };
     setStep('batch');
-    const repair = verifyOf(cfg) ? capstoneRepairer(ctx, { root, results }) : undefined;
+    const mboxOf = (id) => (id === cfg.sweep?.id ? sweepFixed?.mbox : undefined);
+    const repair = verifyOf(cfg) ? capstoneRepairer(ctx, { root, results, mboxOf }) : undefined;
     report = await batchAndTest({ ...landing, git, date: ctx.date, nightDir: status.nightDir, branches, results, sweep, merge: args.merge, setStep, repair });
     const checked = verifyLine(results);
     if (checked) report += `; ${checked}`;
