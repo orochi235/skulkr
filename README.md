@@ -183,6 +183,10 @@ all of theirs; and only a round whose passes read at least half the area's files
 its last covering round is its "last pass" for the queue, staleness and settling, so a later pass that held one
 boundary file of it neither replaces its estimate nor tests it. The map gives each area that pass as `last`, drawn as
 one pass and corrected, and the dashboard's "left after round N", shading, heat scale and totals read it.
+It also gives `lastByRound`: what `last` was after each round that changed it, `{ round, left, leftCorrected }`
+(`pass` naming the round the figure comes from where that is an earlier one, `leftCorrected` left out where it equals
+`left`), none before passes had read half the area's files. Every entry is corrected by today's calibration, not the
+one that held then. The dashboard's round picker shows the map from it.
 
 **Stale estimates.** An area whose files changed since its last pass carries `staleLines` in the map: lines added
 plus deleted in those files (`git log --numstat`, merges left out) by every commit since the pass's commit but that
@@ -415,7 +419,9 @@ jobs feed, the queue, and an area's defects. Its dev server lists the tenants at
 or with none registered the one project `SKULKR_CONFIG` or the working directory names), and serves each tenant's
 map at `api/t/<name>/map` and an area's defects at `api/t/<name>/area?id=<area>`, by running `skulkr map` and
 `skulkr defects` with `--tenant` (which refuses an id not in the partition). The page's title is a menu of the tenants; the one shown is in the URL hash
-(`#weasel`), and each viewer's last choice is remembered. `dashboard/README.md` says how to start it.
+(`#weasel`), and each viewer's last choice is remembered. A slider above the treemap shows the areas as they stood after
+an earlier round, from each area's `lastByRound` (see "History follows files"), the round after an `@` in the hash
+(`#weasel@41`). `dashboard/README.md` says how to start it.
 
 A frozen copy of it, over weasel's audits, is at [michaelbaker.tech/skulkr](https://michaelbaker.tech/skulkr/).
 `skulkr map [--out <file>]` writes the same JSON for anything else that draws it.

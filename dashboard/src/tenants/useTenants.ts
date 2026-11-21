@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { after } from '@weasel-js/registry';
 import { useViewerPref } from '@dash/audits/viewerPref';
+import { hashFor, readHash } from '@dash/hash';
 
 export type TenantsState =
   | { readonly status: 'loading' }
@@ -50,23 +51,15 @@ export function useTenants({ url, dev, everyMs = TENANTS_POLL_MS }: { url: strin
   return state;
 }
 
-const hashTenant = (): string => {
-  try {
-    return decodeURIComponent(window.location.hash.replace(/^#/, ''));
-  } catch {
-    return '';
-  }
-};
-
 /**
  * Which of `names` the page shows, and how to change it: the one the URL hash names, else the one this viewer chose
- * last, else the first. Choosing one puts it in the hash and remembers it.
+ * last, else the first. Choosing one puts it in the hash, in place of any round the map was shown after, and remembers it.
  */
 export function useTenantChoice(names: readonly string[]): [string | null, (name: string) => void] {
   const [stored, , keep] = useViewerPref('tenant', '', (s) => s);
-  const [hash, setHash] = useState(hashTenant);
+  const [hash, setHash] = useState(() => readHash().tenant);
   useEffect(() => {
-    const onHash = () => setHash(hashTenant());
+    const onHash = () => setHash(readHash().tenant);
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
@@ -76,7 +69,7 @@ export function useTenantChoice(names: readonly string[]): [string | null, (name
     setPicked(name);
     setHash(name);
     keep(name);
-    window.location.hash = encodeURIComponent(name);
+    window.location.hash = hashFor({ tenant: name, round: null });
   };
   return [choice, choose];
 }

@@ -6,11 +6,15 @@ import { ordinal } from './ordinal';
 
 /** The areas a run would pick next, in queue order; each picks its cell on the map, and lights it while hovered. */
 
-export function NextUp({ areas, onPick, onLight }: {
+export function NextUp({ areas, onPick, onLight, note }: {
   areas: readonly AuditArea[]; onPick: (id: string) => void; onLight: (id: string | null) => void;
+  /** A line above the list, as when the map beside it shows a past round and the queue is today's. */
+  note?: string | undefined;
 }) {
   return (
-    <ol className={s.list}>
+    <>
+      {note && <p className={s.note}>{note}</p>}
+      <ol className={s.list}>
         {areas.map((a) => (
           <li key={a.id} value={a.queue ?? undefined}>
             <button
@@ -27,6 +31,7 @@ export function NextUp({ areas, onPick, onLight }: {
             </button>
           </li>
         ))}
-    </ol>
+      </ol>
+    </>
   );
 }

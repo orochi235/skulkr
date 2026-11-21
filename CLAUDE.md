@@ -51,6 +51,8 @@ weasel cutover.
   - a branch the batch leaves out: its outcome names the conflicting paths or git's message, a merge that meets a
     lock is retried, and later rounds' batches try it again (README "batch" step, 2026-11-21).
   - `turns`, each job's model turns, on its `usage.jsonl` record (2026-11-21).
+  - each area's `lastByRound` on the map, what its `last` was after each round that changed it (README "History follows
+    files", 2026-11-21).
   - the map's area `last`, the pass its estimate goes by (its last covering round, corrected), for the dashboard
     (2026-11-21).
   - an area whose branch the capstone dropped, no longer held out of the queue once its round lands, since the branch is
