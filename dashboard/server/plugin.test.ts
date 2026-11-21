@@ -5,14 +5,14 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { SKULKR_BIN, createKeptMap, createMapBuilder, createRoutes, createSkulkrRunner, listTenants, tenantArgs } from './plugin';
+import { SKULKR_BIN, createKeptMap, createSharedRun, createRoutes, createSkulkrRunner, listTenants, tenantArgs } from './plugin';
 import { parseTenantPath, tenantMapPath } from '../shared/routes';
 
-describe('createMapBuilder', () => {
+describe('createSharedRun', () => {
   it('shares one build among the calls made while it runs, and starts afresh after', async () => {
     let finish: (json: string) => void = () => {};
     const run = vi.fn(() => new Promise<string>((done) => { finish = done; }));
-    const build = createMapBuilder(run);
+    const build = createSharedRun(run);
     const first = build();
     const second = build();
     expect(run).toHaveBeenCalledTimes(1);
@@ -100,6 +100,19 @@ describe('createRoutes', () => {
     expect(cli).toHaveBeenCalledWith(['defects', '--tenant', 'weasel', 'core.ops']);
     expect(await get('/api/t/weasel/area?id=--config')).toMatchObject({ status: 400 });
     expect(await get('/api/t/weasel/area?id=nope')).toMatchObject({ status: 400 });
+    expect(cli.mock.calls.filter(([args]) => args[0] === 'defects')).toHaveLength(1);
+  });
+
+  it('shares one defects run among the requests for an area made while it runs', async () => {
+    let finish: (json: string) => void = () => {};
+    const { cli, get } = routesOver((args) => (args[0] === 'defects' ? new Promise((done) => { finish = done; }) : Promise.resolve(args[0] === 'tenants' ? tenants : map)));
+    const first = get('/api/t/weasel/area?id=core.ops');
+    const second = get('/api/t/weasel/area?id=core.ops');
+    await vi.waitFor(() => expect(cli.mock.calls.filter(([args]) => args[0] === 'defects')).toHaveLength(1));
+    await new Promise((settle) => setTimeout(settle, 20));
+    finish('[1]');
+    expect((await first).body).toBe('[1]');
+    expect((await second).body).toBe('[1]');
     expect(cli.mock.calls.filter(([args]) => args[0] === 'defects')).toHaveLength(1);
   });
 

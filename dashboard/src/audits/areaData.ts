@@ -2,7 +2,7 @@
 import { lerp } from '@weasel-js/geom';
 import { warpScale } from '@weasel-js/scale';
 import { getOwn } from '@weasel-js/registry';
-import type { AreaStatus, AuditArea, AuditPass, AuditRun } from './skulkrMap.types';
+import type { AreaStatus, AuditArea, AuditPass, AuditRun, SkulkrMap } from './skulkrMap.types';
 
 /** How an area is shaded: never read, settled, or by how many defects are estimated to be left in it. */
 export type AreaTone = 'unaudited' | 'settled' | { readonly left: number };
@@ -131,6 +131,18 @@ export function nextUpOf(areas: readonly AuditArea[], count = 8): AuditArea[] {
 /** The live run holding `id`, if one does. */
 export const runHolding = (runs: readonly AuditRun[], id: string): AuditRun | undefined =>
   runs.find((r) => r.running && r.areas.includes(id));
+
+/**
+ * What `skulkr defects <id>` reads, as far as the map shows it, as one string that changes when its answer could: the
+ * area's recorded passes, and each run's lane for it, step by step, with the commits a fixer has made.
+ */
+export function defectsVersionOf(map: Pick<SkulkrMap, 'areas' | 'runs'>, id: string): string {
+  const passes = map.areas.find((a) => a.id === id)?.passes.map((p) => p.round) ?? [];
+  const lanes = map.runs.flatMap((r) => r.lanes.filter((l) => l.id === id).map((l) => [
+    r.round, Object.entries(l.steps).map(([k, s]) => `${k}:${s.state}:${s.commits ?? ''}:${s.done ?? ''}`),
+  ]));
+  return JSON.stringify([passes, lanes]);
+}
 
 /** What a name shows inside the frame `parent`: the rest of it past the frame's path, or its last segment where it is
  *  the frame's own name; all of it at the top. */

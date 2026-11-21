@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changedSincePass, heatScaleOf, labelIn, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
+import { changedSincePass, defectsVersionOf, heatScaleOf, labelIn, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
 import { continuousText, headlineOf, parseJob, recentJobsOf, spendOf, stepText } from './runData';
 import { stageCountsOf } from './phases';
 import { inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
@@ -79,6 +79,18 @@ describe('lanes', () => {
     expect(continuousText({ until: '', next: 'starts now', nightUsd: 200, spentUsd: 57.4, leftUsd: 142.6 })).toBe('continuous · $143 of $200 left tonight');
     expect(spendOf(live)).toBe('$12.50 of $80');
     expect(spendOf({ ...live, capUsd: null })).toBe('$12.50');
+  });
+});
+
+describe('defectsVersionOf', () => {
+  it("changes when the area's passes or lane do, and not when only the map's stamp or another area does", () => {
+    const v = defectsVersionOf(map, 'core.ops');
+    expect(defectsVersionOf({ ...map, generated: '2030-01-01T00:00:00Z' } as SkulkrMap, 'core.ops')).toBe(v);
+    const other = { ...live, lanes: live.lanes.map((l) => (l.id === 'core.ops' ? l : { ...l, steps: { ...l.steps, B: { state: 'done' as const } } })) };
+    expect(defectsVersionOf({ ...map, runs: [other, finished] }, 'core.ops')).toBe(v);
+    const ops = live.lanes[0]!;
+    const fixed = { ...live, lanes: [{ ...ops, steps: { ...ops.steps, fix: { state: 'done' as const, commits: 2 } } }] };
+    expect(defectsVersionOf({ ...map, runs: [fixed, finished] }, 'core.ops')).not.toBe(v);
   });
 });
 

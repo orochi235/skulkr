@@ -43,8 +43,8 @@ export function createSkulkrRunner({ bin = SKULKR_BIN, env = process.env, cwd, e
   });
 }
 
-/** Builds a map JSON with `args` (`['map']`, or a tenant's), one build at a time; a call during a build gets that build's answer. */
-export function createMapBuilder(run: SkulkrRunner = createSkulkrRunner(), args: readonly string[] = ['map']): () => Promise<string> {
+/** Runs the CLI with `args` (`['map']`, or a tenant's map or defects), one run at a time; a call during a run gets that run's answer. */
+export function createSharedRun(run: SkulkrRunner = createSkulkrRunner(), args: readonly string[] = ['map']): () => Promise<string> {
   let pending: Promise<string> | null = null;
   return () => {
     pending ??= run(args).finally(() => {
@@ -167,10 +167,12 @@ export function createRoutes(options: SkulkrRunnerOptions, cli: SkulkrRunner = c
   const mapOf = (tenant: string, args: readonly string[]) => {
     const key = args.join('\n');
     if (!maps.has(key)) {
-      maps.set(key, { kept: createKeptMap(createMapBuilder(run, args), options.cache === false ? null : mapCachePath(tenant)), ids: createAreaIds() });
+      maps.set(key, { kept: createKeptMap(createSharedRun(run, args), options.cache === false ? null : mapCachePath(tenant)), ids: createAreaIds() });
     }
     return maps.get(key)!;
   };
+  // One per area asked for, so viewers asking for one area at once share its run.
+  const areaRuns = new Map<string, () => Promise<string>>();
   const keptTenants = createKeptMap(() => listTenants(run).then((list) => JSON.stringify(list)), null);
   const json = (res: ServerResponse, body: Promise<string | KeptAnswer>) => body.then((answer) => {
     const { text, error } = typeof answer === 'string' ? { text: answer, error: null } : answer;
@@ -204,7 +206,10 @@ export function createRoutes(options: SkulkrRunnerOptions, cli: SkulkrRunner = c
       if (what === 'map') return map.kept();
       const id = new URLSearchParams(query).get('id') ?? '';
       if (id.startsWith('-') || !map.ids((await map.kept()).text).has(id)) throw new Refusal(400, `no area ${JSON.stringify(id)} in ${tenant}`);
-      return run(tenantArgs(list, tenant, 'area', id)!);
+      const args = tenantArgs(list, tenant, 'area', id)!;
+      const key = args.join('\n');
+      if (!areaRuns.has(key)) areaRuns.set(key, createSharedRun(run, args));
+      return areaRuns.get(key)!();
     }));
   };
 }
