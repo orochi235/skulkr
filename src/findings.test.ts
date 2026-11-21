@@ -54,6 +54,9 @@ describe('validPairs', () => {
   it('reads the first JSON object out of a fenced reply', () => {
     expect(firstJson('```json\n{"pairs": [[0, 1]]}\n```')).toEqual({ pairs: [[0, 1]] });
     expect(() => firstJson('no pairs')).toThrow();
+    expect(firstJson('Pairs: {"pairs": [[0, 1]]}. Note {a} and {b} differ in kind.')).toEqual({ pairs: [[0, 1]] });
+    expect(firstJson('Given {x}, the answer:\n```json\n{"pairs": [[1, 0]], "why": "a } in a string"}\n```\nDone {y}.')).toEqual({ pairs: [[1, 0]], why: 'a } in a string' });
+    expect(firstJson('I compared {A} to {B}: {"pairs": []}')).toEqual({ pairs: [] });
   });
 });
 

@@ -43,7 +43,8 @@ weasel cutover.
   - the map's run `leftOut` and a left-out lane's patch `why`, read from `land.mjs`'s `left out:` lines (2026-11-21).
   - reports the parsers used to misread (2026-11-21): a capitalized `Fixed <sha>` verdict counts as fixed;
     only a `##` section with a `where:` line counts as a finding, and a `## Files Read:` heading lists files read;
-    `area.json`'s `questions` counts question verdicts, not the word.
+    `area.json`'s `questions` counts question verdicts, not the word;
+    a matcher reply with braces in its prose still yields its pairs.
   - a branch the batch leaves out: its outcome names the conflicting paths or git's message, a merge that meets a
     lock is retried, and later rounds' batches try it again (README "batch" step, 2026-11-21).
   Everything else stays at parity.

@@ -57,12 +57,45 @@ export const validPairs = (pairs, a, b) => {
   return kept;
 };
 
-/** The first JSON object in a model's reply, which may wrap it in prose or a code fence. */
+/** The text from the `{` at `start` to the `}` that closes it, strings skipped over; null when it never closes. */
+const balancedAt = (text, start) => {
+  let depth = 0;
+  let quoted = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '\\') i += 1;
+      else if (c === '"') quoted = false;
+    } else if (c === '"') quoted = true;
+    else if (c === '{') depth += 1;
+    else if (c === '}' && --depth === 0) return text.slice(start, i + 1);
+  }
+  return null;
+};
+
+const parsed = (text) => {
+  try {
+    return { value: JSON.parse(text) };
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * The first JSON object in a model's reply, which may wrap it in prose or a code fence: a fenced block's object if one
+ * parses, else the first balanced `{…}` that parses, so braces in the prose around it do not spoil it.
+ */
 export const firstJson = (text) => {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start < 0 || end < start) throw new Error('no JSON object in the reply');
-  return JSON.parse(text.slice(start, end + 1));
+  for (const m of text.matchAll(/```(?:json)?\s*\n([\s\S]*?)```/g)) {
+    const got = parsed(m[1].trim());
+    if (got && typeof got.value === 'object' && got.value !== null) return got.value;
+  }
+  for (let at = text.indexOf('{'); at >= 0; at = text.indexOf('{', at + 1)) {
+    const candidate = balancedAt(text, at);
+    const got = candidate && parsed(candidate);
+    if (got) return got.value;
+  }
+  throw new Error('no JSON object in the reply');
 };
 
 /** The matcher's prompt: both lists, numbered from 0, claim and location only. */
