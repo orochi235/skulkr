@@ -1,8 +1,9 @@
 /**
  * weasel's skulkr config: reproduces the nightly audit weasel's own `scripts/skulk` ran up to round 49. At cutover it
  * becomes `skulkr.config.mjs` at weasel's root, with `weasel/` beside this file moved to `scripts/audit/` and the
- * three `./weasel/` paths below changed to match (README.md "Moving weasel over").
+ * `./weasel/` paths below changed to match (README.md "Moving weasel over").
  */
+import { icons } from './weasel/icons.mjs';
 import { sweep } from './weasel/sweep.mjs';
 
 const NVM = 'export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"; . "$NVM_DIR/nvm.sh" >/dev/null; nvm use >/dev/null';
@@ -115,4 +116,5 @@ export default {
   schedule: { startAt: '23:00', stopAt: '07:00' },
 
   sweep,
+  icons,
 };

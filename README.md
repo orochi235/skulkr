@@ -91,6 +91,7 @@ export default {
   schedule: { startAt: '23:00', stopAt: '07:00', continuous: false }, // the service's start; when a run stops dispatching
   state: undefined,                   // default ~/.local/state/skulkr/<name>
   sweep: null,                        // an extra check beside the reviews; see "A sweep"
+  icons: null,                        // the map's area icons; see "Area icons"
 };
 ```
 
@@ -295,6 +296,26 @@ map at `api/t/<name>/map` and an area's defects at `api/t/<name>/area?id=<area>`
 (`#weasel`), and each viewer's last choice is remembered. `dashboard/README.md` says how to start it.
 
 `skulkr map [--out <file>]` writes the same JSON for anything else that draws it.
+
+### Area icons
+
+The config's `icons` puts an icon in the middle of each area's tile, at one size on every tile and left out of a
+tile too small for it. It is an object, or a function of `{ root }` (the project root) answering one:
+
+```js
+icons: {
+  areas: { ui: 'ui', 'ui.menu': 'menu', 'apps.lab': null }, // an area id or a group's id prefix → an icon name
+  packageOf: (file) => /^packages\/([^/]+)\//.exec(file)?.[1] ?? null, // the package a file lies in
+  packages: { ui: 'ui', geom: 'geom' },  // a package's icon, or a function of its name
+  glyph: (name) => bodies[name],          // an icon's SVG body on a 20×20 viewBox, stroked in currentColor
+},
+```
+
+The `areas` key that is the area's id, else its longest dotted prefix, names its icon; `null` there means none.
+With no key matching, an area whose files all lie in one package by `packageOf` takes that package's icon, and an
+area spanning two takes none. The map carries each named icon's glyph once, in `icons`, and each area's icon name.
+weasel's (`examples/weasel/icons.mjs`) reads `PACKAGE_ICONS` from `apps/site/releaseIcons.ts` and the glyphs from
+the `icons.table.json` files its icon generator writes, as text, so nothing of weasel is imported or built.
 
 ## Where things go
 

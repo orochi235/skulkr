@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { asNodeId } from '@weasel-js/core';
 import { auditNodeSpecs, createAuditScene, frameIdOf, syncAuditScene, type AuditPalette } from './auditScene';
-import type { AuditCellData } from './auditPainter';
-import { layoutMap } from './mapLayout';
+import { AUDIT_PAINTER, type AuditCellData } from './auditPainter';
+import { ICON, layoutMap } from './mapLayout';
 import { phasesOf } from './phases';
 import { rampAt } from './heat';
 import fixture from './fixture.map.json';
@@ -99,5 +99,45 @@ describe('rampAt', () => {
     expect(cellOf(scene, due.id).over).toBeUndefined();
     const unaudited = map.areas.find((a) => a.status === 'unaudited')!;
     expect(cellOf(scene, unaudited.id).over).toMatchObject({ kind: 'hatch' });
+  });
+});
+
+describe('area icons', () => {
+  const GLYPHS = { dot: '<circle cx="10" cy="10" r="4" fill="currentColor" stroke="none"/>' };
+  const areas = map.areas.map((a) => (a.id === 'geom' ? { ...a, icon: 'dot' } : a.id === 'ui.menu' ? { ...a, icon: 'unknown' } : a));
+  const paintOf = (data: AuditCellData, pose: { x: number; y: number; width: number; height: number }) =>
+    AUDIT_PAINTER.paint({ data } as Parameters<typeof AUDIT_PAINTER.paint>[0], pose);
+  const isIcon = (c: { kind: string; transform?: unknown }) => c.kind === 'group' && c.transform !== undefined;
+
+  it("gives a cell its icon's shapes, and none to an area with no icon or one the map has no glyph for", () => {
+    const scene = createAuditScene();
+    syncAuditScene(scene, auditNodeSpecs(areas, layoutMap(areas, 900, 400), PALETTE, new Map(), null, Infinity, new Map(), GLYPHS));
+    expect(cellOf(scene, 'geom').icon).toHaveLength(1);
+    expect(cellOf(scene, 'ui.menu').icon).toBeUndefined();
+    expect(cellOf(scene, 'core.scene').icon).toBeUndefined();
+  });
+
+  it("draws it centered at one size in the cell's ink, muted, under the badges and the label", () => {
+    const scene = createAuditScene();
+    syncAuditScene(scene, auditNodeSpecs(areas, layoutMap(areas, 900, 400), PALETTE, new Map(), null, Infinity, new Map(), GLYPHS));
+    const data = cellOf(scene, 'geom');
+    for (const pose of [{ x: 100, y: 50, width: 120, height: 80 }, { x: 0, y: 0, width: 300, height: 200 }]) {
+      const cmds = paintOf(data, pose);
+      const at = cmds.findIndex(isIcon);
+      const icon = cmds[at] as { alpha: number; transform: ArrayLike<number>; children: { fill: { paint: { color: string } } }[] };
+      const [k, , , , , , tx, ty] = Array.from(icon.transform);
+      expect(k! * 20).toBe(ICON.size);
+      expect([tx, ty]).toEqual([pose.x + (pose.width - ICON.size) / 2, pose.y + (pose.height - ICON.size) / 2]);
+      expect(icon.alpha).toBeLessThan(0.5);
+      expect(icon.children[0]!.fill.paint.color).toBe(data.ink);
+      // Only the cell's fill, hatch, and edge come before it.
+      expect(at).toBe(data.over ? 3 : 2);
+    }
+  });
+
+  it('leaves it out of a cell too small to hold it', () => {
+    const scene = createAuditScene();
+    syncAuditScene(scene, auditNodeSpecs(areas, layoutMap(areas, 900, 400), PALETTE, new Map(), null, Infinity, new Map(), GLYPHS));
+    expect(paintOf(cellOf(scene, 'geom'), { x: 0, y: 0, width: ICON.size + 2 * ICON.margin - 1, height: 200 }).some(isIcon)).toBe(false);
   });
 });

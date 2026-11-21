@@ -94,7 +94,7 @@ function Chart({ map, areaUrl, view }: { map: SkulkrMap; areaUrl: string; view: 
       />
       <Stats stats={stats} />
       <div ref={mainRef} className={s.main}>
-        <Treemap scene={scene} selection={selection} areas={areas} palette={colors} phases={phases} estimates={estimates} onHover={setHovered} lit={lit} areasPerRound={map.areasPerRound} />
+        <Treemap scene={scene} selection={selection} areas={areas} palette={colors} phases={phases} estimates={estimates} onHover={setHovered} lit={lit} areasPerRound={map.areasPerRound} glyphs={map.icons} />
         <ResizeHandle value={asideWidth} min={ASIDE.min} max={ASIDE.max} invert onInput={setAsideWidth} onChange={keepAside} aria-label="Resize the side panel" />
         <aside className={s.aside} aria-label="Area">
           <AreaDetail area={area} holder={area && runHolding(map.runs, area.id)} />

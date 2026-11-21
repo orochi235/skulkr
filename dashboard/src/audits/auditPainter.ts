@@ -1,7 +1,8 @@
 /** How the audit map's nodes paint: an area's cell, and the frame of the package holding it. */
 import { resolvePaintPattern, textCommandFromRuns, type DrawCommand, type NodeShapeEntry, type PosedPaint, type RectPose } from '@weasel-js/core';
 import { circlePath, pathFromD, type Path } from '@weasel-js/geom';
-import { framePadOf } from './mapLayout';
+import { glyphCommands, type GlyphPath } from './glyph';
+import { framePadOf, iconBoxIn } from './mapLayout';
 
 export interface AuditCellData {
   readonly kind: 'audit-cell';
@@ -12,6 +13,8 @@ export interface AuditCellData {
   readonly ink: string;
   /** Its name, a line each. */
   readonly label?: readonly string[];
+  /** Its icon's shapes, centered in it under everything but its fill. */
+  readonly icon?: readonly GlyphPath[];
   /** The outline's color while a live run holds it, which says how far the run has taken it. */
   readonly live?: string;
   /** A solid color its label lines sit on, where `over` would put a hatch under them. */
@@ -48,6 +51,9 @@ export interface AuditFrameData {
 }
 
 export type AuditNodeData = AuditCellData | AuditFrameData;
+
+/** How strongly an icon's ink shows: enough to read on any heat, faint beside the label. */
+const ICON_INK = 0.3;
 
 /** The side of a changed area's cut corner, in pixels. */
 const CUT_PX = 12;
@@ -88,6 +94,8 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
     ...(d.over ? filled(rect(p), d.over) : []),
     { kind: 'path', path: rect(p), stroke: { paint: { color: d.edge }, width: 0.5 } },
   ];
+  const iconBox = d.icon ? iconBoxIn(p) : null;
+  if (d.icon && iconBox) out.push(glyphCommands(d.icon, { x: iconBox.x, y: iconBox.y, size: iconBox.width }, d.ink, ICON_INK));
   if (d.worn) {
     // One size for every cell, shrunk only where a cell is too small to hold it.
     const cut = Math.min(Math.min(p.width, p.height) * 0.45, CUT_PX);
