@@ -45,7 +45,8 @@ const line = (cfg, role, { promptFile, budgetUsd, progress }) => {
   ].join(' ');
 };
 
-/** The envelope's fields as `{ reply, record, error }`; `record` lacks the job's own area, role and node. */
+/** The envelope's fields as `{ reply, record, error }`; `record` lacks the job's own area, role and node. The envelope
+ *  carries its own cost, so the job's config and role go unused. */
 const resultOf = (raw) => {
   let env = {};
   try {

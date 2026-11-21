@@ -43,7 +43,7 @@ export const cameHome = (spec, role, cfg) => {
   const agent = agentFor(cfg, role);
   const raw = readIf(join(spec.to, agent.resultFile));
   if (!raw.trim()) return undefined;
-  const result = agent.resultOf(raw);
+  const result = agent.resultOf(raw, { cfg, role });
   if (result.error) return undefined;
   if (role.startsWith('review') && !isFinished(reviewText(readIf(join(spec.to, 'findings.md')), result.reply))) return undefined;
   return { exit, raw };
@@ -77,7 +77,7 @@ export const dispatch = async (ctx, area, role, spec) => {
   const model = role !== 'verify';
   const earlier = cameHome(spec, role, ctx.cfg) ?? earlierReview(ctx, area, role, spec);
   if (earlier) {
-    const { reply, record } = agentFor(ctx.cfg, role).resultOf(earlier.raw);
+    const { reply, record } = agentFor(ctx.cfg, role).resultOf(earlier.raw, { cfg: ctx.cfg, role });
     const usage = model ? { area: area.id, role, node: 'earlier', ...record, exit: earlier.exit, reused: true } : undefined;
     if (usage) ctx.usage(usage);
     return { status: 0, launched: true, node: 'earlier', minutes: 0, reply, usage };
@@ -133,7 +133,8 @@ export const dispatch = async (ctx, area, role, spec) => {
       continue;
     }
     if (!model) return { status: result.status, launched: Boolean(exit), node, minutes: minutesSince(t0), reply: '' };
-    const { reply, record } = agentFor(ctx.cfg, role).resultOf(readIf(join(spec.to, agentFor(ctx.cfg, role).resultFile)));
+    const agent = agentFor(ctx.cfg, role);
+    const { reply, record } = agent.resultOf(readIf(join(spec.to, agent.resultFile)), { cfg: ctx.cfg, role });
     const usage = { area: area.id, role, node, ...record, exit };
     ctx.usage(usage);
     if (usage.budgetHit) ctx.say(`${role} ${area.id} stopped at its $${ctx.budget[budgetRole(role)]} ceiling`);

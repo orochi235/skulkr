@@ -14,7 +14,8 @@ weasel cutover.
   machine; `onto.mjs` runs them on an onto fleet. Jobs launch only through the runner; outside `src/runner/`, onto
   appears only where `gate.mjs` reads `onto: progress` lines out of the gate command's own log.
 - `src/agent/` — the agent interface (documented in `index.mjs`): what a model job runs, chosen per role by the config's
-  `agent`. `claude.mjs`, the default and only one so far, owns every `claude -p` flag and how its `claude.json` reads.
+  `agent`. `claude.mjs`, the default, owns every `claude -p` flag and how its `claude.json` reads; `codex.mjs` runs
+  reviewers on the Codex CLI.
 - `briefs/` — the shipped default briefs. `examples/weasel.config.mjs` and `examples/weasel/` are weasel's config,
   briefs, and control-sweep adapter, kept to reproduce weasel's behavior exactly.
 - `dashboard/` — the standalone Vite app, its own package (not a workspace); `dashboard/README.md`.

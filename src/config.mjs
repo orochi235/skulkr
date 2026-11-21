@@ -180,6 +180,26 @@ export const DEFAULTS = {
     reviewDenied: ['Task', 'Agent'],
   },
 
+  codex: {
+    /** `CODEX_HOME` for every job, or unset for the node's default. */
+    home: undefined,
+    /** Without the node account's `config.toml` (its MCP servers, profiles and instructions); auth still comes from it. */
+    ignoreUserConfig: true,
+    /** The model each role runs; a role run on Codex must name one, and price it in `prices`. */
+    models: { review: undefined },
+    /** `model_reasoning_effort` by role; unset takes the model's default. */
+    effort: { review: undefined },
+    /**
+     * Dollars per million tokens by model, `{ input, cachedInput, output }`: Codex reports tokens but no cost, so
+     * a job's `costUsd`, and the night's cap, come from these. A cache write is priced as input.
+     */
+    prices: {},
+    /** Each role's brief template in place of the config's `briefs`; unset: the shipped `briefs/codex/` one. */
+    briefs: {},
+    timeoutMin: 45,
+    reviewExpect: '8m',
+  },
+
   areasPerRound: 16,
   /**
    * List-price dollars: each job's `--max-budget-usd` by role, a run's `capUsd`, the guess at an area's cost, and

@@ -299,11 +299,16 @@ complete one.
 ## Agents
 
 An agent runs a model job. A config's `agent` names one for every role, or one per role as `{ review, match, fix }`
-(a repair runs as `fix`); each agent's settings are the config block named for it. `'claude'`, the default and so far
-the only one, runs `claude -p` with the `claude` block's models, effort, tools and cache lifetime, and reads its
-reply and usage from the job's `claude.json`. A name no agent answers to fails the run's plan before anything is
-spent. The interface every agent answers is documented in `src/agent/index.mjs`; `src/agent/claude.mjs` is the
-complete one.
+(a repair runs as `fix`); each agent's settings are the config block named for it. A name no agent answers to, or a
+role an agent cannot run, fails the run's plan before anything is spent. The interface every agent answers is
+documented in `src/agent/index.mjs`.
+
+| `agent` | Runs |
+|---|---|
+| `'claude'` (default) | `claude -p` with the `claude` block's models, effort, tools and cache lifetime, each job stopped at its role's `budget` in dollars; reply and usage come from the job's `claude.json`. |
+| `'codex'` | Reviewers only, so far: `codex exec --json` in the `workspace-write` sandbox (a job's tree is thrown away, and only `.skulkr/out` comes home), without the node's `config.toml` unless `codex.ignoreUserConfig` is false, on `codex.models.review`. Codex reports tokens but no cost and takes no budget, so a job is priced from `codex.prices[model]` (`{ input, cachedInput, output }`, dollars per million tokens, which the config must give) and bounded only by `codex.timeoutMin`. Its reviewers get `briefs/codex/reviewer.md`, which reads files with shell commands and takes `AGENTS.md` as already loaded, unless `codex.briefs.reviewer` names another. Every node it runs on needs the Codex CLI logged in. |
+
+Running one reviewer of each pair on each agent, `agent: { review: … }` aside, is not built yet.
 
 ## The service
 

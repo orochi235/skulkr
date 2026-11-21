@@ -7,13 +7,17 @@
  *   (`review`, `match` or `fix`) within `budgetUsd`, writes `resultFile`, and writes its exit status to `exit`;
  *   `progress`, when given, is the progress filter's arguments, and the line streams through `progress.at`;
  * - `progress`: `{ source(), at }`, the filter's local path and where a job's tree holds it;
- * - `resultOf(raw)`: `{ reply, record, error }` from `resultFile`'s text, `record` the job's usage record (tokens,
- *   `weightedTokens`, `costUsd`, `turns`, `terminalReason`, `budgetHit`, …) and `error` a reply that did no work;
- * - `timeoutMin(cfg)` and `reviewExpect(cfg)`: how long a job may run, and a reviewer's expected duration.
+ * - `resultOf(raw, { cfg, role })`: `{ reply, record, error }` from `resultFile`'s text, `record` the job's usage
+ *   record (tokens, `weightedTokens`, `costUsd`, `turns`, `terminalReason`, `budgetHit`, …) and `error` a reply that
+ *   did no work;
+ * - `timeoutMin(cfg)` and `reviewExpect(cfg)`: how long a job may run, and a reviewer's expected duration;
+ * - optionally `problemFor(cfg, role)`, why the config cannot run `role` on it ('' when it can), and
+ *   `briefPath(cfg, brief)`, its own brief for `reviewer`, `matcher`, `fixer` or `repair` in place of the config's.
  */
 import { claude } from './claude.mjs';
+import { codex } from './codex.mjs';
 
-const AGENTS = { claude };
+const AGENTS = { claude, codex };
 export const ROLES = ['review', 'match', 'fix'];
 
 /** The agent role a job's role runs as: both reviewers review, and a repair fixes. */
@@ -28,5 +32,15 @@ export const agentFor = (cfg, role) => {
   return agent;
 };
 
-/** Every role's agent, so a config naming an unknown one fails before a run spends anything. */
-export const requireAgents = (cfg) => ROLES.map((role) => agentFor(cfg, role));
+/** Every role's agent, so a config naming an unknown one, or one it cannot run, fails before a run spends anything. */
+export const requireAgents = (cfg) => ROLES.map((role) => {
+  const agent = agentFor(cfg, role);
+  const problem = agent.problemFor?.(cfg, role);
+  if (problem) throw new Error(`${problem} (config \`agent\`)`);
+  return agent;
+});
+
+const BRIEF_ROLE = { reviewer: 'review', matcher: 'match', fixer: 'fix', repair: 'fix' };
+
+/** The brief template's path for `brief` (`reviewer`, `matcher`, `fixer`, `repair`): its agent's own, else the config's. */
+export const briefPathFor = (cfg, brief) => agentFor(cfg, BRIEF_ROLE[brief]).briefPath?.(cfg, brief) ?? cfg.briefPath(brief);
