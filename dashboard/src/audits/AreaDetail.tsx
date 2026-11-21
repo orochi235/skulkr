@@ -9,29 +9,42 @@ import s from './AreaDetail.module.css';
 
 const GRADE: Readonly<Record<AreaStatus, Grade | undefined>> = { unaudited: undefined, due: 'info', settled: 'success', tonight: 'danger' };
 
+const SHARE_TITLE = "the part of that pass's files this area holds; est. and left are scaled by it";
+const CORRECTED_TITLE = 'corrected by how much later passes found';
+
+/** Every pass over the area, each figure in its own column so the decimal points line up: the share and the corrected
+ *  figures each get one where any pass has them. */
 function Passes({ area }: { area: AuditArea }) {
   if (area.passes.length === 0) return <p className={s.hint}>No round has read it yet.</p>;
+  const shared = area.passes.some((p) => p.share !== undefined);
+  const corrected = area.passes.some((p) => p.leftCorrected !== undefined);
+  const fix = (p: AuditPass, value: number) => (p.leftCorrected === undefined ? '' : correctedText(value));
   return (
     <table className={s.table}>
       <thead>
-        <tr><th>round</th><th className={s.vennCell}><Venn a="A" both={<span className={s.cap} role="img" aria-label="found by both">∩</span>} b="B" /></th><th>found</th><th>est.</th><th>left</th></tr>
+        <tr>
+          <th>round</th>
+          {shared && <th className={s.side}><abbr className={s.muted} title={SHARE_TITLE}>share</abbr></th>}
+          <th className={s.vennCell}><Venn a="A" both={<span className={s.cap} role="img" aria-label="found by both">∩</span>} b="B" /></th>
+          <th>found</th>
+          <th>est.</th>{corrected && <th className={s.side}><abbr className={s.muted} title={CORRECTED_TITLE}>≈</abbr></th>}
+          <th>left</th>{corrected && <th className={s.side}><abbr className={s.muted} title={CORRECTED_TITLE}>≈</abbr></th>}
+        </tr>
       </thead>
       <tbody>
         {area.passes.map((p, i) => (
           <tr key={`${p.round}-${i}`}>
-            <td>{p.round}{p.share !== undefined && <abbr className={s.share} title="the part of that pass's files this area holds; est. and left are scaled by it"> {Math.round(p.share * 100)}%</abbr>}</td><td className={s.vennCell}><Venn a={p.a - p.shared} both={p.shared} b={p.b - p.shared} /></td><td>{p.distinct}</td>
-            <td>{p.est.toFixed(1)}<Corrected pass={p} value={correctedEstOf(p)} /></td><td>{p.left.toFixed(1)}<Corrected pass={p} value={correctedLeftOf(p)} /></td>
+            <td>{p.round}</td>
+            {shared && <td className={`${s.side} ${s.muted}`}>{p.share === undefined ? '' : `${Math.round(p.share * 100)}%`}</td>}
+            <td className={s.vennCell}><Venn a={p.a - p.shared} both={p.shared} b={p.b - p.shared} /></td>
+            <td>{p.distinct}</td>
+            <td>{p.est.toFixed(1)}</td>{corrected && <td className={`${s.side} ${s.muted}`}>{fix(p, correctedEstOf(p))}</td>}
+            <td>{p.left.toFixed(1)}</td>{corrected && <td className={`${s.side} ${s.muted}`}>{fix(p, correctedLeftOf(p))}</td>}
           </tr>
         ))}
       </tbody>
     </table>
   );
-}
-
-/** A calibrated figure after its raw one, where the map gives the pass one. */
-function Corrected({ pass, value }: { pass: AuditPass; value: number }) {
-  if (pass.leftCorrected === undefined) return null;
-  return <span className={s.corrected} title="corrected by how much later passes found"> {correctedText(value)}</span>;
 }
 
 /** The findings no fixer has acted on, each with the round that reported it. */

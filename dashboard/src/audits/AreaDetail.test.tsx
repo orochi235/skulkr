@@ -12,16 +12,24 @@ const show = (a: AuditArea) => renderWithIcons(<WeaselProvider><AreaDetail area=
 afterEach(cleanup);
 
 describe('AreaDetail', () => {
-  it('gives the corrected left and estimate beside the raw ones', () => {
+  it('gives the corrected left and estimate each in its own column beside the raw ones', () => {
     show(area({ leftCorrected: 8.5 }));
     expect(screen.getByText(/^1\.7 \(≈9 corrected\)$/)).toBeTruthy();
     const cells = [...document.querySelectorAll('tbody td')].map((td) => td.textContent);
-    expect(cells.slice(-2)).toEqual(['6.7 ≈14', '1.7 ≈9']);
+    expect(cells.slice(-4)).toEqual(['6.7', '≈14', '1.7', '≈9']);
   });
 
   it('shows the raw figures alone where the map has no calibration', () => {
     show(area());
+    expect([...document.querySelectorAll('thead th')]).toHaveLength(5);
     expect([...document.querySelectorAll('tbody td')].map((td) => td.textContent).slice(-2)).toEqual(['6.7', '1.7']);
+  });
+
+  it("gives a pass's share its own column, blank for a pass that holds all its files", () => {
+    const a = area();
+    show({ ...a, passes: [a.passes[0]!, { ...pass, round: 41, share: 0.5 }] });
+    const rows = [...document.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].slice(0, 2).map((td) => td.textContent));
+    expect(rows).toEqual([['40', ''], ['41', '50%']]);
   });
 });
 
