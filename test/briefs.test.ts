@@ -7,7 +7,7 @@ const FILLED: Record<string, string[]> = {
   reviewer: ['round', 'area', 'commit', 'out', 'files'],
   matcher: [],
   fixer: ['round', 'area', 'commit', 'source'],
-  repair: ['round', 'area', 'attempt', 'command', 'failures', 'log'],
+  repair: ['round', 'area', 'attempt', 'command', 'failures', 'baseline', 'log'],
 };
 const PROJECT = ['project', 'rules', 'test', 'typecheck', 'lint'];
 const used = (path: string) => [...readFileSync(path, 'utf8').matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]);

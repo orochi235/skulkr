@@ -10,6 +10,8 @@ The check was `{{command}}`, over the files the commits change. Its failing outp
 {{failures}}
 ```
 
+{{baseline}}
+
 ## Where you work
 
 - You are in a copy of the {{project}} repository: the frozen tree with the area's commits applied on top, and its

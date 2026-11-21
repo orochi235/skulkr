@@ -111,9 +111,11 @@ export const failureExcerpt = (log) => {
 
 /** One verdict's few words for the log: `passed (12 test files)` or `failed: 1 of 12 test files failed (a.test.ts)`. */
 export const verdictText = (v) => {
-  if (v.ok) return `passed${v.counts ? ` (${v.counts.total} test files)` : ''}`;
-  const files = v.failedFiles?.length ? ` (${v.failedFiles.slice(0, 3).join(', ')}${v.failedFiles.length > 3 ? ', …' : ''})` : '';
-  return `failed: ${v.why}${files}`;
+  const some = (list) => `${list.slice(0, 3).join(', ')}${list.length > 3 ? ', …' : ''}`;
+  const baseline = v.baseline?.length ? `; ${v.baseline.length} failing on the frozen tree too, set aside (${some(v.baseline)})` : '';
+  if (v.ok) return `passed${v.counts ? ` (${v.counts.total} test files)` : ''}${baseline}`;
+  const files = v.failedFiles?.length ? ` (${some(v.failedFiles)})` : '';
+  return `failed: ${v.why}${files}${baseline}`;
 };
 
 /**

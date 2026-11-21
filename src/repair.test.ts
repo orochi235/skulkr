@@ -21,6 +21,9 @@ const write = (dir: string, files: Record<string, string>) => {
 const mbox = (n: number) => Array.from({ length: n }, (_, i) => `From ${String(i).repeat(40).slice(0, 40)} Mon Sep 17 00:00:00 2001\n`).join('');
 const FAILING = { 'verify.exit': '1', 'verify.log': ' FAIL  a/store.pbt.test.ts > keeps order\n Test Files  1 failed | 2 passed (3)', 'verify.files': 'a/store.ts' };
 const PASSING = { 'verify.exit': '0', 'verify.log': ' Test Files  3 passed (3)', 'verify.files': 'a/store.ts' };
+/** The frozen tree's answer for a file that passes there, and for one that fails there too. */
+const CLEAN = { 'verify.exit': '0', 'verify.log': ' Test Files  1 passed (1)' };
+const BROKEN = { 'verify.exit': '1', 'verify.log': ' FAIL  a/store.pbt.test.ts > keeps order\n Test Files  1 failed (1)' };
 const reply = JSON.stringify({ type: 'result', is_error: false, result: 'fixed abc (order)', total_cost_usd: 1 });
 
 type Job = { task: string; to: string; gui?: boolean; env?: Record<string, string>; kind: string };
@@ -49,7 +52,7 @@ const harness = (verify: object, queued: Record<string, Record<string, string>[]
 
 describe('verifyAndRepair', () => {
   it("repairs a failing fix and keeps the repair's mbox once its own verify passes", async () => {
-    const h = harness({ command: 'run {files}' }, { repair: [{ ...PASSING, 'fix.mbox': mbox(3) }] });
+    const h = harness({ command: 'run {files}' }, { verify: [CLEAN], repair: [{ ...PASSING, 'fix.mbox': mbox(3) }] });
     write(h.fixDir, { ...FAILING, 'fix.mbox': mbox(2) });
     const got = await verifyAndRepair(h.ctx, h.area, { mbox: join(h.fixDir, 'fix.mbox') }, h.fixDir);
     expect(got).toMatchObject({ ok: true, repairs: [{ node: 'studio', added: 1, ok: true }], verify: { ok: true, testFiles: { total: 3 } } });
@@ -61,25 +64,27 @@ describe('verifyAndRepair', () => {
   });
 
   it('stops after two repairs and leaves the area out', async () => {
-    const h = harness({ command: 'run {files}' }, { repair: [{ ...FAILING, 'fix.mbox': mbox(2) }, { ...FAILING, 'fix.mbox': mbox(2) }] });
+    const h = harness({ command: 'run {files}' }, { verify: [CLEAN], repair: [{ ...FAILING, 'fix.mbox': mbox(2) }, { ...FAILING, 'fix.mbox': mbox(2) }] });
     write(h.fixDir, { ...FAILING, 'fix.mbox': mbox(2) });
     const got = await verifyAndRepair(h.ctx, h.area, { mbox: join(h.fixDir, 'fix.mbox') }, h.fixDir);
     expect(got.ok).toBe(false);
     expect(got.repairs).toHaveLength(2);
     expect(got.verify).toMatchObject({ ok: false, failedFiles: ['a/store.pbt.test.ts'] });
     expect(h.said.at(-1)).toBe('verify a: still failing after 2 repairs; left out of the batch');
+    // The file was checked on the frozen tree once, for the fixer's verdict; both repairs' verdicts reuse the answer.
+    expect(h.jobs.filter((j) => j.task === 'audit7-a-verify')).toHaveLength(1);
   });
 
   it('runs the GUI part on a GUI node where the probe lists a browser test, and repairs what fails there', async () => {
     const verify = { command: 'run {files}', gui: { probe: 'list {related}', command: 'run-gui {files}' } };
     const h = harness(verify, {
-      verify: [FAILING, PASSING],
+      verify: [FAILING, CLEAN, PASSING],
       repair: [{ ...PASSING, 'fix.mbox': mbox(2), 'gui.exit': '0', 'gui.txt': '[browser] a/Bar.browser.test.tsx' }],
     });
     write(h.fixDir, { ...PASSING, 'fix.mbox': mbox(1), 'gui.exit': '0', 'gui.txt': '[browser] a/Bar.browser.test.tsx' });
     const got = await verifyAndRepair(h.ctx, h.area, { mbox: join(h.fixDir, 'fix.mbox') }, h.fixDir);
     expect(h.jobs.map((j) => [j.task, j.kind, Boolean(j.gui)])).toEqual([
-      ['audit7-a-verify', 'test', true], ['audit7-a-repair', 'fix', false], ['audit7-a-verify', 'test', true],
+      ['audit7-a-verify', 'test', true], ['audit7-a-verify', 'test', true], ['audit7-a-repair', 'fix', false], ['audit7-a-verify', 'test', true],
     ]);
     expect(got).toMatchObject({ ok: true, verify: { ok: true, gui: true } });
   });
@@ -90,5 +95,47 @@ describe('verifyAndRepair', () => {
     const got = await verifyAndRepair(h.ctx, h.area, { mbox: join(h.fixDir, 'fix.mbox') }, h.fixDir);
     expect(h.jobs.map((j) => j.task)).toEqual(['audit7-a-verify']);
     expect(got).toMatchObject({ ok: false, repairs: [], verify: { ok: false, timedOut: true } });
+  });
+
+  it('passes an area whose only failing file fails on the frozen tree too, and checks that file once a round', async () => {
+    const h = harness({ command: 'run {files}' }, { verify: [BROKEN] });
+    write(h.fixDir, { ...FAILING, 'fix.mbox': mbox(2) });
+    const got = await verifyAndRepair(h.ctx, h.area, { mbox: join(h.fixDir, 'fix.mbox') }, h.fixDir);
+    expect(got).toMatchObject({ ok: true, repairs: [], verify: { ok: true, baseline: ['a/store.pbt.test.ts'] } });
+    expect(h.jobs.map((j) => [j.task, j.env?.VERIFY_EXTRA])).toEqual([['audit7-a-verify', 'a/store.pbt.test.ts']]);
+    expect(h.said).toEqual(['verify a: passed (3 test files); 1 failing on the frozen tree too, set aside (a/store.pbt.test.ts)']);
+    const other = join(h.ctx.nightDir, 'jobs', 'b', 'fix');
+    write(other, { ...FAILING, 'fix.mbox': mbox(1) });
+    const again = await verifyAndRepair(h.ctx, { id: 'b' }, { mbox: join(other, 'fix.mbox') }, other);
+    expect(again.ok).toBe(true);
+    expect(h.jobs).toHaveLength(1);
+  });
+
+  it("repairs only an area's own failures, and tells the repair which failing files are the tree's", async () => {
+    const two = {
+      'verify.exit': '1',
+      'verify.log': ' FAIL  a/store.pbt.test.ts > keeps order\n FAIL  a/own.test.ts > adds\n Test Files  2 failed | 1 passed (3)',
+      'verify.files': 'a/store.ts',
+    };
+    const h = harness({ command: 'run {files}' }, {
+      verify: [{ 'verify.exit': '1', 'verify.log': ' FAIL  a/store.pbt.test.ts > keeps order\n Test Files  1 failed | 1 passed (2)' }],
+      repair: [{ ...two, 'fix.mbox': mbox(3) }, { ...two, 'fix.mbox': mbox(3) }],
+    });
+    write(h.fixDir, { ...two, 'fix.mbox': mbox(2) });
+    const got = await verifyAndRepair(h.ctx, h.area, { mbox: join(h.fixDir, 'fix.mbox') }, h.fixDir);
+    expect(got.verify).toMatchObject({ ok: false, failedFiles: ['a/own.test.ts'], baseline: ['a/store.pbt.test.ts'] });
+    const brief = readFileSync(join(h.ctx.frozen, '.skulkr/in/a/repair.md'), 'utf8');
+    expect(brief).toContain("leave them: `a/store.pbt.test.ts`.");
+  });
+
+  it('keeps a failure the area owns when the frozen-tree run gives no file-level answer', async () => {
+    const h = harness({ command: 'run {files}' }, {
+      verify: [{ 'verify.exit': '1', 'verify.log': 'Error: no install' }],
+      repair: [{ ...PASSING, 'fix.mbox': mbox(3) }],
+    });
+    write(h.fixDir, { ...FAILING, 'fix.mbox': mbox(2) });
+    const got = await verifyAndRepair(h.ctx, h.area, { mbox: join(h.fixDir, 'fix.mbox') }, h.fixDir);
+    expect(got.repairs).toHaveLength(1);
+    expect(got.verify.baseline).toBeUndefined();
   });
 });

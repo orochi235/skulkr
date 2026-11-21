@@ -127,6 +127,19 @@ export const verifyShell = (cfg, area, { gui = false } = {}) => {
   ].join('\n');
 };
 
+/**
+ * The verify step on the frozen tree alone, no area's commits applied, over `$VERIFY_EXTRA`: which of the test files
+ * an area's verify failed on fail without its commits too. Its GUI part with `gui`.
+ */
+export const baselineShell = (cfg, { gui = false } = {}) => {
+  const verify = verifyOf(cfg);
+  return [
+    'set -e', ...prelude(cfg), fresh, ...treeLines(cfg), 'set +e',
+    ...verifyLines(verify, gui ? { command: verify.gui.command, probe: null } : { probe: null }),
+    'exit 0',
+  ].join('\n');
+};
+
 /** A job's runner timeout in minutes: its model's, plus the verify step's where the job runs one. */
 export const timeoutOf = (cfg, { model = true, verify = Boolean(verifyOf(cfg)) } = {}) =>
   (model ? cfg.claude.timeoutMin : 0) + (verify ? (verifyOf(cfg).timeoutMin ?? 20) + 5 : 0) + 10;
