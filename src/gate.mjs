@@ -4,10 +4,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { resolveConfig } from './config.mjs';
 import { stripAnsi } from './ansi.mjs';
-
-const NAMES = resolveConfig().names;
 
 /** The gate's parallel runs in the order the dashboard draws them, each with its label: `[{ id, label }]`. */
 export const gateRunsOf = (gate) => Object.keys(gate.progress ?? {}).map((id) => ({ id, label: gate.labels?.[id] ?? id }));
@@ -149,7 +146,7 @@ const gateJobsOf = (round, jobs, gate, names) => {
 };
 
 /** The nodes running each of a round's gate runs now, `{ <run>: nodes joined | null }`. */
-export const gateNodesOf = (round, jobs, gate, names = NAMES) => {
+export const gateNodesOf = (round, jobs, gate, names) => {
   const names_ = (js) => [...new Set(js.map((j) => j.node).filter(Boolean))].join(' + ') || null;
   return Object.fromEntries(Object.entries(gateJobsOf(round, jobs, gate, names)).map(([r, js]) => [r, names_(js)]));
 };
@@ -158,7 +155,7 @@ export const gateNodesOf = (round, jobs, gate, names = NAMES) => {
  * A finished round's batch run again: each gate run's jobs running now, `{ <run>: { done, total } }` summing their
  * progress, null before any reports, or undefined where none runs; null when no job of the round's batch runs.
  */
-export const rerunOf = (round, jobs, gate, names = NAMES) => {
+export const rerunOf = (round, jobs, gate, names) => {
   const by = gateJobsOf(round, jobs, gate, names);
   if (!Object.values(by).some((js) => js.length)) return null;
   const sum = (js) => {
