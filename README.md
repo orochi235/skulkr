@@ -307,7 +307,9 @@ requests, one JSON object a line on stdin, each echoing its `id`:
 Every request but a bare `ping` may carry `tenant`, the project it is about, and every reply to one names its
 `tenant`. Without one it means the only tenant, and is refused when there are several.
 
-Starting or restarting the service never starts a run. Anything that keeps a process alive and owns its stdin can
+Starting or restarting the service never starts a run, nor stops one: each run is a process group of its own and
+keeps going when the service that started it exits, and a restarted service finds it on disk and reads its latest line
+from its night log. Anything that keeps a process alive and owns its stdin can
 host it (launchd, systemd, tmux); under onto, on the machine holding the project's checkout:
 
     onto sync --in skulkr-myproject orochi                     # from ~/src/skulkr

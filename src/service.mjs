@@ -5,6 +5,8 @@
  * request does.
  */
 import { execFile, execFileSync, spawn } from 'node:child_process';
+import { closeSync, fstatSync, openSync, readSync } from 'node:fs';
+import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { after } from './after.mjs';
@@ -33,6 +35,22 @@ const commitIn = (dir) => {
   }
 };
 
+/** The last line of the file at `path`, read from its tail, or undefined. */
+export const lastLineOf = (path) => {
+  let fd;
+  try {
+    fd = openSync(path, 'r');
+    const size = fstatSync(fd).size;
+    const buf = Buffer.alloc(Math.min(size, 4096));
+    readSync(fd, buf, 0, buf.length, size - buf.length);
+    return buf.toString('utf8').split('\n').filter(Boolean).at(-1);
+  } catch {
+    return undefined;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+};
+
 /** One tenant as the host drives it: `cfg`'s project, each run `skulkr night` from its main checkout. */
 export const createTenant = (name, cfg, { readOnly = false } = {}) => {
   const root = mainCheckout(cfg);
@@ -56,7 +74,8 @@ export const createTenant = (name, cfg, { readOnly = false } = {}) => {
   const start = (args, { continuous = false } = {}) => {
     const at = new Date();
     startedHere = at;
-    const child = spawn(process.execPath, [BIN, 'night', ...base, ...args], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    // A process group of its own, so a restarting service (every `onto sync`) never takes its runs down with it.
+    const child = spawn(process.execPath, [BIN, 'night', ...base, ...args], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     const entry = { lastLine: '' };
     children.set(child.pid, entry);
     say(`run started: skulkr night ${args.join(' ')} (pid ${child.pid})`);
@@ -102,7 +121,10 @@ export const createTenant = (name, cfg, { readOnly = false } = {}) => {
       build: commitIn(root),
       live: () => liveRuns(state).map((r) => r.round),
       status: () => {
-        const runs = liveRuns(state).map((r) => (children.has(r.pid) ? { ...r, lastLine: children.get(r.pid).lastLine } : r));
+        const runs = liveRuns(state).map((r) => {
+          const lastLine = children.get(r.pid)?.lastLine || (r.nightDir ? lastLineOf(join(r.nightDir, 'night.log')) : undefined);
+          return lastLine ? { ...r, lastLine } : r;
+        });
         return { running: runs.length > 0, runs, last: lastFinished(state) ?? null };
       },
       plan: () =>

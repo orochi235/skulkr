@@ -5,3 +5,11 @@
 export const exitAfterFlush = (code) => {
   process.stdout.write('', () => process.exit(code));
 };
+
+/**
+ * Keeps a write to a closed stdout or stderr from killing this process. A night outlives the service that started it
+ * and read its output, and its night log holds every line anyway.
+ */
+export const tolerateClosedOutput = () => {
+  for (const stream of [process.stdout, process.stderr]) stream.on('error', () => {});
+};
