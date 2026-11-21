@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STEP_COLUMN_COUNT, stepColumnCountFor, CLOCK_AHEAD_MINUTES, TYPICAL_MINUTES, isFinished, laneStepsOf, laneViewOf, passDone, phaseColor, phaseOf, phasesOf, runClockOf, withLivePasses } from './phases';
+import { STEP_COLUMN_COUNT, CLOCK_AHEAD_MINUTES, TYPICAL_MINUTES, isFinished, laneStepsOf, laneViewOf, passDone, phaseColor, phaseOf, phasesOf, runClockOf, withLivePasses } from './phases';
 import fixture from './fixture.map.json';
 import type { AuditLane, AuditRun, LaneStep, LaneStepName, SkulkrMap } from './skulkrMap.types';
 
@@ -124,8 +124,8 @@ describe('runClockOf', () => {
 describe('laneStepsOf', () => {
   it('gives every step one equal column, filled by its state, a running one by its share of the typical time', () => {
     const spans = laneStepsOf(lane({ A: done({ findings: 5, minutes: 3 }), B: running(at(27.5)), match: W }), NOW);
-    expect(spans.map((s) => [s.id, s.ms, s.fill])).toEqual([['A', 1, 1], ['B', 1, 0.5], ['match', 1, 0], ['fix', 1, 0], ['checks', 0.25, 0], ['repair', 0.5, 0], ['patch', 0.6, 0]]);
-    expect(spans.filter((s) => s.id !== 'checks').map((s) => s.color)).toEqual(['review', 'reviewed', 'match', 'fix', 'fix', 'patch'].map((p) => phaseColor(p as never)));
+    expect(spans.map((s) => [s.id, s.ms, s.fill])).toEqual([['A', 1, 1], ['B', 1, 0.5], ['match', 1, 0], ['fix', 1, 0], ['checks', 0.5, 0], ['patch', 0.6, 0]]);
+    expect(spans.filter((s) => s.id !== 'checks').map((s) => s.color)).toEqual(['review', 'reviewed', 'match', 'fix', 'patch'].map((p) => phaseColor(p as never)));
     expect(spans[1]!.label).toBe('studio · 2.5 min');
     expect(spans[2]!.label).toBe('');
   });
@@ -133,13 +133,9 @@ describe('laneStepsOf', () => {
   it('runs A and B in one column, A over B, and every later step a column after, across both', () => {
     const spans = laneStepsOf(lane({}), NOW);
     expect(spans.map((s) => [s.id, s.start, s.track ?? 0, s.trackSpan ?? 1])).toEqual([
-      ['A', 0, 0, 1], ['B', 0, 1, 1], ['match', 1, 0, 2], ['fix', 2, 0, 2], ['checks', 3, 0, 2], ['repair', 3.25, 0, 2], ['patch', 3.75, 0, 2],
+      ['A', 0, 0, 1], ['B', 0, 1, 1], ['match', 1, 0, 2], ['fix', 2, 0, 2], ['checks', 3, 0, 2], ['patch', 3.5, 0, 2],
     ]);
-    expect(STEP_COLUMN_COUNT).toBe(4.35);
-    expect(stepColumnCountFor(false)).toBeCloseTo(3.85);
-    const closed = laneStepsOf(lane({}), NOW, false);
-    expect(closed.map((s) => s.id)).not.toContain('repair');
-    expect(closed.find((s) => s.id === 'patch')?.start).toBe(3.25);
+    expect(STEP_COLUMN_COUNT).toBeCloseTo(4.1);
   });
 
   it('stops a running step short of full until it finishes', () => {
@@ -162,6 +158,12 @@ describe('laneStepsOf', () => {
 
 describe('the repair step', () => {
   const fixed = { A: done({ findings: 2 }), B: done({ findings: 1 }), match: matched(2, 1, 1), fix: done({ commits: 2, minutes: 12 }) };
+
+  it('takes over the checks column once a verify or repair job of its own runs, leaving no column between', () => {
+    const withRepair = laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, repair: running(at(25)) } }, NOW);
+    expect(withRepair.map((s) => [s.id, s.start])).toEqual([['A', 0], ['B', 0], ['match', 1], ['fix', 2], ['repair', 3], ['patch', 3.5]]);
+    expect(laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, repair: { state: 'waiting' } } }, NOW).map((s) => s.id)).toContain('checks');
+  });
 
   it('says how many repairs ran and how its verify ended, in its own column', () => {
     const steps = (repair: LaneStep) => laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, repair } }, NOW).find((s) => s.id === 'repair')!;

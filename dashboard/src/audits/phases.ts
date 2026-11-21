@@ -274,13 +274,15 @@ const STEP_COLUMNS: readonly { step: LaneStepKey; part: Part; phase: AuditPhase;
   { step: 'B', part: 'review', phase: 'reviewed', start: 0, width: 1, track: 1 },
   { step: 'match', part: 'match', phase: 'match', start: 1, width: 1, trackSpan: 2 },
   { step: 'fix', part: 'fix', phase: 'fix', start: 2, width: 1, trackSpan: 2 },
-  { step: 'repair', part: 'repair', phase: 'fix', start: 3.25, width: 0.5, trackSpan: 2 },
+  // The fix's checking: its fixer's own checks, then a verify or repair job of the controller's, in one column.
+  { step: 'repair', part: 'repair', phase: 'fix', start: 3, width: 0.5, trackSpan: 2 },
   // Applying a patch takes no time to speak of; its column is wide enough for its tally.
-  { step: 'patch', part: 'patch', phase: 'patch', start: 3.75, width: 0.6, trackSpan: 2 },
+  { step: 'patch', part: 'patch', phase: 'patch', start: 3.5, width: 0.6, trackSpan: 2 },
 ];
 
-/** A narrow track after the fix's own, lit while its fixer runs its checks past its last commit. */
-const CHECKS_COLUMN = { start: 3, width: 0.25 } as const;
+/** The column after the fix's own: lit while its fixer runs its checks past its last commit, until a verify or
+ *  repair job of the controller's takes it over. */
+const CHECKS_COLUMN = { start: 3, width: 0.5 } as const;
 
 /** Whether a fixer has made every commit it set out to and is still running: its checks. */
 const checkingOf = (fix: LaneStep): boolean => fix.state === 'running' && !!fix.total && (fix.done ?? 0) >= fix.total;
@@ -299,18 +301,11 @@ function checksSpan(fix: LaneStep): SpanStripSpan {
 const fixWhileChecking = (span: SpanStripSpan, fix: LaneStep): SpanStripSpan =>
   (checkingOf(fix) ? { ...span, state: 'done', label: span.label.slice(span.label.indexOf(NODE_SEP) + NODE_SEP.length) } : span);
 
-const REPAIR_COLUMN = STEP_COLUMNS.find((c) => c.step === 'repair')!;
+/** How wide the steps view's window is, in columns. */
+export const STEP_COLUMN_COUNT = Math.max(...STEP_COLUMNS.map((c) => c.start + c.width));
 
-/** The steps view's columns for a run: a run none of whose lanes has a repair step closes the repair column up. */
-const stepColumnsFor = (repairs: boolean) => (repairs ? STEP_COLUMNS : STEP_COLUMNS.flatMap((c) =>
-  c.step === 'repair' ? [] : c.start > REPAIR_COLUMN.start ? [{ ...c, start: c.start - REPAIR_COLUMN.width }] : [c]));
-
-/** How wide the steps view's window is, in columns, for a run with or without a repair column. */
-export const stepColumnCountFor = (repairs: boolean): number => Math.max(...stepColumnsFor(repairs).map((c) => c.start + c.width));
-export const STEP_COLUMN_COUNT = stepColumnCountFor(true);
-
-/** Whether any of a run's lanes has a repair step, so its steps view needs the column. */
-export const repairsIn = (lanes: readonly AuditLane[]): boolean => lanes.some((l) => !!l.steps.repair);
+/** Whether the controller has taken over a lane's checking column with a verify or repair job of its own. */
+const repairing = (lane: AuditLane): boolean => !!lane.steps.repair && lane.steps.repair.state !== 'waiting';
 
 /** How full a running step is drawn at most, until it finishes. */
 const RUNNING_FILL_CAP = 0.9;
@@ -320,8 +315,8 @@ const RUNNING_FILL_CAP = 0.9;
  * own count where onto reports one (a fixer's commits of its findings), else as far as its minutes so far go into its
  * typical minutes, short of full until it finishes.
  */
-export function laneStepsOf(lane: AuditLane, now: number, repairs = true): SpanStripSpan[] {
-  return stepColumnsFor(repairs).map(({ step, part, phase, start, width, track, trackSpan }): SpanStripSpan => {
+export function laneStepsOf(lane: AuditLane, now: number): SpanStripSpan[] {
+  return STEP_COLUMNS.filter((c) => c.step !== 'repair' || repairing(lane)).map(({ step, part, phase, start, width, track, trackSpan }): SpanStripSpan => {
     const s = stepOf(lane, step);
     const since = s.state === 'running' ? ms(s.since) : null;
     const fill = s.state === 'done' || s.state === 'failed' ? 1
@@ -335,6 +330,6 @@ export function laneStepsOf(lane: AuditLane, now: number, repairs = true): SpanS
       label: step === 'patch' && s.state !== 'failed' ? tallyOf(lane) : s.state === 'waiting' ? '' : stepText(step, s, now),
       color: phaseColor(s.state === 'failed' ? 'conflict' : phase),
     };
-  }).flatMap((span) => (span.id === 'patch' && span.state !== 'failed' ? withUnfixed(span, lane) : span.id === 'fix' ? [fixWhileChecking(span, lane.steps.fix), checksSpan(lane.steps.fix)] : [span]))
+  }).flatMap((span) => (span.id === 'patch' && span.state !== 'failed' ? withUnfixed(span, lane) : span.id === 'fix' ? [fixWhileChecking(span, lane.steps.fix), ...(repairing(lane) ? [] : [checksSpan(lane.steps.fix)])] : [span]))
     .map((span) => withInk(span));
 }
