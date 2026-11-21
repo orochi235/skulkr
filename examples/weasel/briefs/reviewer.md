@@ -29,8 +29,8 @@ precision lost far from the origin, prototype-chain lookups on user-keyed tables
 delays bypassing `after`, docs/README examples that do not work against the code. Style nits, naming
 preferences and "could be cleaner" are not defects — leave them out.
 
-Earlier rounds fixed a lot; look for what is still there, especially in code changed in the last week
-(`git log --since=<a week ago> -- <paths>`).
+Earlier rounds fixed a lot; look for what is still there, especially in the files the list below marks
+`changed this week` (from `git log` over the last seven days; never run that search yourself).
 
 ## Output
 

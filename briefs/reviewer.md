@@ -29,7 +29,8 @@ teardown, a decision answered two different ways in two places, an option silent
 docs or README examples that do not work against the code. Style nits, naming preferences and "could be
 cleaner" are not defects — leave them out.
 
-Look hardest at code changed in the last week (`git log --since=<a week ago> -- <paths>`).
+Look hardest at code changed in the last week: the list below marks those files `changed this week`, from
+`git log` over the last seven days, so never run that search yourself.
 
 ## Output
 

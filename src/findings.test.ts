@@ -40,7 +40,7 @@ describe('parseFindings', () => {
   });
 
   it("reads a files-read path that kept the brief's line count", () => {
-    expect(parseFilesRead('## Files read\n- a.ts (120 lines)\n- `b.ts` (1 line)\n')).toEqual(['a.ts', 'b.ts']);
+    expect(parseFilesRead('## Files read\n- a.ts (120 lines)\n- `b.ts` (1 line, changed this week)\n- c.ts (changed this week)\n')).toEqual(['a.ts', 'b.ts', 'c.ts']);
   });
 
   it('answers nothing for an empty report', () => {

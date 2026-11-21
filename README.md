@@ -120,7 +120,7 @@ the config, unless the config's `root` or `--root` says otherwise. `skulkr confi
 
 **Briefs.** The shipped briefs in `briefs/` are generic and fill `{{project}}`, `{{rules}}`, `{{test}}`,
 `{{typecheck}}`, and `{{lint}}` from the config, beside their own variables (`{{round}}`, `{{area}}`,
-`{{commit}}`, `{{files}}` (each with its line count), `{{out}}` for a reviewer; `{{source}}` for a fixer; `{{attempt}}`, `{{command}}`,
+`{{commit}}`, `{{files}}` (each with its line count, marked `changed this week` where a commit of the last seven days changed it), `{{out}}` for a reviewer; `{{source}}` for a fixer; `{{attempt}}`, `{{command}}`,
 `{{failures}}`, and `{{log}}` for a repair). A project's own brief may use the
 same ones. The reviewer brief's closing `<!-- done: … -->` line, its `## Files read` section, and the fixer
 brief's `tally:` line are read back by the pipeline, so a replacement must keep them.

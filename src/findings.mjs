@@ -16,7 +16,7 @@ export const parseFindings = (text) => parseSections(text).filter((f) => f.claim
 export const parseFilesRead = (text) => {
   const m = /^## Files read:?[ \t]*\n([\s\S]*?)(?=^## |<!--|$(?![\s\S]))/im.exec(text);
   if (!m) return [];
-  return m[1].split('\n').map((line) => line.replace(/^[-*]\s*/, '').replace(/`/g, '').replace(/\s+\(\d+ lines?[^)]*\)\s*$/, '').trim()).filter(Boolean);
+  return m[1].split('\n').map((line) => line.replace(/^[-*]\s*/, '').replace(/`/g, '').replace(/\s+\((?:\d+ lines?|changed this week)[^)]*\)\s*$/, '').trim()).filter(Boolean);
 };
 
 const DONE = /<!--\s*done:/i;
