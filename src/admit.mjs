@@ -13,7 +13,7 @@ export const areasAtOnce = (cfg, args, role, jobsPerArea) => {
  * Starts each of `picked` with `start(area)`, at most `maxAreas()` at once, asked again before each area so a change to
  * `limits.json` reaches a run already going, each only while the run has no stop
  * request, is before `deadline`, and has the dollars for one more area; resolves when every started one has finished,
- * its summary pushed to `results`.
+ * its summary pushed to `results`. What a fixer outside any area (the sweep's) may still spend counts as spent.
  */
 export const startAreas = async ({ ctx, picked, args, status, deadline, results, maxAreas, start }) => {
   const inFlight = new Map();
@@ -21,7 +21,7 @@ export const startAreas = async ({ ctx, picked, args, status, deadline, results,
   for (const area of picked) {
     while (inFlight.size >= maxAreas()) await Promise.race(inFlight.keys());
     const running = [...inFlight.values()].map((id) => ctx.spentOn?.(id) ?? 0);
-    const affordable = mayStartArea({ used: status.costUsd, finished: results.map((r) => r.jobs.costUsd), running, cap: args.capUsd, guess: cfg.budget.areaGuessUsd });
+    const affordable = mayStartArea({ used: status.costUsd + (ctx.reservedUsd?.() ?? 0), finished: results.map((r) => r.jobs.costUsd), running, cap: args.capUsd, guess: cfg.budget.areaGuessUsd });
     const why = ctx.stopped() ? 'stop requested'
       : new Date() >= deadline ? `past ${cfg.schedule.stopAt}`
         : !affordable ? `the next area would cross the ${usd(args.capUsd)} cap (${usd(status.costUsd)} used)` : '';

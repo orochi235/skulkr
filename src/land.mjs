@@ -108,13 +108,13 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
 /**
  * Merges the branches into the batch, records the round there, runs the gate on its tip, and merges if green. A red
  * gate gets one capstone repair cycle where `repair` is given (`capstone.mjs`): its failures go to the branches that
- * caused them, the batch is rebuilt from the repaired ones, and the gate runs once more. Still red, it lands anyway
+ * caused them, each repair starting only while `mayRepair` allows (`repairCapstone`), the batch is rebuilt from the repaired ones, and the gate runs once more. Still red, it lands anyway
  * where `baseline(files)` says every failure left is a test file that fails on the frozen commit too: `main` has
  * those failures already, so landing leaves it no worse. A branch left out because it would not merge is recorded
  * (`leftOut.mjs`), and the next round's batch tries it again after its own branches. `onLanded({ tip, areas })` hears
  * that `main` fast-forwarded to `tip` with the round's `areas` in it.
  */
-export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, baseline, onLanded = /** @type {(landed: { tip: string, areas: string[] }) => void} */ (() => {}) }) => {
+export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, mayRepair = /** @type {(started: number) => string} */ (() => ''), baseline, onLanded = /** @type {(landed: { tip: string, areas: string[] }) => void} */ (() => {}) }) => {
   const idOf = cfg.names.idOf;
   const fixCommits = new Map(results.map((a) => [a.id, a.fixCommits]));
   const main = cfg.git.main;
@@ -172,21 +172,21 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
       batch = tested.batch ?? batch;
       if (!tested.report || cycle || !repair) break;
       setStep('repair');
-      cycle = await repairCapstone({ cfg, root, round, commit, batch, logPath: tested.log, repair, say });
+      cycle = await repairCapstone({ cfg, root, round, commit, batch, logPath: tested.log, repair, say, mayRepair });
       for (const id of cycle.repaired.map(idOf)) fixCommits.set(id, results.find((a) => a.id === id)?.fixCommits);
-      for (const branch of cycle.dropped) {
+      for (const branch of [...cycle.dropped, ...cycle.skipped]) {
         fixCommits.set(idOf(branch), []);
         const area = results.find((a) => a.id === idOf(branch));
         if (area) area.fixCommits = [];
-        outcomes[idOf(branch)] = `\`${branch}\`, left out: its capstone failures still failed after a repair`;
+        outcomes[idOf(branch)] = `\`${branch}\`, left out: ${cycle.skipped.includes(branch) ? 'its capstone repair never started, for the dollar cap or a stop request' : 'its capstone failures still failed after a repair'}`;
       }
-      const out = [...cycle.dropped, ...cycle.unrepairable];
+      const out = [...cycle.dropped, ...cycle.skipped, ...cycle.unrepairable];
       if (!cycle.repaired.length && !out.length) break;
       landing = landing.filter((b) => !out.includes(b));
       ({ batch, tip: recorded } = build());
       say(`capstone: rebuilt ${batch.name} with ${cycle.repaired.length} repaired and ${out.length} left out; testing again`);
     }
-    const retested = cycle && (cycle.repaired.length || cycle.dropped.length || cycle.unrepairable.length) ? !tested.report : undefined;
+    const retested = cycle && (cycle.repaired.length || cycle.dropped.length || cycle.skipped.length || cycle.unrepairable.length) ? !tested.report : undefined;
     let tried = earlier.size ? `; retried ${earlier.size} branches left out of earlier rounds, ${retried.merged} merged and ${retried.out} still left out` : '';
     if (cycle) tried += `; ${capstoneText(cycle, idOf, retested)}`;
     const over = tested.report && baseline ? await alreadyFailing(cfg, tested.log, baseline) : null;
@@ -202,7 +202,7 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
       // Another round may have landed and deleted a branch both took from the left-out record. A branch the capstone
       // dropped goes too, as a verify failure leaves no branch: kept, it would hold its area out of every later plan,
       // and an earlier round's one it blamed would be retried, and fail the gate, in every later round's batch.
-      for (const b of [...batch.merged, batch.name, ...(cycle?.dropped ?? []), ...(cycle?.unrepairable ?? [])]) tryDelete(git, b);
+      for (const b of [...batch.merged, batch.name, ...(cycle?.dropped ?? []), ...(cycle?.skipped ?? []), ...(cycle?.unrepairable ?? [])]) tryDelete(git, b);
     }
     return `${result}${tried}`;
   } finally {

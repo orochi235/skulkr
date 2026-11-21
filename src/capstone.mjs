@@ -11,6 +11,7 @@ import { failedWhereIn } from './gate.mjs';
 import { checkedIn, repairJob, summaryOf } from './repair.mjs';
 import { isTestPath, verdictText } from './verify.mjs';
 import { stripAnsi } from './ansi.mjs';
+import { usd } from './usage.mjs';
 
 /** How many lines of the log a failing file's excerpt keeps after each line naming it; a failed step, whose output
  *  is all there is to go on, keeps more. */
@@ -62,12 +63,24 @@ export const capstoneRepairer = (ctx, { root, results, mboxOf = () => undefined 
 };
 
 /**
- * One repair cycle for a red capstone whose log is at `logPath`, on the batch `batch` built from the frozen commit
- * `commit`. `repair(id, files, log)` repairs one of this round's area branches. Answers what was tried: `repaired`
- * and `dropped` branches, `unrepairable`, earlier rounds' branches failures were laid at, `byBranch`, the failing
- * files laid at each, and `unattributed`, the failures no branch reaches.
+ * Why a capstone repair may not start, or '': a stop is requested, or the night's `used` dollars plus `fix`, the
+ * fixer's ceiling, for it and each of the `started` repairs before it would pass `cap`.
  */
-export const repairCapstone = async ({ cfg, root, round, commit, batch, logPath, repair, say }) => {
+export const repairRefusal = ({ stopped, used, started, fix, cap }) => {
+  if (stopped) return 'stop requested';
+  if (used + (started + 1) * fix <= cap) return '';
+  return `a repair at its ${usd(fix)} ceiling would cross the ${usd(cap)} cap (${usd(used)} used${started ? `, ${started} repairs started` : ''})`;
+};
+
+/**
+ * One repair cycle for a red capstone whose log is at `logPath`, on the batch `batch` built from the frozen commit
+ * `commit`. `repair(id, files, log)` repairs one of this round's area branches, each started only while
+ * `mayRepair(started)` answers '' (else why not), `started` the repairs started before it. Answers what was tried:
+ * `repaired` and `dropped` branches, `skipped`, those whose repair never started, `unrepairable`, earlier rounds'
+ * branches failures were laid at, `byBranch`, the failing files laid at each, and `unattributed`, the failures no
+ * branch reaches.
+ */
+export const repairCapstone = async ({ cfg, root, round, commit, batch, logPath, repair, say, mayRepair = /** @type {(started: number) => string} */ (() => '') }) => {
   const text = readFileSync(logPath, 'utf8');
   const where = failedWhereIn(text, cfg.gate);
   const failing = where.filter(isTestPath);
@@ -94,11 +107,18 @@ export const repairCapstone = async ({ cfg, root, round, commit, batch, logPath,
   say(`capstone: ${where.length} failures; ${laid || 'none laid at a branch'}${unattributed.length + unblamed.length ? `; ${unattributed.length + unblamed.length} unattributed` : ''}`);
   // A branch an earlier round left out has its commits in that round's night, not this one's: none to repair here.
   const earlier = (branch) => cfg.names.branchOf(branch)?.round !== round;
+  let started = 0;
   const tried = await Promise.all([...byBranch].map(async ([branch, files]) => {
     if (earlier(branch)) {
       say(`repair ${branch} capstone: left out, not repairable this round`);
       return { branch, ok: false, earlier: true };
     }
+    const why = mayRepair(started);
+    if (why) {
+      say(`repair ${idOf(branch)} capstone: not started, ${why}`);
+      return { branch, ok: false, skipped: why };
+    }
+    started += 1;
     try {
       return { branch, ...(await repair(idOf(branch), files, excerptFor(text, files))) };
     } catch (error) {
@@ -108,7 +128,8 @@ export const repairCapstone = async ({ cfg, root, round, commit, batch, logPath,
   }));
   return {
     repaired: tried.filter((t) => t.ok).map((t) => t.branch),
-    dropped: tried.filter((t) => !t.ok && !t.earlier).map((t) => t.branch),
+    dropped: tried.filter((t) => !t.ok && !t.earlier && !t.skipped).map((t) => t.branch),
+    skipped: tried.filter((t) => t.skipped).map((t) => t.branch),
     unrepairable: tried.filter((t) => t.earlier).map((t) => t.branch),
     byBranch: Object.fromEntries([...byBranch].map(([b, files]) => [earlier(b) ? b : idOf(b), files])),
     unattributed: [...unattributed, ...unblamed],
@@ -122,6 +143,7 @@ export const capstoneText = (cycle, idOf, again) => {
     'capstone repair:',
     cycle.repaired.length ? ` repaired ${ids(cycle.repaired)};` : '',
     cycle.dropped.length ? ` left out ${ids(cycle.dropped)}, whose repair still failed;` : '',
+    cycle.skipped?.length ? ` left out ${ids(cycle.skipped)}, whose repair the dollar cap or a stop request kept from starting;` : '',
     cycle.unrepairable?.length ? ` left out ${cycle.unrepairable.join(', ')}, not repairable this round;` : '',
     cycle.unattributed.length ? ` unattributed: ${cycle.unattributed.slice(0, 5).join(', ')}${cycle.unattributed.length > 5 ? ', …' : ''};` : '',
     again === undefined ? ' nothing to retest' : ` the capstone ran again ${again ? 'green' : 'red'}`,
