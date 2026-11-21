@@ -1,10 +1,10 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir, uptime } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { PLACED, createSlots } from './jobs.mjs';
-import { leaseAt, pidAlive, takeLease, waitForLease } from './lease.mjs';
+import { heldAlive, leaseAt, pidAlive, takeLease, waitForLease } from './lease.mjs';
 import { mergeLock } from './runs.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';
 
@@ -64,6 +64,18 @@ describe('takeLease', () => {
     expect(leaseAt(path)).toMatchObject({ round: 2 });
     other();
   });
+  it('counts a lease alive while the process group it names lives on, though its pid is dead', async () => {
+    const child = spawn('sleep', ['30'], { detached: true, stdio: 'ignore' });
+    const record = { pid: deadPid(), group: child.pid, at: new Date().toISOString() };
+    try {
+      expect(heldAlive(record)).toBe(true);
+    } finally {
+      process.kill(-child.pid!, 'SIGKILL');
+    }
+    await new Promise((done) => child.on('close', done));
+    expect(heldAlive(record)).toBe(false);
+  });
+
   it('takes back a lease written before this machine booted, though its pid is alive again', () => {
     const path = join(state(), 'lease');
     const before = new Date(Date.now() - uptime() * 1000 - 3_600_000).toISOString();

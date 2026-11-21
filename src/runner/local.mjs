@@ -9,7 +9,7 @@ import { cpSync, existsSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { JOB_IN } from '../config.mjs';
 import { readJson, writeJson } from '../json.mjs';
-import { heldAlive, takeLease } from '../lease.mjs';
+import { amendLease, heldAlive, takeLease } from '../lease.mjs';
 
 /** How long a finished job's record is kept for `jobs()`. */
 const KEEP_JOBS_MS = 7 * 24 * 3_600_000;
@@ -22,12 +22,13 @@ export const durationMs = (d) => {
   return m ? Number(m[1]) * { s: 1_000, m: 60_000, h: 3_600_000 }[m[2]] : undefined;
 };
 
-/** Leases a tree of the pool, cloning it the first time. Answers `{ dir, release }`. */
+/** Leases a tree of the pool, cloning it the first time. Answers `{ dir, lease, release }`, `lease` the lease's path. */
 const leaseTree = (state, source) => {
   const pool = join(state, 'trees');
   for (let k = 1; ; k++) {
     const dir = join(pool, `t${k}`);
-    const release = takeLease(join(pool, `t${k}.lease`), {});
+    const lease = join(pool, `t${k}.lease`);
+    const release = takeLease(lease, {});
     if (!release) continue;
     try {
       if (!existsSync(join(dir, '.git'))) {
@@ -38,7 +39,7 @@ const leaseTree = (state, source) => {
       release();
       throw error;
     }
-    return { dir, release };
+    return { dir, lease, release };
   }
 };
 
@@ -61,13 +62,37 @@ const signalGroup = (pid, signal) => {
   } catch { /* already gone */ }
 };
 
+/** The process groups of the jobs running now, each killed when this process exits or is signaled to. */
+const running = new Set();
+let reaping = false;
+const reapOnExit = () => {
+  if (reaping) return;
+  reaping = true;
+  const reap = () => {
+    for (const pid of running) signalGroup(pid, 'SIGTERM');
+  };
+  process.on('exit', reap);
+  for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
+    process.once(signal, () => {
+      reap();
+      process.kill(process.pid, signal);
+    });
+  }
+};
+
 /**
- * Runs `bash -lc shell` in `cwd`, its output to `log`, killed with its children after `timeoutMs`: SIGTERM, then
- * SIGKILL `graceMs` later if it has not closed. Answers the exit status.
+ * Runs `bash -lc shell` in `cwd` as a process group of its own, its output to `log`, killed with its children after
+ * `timeoutMs`: SIGTERM, then SIGKILL `graceMs` later if it has not closed. `onSpawn(pid)` hears the group's id.
+ * Answers the exit status.
  */
-const runShell = (shell, { cwd, env, log, timeoutMs, graceMs = KILL_GRACE_MS }) =>
+const runShell = (shell, { cwd, env, log, timeoutMs, graceMs = KILL_GRACE_MS, onSpawn }) =>
   new Promise((done) => {
+    reapOnExit();
     const child = spawn('bash', ['-lc', shell], { cwd, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    if (child.pid) {
+      running.add(child.pid);
+      onSpawn?.(child.pid);
+    }
     child.stdout.pipe(log, { end: false });
     child.stderr.pipe(log, { end: false });
     let kill;
@@ -81,6 +106,7 @@ const runShell = (shell, { cwd, env, log, timeoutMs, graceMs = KILL_GRACE_MS }) 
       done(1);
     });
     child.on('close', (status) => {
+      running.delete(child.pid);
       clearTimeout(timer);
       clearTimeout(kill);
       done(status ?? 1);
@@ -100,8 +126,10 @@ const pruneJobs = (dir) => {
   });
 };
 
-/** The runner interface (documented in `onto.mjs`), with every job on this machine as node `local`. */
-/** `graceMs`: how long a timed-out job has between SIGTERM and SIGKILL. */
+/**
+ * The runner interface (documented in `onto.mjs`), with every job on this machine as node `local`. `graceMs`: how long
+ * a timed-out job has between SIGTERM and SIGKILL.
+ */
 export const createLocalRunner = (cfg, { graceMs } = {}) => {
   const jobsDir = join(cfg.state, 'local-jobs');
   const record = (file, job) => writeJson(join(jobsDir, file), job);
@@ -116,7 +144,13 @@ export const createLocalRunner = (cfg, { graceMs } = {}) => {
       try {
         tree = leaseTree(cfg.state, git(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']));
         syncTree(tree.dir, cwd, job.ref ?? git(cwd, ['rev-parse', 'HEAD']));
-        status = await runShell(job.shell, { cwd: tree.dir, env: job.env, log, timeoutMs: durationMs(job.timeout), graceMs });
+        // A job outliving this process (killed with SIGKILL) keeps its tree and its record alive by its group.
+        const onSpawn = (group) => {
+          amendLease(tree.lease, { group });
+          entry.group = group;
+          record(file, entry);
+        };
+        status = await runShell(job.shell, { cwd: tree.dir, env: job.env, log, timeoutMs: durationMs(job.timeout), graceMs, onSpawn });
         const out = join(tree.dir, job.out);
         if (existsSync(out)) cpSync(out, job.to, { recursive: true });
       } catch (error) {

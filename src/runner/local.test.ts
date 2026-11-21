@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -115,6 +115,36 @@ describe('the local runner', () => {
     await run(s, 'true');
     expect(existsSync(old)).toBe(false);
     expect(readdirSync(jobs)).toHaveLength(1);
+  });
+
+  it('kills its running jobs when the process running them is told to stop', async () => {
+    const s = setup();
+    const pidFile = join(s.dir, 'job.pid');
+    const script = `
+      import { createWriteStream } from 'node:fs';
+      import { resolveConfig } from ${JSON.stringify(new URL('../config.mjs', import.meta.url).pathname)};
+      import { createLocalRunner } from ${JSON.stringify(new URL('./local.mjs', import.meta.url).pathname)};
+      const runner = createLocalRunner(resolveConfig({ name: 't', state: ${JSON.stringify(join(s.dir, 'state'))} }));
+      const job = { kind: 'fix', task: 't', ref: ${JSON.stringify(s.base)}, timeout: '1m', out: '.skulkr/out', to: ${JSON.stringify(s.dir)},
+        shell: 'echo $$ > ${pidFile}; sleep 30' };
+      runner.run(job, { cwd: ${JSON.stringify(s.frozen)}, log: createWriteStream('/dev/null') });
+    `;
+    const night = spawn(process.execPath, ['--input-type=module', '-e', script], { stdio: 'ignore' });
+    for (let i = 0; i < 100 && !existsSync(pidFile); i++) await new Promise((done) => setTimeout(done, 50));
+    const job = Number(readFileSync(pidFile, 'utf8'));
+    const alive = () => {
+      try {
+        process.kill(-job, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    expect(alive()).toBe(true);
+    night.kill('SIGTERM');
+    await new Promise((done) => night.on('close', done));
+    for (let i = 0; i < 40 && alive(); i++) await new Promise((done) => setTimeout(done, 50));
+    expect(alive()).toBe(false);
   });
 
   it('reads runner durations', () => {
