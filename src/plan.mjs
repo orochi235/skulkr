@@ -103,7 +103,7 @@ export const begin = async (cfg, root, args, say) => {
     mkdirSync(nightDir, { recursive: true });
     const status = { round: p.round, commit: p.commit, started: started.toISOString(), step: 'freeze', areas: p.picked.map((a) => a.id), nightDir, weightedTokens: 0, costUsd: 0, capUsd: args.capUsd, args };
     writeStatus(p.round, status, cfg.state);
-    return { p, status, started };
+    return { p, status };
   } finally {
     release();
   }

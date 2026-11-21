@@ -39,9 +39,8 @@ export const resume = (cfg, root, args, say) => {
     commit, round, picked: ids.flatMap((id) => (byId.has(id) ? [byId.get(id)] : [])), passes: inheritPasses([...byId.values()], passesIn(cfg, git, root)).history,
     running: liveRuns(state), open: openFindingsIn(cfg, git, root),
   };
-  const started = new Date(prior.started);
   const status = { round, commit, started: prior.started, resumed: new Date().toISOString(), step: 'freeze', areas: ids, nightDir: prior.nightDir, weightedTokens: prior.weightedTokens ?? 0, costUsd: prior.costUsd ?? 0, capUsd: args.capUsd, args };
   writeStatus(round, status, state);
   say(`resuming round ${round} at ${commit.slice(0, 10)}: ${p.picked.length} areas, reusing every job whose result came home`);
-  return { p, status, started };
+  return { p, status };
 };

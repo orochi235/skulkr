@@ -30,6 +30,9 @@ const UNAVAILABLE_TTL_MS = 5 * 60_000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** When a run stops starting areas: the first `schedule.stopAt` after it started, or after it was resumed. */
+export const deadlineOf = (cfg, status) => nextClock(new Date(status.resumed ?? status.started), cfg.schedule.stopAt);
+
 const pruneNights = (cfg) => {
   const dir = join(cfg.state, 'nights');
   if (!existsSync(dir)) return;
@@ -170,7 +173,7 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     return { round: p.round, dry: true };
   }
   mkdirSync(cfg.state, { recursive: true });
-  const { p, status, started } = args.resume === undefined ? await begin(cfg, root, args, say) : resume(cfg, root, args, say);
+  const { p, status } = args.resume === undefined ? await begin(cfg, root, args, say) : resume(cfg, root, args, say);
   if (!status) return { round: p.round, dry: true };
   pruneNights(cfg);
   pruneRuns(cfg.keepNights, cfg.state);
@@ -199,7 +202,7 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     // The sweep is one job on one node; the reviews fill every other slot while it runs.
     const sweepFix = args.sweep ? startSweep(ctx, (s) => (sweep = s)) : Promise.resolve(undefined);
     setStep('review');
-    const deadline = nextClock(started, cfg.schedule.stopAt);
+    const deadline = deadlineOf(cfg, status);
     if (args.fixOnly) await fixOnlyAreas({ ctx, picked: p.picked, open: p.open, deadline, results });
     else await reviewAreas({ ctx, git, picked: p.picked, passes: p.passes, open: p.open, args, status, deadline, results });
     const sweepFixed = await sweepFix;
