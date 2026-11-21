@@ -107,6 +107,18 @@ describe('openFindings after a recut', () => {
     expect(openFindings([reported(56, [LEAK]), fixed], { areas }).size).toBe(0);
   });
 
+  it('decides which area held a finding in a round from that round\'s file lists, not the partition now', () => {
+    const again: [string, string] = ['`useTicker` keeps its interval after unmount, so remounts stack timers', 'src/ticker.ts:41'];
+    const old = reported(56, [LEAK], { area: { patches: 0, fixCommits: [], files: ['src/clamp.ts', 'src/ticker.ts'] } });
+    const fixed = {
+      ...reported(57, [again]), id: 'ticker', area: { patches: 0, fixCommits: [], files: ['src/ticker.ts', 'src/tick.ts'] },
+      fix: `- ${again[0]} (A): fixed 1a2b3c4d.\n\ntally: 1 of 1 fixed, 0 extra fixed`,
+    };
+    // A later recut split `ticker`; round 57's `ticker` still held src/ticker.ts, so its fix closes x's finding.
+    const split = [{ id: 'clamp', files: ['src/clamp.ts'] }, { id: 'ticker.a', files: ['src/ticker.ts'] }, { id: 'ticker.b', files: ['src/tick.ts'] }];
+    expect(openFindings([old, fixed], { areas: split }).size).toBe(0);
+  });
+
   it("closes the handed finding, not the new area's own of the same id, from a record carrying it by bare id", () => {
     const carried = [{ id: 'r56-2', claim: LEAK[0], where: LEAK[1], from: 'A', round: 56, rounds: [56] }];
     const fix = `- [r56-2] ${LEAK[0]} (carried): fixed 1a2b3c4d.\n\ntally: 1 of 1 fixed, 0 extra fixed`;

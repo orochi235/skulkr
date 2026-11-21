@@ -92,18 +92,30 @@ const sameDefect = (open, finding, cited) => {
  * acted on all of them; otherwise each finding is matched to its verdicts one by one (`actsOn`). Records keep the
  * area ids of their round; with `areas`, the partition now, each finding is listed under the area holding its cited
  * paths (`createHolderLookup`), so a recut hands it to the area that holds its code: that area's reviewers reporting it
- * again report the same defect, and its fixer answering it closes it.
+ * again report the same defect, and its fixer answering it closes it. Which area held a finding in an earlier round is
+ * decided by that round's file lists (`files`, or `area.files`), and by `areas` only for a record without one.
  */
 export const openFindings = (records, { cited, areas } = {}) => {
   const holder = areas && createHolderLookup(areas);
+  const filesOf = (rec) => rec.files ?? rec.area?.files;
+  const roundAreas = new Map();
+  for (const rec of records) {
+    if (!filesOf(rec)) continue;
+    if (!roundAreas.has(rec.round)) roundAreas.set(rec.round, []);
+    roundAreas.get(rec.round).push({ id: rec.id, files: filesOf(rec) });
+  }
+  const roundHolders = new Map([...roundAreas].map(([round, list]) => [round, createHolderLookup(list)]));
   const byArea = new Map();
   const all = [];
-  /** An area's findings: those it reported, then those reported elsewhere that its files now hold. */
-  const viewOf = (id) => [...byArea.get(id), ...all.filter((o) => o.area !== id && o.to === id)];
+  /** An area's findings in `rec`'s round: those it reported, then those reported elsewhere that its files held. */
+  const viewOf = (rec) => {
+    const held = filesOf(rec) ? roundHolders.get(rec.round) : (paths, o) => o.to;
+    return [...byArea.get(rec.id), ...all.filter((o) => o.area !== rec.id && held(o.paths, o) === rec.id)];
+  };
   for (const rec of [...records].sort((x, y) => x.round - y.round)) {
     const list = byArea.get(rec.id) ?? [];
     byArea.set(rec.id, list);
-    const view = viewOf(rec.id);
+    const view = viewOf(rec);
     const { fresh, carried } = givenIn(rec);
     const given = [];
     for (const f of fresh) {
