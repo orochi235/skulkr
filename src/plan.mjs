@@ -12,8 +12,8 @@ import { waitForLease } from './lease.mjs';
 import { partitionAt } from './partition.mjs';
 import { areaStats, areasInFlight, gitTouched, nextRound, passesIn, pickAreas, scaledOf } from './rounds.mjs';
 import { claimRound, claimedRounds, liveRuns, planLock, writeStatus } from './runs.mjs';
+import { usd } from './usage.mjs';
 
-export const usd = (n) => `$${n.toFixed(2)}`;
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 export const localDate = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const sweepName = (cfg) => cfg.sweep?.title?.toLowerCase() ?? cfg.sweep?.id ?? 'sweep';

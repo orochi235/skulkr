@@ -6,6 +6,7 @@
  * another's runs waits its turn.
  */
 import { inWindow, nextClock } from './config.mjs';
+import { usd } from './usage.mjs';
 
 /** A run's steps before its patch step: everything its model jobs do. */
 export const MODEL_STEPS = ['freeze', 'review'];
@@ -57,7 +58,6 @@ export const modeOf = ({ now, schedule, nightUsd, override }) => {
   return { on: true, by: live ? 'request' : 'config', until: live ? live.until : nextClock(now, schedule.stopAt).toISOString() };
 };
 
-const usd = (n) => `$${n.toFixed(2)}`;
 
 /**
  * Whether tenant's next continuous round starts now, and with what cap; else why not. Inputs:

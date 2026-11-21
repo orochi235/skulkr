@@ -204,7 +204,7 @@ reviews already running, fixers, and verify steps go on.
 **Limits.** Each job's model is stopped at `claude.timeoutMin` and the runner stops the job ten minutes later, so
 what it wrote still comes home. A run starts no new area after `schedule.stopAt`, nor when the areas running plus
 one more, each expected to cost the mean of this run's finished areas (`budget.areaGuessUsd` before any has),
-would pass the dollar cap. An area whose reviewers ran always gets its matcher and fixer. Where skulkr picks
+would pass the dollar cap, nor once a stop is requested; a fix-only round's fixers start under the same checks. An area whose reviewers ran always gets its matcher and fixer. Where skulkr picks
 nodes (a pinned run, or a runner that does not place jobs), a node the runner reports unavailable is skipped, and a
 dispatch a node refuses moves to another node and keeps that one out for `nodes.refusedCooldownMin`.
 `<state>/limits.json` (`{ "review": n, "fix": n }`) changes the slots per node, or under a placing runner the jobs at

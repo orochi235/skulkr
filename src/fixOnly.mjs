@@ -4,6 +4,7 @@
  */
 import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { areasAtOnce, startAreas } from './admit.mjs';
 import { fix } from './area.mjs';
 import { writeCarried } from './carryBrief.mjs';
 import { JOB_IN } from './config.mjs';
@@ -73,18 +74,8 @@ export const fixCarried = async (ctx, area, carried) => {
   };
 };
 
-/** Every picked area's fixer, each started while the round has no stop request and is before its deadline. */
-export const fixOnlyAreas = async ({ ctx, picked, open, deadline, results }) => {
-  await Promise.all(picked.map(async (area) => {
-    const why = ctx.stopped() ? 'stop requested' : new Date() >= deadline ? `past ${ctx.cfg.schedule.stopAt}` : '';
-    if (why) {
-      ctx.say(`not starting ${area.id}: ${why}`);
-      return;
-    }
-    try {
-      results.push(await fixCarried(ctx, area, open.get(area.id) ?? []));
-    } catch (error) {
-      ctx.say(`area ${area.id} failed: ${error.stack ?? error}`);
-    }
-  }));
-};
+/** Every picked area's fixer, started as `startAreas` admits them; resolves when all finish. */
+export const fixOnlyAreas = ({ ctx, picked, open, args, status, deadline, results }) => startAreas({
+  ctx, picked, args, status, deadline, results, maxAreas: areasAtOnce(ctx.cfg, args, 'fix', 1),
+  start: (area) => fixCarried(ctx, area, open.get(area.id) ?? []),
+});

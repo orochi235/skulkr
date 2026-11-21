@@ -6,6 +6,9 @@
  */
 export const TOKEN_WEIGHTS = { input: 1, output: 5, cacheWrite5m: 1.25, cacheWrite1h: 2, cacheRead: 0.1 };
 
+/** `n` dollars as the log prints them: `$1.50`. */
+export const usd = (n) => `$${n.toFixed(2)}`;
+
 /** `tokens` counted as input tokens of equal cost. */
 export const weightedTokens = (tokens) =>
   Math.round(Object.entries(TOKEN_WEIGHTS).reduce((s, [kind, w]) => s + (tokens[kind] ?? 0) * w, 0));

@@ -12,17 +12,17 @@ import { parseArgs } from './args.mjs';
 import { capstoneRepairer } from './capstone.mjs';
 import { gateBaseline } from './repair.mjs';
 import { gateAhead } from './fleet.mjs';
+import { areasAtOnce, startAreas } from './admit.mjs';
 import { addWorktree, gitIn, mainCheckout, removeWorktree } from './batch.mjs';
-import { JOB_IN, nextClock, nodesAt } from './config.mjs';
+import { JOB_IN, nextClock } from './config.mjs';
 import { fixOnlyAreas } from './fixOnly.mjs';
 import { createSlots, runUntilFree } from './jobs.mjs';
 import { batchAndTest, patchAreas, patchSweep } from './land.mjs';
-import { begin, localDate, plan, printPlan, usd } from './plan.mjs';
+import { begin, localDate, plan, printPlan } from './plan.mjs';
 import { resume } from './resume.mjs';
 import { scaledOf } from './rounds.mjs';
 import { clearStatus, nightsAt, pruneRuns, stopRequested, writeStatus, writeSummary } from './runs.mjs';
 import { fixSweep, runSweep, sweepLine } from './sweep.mjs';
-import { mayStartArea } from './usage.mjs';
 import { verifyLine, verifyOf } from './verify.mjs';
 
 const POLL_MS = 15_000;
@@ -54,33 +54,16 @@ const changedSince = (git, files, from, exclude) => {
   return [...changed];
 };
 
-/** Starts each picked area while the night has time, budget and no stop request; resolves when all finish. */
-const reviewAreas = async ({ ctx, git, picked, passes, open, args, status, deadline, results }) => {
-  const inFlight = new Set();
-  const cfg = ctx.cfg;
-  const reviews = args.places && !args.nodes ? cfg.concurrency.review : (args.nodes ?? nodesAt(cfg, new Date())).length * cfg.nodes.reviewSlots;
-  const maxAreas = Math.max(1, Math.floor(reviews / 2));
-  for (const area of picked) {
-    while (inFlight.size >= maxAreas) await Promise.race(inFlight);
-    const affordable = mayStartArea({ used: status.costUsd, finished: results.map((r) => r.jobs.costUsd), inFlight: inFlight.size, cap: args.capUsd, guess: cfg.budget.areaGuessUsd });
-    const why = ctx.stopped() ? 'stop requested'
-      : new Date() >= deadline ? `past ${cfg.schedule.stopAt}`
-        : !affordable ? `the next area would cross the ${usd(args.capUsd)} cap (${usd(status.costUsd)} used)` : '';
-    if (why) {
-      ctx.say(`not starting ${area.id}: ${why}`);
-      continue;
-    }
+/** Each picked area's reviews, matcher and fixer, started as `startAreas` admits them; resolves when all finish. */
+const reviewAreas = ({ ctx, git, picked, passes, open, args, status, deadline, results }) => startAreas({
+  ctx, picked, args, status, deadline, results, maxAreas: areasAtOnce(ctx.cfg, args, 'review', 2),
+  start: (area) => {
     const last = passes.get(area.id)?.at(-1);
     const previous = last && { ...last, ...scaledOf(last) };
     const carried = open?.get(area.id) ?? [];
-    const job = runArea(ctx, area, { previous, carried, changedSince: changedSince(git, area.files, previous?.commit, previous?.fixCommits ?? []) })
-      .then((summary) => results.push(summary))
-      .catch((error) => ctx.say(`area ${area.id} failed: ${error.stack ?? error}`))
-      .finally(() => inFlight.delete(job));
-    inFlight.add(job);
-  }
-  await Promise.all(inFlight);
-};
+    return runArea(ctx, area, { previous, carried, changedSince: changedSince(git, area.files, previous?.commit, previous?.fixCommits ?? []) });
+  },
+});
 
 /** The sweep's part of the night's summary. */
 const sweepSummary = (cfg, sweep, outcomes) => (sweep.ran
@@ -203,7 +186,7 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     const sweepFix = args.sweep ? startSweep(ctx, (s) => (sweep = s)) : Promise.resolve(undefined);
     setStep('review');
     const deadline = deadlineOf(cfg, status);
-    if (args.fixOnly) await fixOnlyAreas({ ctx, picked: p.picked, open: p.open, deadline, results });
+    if (args.fixOnly) await fixOnlyAreas({ ctx, picked: p.picked, open: p.open, args, status, deadline, results });
     else await reviewAreas({ ctx, git, picked: p.picked, passes: p.passes, open: p.open, args, status, deadline, results });
     const sweepFixed = await sweepFix;
     if (results.length === 0 && !sweepFixed?.mbox) throw new Error('no area finished');
