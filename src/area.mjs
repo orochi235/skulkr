@@ -10,7 +10,8 @@ import { citedPaths, firstJson, isFinished, matchPrompt, parseFilesRead, parseFi
 import { brief, fill, projectVars } from './brief.mjs';
 import { toCarry, writeCarried } from './carryBrief.mjs';
 import { dispatch } from './dispatch.mjs';
-import { CHECKS_IN, PROGRESS_IN, fixShell, jobDir, matchShell, progressSource, reviewShell, stoppedBeforeModel, timeoutOf } from './jobs.mjs';
+import { CHECKS_IN, fixShell, jobDir, matchShell, reviewShell, stoppedBeforeModel, timeoutOf } from './jobs.mjs';
+import { agentFor, requireAgents } from './agent/index.mjs';
 import { patchesIn, verifyAndRepair } from './repair.mjs';
 import { recentlyChanged, reviewFileList } from './reviewFiles.mjs';
 import { chapman } from './rounds.mjs';
@@ -24,7 +25,7 @@ const cents = (n) => Number(n.toFixed(2));
 const review = async (ctx, area, side) => {
   const to = jobDir(ctx.nightDir, area.id, side);
   const run = await dispatch(ctx, area, `review-${side}`, {
-    kind: 'review', expect: ctx.cfg.claude.reviewExpect, shell: reviewShell(ctx.cfg, area.id, ctx.budget.review), to,
+    kind: 'review', expect: agentFor(ctx.cfg, 'review').reviewExpect(ctx.cfg), shell: reviewShell(ctx.cfg, area.id, ctx.budget.review), to,
     task: ctx.cfg.names.task(ctx.round, area.id, side), logPath: join(to, '..', `${side}.log`),
     about: `Blind reviewer ${side} for audit round ${ctx.round}, area ${area.id}: reads its files and lists defects without fixing.`,
   });
@@ -88,11 +89,11 @@ export const fix = async (ctx, area, findings, source = reviewedSource(ctx, area
   };
 };
 
-/** Readies the frozen tree's `.skulkr/in` for `area`'s jobs: its directory, the progress filter, and the tally checks. Answers the directory. */
+/** Readies the frozen tree's `.skulkr/in` for `area`'s jobs: its directory, each role's agent's progress filter, and the tally checks. Answers the directory. */
 export const stageIn = (ctx, area) => {
   const inDir = join(ctx.frozen, JOB_IN, area.id);
   mkdirSync(inDir, { recursive: true });
-  copyFileSync(progressSource(), join(ctx.frozen, PROGRESS_IN));
+  for (const { progress } of new Set(requireAgents(ctx.cfg))) copyFileSync(progress.source(), join(ctx.frozen, progress.at));
   writeFileSync(join(ctx.frozen, CHECKS_IN), `${JSON.stringify(ctx.cfg.checks.tally ?? {})}\n`);
   return inDir;
 };

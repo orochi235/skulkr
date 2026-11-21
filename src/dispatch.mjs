@@ -8,7 +8,7 @@ import { sleep } from './after.mjs';
 import { isFinished, reviewText } from './findings.mjs';
 import { STARTED, runJob } from './jobs.mjs';
 import { readIf } from './text.mjs';
-import { parseEnvelope } from './usage.mjs';
+import { agentFor } from './agent/index.mjs';
 
 const minutesSince = (t0) => (Date.now() - t0) / 60_000;
 /** How many times a job that never reached its node is launched before its area is recorded incomplete. */
@@ -33,16 +33,19 @@ const budgetRole = (role) => (role.startsWith('review') ? 'review' : role === 'r
  * not an error (a usage-limit refusal is), and for a committing job its mbox; for a verify job, its verdict.
  * Answers undefined to run it again.
  */
-export const cameHome = (spec, role) => {
+export const cameHome = (spec, role, cfg) => {
   if (role === 'verify') {
     const exit = readIf(join(spec.to, 'verify.exit')).trim();
     return exit === '' ? undefined : { exit, raw: '' };
   }
   const exit = readIf(join(spec.to, 'exit')).trim();
   if (exit === '' || (COMMITTING.has(role) && !existsSync(join(spec.to, 'fix.mbox')))) return undefined;
-  const raw = readIf(join(spec.to, 'claude.json'));
-  if (!raw.trim() || /"is_error":\s*true/.test(raw)) return undefined;
-  if (role.startsWith('review') && !isFinished(reviewText(readIf(join(spec.to, 'findings.md')), parseEnvelope(raw).reply))) return undefined;
+  const agent = agentFor(cfg, role);
+  const raw = readIf(join(spec.to, agent.resultFile));
+  if (!raw.trim()) return undefined;
+  const result = agent.resultOf(raw);
+  if (result.error) return undefined;
+  if (role.startsWith('review') && !isFinished(reviewText(readIf(join(spec.to, 'findings.md')), result.reply))) return undefined;
   return { exit, raw };
 };
 
@@ -56,7 +59,7 @@ export const earlierReview = (ctx, area, role, spec) => {
   for (const night of ctx.earlierNights ?? []) {
     if (readIf(join(night, 'areas', area.id, 'files.txt')) !== files) continue;
     const to = join(night, relative(ctx.nightDir, spec.to));
-    const found = cameHome({ to }, role);
+    const found = cameHome({ to }, role, ctx.cfg);
     if (!found) continue;
     cpSync(to, spec.to, { recursive: true });
     ctx.say?.(`${role} ${area.id}: reusing the finished review from ${night}`);
@@ -72,9 +75,9 @@ export const earlierReview = (ctx, area, role, spec) => {
  */
 export const dispatch = async (ctx, area, role, spec) => {
   const model = role !== 'verify';
-  const earlier = cameHome(spec, role) ?? earlierReview(ctx, area, role, spec);
+  const earlier = cameHome(spec, role, ctx.cfg) ?? earlierReview(ctx, area, role, spec);
   if (earlier) {
-    const { reply, record } = parseEnvelope(earlier.raw);
+    const { reply, record } = agentFor(ctx.cfg, role).resultOf(earlier.raw);
     const usage = model ? { area: area.id, role, node: 'earlier', ...record, exit: earlier.exit, reused: true } : undefined;
     if (usage) ctx.usage(usage);
     return { status: 0, launched: true, node: 'earlier', minutes: 0, reply, usage };
@@ -86,7 +89,7 @@ export const dispatch = async (ctx, area, role, spec) => {
     const slot = await ctx.acquire(FIX_ROLES.has(role) ? 'fix' : 'review');
     const t0 = Date.now();
     // What an earlier launch left would otherwise read as this one's answer if this one never runs.
-    if (model) for (const f of [STARTED, 'exit', 'claude.json', 'fix.mbox']) rmSync(join(spec.to, f), { force: true });
+    if (model) for (const f of [STARTED, 'exit', agentFor(ctx.cfg, role).resultFile, 'fix.mbox']) rmSync(join(spec.to, f), { force: true });
     let result;
     try {
       result = await runJob({ ...spec, cfg: ctx.cfg, runner: ctx.runner, frozen: ctx.frozen, base: ctx.base, slot });
@@ -130,7 +133,7 @@ export const dispatch = async (ctx, area, role, spec) => {
       continue;
     }
     if (!model) return { status: result.status, launched: Boolean(exit), node, minutes: minutesSince(t0), reply: '' };
-    const { reply, record } = parseEnvelope(readIf(join(spec.to, 'claude.json')));
+    const { reply, record } = agentFor(ctx.cfg, role).resultOf(readIf(join(spec.to, agentFor(ctx.cfg, role).resultFile)));
     const usage = { area: area.id, role, node, ...record, exit };
     ctx.usage(usage);
     if (usage.budgetHit) ctx.say(`${role} ${area.id} stopped at its $${ctx.budget[budgetRole(role)]} ceiling`);

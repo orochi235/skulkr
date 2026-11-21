@@ -4,7 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createCommitProgress, createProgress } from './progress.mjs';
-import { parseEnvelope } from './usage.mjs';
+import { claude } from './agent/claude.mjs';
+
+const parseEnvelope = claude.resultOf;
 import { weaselConfig } from '../test/weaselConfig.ts';
 import { resolveConfig } from './config.mjs';
 

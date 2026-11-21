@@ -4,6 +4,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { requireAgents } from './agent/index.mjs';
 import { gitIn } from './batch.mjs';
 import { openFindingsIn } from './carryRecords.mjs';
 import { nodesAt } from './config.mjs';
@@ -21,6 +22,7 @@ const sweepName = (cfg) => cfg.sweep?.title?.toLowerCase() ?? cfg.sweep?.id ?? '
 
 /** What a run started now would do. Its round is the next unclaimed one; areas a live run holds are left out. */
 export const plan = (cfg, root, args) => {
+  requireAgents(cfg);
   const git = gitIn(root);
   const main = cfg.git.main;
   const commit = git('rev-parse', main);

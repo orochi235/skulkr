@@ -18,7 +18,7 @@ import { abandonedRounds, nightsByRound, recordsFor } from './recordFiles.mjs';
 import { continuousOf } from './continuousOf.mjs';
 import { readJson } from './json.mjs';
 import { lastFinished, liveRuns } from './runs.mjs';
-import { parseEnvelope } from './usage.mjs';
+import { agentFor } from './agent/index.mjs';
 
 const NAMES = resolveConfig().names;
 
@@ -34,9 +34,9 @@ export const withPasses = (lanes, run) => lanes.map((lane) => {
 });
 
 /** Each area's fixer report that has come home, by area. */
-const fixReports = (nightDir, ids) => new Map(nightDir ? ids.flatMap((id) => {
-  const file = join(nightDir, 'jobs', id, 'fix', 'claude.json');
-  return existsSync(file) ? [[id, parseEnvelope(readFileSync(file, 'utf8')).reply]] : [];
+const fixReports = (agent, nightDir, ids) => new Map(nightDir ? ids.flatMap((id) => {
+  const file = join(nightDir, 'jobs', id, 'fix', agent.resultFile);
+  return existsSync(file) ? [[id, agent.resultOf(readFileSync(file, 'utf8')).reply]] : [];
 }) : []);
 
 export { fleetOf, fleetProgressOf, gateFailuresOf, gateNodesOf, gateOutcomesOf, gateRunsOf, rerunOf } from './gate.mjs';
@@ -45,9 +45,10 @@ const DEFAULT_GATE = resolveConfig().gate;
 
 /**
  * What one run, live (`running`) or finished, says about its areas; `jobs` are the runner's jobs, running and
- * finished; `sweepId` the config's sweep, whose running job marks `sweepRunning`; `gate` the config's, for `fleet`.
+ * finished; `sweepId` the config's sweep, whose running job marks `sweepRunning`; `gate` the config's, for `fleet`;
+ * `fixAgent` the agent whose result files hold the fixers' reports.
  */
-export const readRun = (found, running, jobs = [], state, { names = NAMES, sweepId, gate = DEFAULT_GATE } = {}) => {
+export const readRun = (found, running, jobs = [], state, { names = NAMES, sweepId, gate = DEFAULT_GATE, fixAgent = agentFor(undefined, 'fix') } = {}) => {
   const run = { ...found, nightDir: nightDirOf(found, state) };
   const logPath = run.nightDir ? join(run.nightDir, 'night.log') : null;
   const log = logPath && existsSync(logPath) ? readFileSync(logPath, 'utf8') : '';
@@ -68,7 +69,7 @@ export const readRun = (found, running, jobs = [], state, { names = NAMES, sweep
     areas: areaIds,
     stages: Object.fromEntries(nightStages(log, names)),
     leftOut: nightLeftOut(log, run.round, names),
-    lanes: withPasses(nightLanes(log, areaIds, running ? own : own.filter((j) => j.finished), fixReports(run.nightDir, areaIds), names), run),
+    lanes: withPasses(nightLanes(log, areaIds, running ? own : own.filter((j) => j.finished), fixReports(fixAgent, run.nightDir, areaIds), names), run),
     sweepRunning: Boolean(running && sweepId && jobs.some((j) => !j.finished && (j.task ?? '').endsWith(sweepId))),
     nightDir: run.nightDir ?? null,
     lastLine: lines.at(-1) ?? null,
@@ -154,7 +155,7 @@ export const buildMap = (cfg, root, runner) => {
   const corrected = (p) => ({ ...p, leftCorrected: correctedLeftOf(p, calibration) });
   const { picked, settled } = pickAreas({ areas, passes, covered, staleLines, calibration, touched, count: Infinity, inFlight: areasInFlightFor(cfg, git) });
   const settledSet = new Set(settled);
-  const runs = readRuns(cfg.state, null, { listJobs: (since) => runner.jobs(since), listProgress: () => runner.progress?.() ?? new Map(), names: cfg.names, sweepId: cfg.sweep?.id, gate: cfg.gate })
+  const runs = readRuns(cfg.state, null, { listJobs: (since) => runner.jobs(since), listProgress: () => runner.progress?.() ?? new Map(), names: cfg.names, sweepId: cfg.sweep?.id, gate: cfg.gate, fixAgent: agentFor(cfg, 'fix') })
     .map((r) => ({ ...r, lanes: r.lanes.map((l) => (l.pass ? { ...l, pass: corrected(l.pass) } : l)) }));
   /** The live run holding each area. */
   const holder = new Map(runs.filter((r) => r.running).flatMap((r) => r.areas.map((id) => [id, r])));

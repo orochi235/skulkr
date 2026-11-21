@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { citedPaths, firstJson, fixTallyOf, isFinished, questionsIn, reportItems, parseFilesRead, parseFindings, reviewText, validPairs } from './findings.mjs';
 import { appendRecordRow } from './record.mjs';
-import { mayStartArea, parseEnvelope } from './usage.mjs';
+import { mayStartArea } from './usage.mjs';
+import { claude } from './agent/claude.mjs';
+
+const parseEnvelope = claude.resultOf;
 import { weaselConfig } from '../test/weaselConfig.ts';
 
 const REPORT = `# Audit — core

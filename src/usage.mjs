@@ -1,4 +1,4 @@
-/** What a `claude -p --output-format json` job reports about itself, as one usage record per job. */
+/** Usage records, one per model job, as its agent's `resultOf` reads them (`src/agent/`), and what they add up to. */
 
 /**
  * What each kind of token costs against an input token, the same ratios for every Claude model: a cache read is
@@ -12,41 +12,6 @@ export const usd = (n) => `$${n.toFixed(2)}`;
 /** `tokens` counted as input tokens of equal cost. */
 export const weightedTokens = (tokens) =>
   Math.round(Object.entries(TOKEN_WEIGHTS).reduce((s, [kind, w]) => s + (tokens[kind] ?? 0) * w, 0));
-
-/** The envelope's fields as `{ reply, record }`; `record` lacks the job's own area, role and node. */
-export const parseEnvelope = (raw) => {
-  let env = {};
-  try {
-    env = raw ? JSON.parse(raw) : {};
-  } catch {
-    env = { result: raw };
-  }
-  const u = env.usage ?? {};
-  const cacheCreation = u.cache_creation_input_tokens ?? 0;
-  const cacheWrite1h = u.cache_creation?.ephemeral_1h_input_tokens ?? 0;
-  const tokens = {
-    input: u.input_tokens ?? 0,
-    output: u.output_tokens ?? 0,
-    cacheWrite5m: cacheCreation - cacheWrite1h,
-    cacheWrite1h,
-    cacheRead: u.cache_read_input_tokens ?? 0,
-  };
-  const reason = env.terminal_reason ?? env.subtype ?? (raw ? 'unknown' : 'no envelope');
-  return {
-    reply: String(env.report ?? env.result ?? ''),
-    record: {
-      models: Object.keys(env.modelUsage ?? {}),
-      tokens,
-      weightedTokens: weightedTokens(tokens),
-      costUsd: env.total_cost_usd ?? Object.values(env.modelUsage ?? {}).reduce((s, m) => s + (m.costUSD ?? 0), 0),
-      durationMs: env.duration_ms ?? 0,
-      turns: env.num_turns ?? 0,
-      terminalReason: reason,
-      subtype: env.subtype,
-      budgetHit: /budget/i.test(`${env.subtype ?? ''} ${env.terminal_reason ?? ''}`),
-    },
-  };
-};
 
 /** Sums of a list of usage records. */
 export const totals = (records) => ({

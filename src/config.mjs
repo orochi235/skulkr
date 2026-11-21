@@ -143,6 +143,12 @@ export const DEFAULTS = {
     fixSlots: undefined,
   },
 
+  /**
+   * The agent each model job runs (`src/agent/`): one name for every role, or `{ review, match, fix }` (a repair runs
+   * as `fix`). Each agent's settings are the block named for it.
+   */
+  agent: 'claude',
+
   claude: {
     /** `CLAUDE_CONFIG_DIR` for every job, or unset for the node's default. */
     configDir: undefined,

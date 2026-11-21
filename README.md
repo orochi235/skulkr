@@ -296,6 +296,15 @@ noRoom }`, `unavailableNodes()`, `jobs(sinceIso)` (what the dashboard's lanes ar
 `progress()`, each running job's own count by task (a running step's fill). `src/runner/local.mjs` is the smallest
 complete one.
 
+## Agents
+
+An agent runs a model job. A config's `agent` names one for every role, or one per role as `{ review, match, fix }`
+(a repair runs as `fix`); each agent's settings are the config block named for it. `'claude'`, the default and so far
+the only one, runs `claude -p` with the `claude` block's models, effort, tools and cache lifetime, and reads its
+reply and usage from the job's `claude.json`. A name no agent answers to fails the run's plan before anything is
+spent. The interface every agent answers is documented in `src/agent/index.mjs`; `src/agent/claude.mjs` is the
+complete one.
+
 ## The service
 
 `skulkr service` runs nights as a long-running service, for the project its config names or, with none named, for

@@ -4,59 +4,34 @@
  */
 import { createWriteStream, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { JOB_IN, JOB_OUT } from './config.mjs';
 import { sleep } from './after.mjs';
 import { q, readIf } from './text.mjs';
 import { verifyLines, verifyOf } from './verify.mjs';
+import { agentFor } from './agent/index.mjs';
 
 export const BUSY_WAIT_MS = 30_000;
 
 
-/** The progress filter, copied into each frozen tree's `.skulkr/in` so a node runs the one this run ships. */
-export const progressSource = () => fileURLToPath(new URL('./progress.mjs', import.meta.url));
-export const PROGRESS_IN = `${JOB_IN}/progress.mjs`;
-/** The config's `checks.tally`, beside the filter, for the fixer's checks. */
+/** The config's `checks.tally`, beside the progress filter, for the fixer's checks. */
 export const CHECKS_IN = `${JOB_IN}/checks.json`;
 
-/** The file a model job writes just before `claude` starts: a job with it and no `exit` ran and was cut off. */
+/** The file a model job writes just before its agent starts: a job with it and no `exit` ran and was cut off. */
 export const STARTED = 'started';
 
-/**
- * Runs `claude -p` on a prompt file, stopped by an alarm before the runner's timeout so what it wrote still comes
- * home, after writing {@link STARTED}. With `progress` (the progress filter's arguments before the result path), it
- * streams through the filter, which prints onto progress lines and writes the same result envelope to `claude.json`.
- */
-const claudeLine = (cfg, role, promptFile, budgetUsd, flags, progress) =>
-  [
-    `date -u +%FT%TZ > ${JOB_OUT}/${STARTED} &&`,
-    ...(cfg.claude.configDir ? [`CLAUDE_CONFIG_DIR=${cfg.claude.configDir}`] : []),
-    ...(cfg.claude.cacheTtl?.[role] ? [`CLAUDE_CODE_PROMPT_CACHE_TTL=${cfg.claude.cacheTtl[role]}`] : []),
-    // A reviewer's write rule is relative to the working directory, which a `cd` would otherwise move.
-    ...(role === 'review' ? ['CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1'] : []),
-    `perl -e 'alarm shift; exec @ARGV' ${cfg.claude.timeoutMin * 60}`,
-    'claude -p "$(cat', `${q(promptFile)})"`,
-    `--output-format ${progress ? 'stream-json --verbose' : 'json'} --strict-mcp-config`,
-    ...(cfg.claude.settingSources ? [`--setting-sources ${cfg.claude.settingSources}`] : []),
-    `--max-budget-usd ${budgetUsd}`, ...flags,
-    progress
-      ? `2> ${JOB_OUT}/claude.err | node ${PROGRESS_IN} ${progress} ${JOB_OUT}/claude.json; echo "\${PIPESTATUS[0]}" > ${JOB_OUT}/exit`
-      : `> ${JOB_OUT}/claude.json 2> ${JOB_OUT}/claude.err; echo $? > ${JOB_OUT}/exit`,
-  ].join(' ');
+/** The agent the config names for `role`, run on `promptFile` after writing {@link STARTED}. */
+const agentLine = (cfg, role, promptFile, budgetUsd, progress) =>
+  `date -u +%FT%TZ > ${JOB_OUT}/${STARTED} && ${agentFor(cfg, role).line(cfg, role, { promptFile, budgetUsd, progress })}`;
 
-const model = (name) => (name ? ['--model', name] : []);
-const effort = (level) => (level ? ['--effort', level] : []);
 const fresh = `rm -rf ${JOB_OUT} && mkdir -p ${JOB_OUT}`;
 const prelude = (cfg) => (cfg.setup.prelude ? [cfg.setup.prelude] : []);
 
 /** A reviewer, counted through the files listed in `.skulkr/in/<area>/files.txt`. */
 export const reviewShell = (cfg, area, budgetUsd) =>
-  [...prelude(cfg), fresh, claudeLine(cfg, 'review', `${JOB_IN}/${area}/review.md`, budgetUsd, [
-    '--allowedTools', q(cfg.claude.reviewTools.join(',')), '--disallowedTools', q(cfg.claude.reviewDenied.join(',')), ...model(cfg.claude.models.review), ...effort(cfg.claude.effort?.review),
-  ], q(`${JOB_IN}/${area}/files.txt`))].join(' && ');
+  [...prelude(cfg), fresh, agentLine(cfg, 'review', `${JOB_IN}/${area}/review.md`, budgetUsd, q(`${JOB_IN}/${area}/files.txt`))].join(' && ');
 
 export const matchShell = (cfg, area, budgetUsd) =>
-  [fresh, claudeLine(cfg, 'match', `${JOB_IN}/${area}/match.md`, budgetUsd, ['--disallowedTools', q('Bash,Edit,Write,Task,Agent'), ...model(cfg.claude.models.match), ...effort(cfg.claude.effort?.match)])].join(' && ');
+  [fresh, agentLine(cfg, 'match', `${JOB_IN}/${area}/match.md`, budgetUsd)].join(' && ');
 
 /**
  * Files a job writes under its output when it stops before the model runs, each holding why: the synced tree is not
@@ -118,8 +93,6 @@ const handBackLines = (cfg) => {
   ];
 };
 
-const fixFlags = (cfg) => ['--dangerously-skip-permissions', ...model(cfg.claude.models.fix), ...effort(cfg.claude.effort?.fix)];
-
 /**
  * The fixer readies the tree, lets the model fix and commit, hands back its commits as one mbox, and runs the
  * config's verify step over the files they changed.
@@ -127,7 +100,7 @@ const fixFlags = (cfg) => ['--dangerously-skip-permissions', ...model(cfg.claude
 export const fixShell = (cfg, area, budgetUsd, findings) =>
   [
     'set -e', ...prelude(cfg), fresh, ...treeLines(cfg), 'set +e',
-    claudeLine(cfg, 'fix', `${JOB_IN}/${area}/fix.md`, budgetUsd, fixFlags(cfg), `--commits ${findings} --checks ${CHECKS_IN}`),
+    agentLine(cfg, 'fix', `${JOB_IN}/${area}/fix.md`, budgetUsd, `--commits ${findings} --checks ${CHECKS_IN}`),
     ...handBackLines(cfg),
   ].join('\n');
 
@@ -136,7 +109,7 @@ export const fixShell = (cfg, area, budgetUsd, findings) =>
 export const repairShell = (cfg, area, budgetUsd) =>
   [
     'set -e', ...prelude(cfg), fresh, ...treeLines(cfg), ...applyLines(area), 'set +e',
-    claudeLine(cfg, 'fix', `${JOB_IN}/${area}/repair.md`, budgetUsd, fixFlags(cfg)),
+    agentLine(cfg, 'fix', `${JOB_IN}/${area}/repair.md`, budgetUsd),
     ...handBackLines(cfg),
   ].join('\n');
 
@@ -165,7 +138,7 @@ export const baselineShell = (cfg, { gui = false } = {}) => {
 
 /** A job's runner timeout in minutes: its model's, plus the verify step's where the job runs one. */
 export const timeoutOf = (cfg, { model = true, verify = Boolean(verifyOf(cfg)) } = {}) =>
-  (model ? cfg.claude.timeoutMin : 0) + (verify ? (verifyOf(cfg).timeoutMin ?? 20) + 5 : 0) + 10;
+  (model ? agentFor(cfg, 'fix').timeoutMin(cfg) : 0) + (verify ? (verifyOf(cfg).timeoutMin ?? 20) + 5 : 0) + 10;
 
 /** One runner job from `cwd`, tried again while its tree is busy; its output goes to `logPath`. Answers `{ status, refused, noRoom, node? }`. */
 export const runUntilFree = async (runner, job, { cwd, logPath, waitMs = BUSY_WAIT_MS }) => {
@@ -194,7 +167,7 @@ export const runUntilFree = async (runner, job, { cwd, logPath, waitMs = BUSY_WA
  * `{ status, refused }`: `refused` when the node turned the job away as quiet or unavailable before
  * anything ran, so the caller tries another node.
  */
-export const runJob = ({ cfg, runner, frozen, base, slot, kind, task, about, expect, env = {}, shell, to, logPath, gui, timeoutMin = cfg.claude.timeoutMin + 10 }) =>
+export const runJob = ({ cfg, runner, frozen, base, slot, kind, task, about, expect, env = {}, shell, to, logPath, gui, timeoutMin = agentFor(cfg, kind === 'review' ? 'review' : 'fix').timeoutMin(cfg) + 10 }) =>
   runUntilFree(runner, {
     kind, node: slot.placed ? undefined : slot.node, ref: base, timeout: `${timeoutMin}m`, expect, task, about,
     out: JOB_OUT, to, env, shell, ...(gui ? { gui: true } : {}),
