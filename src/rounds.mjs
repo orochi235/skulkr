@@ -35,6 +35,47 @@ export const readPasses = (root, recordDir) => {
   return passes;
 };
 
+/**
+ * `passes` (`readPasses`') with the passes recorded on each of `refs` for rounds not on disk: a batch that has not
+ * landed holds its round's record, and its areas were audited all the same. Keeps each round from the first ref
+ * holding it; a pass marked incomplete is skipped, as on disk.
+ */
+export const withBatchPasses = (passes, git, recordDir, refs) => {
+  const known = new Set([...passes.values()].flat().map((p) => p.round));
+  const area = new RegExp(`^${recordDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/round-(\\d+)/([^/]+)/area\\.json$`);
+  const added = new Set();
+  for (const ref of refs) {
+    const found = new Set();
+    for (const path of git('ls-tree', '-r', '--name-only', ref, '--', recordDir).split('\n')) {
+      const m = area.exec(path);
+      if (!m || known.has(Number(m[1])) || added.has(Number(m[1]))) continue;
+      const round = Number(m[1]);
+      found.add(round);
+      const pass = { round, ...JSON.parse(git('show', `${ref}:${path}`)) };
+      if (!Array.isArray(pass.files)) {
+        try {
+          pass.files = git('show', `${ref}:${path.replace(/area\.json$/, 'files.txt')}`).split('\n').filter(Boolean);
+        } catch {}
+      }
+      if (pass.incomplete?.length) continue;
+      if (!passes.has(pass.id)) passes.set(pass.id, []);
+      passes.get(pass.id).push(pass);
+    }
+    for (const r of found) added.add(r);
+  }
+  for (const list of passes.values()) list.sort((x, y) => x.round - y.round);
+  return passes;
+};
+
+/** The batch branches not yet merged into `main`, newest name first. */
+export const unlandedBatches = (git, batchPrefix, main) =>
+  git('for-each-ref', `--no-merged=${main}`, '--sort=-refname', '--format=%(refname:short)', `refs/heads/${batchPrefix}/`)
+    .split('\n').filter(Boolean);
+
+/** Every pass the project holds: on disk under `recordDir`, and on the batches `main` has not merged. */
+export const passesIn = (cfg, git, root) =>
+  withBatchPasses(readPasses(root, cfg.record.dir), git, cfg.record.dir, unlandedBatches(git, cfg.naming.batchPrefix, cfg.git.main));
+
 /** An area counts as audited once at least this share of its files were read by some pass. */
 export const COVERED = 0.5;
 

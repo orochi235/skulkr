@@ -10,7 +10,7 @@ import { resolveConfig } from './config.mjs';
 import { fixTallyOf } from './findings.mjs';
 import { fleetOf } from './gate.mjs';
 import { partitionAt } from './partition.mjs';
-import { COVERED, areaStats, chapman, gitTouched, pickAreas, readPasses } from './rounds.mjs';
+import { COVERED, areaStats, chapman, gitTouched, passesIn, pickAreas } from './rounds.mjs';
 import { continuousOf } from './continuousOf.mjs';
 import { lastFinished, liveRuns, readJson } from './runs.mjs';
 import { parseEnvelope } from './usage.mjs';
@@ -252,7 +252,7 @@ export const buildMap = (cfg, root, runner) => {
   const git = gitIn(root);
   const head = git('rev-parse', '--short', 'HEAD');
   const areas = partitionAt(cfg, root, 'HEAD');
-  const { history: passes, covered, staleLines } = areaStats(cfg, git, areas, readPasses(root, cfg.record.dir), root);
+  const { history: passes, covered, staleLines } = areaStats(cfg, git, areas, passesIn(cfg, git, root), root);
   const { picked, settled } = pickAreas({ areas, passes, covered, staleLines, touched: gitTouched(git), count: Infinity });
   const settledSet = new Set(settled);
   const runs = readRuns(cfg.state, null, { listJobs: (since) => runner.jobs(since), listProgress: () => runner.progress?.() ?? new Map(), names: cfg.names, sweepId: cfg.sweep?.id, gate: cfg.gate });

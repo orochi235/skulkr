@@ -14,7 +14,7 @@ import { createSlots, runUntilFree } from './jobs.mjs';
 import { batchAndTest, patchAreas, patchSweep } from './land.mjs';
 import { waitForLease } from './lease.mjs';
 import { partitionAt } from './partition.mjs';
-import { areaStats, areasInFlight, gitTouched, inheritPasses, nextRound, pickAreas, readPasses, scaledOf } from './rounds.mjs';
+import { areaStats, areasInFlight, gitTouched, inheritPasses, nextRound, passesIn, pickAreas, scaledOf } from './rounds.mjs';
 import { claimRound, claimedRounds, clearStatus, clearStop, liveRuns, planLock, pruneRuns, readJson, runDir, stopRequested, writeStatus, writeSummary } from './runs.mjs';
 import { fixSweep, runSweep, sweepLine } from './sweep.mjs';
 import { mayStartArea } from './usage.mjs';
@@ -88,7 +88,7 @@ const plan = (cfg, root, args) => {
   const hardening = ledger && existsSync(ledger) ? readFileSync(ledger, 'utf8') : '';
   const round = nextRound({ roundDirs, hardening, branches, claimed: claimedRounds(cfg.state), roundIn: cfg.names.roundIn });
   const areas = partitionAt(cfg, root, commit);
-  const { history: passes, covered, staleLines } = areaStats(cfg, git, areas, readPasses(root, cfg.record.dir), root);
+  const { history: passes, covered, staleLines } = areaStats(cfg, git, areas, passesIn(cfg, git, root), root);
   const running = liveRuns(cfg.state);
   const held = new Set(running.flatMap((r) => r.areas ?? []));
   const byId = new Map(areas.map((a) => [a.id, a]));
@@ -265,7 +265,7 @@ const resume = (cfg, root, args, say) => {
   const landed = new Set((prior.areas ?? []).flatMap((a) => (typeof a === 'object' && (a.patches ?? 0) > 0 && inMain(a.id) ? [a.id] : [])));
   const ids = (prior.planned ?? prior.areas ?? []).map((a) => (typeof a === 'string' ? a : a.id)).filter((id) => !landed.has(id));
   clearStop(round, state);
-  const p = { commit, round, picked: ids.flatMap((id) => (byId.has(id) ? [byId.get(id)] : [])), passes: inheritPasses([...byId.values()], readPasses(root, cfg.record.dir)).history, running: liveRuns(state) };
+  const p = { commit, round, picked: ids.flatMap((id) => (byId.has(id) ? [byId.get(id)] : [])), passes: inheritPasses([...byId.values()], passesIn(cfg, git, root)).history, running: liveRuns(state) };
   const started = new Date(prior.started);
   const status = { round, commit, started: prior.started, resumed: new Date().toISOString(), step: 'freeze', areas: ids, nightDir: prior.nightDir, weightedTokens: 0, costUsd: 0, capUsd: args.capUsd, args };
   writeStatus(round, status, state);

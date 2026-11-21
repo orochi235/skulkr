@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { areasInFlight, chapman, inheritPasses, isSettled, nextRound, pickAreas, readPasses, scaledOf } from './rounds.mjs';
+import { areasInFlight, chapman, inheritPasses, isSettled, nextRound, pickAreas, readPasses, scaledOf, withBatchPasses } from './rounds.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -139,5 +139,25 @@ describe('pickAreas with churn', () => {
     const staleLines = new Map([['a', 40], ['d', 400]]);
     const { picked } = pickAreas({ areas: ['a', 'b', 'c', 'd', 'e', 'f'].map(area), passes, covered, staleLines, touched: () => true, count: 9 });
     expect(picked).toEqual(['e', 'f', 'd', 'a', 'b', 'c']);
+  });
+});
+
+describe('withBatchPasses', () => {
+  const tree = {
+    'b/new:docs/audits/round-5/ui/area.json': JSON.stringify({ id: 'ui', a: 2, b: 1, m: 1, distinct: 2, files: ['x.ts'] }),
+    'b/new:docs/audits/round-4/ui/area.json': JSON.stringify({ id: 'ui', a: 9, b: 9, m: 9, distinct: 9 }),
+    'b/new:docs/audits/round-5/gone/area.json': JSON.stringify({ id: 'gone', incomplete: ['B'] }),
+  };
+  const git = (...args: string[]) => {
+    if (args[0] === 'show') return tree[args[1] as keyof typeof tree];
+    const ref = args[3];
+    return Object.keys(tree).filter((k) => k.startsWith(`${ref}:`)).map((k) => k.slice(ref.length + 1)).join('\n');
+  };
+
+  it("adds an unlanded batch's passes for rounds not on disk, in round order, skipping incomplete ones", () => {
+    const passes = new Map([['ui', [{ round: 4, id: 'ui', distinct: 3 }]]]);
+    withBatchPasses(passes, git, 'docs/audits', ['b/new']);
+    expect(passes.get('ui')!.map((p) => [p.round, p.distinct])).toEqual([[4, 3], [5, 2]]);
+    expect(passes.has('gone')).toBe(false);
   });
 });
