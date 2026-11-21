@@ -11,6 +11,7 @@ import { fixTallyOf } from './findings.mjs';
 import { fleetOf } from './gate.mjs';
 import { areaIcons, iconsFor } from './icons.mjs';
 import { partitionAt } from './partition.mjs';
+import { openFindingsIn } from './carryRecords.mjs';
 import { COVERED, areaStats, chapman, gitTouched, incompleteByRound, passesIn, pickAreas } from './rounds.mjs';
 import { continuousOf } from './continuousOf.mjs';
 import { lastFinished, liveRuns, readJson } from './runs.mjs';
@@ -291,6 +292,7 @@ export const buildMap = (cfg, root, runner) => {
   // A live run's areas are being audited, not waiting, so the queue counts from 1 past them.
   const queue = new Map(picked.filter((id) => !holder.has(id)).map((id, i) => [id, i + 1]));
   const icons = areaIcons(iconsFor(cfg, root), areas);
+  const open = openFindingsIn(cfg, git, root);
 
   const out = areas.map((area) => {
     const own = passes.get(area.id) ?? [];
@@ -308,6 +310,7 @@ export const buildMap = (cfg, root, runner) => {
       passes: history,
       stage: run ? run.stages[area.id] ?? 'queued' : null,
       ...(stale ? { staleLines: stale } : {}),
+      ...(open.get(area.id)?.length ? { openFindings: open.get(area.id).length, open: open.get(area.id).map(({ round, claim, where }) => ({ round, claim, where })) } : {}),
       ...(icons.byArea.has(area.id) ? { icon: icons.byArea.get(area.id) } : {}),
       _raw: own,
     };

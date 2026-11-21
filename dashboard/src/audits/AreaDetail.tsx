@@ -28,6 +28,18 @@ function Passes({ area }: { area: AuditArea }) {
   );
 }
 
+/** The findings no fixer has acted on, each with the round that reported it. */
+function OpenFindings({ area }: { area: AuditArea }) {
+  if (!area.open?.length) return null;
+  return (
+    <ul className={s.open} aria-label="open findings">
+      {area.open.map((f, i) => (
+        <li key={`${f.round}-${i}`} title={f.where}><span className={s.openRound}>r{f.round}</span> {f.claim}</li>
+      ))}
+    </ul>
+  );
+}
+
 /** Reviewer A's findings and B's as two pills overlapping in the middle: only A's, the ones both found, only B's. */
 function Venn({ a, both, b }: { a: ReactNode; both: ReactNode; b: ReactNode }) {
   return (
@@ -57,7 +69,9 @@ export function AreaDetail({ area, holder }: { area: AuditArea | undefined; hold
             {area.stage && <DetailRow label="this run">{stageLabelOf(area.stage)}</DetailRow>}
             {last && <DetailRow label={`left after round ${last.round}`}>{last.left.toFixed(1)}</DetailRow>}
             {area.staleLines ? <DetailRow label="lines changed since">{area.staleLines.toLocaleString()}</DetailRow> : null}
+            {area.openFindings ? <DetailRow label="open findings">{area.openFindings}</DetailRow> : null}
           </DetailList>
+          <OpenFindings area={area} />
           <Passes area={area} />
         </div>
       )}

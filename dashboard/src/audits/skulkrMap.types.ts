@@ -30,6 +30,16 @@ export interface AuditArea {
   readonly staleLines?: number;
   /** Its icon's name, a key of the map's `icons`; absent when the config gives it none. */
   readonly icon?: string;
+  /** How many findings a round reported that no fixer has acted on since; absent when none. */
+  readonly openFindings?: number;
+  /** Those findings, oldest first, each with the round that first reported it. */
+  readonly open?: readonly OpenFinding[];
+}
+
+export interface OpenFinding {
+  readonly round: number;
+  readonly claim: string;
+  readonly where: string;
 }
 
 export type LaneStepName = 'A' | 'B' | 'match' | 'fix' | 'patch';
