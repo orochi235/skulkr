@@ -26,11 +26,11 @@ const stage = (ctx, id, mbox) => {
 const nodeEnv = (ctx, extra = []) => ({ FROZEN_TREE: ctx.frozenTree, ...ctx.identity, ...(extra.length ? { VERIFY_EXTRA: extra.join(' ') } : {}) });
 
 /** The verify step alone on `mbox`, its GUI part with `gui`, in a job of its own. Answers its verdict. */
-const verifyJob = async (ctx, area, mbox, { gui, label }) => {
+const verifyJob = async (ctx, area, mbox, { gui, label, extra }) => {
   stage(ctx, area.id, mbox);
   const to = jobDir(ctx.nightDir, area.id, `verify-${label}${gui ? '-gui' : ''}`);
   await dispatch(ctx, area, 'verify', {
-    kind: 'test', expect: 'none', gui, shell: verifyShell(ctx.cfg, area.id, { gui }), to, env: nodeEnv(ctx),
+    kind: 'test', expect: 'none', gui, shell: verifyShell(ctx.cfg, area.id, { gui }), to, env: nodeEnv(ctx, extra),
     task: ctx.cfg.names.task(ctx.round, area.id, 'verify'), logPath: join(to, '..', `verify-${label}${gui ? '-gui' : ''}.log`),
     timeoutMin: timeoutOf(ctx.cfg, { model: false }),
     about: `Runs ${gui ? 'the browser part of ' : ''}the verify step on audit round ${ctx.round}'s fixes to area ${area.id}.`,
@@ -40,14 +40,15 @@ const verifyJob = async (ctx, area, mbox, { gui, label }) => {
 
 /**
  * The verdict on the commits a model job left in `dir` (its mbox `mbox`): the one that job ran, or one run now where
- * it left none, then the GUI part where the changes need it and the rest passed.
+ * it left none, then the GUI part where the changes need it and the rest passed; `extra` are files checked beside
+ * the changed ones.
  */
-export const checkedIn = async (ctx, area, dir, mbox, label) => {
+export const checkedIn = async (ctx, area, dir, mbox, label, extra = []) => {
   const verify = verifyOf(ctx.cfg);
   let plain = { ...verdictIn(dir), dir };
-  if (plain.unrun) plain = await verifyJob(ctx, area, mbox, { gui: false, label });
+  if (plain.unrun) plain = await verifyJob(ctx, area, mbox, { gui: false, label, extra });
   if (!plain.ok || !needsGui(verify, plain.dir)) return plain;
-  const gui = await verifyJob(ctx, area, mbox, { gui: true, label });
+  const gui = await verifyJob(ctx, area, mbox, { gui: true, label, extra });
   const sum = (k) => (plain.counts?.[k] ?? 0) + (gui.counts?.[k] ?? 0);
   const counts = plain.counts || gui.counts ? { failed: sum('failed'), passed: sum('passed'), total: sum('total') } : undefined;
   return { ...gui, ok: gui.ok, counts, failedFiles: gui.failedFiles, files: plain.files, guiRan: true };

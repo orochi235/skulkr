@@ -8,6 +8,7 @@
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { runArea } from './area.mjs';
+import { capstoneRepairer } from './capstone.mjs';
 import { addWorktree, gitIn, mainCheckout, removeWorktree } from './batch.mjs';
 import { JOB_IN, nextClock, nodesAt } from './config.mjs';
 import { createSlots, runUntilFree } from './jobs.mjs';
@@ -18,6 +19,7 @@ import { areaStats, areasInFlight, gitTouched, inheritPasses, nextRound, passesI
 import { claimRound, claimedRounds, clearStatus, clearStop, liveRuns, planLock, pruneRuns, readJson, runDir, stopRequested, writeStatus, writeSummary } from './runs.mjs';
 import { fixSweep, runSweep, sweepLine } from './sweep.mjs';
 import { mayStartArea } from './usage.mjs';
+import { verifyLine, verifyOf } from './verify.mjs';
 
 const POLL_MS = 15_000;
 const UNAVAILABLE_TTL_MS = 5 * 60_000;
@@ -176,7 +178,7 @@ const sweepName = (cfg) => cfg.sweep?.title?.toLowerCase() ?? cfg.sweep?.id ?? '
 
 /** The sweep's part of the night's summary. */
 const sweepSummary = (cfg, sweep, outcomes) => (sweep.ran
-  ? { ...sweep.summary, minutes: Number(sweep.minutes.toFixed(1)), exit: sweep.exit, fixCommits: sweep.fix?.commits.length ?? 0, outcome: outcomes[cfg.sweep.id] }
+  ? { ...sweep.summary, minutes: Number(sweep.minutes.toFixed(1)), exit: sweep.exit, fixCommits: sweep.fix?.commits.length ?? 0, outcome: outcomes[cfg.sweep.id], ...(sweep.fix?.verify ? { verify: sweep.fix.verify } : {}) }
   : { skipped: sweep.skipped ?? `did not run: ${sweep.why}` });
 
 /** What every job of the run reads: its round, trees, budget, logging, and the slots it takes jobs in. */
@@ -321,9 +323,12 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     setStep('patch');
     const landing = { cfg, root, round: p.round, commit: p.commit, outcomes, say };
     const branches = patchAreas({ ...landing, nightDir: status.nightDir, results });
-    if (sweepFixed) sweep.fix = patchSweep({ ...landing, fixed: sweepFixed, branches });
+    if (sweepFixed) sweep.fix = { ...patchSweep({ ...landing, fixed: sweepFixed, branches }), ...(sweepFixed.verify ? { verify: sweepFixed.verify } : {}) };
     setStep('batch');
-    report = await batchAndTest({ ...landing, git, date: ctx.date, nightDir: status.nightDir, branches, results, sweep, merge: args.merge, setStep });
+    const repair = verifyOf(cfg) ? capstoneRepairer(ctx, { root, results }) : undefined;
+    report = await batchAndTest({ ...landing, git, date: ctx.date, nightDir: status.nightDir, branches, results, sweep, merge: args.merge, setStep, repair });
+    const checked = verifyLine(results);
+    if (checked) report += `; ${checked}`;
     const unrun = results.filter((s) => s.incomplete?.length).map((s) => `${s.id} (${s.incomplete.join(', ')})`);
     if (unrun.length) report += `; ${unrun.length} of ${results.length} areas incomplete, reviewer never ran or never finished: ${unrun.join(', ')}`;
     say(`night: ${report}`);
@@ -332,7 +337,7 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     writeSummary(p.round, {
       round: p.round, commit: p.commit, started: status.started, ended: new Date().toISOString(), nightDir: status.nightDir, report, planned: status.areas,
       weightedTokens: status.weightedTokens, costUsd: status.costUsd, capUsd: args.capUsd, sweep: sweepSummary(cfg, sweep, outcomes),
-      areas: results.map((s) => ({ id: s.id, a: s.a, b: s.b, m: s.m, distinct: s.distinct, chapman: s.chapman, patches: s.patches, outcome: outcomes[s.id], ...(s.incomplete?.length ? { incomplete: s.incomplete } : {}), minutes: s.jobs.minutes, weightedTokens: s.jobs.weightedTokens, costUsd: s.jobs.costUsd, budgetHit: s.budgetHit })),
+      areas: results.map((s) => ({ id: s.id, a: s.a, b: s.b, m: s.m, distinct: s.distinct, chapman: s.chapman, patches: s.patches, outcome: outcomes[s.id], ...(s.incomplete?.length ? { incomplete: s.incomplete } : {}), ...(s.verify ? { verify: s.verify } : {}), minutes: s.jobs.minutes, weightedTokens: s.jobs.weightedTokens, costUsd: s.jobs.costUsd, budgetHit: s.budgetHit })),
     }, cfg.state);
     clearStatus(p.round, cfg.state);
   }

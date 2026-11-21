@@ -139,11 +139,9 @@ export const runGate = (cfg, { root, batch, logPath }) =>
     const child = spawn(cmd, args, { cwd: cfg.gate.cwd === 'root' ? root : batch.tree, stdio: ['ignore', 'pipe', 'pipe'] });
     child.stdout.pipe(log, { end: false });
     child.stderr.pipe(log, { end: false });
-    child.on('error', () => done(1));
-    child.on('close', (status) => {
-      log.end();
-      done(status ?? 1);
-    });
+    child.on('error', () => log.end(() => done(1)));
+    // Answered once the log is flushed: a red gate's log is read back for its failures.
+    child.on('close', (status) => log.end(() => done(status ?? 1)));
   });
 
 /** Merges `main` into the batch checked out at `tree` unless it already holds it. Answers whether it moved, the new tip, or a conflict.

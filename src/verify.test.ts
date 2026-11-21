@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { TIMED_OUT, failedFilesIn, failureExcerpt, fileCountsOf, needsGui, verdictOf, verifyLines } from './verify.mjs';
+import { TIMED_OUT, failedFilesIn, failureExcerpt, fileCountsOf, needsGui, verdictOf, verifyLine, verifyLines } from './verify.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -116,5 +116,16 @@ describe('verifyLines in bash', () => {
     expect(out('verify.log')).toBe('files: a.ts\n2');
     expect(out('gui.txt')).toBe('--related=a.ts');
     expect(existsSync(join(tree, 'x.test.ts'))).toBe(false);
+  });
+});
+
+describe('verifyLine', () => {
+  it('counts the areas that passed at once and names the rest by how they ended', () => {
+    const areas = [
+      { id: 'a', verify: { ok: true, repairs: 0 } }, { id: 'b', verify: { ok: true, repairs: 0 } }, { id: 'c', verify: { ok: true, repairs: 1 } },
+      { id: 'd', verify: { ok: false, timedOut: true, repairs: 0 } }, { id: 'e', verify: { ok: false, repairs: 2 } }, { id: 'f' },
+    ];
+    expect(verifyLine(areas)).toBe('verify: 2 passed, 1 passed after repair (c), 1 timed out unverified (d), 1 left out failing (e)');
+    expect(verifyLine([{ id: 'f' }])).toBe('');
   });
 });

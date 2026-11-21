@@ -7,10 +7,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { JOB_OUT } from './config.mjs';
+import { stripAnsi } from './ansi.mjs';
 
 const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 const readIf = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : '');
-const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
 
 /** What a timed-out command exits with: perl's alarm is SIGALRM. */
 export const TIMED_OUT = 142;
@@ -48,7 +48,7 @@ const TEST_PATH = /([\w@./-]+\.(?:test|spec)\.[cm]?[jt]sx?)\b/;
 
 /** vitest's file-level counts in `text`: its last `Test Files  1 failed | 2 passed (3)` line, or undefined. */
 export const fileCountsOf = (text) => {
-  const line = text.replace(ANSI, '').split('\n').filter((l) => /^\s*Test Files\s/.test(l)).at(-1);
+  const line = stripAnsi(text).split('\n').filter((l) => /^\s*Test Files\s/.test(l)).at(-1);
   if (!line) return undefined;
   const n = (word) => Number(new RegExp(`(\\d+) ${word}`).exec(line)?.[1] ?? 0);
   const total = Number(/\((\d+)\)\s*$/.exec(line)?.[1] ?? n('failed') + n('passed'));
@@ -57,7 +57,7 @@ export const fileCountsOf = (text) => {
 
 /** The test files `text` reports failing: each path on a `FAIL` line, once. */
 export const failedFilesIn = (text) =>
-  [...new Set(text.replace(ANSI, '').split('\n').filter((l) => /\bFAIL\b/.test(l)).flatMap((l) => TEST_PATH.exec(l)?.[1] ?? []))];
+  [...new Set(stripAnsi(text).split('\n').filter((l) => /\bFAIL\b/.test(l)).flatMap((l) => TEST_PATH.exec(l)?.[1] ?? []))];
 
 /**
  * The verdict of one verify run from its exit status and log: `{ ok, exit, counts, failedFiles, why, timedOut? }`. It
@@ -101,7 +101,7 @@ const EXCERPT_LINES = 300;
  * middle cut when it runs past {@link EXCERPT_LINES}.
  */
 export const failureExcerpt = (log) => {
-  const lines = log.replace(ANSI, '').split('\n');
+  const lines = stripAnsi(log).split('\n');
   const first = lines.findIndex((l) => /\bFAIL\b|Failed Tests|Unhandled Error|Error:/.test(l));
   const tail = lines.slice(first < 0 ? Math.max(0, lines.length - EXCERPT_LINES) : first);
   if (tail.length <= EXCERPT_LINES) return tail.join('\n').trim();
@@ -114,4 +114,20 @@ export const verdictText = (v) => {
   if (v.ok) return `passed${v.counts ? ` (${v.counts.total} test files)` : ''}`;
   const files = v.failedFiles?.length ? ` (${v.failedFiles.slice(0, 3).join(', ')}${v.failedFiles.length > 3 ? ', …' : ''})` : '';
   return `failed: ${v.why}${files}`;
+};
+
+/**
+ * The round's verify results in one clause for its closing line: how many areas passed at once, passed after a
+ * repair, timed out unverified, or were left out still failing, naming all but the first. Empty with none checked.
+ */
+export const verifyLine = (areas) => {
+  const checked = areas.filter((a) => a.verify);
+  if (!checked.length) return '';
+  const group = (test) => checked.filter((a) => test(a.verify)).map((a) => a.id);
+  const parts = [
+    [group((v) => v.ok && !v.repairs).length, 'passed', []],
+    ...[[group((v) => v.ok && v.repairs > 0), 'passed after repair'], [group((v) => v.timedOut), 'timed out unverified'], [group((v) => !v.ok && !v.timedOut), 'left out failing']]
+      .map(([ids, what]) => [ids.length, what, ids]),
+  ].filter(([n]) => n > 0);
+  return `verify: ${parts.map(([n, what, ids]) => `${n} ${what}${ids.length ? ` (${ids.join(', ')})` : ''}`).join(', ')}`;
 };
