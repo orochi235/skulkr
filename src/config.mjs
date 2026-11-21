@@ -244,7 +244,7 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
       /** A runner job of round `round`'s batch gate, by its task name. */
       batchJobOf: (round) => new RegExp(`${escape(batchPrefix)}-\\d{4}-\\d\\d-\\d\\d-(?:${pre}|skulkr)${round}(?:-|$)`),
       /** A step's task name → `[area, step]`. */
-      step: new RegExp(`^(?:${pre}|skulkr)\\d+-(.+)-(A|B|match|fix)$`),
+      step: new RegExp(`^(?:${pre}|skulkr)\\d+-(.+)-(A|B|match|fix|repair|verify)$`),
       /** A night log's conflict line → the area. */
       conflict: new RegExp(`^batch: ${pre}\\d+-(\\S+) conflicts`),
       trees: { review: `${name}-skulkr-r`, fix: `${name}-skulkr-f` },

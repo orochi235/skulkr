@@ -1,5 +1,5 @@
 /** What the audit page says about runs: each one's headline, its lanes, and the jobs its log reports. */
-import type { AuditContinuous, AuditRun, LaneStep, LaneStepName } from './skulkrMap.types';
+import type { AuditContinuous, AuditRun, LaneStep, LaneStepKey } from './skulkrMap.types';
 
 /**
  * `m` minutes as a lane says them, `<1 min`, `8.2 min` or `12 min`, a tenth shown under ten. Spelled out: the lanes
@@ -18,7 +18,7 @@ const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 /** Between a running step's node and how long it has run, in its label. */
 export const NODE_SEP = ' · ';
 
-export function stepText(step: LaneStepName, s: LaneStep, now: number): string {
+export function stepText(step: LaneStepKey, s: LaneStep, now: number): string {
   if (s.state === 'running') {
     const count = s.total ? `${s.done ?? 0}/${s.total} · ` : '';
     return `${s.node ?? ''}${NODE_SEP}${count}${s.since ? minutesSince(s.since, now) : 'running'}`;
@@ -28,6 +28,7 @@ export function stepText(step: LaneStepName, s: LaneStep, now: number): string {
   if (step === 'A' || step === 'B') return `${s.findings ?? 0} found · ${minutesText(s.minutes ?? 0)}`;
   if (step === 'match') return matchText(s.shared ?? 0, s.a ?? 0, s.b ?? 0);
   if (step === 'fix') return `${plural(s.commits ?? 0, 'commit')} · ${minutesText(s.minutes ?? 0)}`;
+  if (step === 'repair') return s.outcome === 'timed out' ? 'timed out' : s.attempts ? `${plural(s.attempts, 'repair')} · passed` : 'verified';
   return `${s.commits ?? 0} applied`;
 }
 
@@ -108,8 +109,15 @@ export function parseJob(line: string): Job | null {
   if ((m = /^patch (\S+): (\d+) commits on (\S+)/.exec(line))) {
     return { kind: 'patch', label: 'patch', area: m[1]!, what: `${m[2]} commits on ${m[3]}`, bad: false };
   }
-  if ((m = /^patch (\S+): (did not apply: .*)$/.exec(line))) {
+  if ((m = /^patch (\S+): ((?:did not apply|left out): .*)$/.exec(line))) {
     return { kind: 'patch', label: 'patch', area: m[1]!, what: m[2]!, bad: true };
+  }
+  // skulkr's own check of a fix, and each repair of one (`repair.mjs`).
+  if ((m = /^verify ([^\s:]+): (passed.*|failed.*|still failing.*|timed out.*)$/.exec(line))) {
+    return { kind: 'fix', label: 'verify', area: m[1]!, what: m[2]!, bad: !m[2]!.startsWith('passed') };
+  }
+  if ((m = /^repair (\S+) (\S+) on (\S+): (\d+) commits, ([\d.]+) min; verify (.*)$/.exec(line))) {
+    return { kind: 'fix', label: `repair ${m[2]}`, area: m[1]!, what: `${plural(Number(m[4]), 'commit')}; verify ${m[6]}`, node: m[3], minutes: Number(m[5]), bad: m[6] !== 'passed' };
   }
   if ((m = /^batch: audit\d+-(\S+) conflicts/.exec(line))) {
     return { kind: 'batch', label: 'batch', area: m[1]!, what: 'conflicts; left out of the batch', bad: true };
@@ -119,7 +127,7 @@ export function parseJob(line: string): Job | null {
     return { kind: 'sweep', label: 'sweep', area: '', what: m[1]!.replace(/; see \S+/, ''), bad: m[1]!.startsWith('did not run') };
   }
   if (line.startsWith('fleet:')) return { kind: 'fleet', label: 'fleet', area: '', what: line.replace(/^fleet: /, ''), bad: line.includes('fail') };
-  if ((m = /^(night|record|batch): (.*)$/.exec(line))) return { kind: 'night', label: m[1]!, area: '', what: m[2]!, bad: false };
+  if ((m = /^(night|record|batch|capstone): (.*)$/.exec(line))) return { kind: 'night', label: m[1]!, area: '', what: m[2]!, bad: false };
   return null;
 }
 

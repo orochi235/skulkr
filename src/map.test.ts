@@ -249,3 +249,32 @@ describe('gate outcomes and reruns', () => {
     expect([...progressOfTop(top)]).toEqual([['audit50-a-A', { done: 4, total: 9 }]]);
   });
 });
+
+describe('nightLanes repair step', () => {
+  const fix = 'fix 1/1 a on studio: 2 commits, 8.0 min, 0.5M weighted tokens';
+
+  it('is absent until skulkr checks the fix, then done once its verify passes', () => {
+    expect(nightLanes(fix, ['a'])[0]!.steps).not.toHaveProperty('repair');
+    expect(nightLanes(`${fix}\nverify a: passed (3 test files)`, ['a'])[0]!.steps.repair).toEqual({ state: 'done', attempts: 0, outcome: 'passed' });
+  });
+
+  it('counts repairs, runs while a failing verdict waits on one, and fails once the area is left out', () => {
+    const log = [fix, 'verify a: failed: 1 of 3 test files failed (a/x.test.ts)', 'repair a 1/2 on teitou: 1 commits, 4.0 min; verify failed: exited 1'];
+    const running = [{ task: 'audit9-a-repair', node: 'studio', started: '2026-11-20T23:00:00Z' }];
+    expect(nightLanes(log.join('\n'), ['a'], running)[0]!.steps.repair).toMatchObject({ state: 'running', attempts: 1, node: 'studio', since: '2026-11-20T23:00:00Z' });
+    const left = [...log, 'repair a 2/2 on studio: 0 commits, 3.5 min; verify failed: exited 1', 'verify a: still failing after 2 repairs; left out of the batch', 'patch a: left out: verify still failing after 2 repairs (exited 1)'];
+    const [lane] = nightLanes(left.join('\n'), ['a']);
+    expect(lane!.steps.repair).toMatchObject({ state: 'failed', attempts: 2, minutes: 7.5, why: 'still failing after 2 repairs' });
+    expect(lane!.steps.patch).toEqual({ state: 'failed', why: 'verify still failing after 2 repairs (exited 1)' });
+  });
+
+  it('shows a GUI verify job running before any verdict', () => {
+    const running = [{ task: 'audit9-a-verify', node: 'msb-uai', started: '2026-11-20T23:00:00Z' }];
+    expect(nightLanes(fix, ['a'], running)[0]!.steps.repair).toEqual({ state: 'running', node: 'msb-uai', since: '2026-11-20T23:00:00Z' });
+  });
+
+  it('counts a capstone repair as one more attempt', () => {
+    const log = [fix, 'verify a: passed (3 test files)', 'repair a capstone on studio: 1 commits, 5.0 min; verify passed'];
+    expect(nightLanes(log.join('\n'), ['a'])[0]!.steps.repair).toMatchObject({ state: 'done', attempts: 1, outcome: 'passed' });
+  });
+});

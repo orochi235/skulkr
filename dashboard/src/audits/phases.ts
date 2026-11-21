@@ -2,7 +2,7 @@
 import { getOwn } from '@weasel-js/registry';
 import type { SpanState, SpanStripSpan } from '@weasel-js/ui/components/SpanStrip';
 import { NODE_SEP, minutesText, stepText } from './runData';
-import type { AuditArea, AuditLane, AuditRun, FleetProgress, GateFailures, LaneStep, LaneStepName } from './skulkrMap.types';
+import type { AuditArea, AuditLane, AuditRun, LaneStep, LaneStepKey } from './skulkrMap.types';
 import palette from './palette.module.css';
 
 /** Where every area goes, in order, `reviewed` once one of its two reviews is in: their colors run along one sweep,
@@ -19,13 +19,18 @@ export const OFF_PIPELINE = ['conflict', 'done'] as const;
 export const AUDIT_PHASES = [...PIPELINE, ...OFF_PIPELINE] as const;
 export type AuditPhase = typeof AUDIT_PHASES[number];
 
-/** A lane's stretches, in order: the two reviewers run side by side, so they share one. */
-const PARTS = ['review', 'match', 'fix', 'patch'] as const;
+/** A lane's stretches, in order: the two reviewers run side by side, so they share one. A lane has a repair stretch
+ *  only once skulkr has checked its fix. */
+const PARTS = ['review', 'match', 'fix', 'repair', 'patch'] as const;
 type Part = typeof PARTS[number];
-const STEPS_OF: Readonly<Record<Part, readonly LaneStepName[]>> = { review: ['A', 'B'], match: ['match'], fix: ['fix'], patch: ['patch'] };
+const STEPS_OF: Readonly<Record<Part, readonly LaneStepKey[]>> = { review: ['A', 'B'], match: ['match'], fix: ['fix'], repair: ['repair'], patch: ['patch'] };
 
 /** How long each stretch usually takes, in minutes: its width until it has a measured one. */
-export const TYPICAL_MINUTES: Readonly<Record<Part, number>> = { review: 5, match: 0.5, fix: 18, patch: 0.5 };
+export const TYPICAL_MINUTES: Readonly<Record<Part, number>> = { review: 5, match: 0.5, fix: 18, repair: 10, patch: 0.5 };
+
+const WAITING: LaneStep = { state: 'waiting' };
+/** A lane's step by key; a lane not yet checked has no repair step, which reads as waiting. */
+const stepOf = (lane: AuditLane, key: LaneStepKey): LaneStep => lane.steps[key] ?? WAITING;
 
 /** How far past now a run's clock runs, in minutes: room for the steps still to come. */
 export const CLOCK_AHEAD_MINUTES = 20;
@@ -52,7 +57,7 @@ interface PartState {
 }
 
 function partState(lane: AuditLane, part: Part): PartState {
-  const steps = STEPS_OF[part].map((name) => lane.steps[name]);
+  const steps = STEPS_OF[part].map((name) => stepOf(lane, name));
   const state = steps.some((s) => s.state === 'failed') ? 'failed'
     : steps.every((s) => s.state === 'done') ? 'done'
     : steps.some((s) => s.state !== 'waiting') ? 'running'
@@ -60,7 +65,7 @@ function partState(lane: AuditLane, part: Part): PartState {
   return { part, state, steps };
 }
 
-const partsOf = (lane: AuditLane): PartState[] => PARTS.map((part) => partState(lane, part));
+const partsOf = (lane: AuditLane): PartState[] => PARTS.filter((part) => part !== 'repair' || lane.steps.repair).map((part) => partState(lane, part));
 
 /** Whether an area is through: patched, fixed with no commits to patch, or reviewed or matched with nothing to fix. */
 export function isFinished(lane: AuditLane): boolean {
@@ -86,7 +91,7 @@ export function phaseOf(lane: AuditLane): AuditPhase {
 function partPhase(p: PartState): AuditPhase {
   if (p.state === 'failed') return 'conflict';
   if (p.part === 'review' && p.steps.some((s) => s.state === 'done')) return 'reviewed';
-  return p.part;
+  return p.part === 'repair' ? 'fix' : p.part;
 }
 
 /** A round's areas counted by phase: how many are done of all of them, then how many sit in each phase that has any,
@@ -101,9 +106,10 @@ export function stageCountsOf(lanes: readonly AuditLane[]): { done: number; tota
   return { done: by.get('done') ?? 0, total: lanes.length, stages };
 }
 
-/** Whether the round's pass over an area is done: it is through, or its fixer has finished and only its patch, which
- *  lands with the round's batch, is left. */
-export const passDone = (lane: AuditLane): boolean => isFinished(lane) || lane.steps.fix.state === 'done';
+/** Whether the round's pass over an area is done: it is through, or its fixer has finished, no repair is under way, and
+ *  only its patch, which lands with the round's batch, is left. */
+export const passDone = (lane: AuditLane): boolean =>
+  isFinished(lane) || (lane.steps.fix.state === 'done' && lane.steps.repair?.state !== 'running');
 
 /** Every area a live run holds, by id, and its phase on the map: `done` once its pass is. */
 export function phasesOf(runs: readonly AuditRun[]): ReadonlyMap<string, AuditPhase> {
@@ -243,7 +249,7 @@ export function laneViewOf(lane: AuditLane, now: number, roundStart: number): La
     if (p.state === 'running') elapsed = minutesText((now - start) / MIN);
     if (p.state === 'done' || p.state === 'failed') ended = Math.max(ended ?? end, end);
     cursor = end;
-    const title = STEPS_OF[p.part].map((name) => `${name}: ${stepText(name, lane.steps[name], now)}`).join('; ');
+    const title = STEPS_OF[p.part].map((name) => `${name}: ${stepText(name, stepOf(lane, name), now)}`).join('; ');
     return {
       id: p.part, label: partLabel(lane, p, now), start, ms: Math.max(0, end - start), color: phaseColor(phase), state: SPAN_STATE[p.state], title,
       ...(waitsForBatch ? { fill: patchFillOf(lane) } : p.state === 'waiting' ? { fill: 0 } : {}),
@@ -263,13 +269,14 @@ export function runClockOf(run: AuditRun, now: number): { from: number; to: numb
 /** The steps view's columns, one per step, each the color of the phase it stands for. */
 /** The steps view's columns: the two blind reviews run side by side, A over B, in the first, and every later step
  *  covers both stripes. */
-const STEP_COLUMNS: readonly { step: LaneStepName; part: Part; phase: AuditPhase; start: number; width: number; track?: number; trackSpan?: number }[] = [
+const STEP_COLUMNS: readonly { step: LaneStepKey; part: Part; phase: AuditPhase; start: number; width: number; track?: number; trackSpan?: number }[] = [
   { step: 'A', part: 'review', phase: 'review', start: 0, width: 1 },
   { step: 'B', part: 'review', phase: 'reviewed', start: 0, width: 1, track: 1 },
   { step: 'match', part: 'match', phase: 'match', start: 1, width: 1, trackSpan: 2 },
   { step: 'fix', part: 'fix', phase: 'fix', start: 2, width: 1, trackSpan: 2 },
+  { step: 'repair', part: 'repair', phase: 'fix', start: 3.25, width: 0.5, trackSpan: 2 },
   // Applying a patch takes no time to speak of; its column is wide enough for its tally.
-  { step: 'patch', part: 'patch', phase: 'patch', start: 3 + 0.25, width: 0.6, trackSpan: 2 },
+  { step: 'patch', part: 'patch', phase: 'patch', start: 3.75, width: 0.6, trackSpan: 2 },
 ];
 
 /** A narrow track after the fix's own, lit while its fixer runs its checks past its last commit. */
@@ -305,7 +312,7 @@ const RUNNING_FILL_CAP = 0.9;
  */
 export function laneStepsOf(lane: AuditLane, now: number): SpanStripSpan[] {
   return STEP_COLUMNS.map(({ step, part, phase, start, width, track, trackSpan }): SpanStripSpan => {
-    const s = lane.steps[step];
+    const s = stepOf(lane, step);
     const since = s.state === 'running' ? ms(s.since) : null;
     const fill = s.state === 'done' || s.state === 'failed' ? 1
       : step === 'patch' ? patchFillOf(lane)
@@ -320,78 +327,4 @@ export function laneStepsOf(lane: AuditLane, now: number): SpanStripSpan[] {
     };
   }).flatMap((span) => (span.id === 'patch' && span.state !== 'failed' ? withUnfixed(span, lane) : span.id === 'fix' ? [fixWhileChecking(span, lane.steps.fix), checksSpan(lane.steps.fix)] : [span]))
     .map((span) => withInk(span));
-}
-
-/** The steps every area shares once its own lane is done, in order. The fleet run's column also holds the waits before
- *  it (for the merge lock, then for the fleet) and the fast-forward after it, which is instant. */
-const SHARED_STEPS = [
-  { id: 'batch', label: 'batch', steps: ['batch'] },
-  { id: 'fleet', label: 'fleet run', steps: ['merge-wait', 'fleet-wait', 'fleet', 'merge'] },
-] as const;
-
-/** The steps where the fleet run's column is waiting for its turn rather than running. */
-const FLEET_WAITS: readonly string[] = ['merge-wait', 'fleet-wait'];
-
-/** Whether the run has reached the steps its areas share: the batch and the fleet run. */
-export const inSharedSteps = (run: AuditRun): boolean =>
-  !run.running || SHARED_STEPS.some((s) => (s.steps as readonly string[]).includes(run.step));
-
-/** The two fleet runs a batch's gate starts at once, a stripe each in the fleet column, in two of the ramp's cold
- *  colors so neither reads as a step of an area's own. */
-export const GATE_RUNS = [
-  { id: 'tests', label: 'fleet tests', phase: 'match' },
-  { id: 'build', label: 'postbuild', phase: 'review' },
-] as const;
-export type GateRun = typeof GATE_RUNS[number]['id'];
-
-/** A running fleet run's label: the node running it first, where known, then what it is and how far it has got. */
-const activeGateLabel = (name: string, node: string | null, fleet: FleetProgress | null, fill: number): string =>
-  [...(node ? [node] : []), name, ...(fleet ? [`${Math.round(fill * 100)}%`] : [])].join(NODE_SEP);
-
-/** A gate run's failures in a few words: how many failed, and in how many files where that is fewer. */
-const failedText = (f: GateFailures): string =>
-  `${f.count.toLocaleString()} failed${f.files < f.count ? ` in ${f.files.toLocaleString()} file${f.files === 1 ? '' : 's'}` : ''}`;
-
-/** Whether a shared-lane span's label leads with the node running it, the part that pulses. */
-export const leadsWithNode = (span: SpanStripSpan, run: AuditRun): boolean =>
-  !span.id.startsWith('fleet-') || !!run.gateNodes?.[span.id.slice('fleet-'.length) as GateRun];
-
-const GATE_SPAN_STATE = { running: 'active', passed: 'done', failed: 'failed' } as const;
-
-/** The run's lane for every area at once: the batch, then its two fleet runs side by side, a fleet run filled by how
- *  far it has got, or saying it waits for its turn. A finished round says how each fleet run ended, and a red round
- *  whose batch runs again shows it running. */
-export function sharedSpansOf(run: AuditRun): SpanStripSpan[] {
-  const red = !run.running && /^red\b/.test(run.report ?? '');
-  const again = !run.running && !!run.rerun;
-  const at = run.running ? SHARED_STEPS.findIndex((s) => (s.steps as readonly string[]).includes(run.step))
-    : red || again ? SHARED_STEPS.findIndex((s) => s.id === 'fleet') : SHARED_STEPS.length;
-  const waiting = run.running && FLEET_WAITS.includes(run.step);
-  const stepState = (i: number) => (i < at ? 'done' : i === at ? (waiting ? 'pending' : 'active') : 'pending');
-  return SHARED_STEPS.flatMap((s, i): SpanStripSpan[] => {
-    if (s.id !== 'fleet') {
-      const state = stepState(i);
-      const fill = state === 'done' ? 1 : 0;
-      return [{ id: s.id, start: i, ms: 1, trackSpan: GATE_RUNS.length, state, fill, label: s.label, color: phaseColor('fix') }];
-    }
-    return GATE_RUNS.map((g, track): SpanStripSpan => {
-      const ended = run.gates?.[g.id] ?? null;
-      const state = !run.running && ended ? GATE_SPAN_STATE[ended] : red && !again ? 'failed' : stepState(i);
-      const fleet = state === 'active' ? run.fleet?.[g.id] ?? null : null;
-      const fill = state === 'done' || state === 'failed' ? 1 : fleet && fleet.total > 0 ? Math.min(1, fleet.done / fleet.total) : 0;
-      const failed = run.failures?.[g.id] ?? null;
-      const said = failed ? failedText(failed) : '';
-      return {
-        id: `fleet-${g.id}`, start: i, ms: 1, track, state, fill,
-        label: state === 'active' ? `${activeGateLabel(g.label, run.gateNodes?.[g.id] ?? null, fleet, fill)}${said ? `${NODE_SEP}${said}` : ''}`
-          : waiting && i === at ? `${g.label}${NODE_SEP}waiting`
-            : state === 'failed' && said ? `${g.label}${NODE_SEP}${said}` : g.label,
-        color: phaseColor(state === 'failed' ? 'conflict' : g.phase),
-        ...(failed || fleet ? { title: [
-          ...(fleet ? [`${fleet.done.toLocaleString()} of ${fleet.total.toLocaleString()} done`] : []),
-          ...(failed ? [...failed.names, ...(failed.files > failed.names.length ? [`and ${failed.files - failed.names.length} more`] : [])] : []),
-        ].join('\n') } : {}),
-      };
-    });
-  });
 }

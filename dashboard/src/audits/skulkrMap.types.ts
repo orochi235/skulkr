@@ -31,6 +31,9 @@ export interface AuditArea {
 }
 
 export type LaneStepName = 'A' | 'B' | 'match' | 'fix' | 'patch';
+/** A lane's steps, the repair among them once skulkr has checked the fix: it verifies what the fixer committed and
+ *  repairs it while that fails. */
+export type LaneStepKey = LaneStepName | 'repair';
 
 export interface LaneStep {
   readonly state: 'waiting' | 'running' | 'done' | 'failed';
@@ -58,6 +61,9 @@ export interface LaneStep {
   /** Of `of`, how many the fixer found were no defect. */
   readonly dismissed?: number;
   readonly why?: string;
+  /** A repair step's repair jobs so far, and how its last verify ended. */
+  readonly attempts?: number;
+  readonly outcome?: 'passed' | 'failed' | 'timed out';
   /** When a done step began and ended, from onto's record of the job that ran it. */
   readonly started?: string;
   readonly ended?: string;
@@ -65,7 +71,7 @@ export interface LaneStep {
 
 export interface AuditLane {
   readonly id: string;
-  readonly steps: Readonly<Record<LaneStepName, LaneStep>>;
+  readonly steps: Readonly<Record<LaneStepName, LaneStep>> & { readonly repair?: LaneStep };
   /** The pass this round has made of the area, once matched, as its record will hold it. */
   readonly pass?: AuditPass;
 }

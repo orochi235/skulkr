@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { changedSincePass, heatScaleOf, labelIn, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
 import { continuousText, headlineOf, parseJob, recentJobsOf, spendOf, stepText } from './runData';
-import { inSharedSteps, leadsWithNode, sharedSpansOf, stageCountsOf } from './phases';
+import { stageCountsOf } from './phases';
+import { inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
 import { ticksFor } from './RoundsChart';
 import { layoutMap, squarify } from './mapLayout';
 import { areaTree, leavesOf, type AreaTreeNode } from './areaTree';
@@ -87,6 +88,16 @@ describe('jobs', () => {
     expect(parseJob('batch: audit41-core.ops conflicts; left out')?.bad).toBe(true);
     expect(parseJob('fleet: 2 failed')).toMatchObject({ kind: 'fleet', bad: true });
     expect(parseJob('something else')).toBeNull();
+  });
+
+  it("reads skulkr's verify of a fix and each repair, a failing one as bad", () => {
+    expect(parseJob('verify core.ops: failed: 1 of 3 test files failed (a/store.pbt.test.ts)')).toMatchObject({ kind: 'fix', label: 'verify', area: 'core.ops', bad: true });
+    expect(parseJob('verify core.ops: passed (3 test files)')).toMatchObject({ label: 'verify', bad: false });
+    expect(parseJob('repair core.ops 1/2 on studio: 1 commits, 4.0 min; verify passed')).toEqual({
+      kind: 'fix', label: 'repair 1/2', area: 'core.ops', what: '1 commit; verify passed', node: 'studio', minutes: 4, bad: false,
+    });
+    expect(parseJob('patch core.ops: left out: verify still failing after 2 repairs (exited 1)')).toMatchObject({ kind: 'patch', bad: true });
+    expect(stepText('repair', { state: 'done', attempts: 1, outcome: 'passed' }, 0)).toBe('1 repair · passed');
   });
 
   it('reads a patch that did not apply as a bad patch job', () => {
