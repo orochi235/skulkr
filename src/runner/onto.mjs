@@ -25,9 +25,15 @@ export const launchOf = (r) => {
     status: r.status,
     busy: r.status !== 0 && BUSY.test(error),
     refused: r.status !== 0 && REFUSED.test(error) && !/job .* (failed|exited)/.test(error),
-    noRoom: r.status !== 0 && NO_ROOM.test(r.tail),
+    noRoom: r.status !== 0 && NO_ROOM.test(launchLinesOf(r.tail)),
     node: nodeOfLaunch(r.tail),
   };
+};
+
+/** onto's own lines before its `job <id> on <node>` line, so a job's output never reads as onto's refusal. */
+const launchLinesOf = (tail) => {
+  const at = /^\s*job\s+\S+\s+on\s+\S+/m.exec(tail)?.index;
+  return at === undefined ? tail : tail.slice(0, at);
 };
 
 /** The node onto started a job on, from its `job <id> on <node>` line. */

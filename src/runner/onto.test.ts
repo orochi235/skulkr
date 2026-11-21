@@ -61,4 +61,9 @@ describe('launchOf', () => {
     expect(at(job, 0)).toMatchObject({ refused: false, busy: false });
     expect(at(`${job}fake onto do: x refuses y\n`)).toMatchObject({ refused: false });
   });
+
+  it('reads no room only from onto\'s lines before the job started', () => {
+    expect(at('studio at or over this node\'s 6 tree ceiling\nonto do: no node has room\n')).toMatchObject({ noRoom: true });
+    expect(at('  job 1a2b on studio\nexpect(log).toMatch(/will not take a new tree/)\nonto do: job exited 1 on studio after 5000ms\n')).toMatchObject({ noRoom: false });
+  });
 });
