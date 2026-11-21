@@ -1,10 +1,11 @@
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { resolveConfig } from './config.mjs';
-import { configText, guessConfig } from './init.mjs';
+import { NO_GATE, configText, guessConfig } from './init.mjs';
 
 const load = async (text: string) => {
   const dir = mkdtempSync(join(tmpdir(), 'skulkr-init-'));
@@ -37,7 +38,8 @@ describe('skulkr init', () => {
     expect(g).toMatchObject({ roots: ['net', 'util'], extensions: ['go'], gate: null, install: null });
     const cfg = await load(configText(g));
     expect(cfg.partition.isSource('util/x.go')).toBe(true);
-    expect(cfg.gate.command).toEqual(['true']);
+    expect(cfg.gate.command).toEqual(NO_GATE);
+    expect(spawnSync(cfg.gate.command[0], cfg.gate.command.slice(1), { encoding: 'utf8' })).toMatchObject({ status: 1, stderr: expect.stringContaining('no gate command set') });
     expect(cfg.checks.verify).toBeNull();
   });
 });
