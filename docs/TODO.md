@@ -2,9 +2,6 @@
 
 Open work on skulkr. Each entry says when it closes.
 
-- [ ] (P3) A read-only tenant's `status` reply still gives a `nextStart`: blits, registered `--read-only` so nothing
-  runs it overnight, answered `"nextStart":"2026-11-22T04:00:00.000Z"` (2026-11-21), though `src/host.mjs` never
-  starts a read-only tenant. Closes when a read-only tenant's reply has no `nextStart`.
 - [ ] (P2) Finish cutting weasel over to skulkr (README.md "Moving weasel over"). The `skulkr` service already runs
   weasel's rounds from `examples/weasel.config.mjs` (2026-11-21); left are moving the config and its briefs into
   weasel and deleting `scripts/skulk/`. Closes when weasel's own `skulkr.config.mjs` drives its rounds and

@@ -117,6 +117,8 @@ describe('createHost', () => {
     h.tick();
     expect(list[0]!.starts).toEqual([[]]);
     expect(ro.starts).toEqual([]);
+    expect(await h.request('{"id":2,"status":true,"tenant":"ro"}')).not.toHaveProperty('nextStart');
+    expect(await h.request('{"id":3,"status":true,"tenant":"a"}')).toHaveProperty('nextStart');
   });
 });
 

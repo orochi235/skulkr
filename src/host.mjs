@@ -171,7 +171,7 @@ export const createHost = ({ tenants, now = () => new Date(), log = () => {}, bu
         const waiting = waitingOf(t, list);
         const next = fireAt.get(t.name)?.at;
         return {
-          ...t.deps.status(), ...(waiting.length ? { waiting } : {}), ...(next && !t.scheduledContinuous ? { nextStart: next.toISOString() } : {}),
+          ...t.deps.status(), ...(waiting.length ? { waiting } : {}), ...(next && !t.scheduledContinuous && !t.readOnly ? { nextStart: next.toISOString() } : {}),
           ...(t.readOnly ? { readOnly: true } : {}), ...(t.continuous ? continuousStatus(t.continuous(now())) : {}),
         };
       },
