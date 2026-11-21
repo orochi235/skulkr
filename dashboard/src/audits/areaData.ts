@@ -2,7 +2,7 @@
 import { lerp } from '@weasel-js/geom';
 import { warpScale } from '@weasel-js/scale';
 import { getOwn } from '@weasel-js/registry';
-import type { AreaStatus, AuditArea, AuditPass, AuditRun, SkulkrMap } from './skulkrMap.types';
+import type { AreaEstimate, AreaStatus, AuditArea, AuditPass, AuditRun, SkulkrMap } from './skulkrMap.types';
 
 /** How an area is shaded: never read, settled, or by how many defects are estimated to be left in it. */
 export type AreaTone = 'unaudited' | 'settled' | { readonly left: number };
@@ -49,12 +49,15 @@ export function passRoundsOf(passes: readonly AuditPass[]): AuditPass[] {
 }
 
 /** The pass an area's estimate goes by: the map's `last`, or on a map without it, its last round's passes joined
- *  (`passRoundsOf`). */
-export const lastPassOf = (area: AuditArea): AuditPass | null =>
-  area.last !== undefined ? area.last : passRoundsOf(area.passes).at(-1) ?? null;
+ *  (`passRoundsOf`). Given a past `round`, the estimate `lastByRound` held after it, or null where none did yet. */
+export function lastPassOf(area: AuditArea, round?: number | null): AreaEstimate | null {
+  if (round === undefined || round === null) return area.last !== undefined ? area.last : passRoundsOf(area.passes).at(-1) ?? null;
+  const at = area.lastByRound?.findLast((e) => e.round <= round);
+  return at ? { round: at.pass ?? at.round, left: at.left, leftCorrected: at.leftCorrected ?? at.left } : null;
+}
 
 /** A pass's left, calibrated, or its own where the map has no calibration. */
-export const correctedLeftOf = (p: AuditPass): number => p.leftCorrected ?? p.left;
+export const correctedLeftOf = (p: AreaEstimate): number => p.leftCorrected ?? p.left;
 
 /** A pass's estimate with its left calibrated: what it found plus the corrected left. */
 export const correctedEstOf = (p: AuditPass): number => p.est + correctedLeftOf(p) - p.left;
@@ -117,8 +120,9 @@ export interface Stat {
   readonly label: string;
 }
 
-/** The headline numbers over every area. */
-export function statsFor(areas: readonly AuditArea[]): Stat[] {
+/** The headline numbers over every area, or over the areas as of a past round (`areasAsOf`), whose settling is not
+ *  known. */
+export function statsFor(areas: readonly AuditArea[], asOf: number | null = null): Stat[] {
   const files = areas.reduce((n, a) => n + a.files, 0);
   const audited = areas.filter((a) => a.passes.length > 0 && a.status !== 'unaudited');
   const auditedFiles = audited.reduce((n, a) => n + a.files, 0);
@@ -130,14 +134,14 @@ export function statsFor(areas: readonly AuditArea[]): Stat[] {
   const found = Math.round(areas.reduce((n, a) => n + a.passes.reduce((m, p) => m + p.distinct * (p.share ?? 1), 0), 0));
   const settled = areas.filter((a) => a.status === 'settled').length;
   return [
-    { value: `${formatCount(audited.length)} / ${formatCount(areas.length)}`, label: 'areas audited at least once' },
+    { value: `${formatCount(audited.length)} / ${formatCount(areas.length)}`, label: asOf === null ? 'areas audited at least once' : `areas audited by round ${asOf}` },
     { value: `${files ? Math.round((100 * auditedFiles) / files) : 0}%`, label: `of ${formatCount(files)} source files charted` },
-    { value: formatCount(found), label: 'defects found and fixed, all rounds' },
+    { value: formatCount(found), label: asOf === null ? 'defects found and fixed, all rounds' : `defects found and fixed through round ${asOf}` },
     {
       value: `≈${formatCount(Math.round(left))}`,
       label: `estimated still in audited areas${calibrated ? ` (${correctedText(leftCorrected)} corrected)` : ''}${staleLeft >= 0.5 ? `, ≈${formatCount(Math.round(staleLeft))} of it in areas changed since` : ''}`,
     },
-    { value: formatCount(settled), label: 'areas settled' },
+    ...(asOf === null ? [{ value: formatCount(settled), label: 'areas settled' }] : []),
   ];
 }
 

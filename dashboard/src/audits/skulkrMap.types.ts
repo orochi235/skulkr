@@ -21,6 +21,22 @@ export interface AuditPass {
   readonly provisional?: boolean;
 }
 
+/** What an area's estimate goes by: the round of the pass it comes from, and what that pass left. */
+export interface AreaEstimate {
+  readonly round: number;
+  readonly left: number;
+  readonly leftCorrected?: number;
+}
+
+/** An area's estimate from round `round` on: from the pass of round `pass` where that is earlier, `leftCorrected`
+ *  absent where it equals `left`. */
+export interface AreaEstimateAt {
+  readonly round: number;
+  readonly pass?: number;
+  readonly left: number;
+  readonly leftCorrected?: number;
+}
+
 export interface AuditArea {
   readonly id: string;
   readonly group: string;
@@ -30,7 +46,10 @@ export interface AuditArea {
   readonly passes: readonly AuditPass[];
   /** The pass its estimate goes by, as the queue ranks it: its last round that read at least half its files, drawn as
    *  one pass and corrected. Null with no passes; absent from maps built before 2026-11-21. */
-  readonly last?: AuditPass | null;
+  readonly last?: AreaEstimate | null;
+  /** What `last` was after each round that changed it, oldest first; absent before passes had read half its files,
+   *  and from maps built before 2026-11-21. */
+  readonly lastByRound?: readonly AreaEstimateAt[];
   readonly stage: string | null;
   /** Lines of its files changed since its last pass, that pass's own fixes aside; absent when none. */
   readonly staleLines?: number;
