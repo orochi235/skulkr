@@ -3,12 +3,33 @@
  * writes under `out` brought back to `to`. onto's own README covers `do`, `status` and `jobs`.
  */
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
+import { readJson, writeJson } from '../json.mjs';
 
 const BUSY = /working tree .* is busy/;
 const REFUSED = /\bquiet\b|refuses|is offline|not reachable|unavailable/i;
+/**
+ * onto's own error from `onto do`'s stderr: from its last `onto do: ` line on, or empty. The job's own output shares
+ * the stream, so a fixer that printed "unavailable" is never read as onto refusing it.
+ */
+export const ontoErrorOf = (stderr) => {
+  const at = stderr.lastIndexOf('onto do: ');
+  return at < 0 || (at > 0 && stderr[at - 1] !== '\n') ? '' : stderr.slice(at);
+};
+
+/** What one `onto do`'s `{ status, stderr, tail }` says happened, as `run` answers it. */
+export const launchOf = (r) => {
+  const error = ontoErrorOf(r.stderr);
+  return {
+    status: r.status,
+    busy: r.status !== 0 && BUSY.test(error),
+    refused: r.status !== 0 && REFUSED.test(error) && !/job .* (failed|exited)/.test(error),
+    noRoom: r.status !== 0 && NO_ROOM.test(r.tail),
+    node: nodeOfLaunch(r.tail),
+  };
+};
+
 /** The node onto started a job on, from its `job <id> on <node>` line. */
 export const nodeOfLaunch = (text) => /^\s*job\s+\S+\s+on\s+(\S+)/m.exec(text)?.[1];
 
@@ -117,18 +138,10 @@ export const memoryStore = () => {
  * its own exit. One file, overwritten on every good listing.
  */
 export const fileStore = (path) => ({
-  read: () => {
-    try {
-      return JSON.parse(readFileSync(path, 'utf8'));
-    } catch {
-      return null;
-    }
-  },
+  read: () => readJson(path) ?? null,
   write: (v) => {
     try {
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(`${path}.tmp`, JSON.stringify(v));
-      renameSync(`${path}.tmp`, path);
+      writeJson(path, v);
     } catch {
       // A listing that cannot be kept is still answered.
     }
@@ -148,16 +161,7 @@ export const createOntoRunner = () => {
   // Unpinned, a job waits in onto's queue and starts on whichever node has room first, so no one busy machine
   // holds it; each node's own policy (`onto set --refuse`, `--quiet`, `--weight`) says what it takes.
   places: true,
-  run: async (job, { cwd, log }) => {
-    const r = await ontoOnce(ontoArgs(job), cwd, log);
-    return {
-      status: r.status,
-      busy: BUSY.test(r.stderr),
-      refused: r.status !== 0 && REFUSED.test(r.stderr) && !/job .* (failed|exited)/.test(r.stderr),
-      noRoom: r.status !== 0 && NO_ROOM.test(r.tail),
-      node: nodeOfLaunch(r.tail),
-    };
-  },
+  run: async (job, { cwd, log }) => launchOf(await ontoOnce(ontoArgs(job), cwd, log)),
   // onto places each job where there is room, so no node needs ruling out here.
   unavailableNodes: () => new Set(),
   progress: () => {

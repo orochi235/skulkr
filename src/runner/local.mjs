@@ -5,10 +5,11 @@
  * once, so their count is bounded by the config's slots.
  */
 import { spawn, execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync, readFileSync } from 'node:fs';
+import { cpSync, existsSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { JOB_IN } from '../config.mjs';
-import { pidAlive, takeLease } from '../lease.mjs';
+import { readJson, writeJson } from '../json.mjs';
+import { amendLease, heldAlive, takeLease } from '../lease.mjs';
 
 /** How long a finished job's record is kept for `jobs()`. */
 const KEEP_JOBS_MS = 7 * 24 * 3_600_000;
@@ -21,18 +22,24 @@ export const durationMs = (d) => {
   return m ? Number(m[1]) * { s: 1_000, m: 60_000, h: 3_600_000 }[m[2]] : undefined;
 };
 
-/** Leases a tree of the pool, cloning it the first time. Answers `{ dir, release }`. */
+/** Leases a tree of the pool, cloning it the first time. Answers `{ dir, lease, release }`, `lease` the lease's path. */
 const leaseTree = (state, source) => {
   const pool = join(state, 'trees');
   for (let k = 1; ; k++) {
     const dir = join(pool, `t${k}`);
-    const release = takeLease(join(pool, `t${k}.lease`), {});
+    const lease = join(pool, `t${k}.lease`);
+    const release = takeLease(lease, {});
     if (!release) continue;
-    if (!existsSync(join(dir, '.git'))) {
-      rmSync(dir, { recursive: true, force: true });
-      execFileSync('git', ['clone', '-q', '--shared', '--no-checkout', source, dir], { stdio: 'ignore' });
+    try {
+      if (!existsSync(join(dir, '.git'))) {
+        rmSync(dir, { recursive: true, force: true });
+        execFileSync('git', ['clone', '-q', '--shared', '--no-checkout', source, dir], { stdio: 'ignore' });
+      }
+    } catch (error) {
+      release();
+      throw error;
     }
-    return { dir, release };
+    return { dir, lease, release };
   }
 };
 
@@ -46,74 +53,122 @@ const syncTree = (dir, from, ref) => {
   if (existsSync(join(from, JOB_IN))) cpSync(join(from, JOB_IN), join(dir, JOB_IN), { recursive: true });
 };
 
-/** Runs `bash -lc shell` in `cwd`, its output to `log`, killed with its children after `timeoutMs`. Answers the exit status. */
-const runShell = (shell, { cwd, env, log, timeoutMs }) =>
+/** How long a timed-out job's process group has after SIGTERM before it gets SIGKILL. */
+const KILL_GRACE_MS = 30_000;
+
+const signalGroup = (pid, signal) => {
+  try {
+    process.kill(-pid, signal);
+  } catch { /* already gone */ }
+};
+
+/** The process groups of the jobs running now, each killed when this process exits or is signaled to. */
+const running = new Set();
+let reaping = false;
+const reapOnExit = () => {
+  if (reaping) return;
+  reaping = true;
+  const reap = () => {
+    for (const pid of running) signalGroup(pid, 'SIGTERM');
+  };
+  process.on('exit', reap);
+  for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
+    process.once(signal, () => {
+      reap();
+      process.kill(process.pid, signal);
+    });
+  }
+};
+
+/**
+ * Runs `bash -lc shell` in `cwd` as a process group of its own, its output to `log`, killed with its children after
+ * `timeoutMs`: SIGTERM, then SIGKILL `graceMs` later if it has not closed. `onSpawn(pid)` hears the group's id.
+ * Answers the exit status.
+ */
+const runShell = (shell, { cwd, env, log, timeoutMs, graceMs = KILL_GRACE_MS, onSpawn }) =>
   new Promise((done) => {
+    reapOnExit();
     const child = spawn('bash', ['-lc', shell], { cwd, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    if (child.pid) {
+      running.add(child.pid);
+      onSpawn?.(child.pid);
+    }
     child.stdout.pipe(log, { end: false });
     child.stderr.pipe(log, { end: false });
+    let kill;
     const timer = timeoutMs && setTimeout(() => {
       log.write(`\nskulkr local runner: timed out after ${timeoutMs / 60_000} min\n`);
-      try {
-        process.kill(-child.pid, 'SIGTERM');
-      } catch { /* already gone */ }
+      signalGroup(child.pid, 'SIGTERM');
+      kill = setTimeout(() => signalGroup(child.pid, 'SIGKILL'), graceMs);
     }, timeoutMs);
     child.on('error', (error) => {
       log.write(`${error}\n`);
       done(1);
     });
     child.on('close', (status) => {
-      if (timer) clearTimeout(timer);
+      running.delete(child.pid);
+      clearTimeout(timer);
+      clearTimeout(kill);
       done(status ?? 1);
     });
   });
 
-/** The runner interface (documented in `onto.mjs`), with every job on this machine as node `local`. */
-export const createLocalRunner = (cfg) => {
+/** Deletes the job records in `dir` older than {@link KEEP_JOBS_MS}, and answers the names of the rest. */
+const pruneJobs = (dir) => {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).filter((name) => {
+    const path = join(dir, name);
+    try {
+      if (Date.now() - statSync(path).mtimeMs <= KEEP_JOBS_MS) return true;
+      rmSync(path, { force: true });
+    } catch { /* gone already */ }
+    return false;
+  });
+};
+
+/**
+ * The runner interface (documented in `onto.mjs`), with every job on this machine as node `local`. `graceMs`: how long
+ * a timed-out job has between SIGTERM and SIGKILL.
+ */
+export const createLocalRunner = (cfg, { graceMs } = {}) => {
   const jobsDir = join(cfg.state, 'local-jobs');
-  const record = (file, job) => {
-    mkdirSync(jobsDir, { recursive: true });
-    writeFileSync(join(jobsDir, file), JSON.stringify(job));
-  };
+  const record = (file, job) => writeJson(join(jobsDir, file), job);
   return {
     run: async (job, { cwd, log }) => {
-      const source = git(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
-      const tree = leaseTree(cfg.state, source);
+      pruneJobs(jobsDir);
       const file = `${Date.now()}-${process.pid}-${job.task.replace(/[^\w.-]+/g, '_')}.json`;
       const entry = { task: job.task, node: 'local', state: 'running', started: new Date().toISOString(), pid: process.pid };
       record(file, entry);
       let status = 1;
+      let tree;
       try {
+        tree = leaseTree(cfg.state, git(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']));
         syncTree(tree.dir, cwd, job.ref ?? git(cwd, ['rev-parse', 'HEAD']));
-        status = await runShell(job.shell, { cwd: tree.dir, env: job.env, log, timeoutMs: durationMs(job.timeout) });
+        // A job outliving this process (killed with SIGKILL) keeps its tree and its record alive by its group.
+        const onSpawn = (group) => {
+          amendLease(tree.lease, { group });
+          entry.group = group;
+          record(file, entry);
+        };
+        status = await runShell(job.shell, { cwd: tree.dir, env: job.env, log, timeoutMs: durationMs(job.timeout), graceMs, onSpawn });
         const out = join(tree.dir, job.out);
         if (existsSync(out)) cpSync(out, job.to, { recursive: true });
       } catch (error) {
         log.write(`skulkr local runner: ${error.message ?? error}\n`);
       } finally {
-        tree.release();
+        tree?.release();
         record(file, { ...entry, state: status === 0 ? 'done' : 'failed', exit: status, finished: new Date().toISOString() });
       }
       return { status, busy: false, refused: false };
     },
     unavailableNodes: () => new Set(),
     jobs: (since) => {
-      if (!existsSync(jobsDir)) return [];
       const after = Date.parse(since);
       const out = [];
-      for (const name of readdirSync(jobsDir)) {
-        const path = join(jobsDir, name);
-        if (Date.now() - statSync(path).mtimeMs > KEEP_JOBS_MS) {
-          rmSync(path, { force: true });
-          continue;
-        }
-        let j;
-        try {
-          j = JSON.parse(readFileSync(path, 'utf8'));
-        } catch {
-          continue;
-        }
-        if (j.state === 'running' && !pidAlive(j.pid)) j = { ...j, state: 'failed', finished: j.started };
+      for (const name of pruneJobs(jobsDir)) {
+        let j = readJson(join(jobsDir, name));
+        if (!j) continue;
+        if (j.state === 'running' && !heldAlive(j)) j = { ...j, state: 'failed', finished: j.started };
         if (j.state === 'running' || Date.parse(j.finished) >= after || !Number.isFinite(after)) out.push(j);
       }
       return out;

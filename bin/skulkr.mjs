@@ -17,7 +17,7 @@
  *   skulkr tenants rm <name>
  */
 import { mainCheckout } from '../src/batch.mjs';
-import { exitAfterFlush } from '../src/exit.mjs';
+import { exitAfterFlush, tolerateClosedOutput } from '../src/exit.mjs';
 import { loadConfig } from '../src/config.mjs';
 import { areaDefects } from '../src/defects.mjs';
 import { initCommand } from '../src/init.mjs';
@@ -110,6 +110,7 @@ const main = async () => {
   const root = () => mainCheckout(cfg);
   switch (command) {
     case 'night':
+      tolerateClosedOutput();
       await runNight(cfg, await loadRunner(cfg), rest);
       return 0;
     case 'partition':

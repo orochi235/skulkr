@@ -44,6 +44,9 @@ export const guessConfig = (files, pkg, name) => {
   };
 };
 
+/** The gate written when no test script was found: it fails, so no batch merges untested until it is replaced. */
+export const NO_GATE = ['sh', '-c', 'echo "skulkr: no gate command set; name your test command in skulkr.config.mjs gate.command" >&2; exit 1'];
+
 /** `v` as config source: single-quoted strings, spaced arrays and objects, bare keys. */
 const js = (v) => {
   if (Array.isArray(v)) return `[${v.map(js).join(', ')}]`;
@@ -63,7 +66,7 @@ export default {
   },
 
   // How a batch of fixes is tested before main moves; it runs in the batch's worktree.
-  gate: { name: 'test', command: ${g.gate ? js(g.gate) : "['true'] /* no test script found: name your test command */"} },
+  gate: { name: 'test', command: ${g.gate ? js(g.gate) : `${js(NO_GATE)} /* no test script found: name your test command */`} },
 
   checks: {
     test: ${js(g.vitest ? 'npx vitest run <file>' : 'npm test -- <file>')},

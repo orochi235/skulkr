@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { JOBS_TTL_MS, fileStore, keptJobs } from './onto.mjs';
+import { JOBS_TTL_MS, fileStore, keptJobs, launchOf } from './onto.mjs';
 
 describe('keptJobs', () => {
   it('answers from its last call within the TTL, and from its last good answer when a call throws', () => {
@@ -45,5 +45,20 @@ describe('keptJobs', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('launchOf', () => {
+  const at = (stderr: string, status = 1) => launchOf({ status, stderr, tail: stderr });
+  it('reads a refusal or a busy tree from onto\'s own error line only', () => {
+    expect(at('onto do: studio refuses kind:fix; `onto set studio --allow kind:fix` takes it back\n')).toMatchObject({ refused: true, busy: false });
+    expect(at('onto do: working tree "w-r1" is busy: a job runs in it; wait for it to finish and retry\n')).toMatchObject({ busy: true, refused: false });
+  });
+
+  it('never reads the job\'s own output as onto refusing it', () => {
+    const job = 'the API is unavailable; working tree "x" is busy\n';
+    expect(at(`${job}onto do: job exited 1 on studio after 5000ms\n`)).toMatchObject({ refused: false, busy: false });
+    expect(at(job, 0)).toMatchObject({ refused: false, busy: false });
+    expect(at(`${job}fake onto do: x refuses y\n`)).toMatchObject({ refused: false });
   });
 });

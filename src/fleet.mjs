@@ -9,9 +9,8 @@
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { leaseAt, pidAlive, takeLease } from './lease.mjs';
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+import { sleep } from './after.mjs';
+import { heldAlive, leaseAt, takeLease } from './lease.mjs';
 
 /** The fleet queue's directory: `SKULKR_FLEET`, else `~/.local/state/skulkr/fleet`, beside the tenants' own state. */
 export const fleetDir = (env = process.env) => env.SKULKR_FLEET ?? join(homedir(), '.local', 'state', 'skulkr', 'fleet');
@@ -30,7 +29,7 @@ const tickets = (dir) => {
   return names.flatMap((name) => {
     const file = join(waitingDir(dir), name);
     const t = leaseAt(file);
-    if (t && pidAlive(t.pid)) return [{ file, ...t }];
+    if (heldAlive(t)) return [{ file, ...t }];
     // A half-written ticket reads as undefined; only one naming a dead pid is cleared.
     if (t) rmSync(file, { force: true });
     return [];
@@ -42,7 +41,7 @@ const about = ({ file: _file, pid: _pid, ...rest }) => rest;
 /** Who holds the gate (`{ tenant, round, at }` or null) and who waits for it, oldest first. */
 export const readFleet = (dir = fleetDir()) => {
   const held = leaseAt(leasePath(dir));
-  return { holder: held && pidAlive(held.pid) ? about(held) : null, waiting: tickets(dir).map(about) };
+  return { holder: heldAlive(held) ? about(held) : null, waiting: tickets(dir).map(about) };
 };
 
 /**

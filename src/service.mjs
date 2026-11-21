@@ -5,6 +5,8 @@
  * request does.
  */
 import { execFile, execFileSync, spawn } from 'node:child_process';
+import { closeSync, fstatSync, openSync, readSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { after } from './after.mjs';
@@ -33,8 +35,28 @@ const commitIn = (dir) => {
   }
 };
 
-/** One tenant as the host drives it: `cfg`'s project, each run `skulkr night` from its main checkout. */
-export const createTenant = (name, cfg, { readOnly = false } = {}) => {
+/** The last line of the file at `path`, read from its tail, or undefined. */
+export const lastLineOf = (path) => {
+  let fd;
+  try {
+    fd = openSync(path, 'r');
+    const size = fstatSync(fd).size;
+    const buf = Buffer.alloc(Math.min(size, 4096));
+    readSync(fd, buf, 0, buf.length, size - buf.length);
+    return buf.toString('utf8').split('\n').filter(Boolean).at(-1);
+  } catch {
+    return undefined;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+};
+
+/**
+ * One tenant as the host drives it: `cfg`'s project, each run `skulkr night` from its main checkout. `runtime` is what the tenant knows that is not on disk: the runs it started, when it last started one, and how long
+ * continuous mode idles. A tenant reloaded from an edited config takes its predecessor's, so neither its runs nor its
+ * idling are forgotten.
+ */
+export const createTenant = (name, cfg, { readOnly = false, runtime = { children: new Map() } } = {}) => {
   const root = mainCheckout(cfg);
   const state = cfg.state;
   /** Every run starts from the same config and checkout as this tenant. */
@@ -43,20 +65,39 @@ export const createTenant = (name, cfg, { readOnly = false } = {}) => {
   const say = (line) => log(`${name}: ${line}`);
 
   /** The runs this service started that have not exited, by pid, with the last line each printed. */
-  const children = new Map();
-  let startedHere;
-  /** Set when a continuous round exited without claiming one or failed, so another is not started every tick. */
-  let idleUntil;
+  const { children } = runtime;
   /** Rounds this service started that have not claimed a round yet. */
   const pending = () => {
     const live = new Set(liveRuns(state).map((r) => r.pid));
     return [...children.keys()].filter((pid) => !live.has(pid)).length;
   };
 
+  /** Starts no continuous round until the night's stop time, after one that `why`. */
+  const idle = (why) => {
+    runtime.idleUntil = nextClock(new Date(), cfg.schedule.stopAt).toISOString();
+    say(`continuous: that round ${why}; no more start until ${runtime.idleUntil}`);
+  };
+
   const start = (args, { continuous = false } = {}) => {
     const at = new Date();
-    startedHere = at;
-    const child = spawn(process.execPath, [BIN, 'night', ...base, ...args], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const failed = (error) => {
+      say(`run could not start: skulkr night ${args.join(' ')}: ${error.message ?? error}`);
+      if (continuous) idle('could not start');
+    };
+    let child;
+    try {
+      // A process group of its own, so a restarting service (every `onto sync`) never takes its runs down with it.
+      child = spawn(process.execPath, [BIN, 'night', ...base, ...args], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    } catch (error) {
+      failed(error);
+      return args;
+    }
+    if (child.pid === undefined) {
+      child.on('error', failed);
+      return args;
+    }
+    child.on('error', (error) => say(`run ${child.pid}: ${error.message}`));
+    runtime.startedHere = at;
     const entry = { lastLine: '' };
     children.set(child.pid, entry);
     say(`run started: skulkr night ${args.join(' ')} (pid ${child.pid})`);
@@ -71,10 +112,7 @@ export const createTenant = (name, cfg, { readOnly = false } = {}) => {
       children.delete(child.pid);
       const claimed = (lastStartedAt(state) ?? 0) >= at;
       // A continuous round that found nothing to do, or failed, would only be followed by another like it.
-      if (continuous && (!claimed || code !== 0)) {
-        idleUntil = nextClock(new Date(), cfg.schedule.stopAt).toISOString();
-        say(`continuous: that round ${claimed ? 'failed' : 'found nothing to do'}; no more start until ${idleUntil}`);
-      }
+      if (continuous && (!claimed || code !== 0)) idle(claimed ? 'failed' : 'found nothing to do');
     });
     return args;
   };
@@ -82,27 +120,32 @@ export const createTenant = (name, cfg, { readOnly = false } = {}) => {
   return {
     name,
     readOnly,
+    runtime,
     startAt: cfg.schedule.startAt,
+    stopAt: cfg.schedule.stopAt,
     /** A run this service started counts before it has claimed its round, so no second one starts beside it. */
     running: () => children.size > 0 || liveRuns(state).length > 0,
     modelBusy: () => pending() > 0 || liveRuns(state).some(inModelSteps),
     scheduledContinuous: Boolean(cfg.schedule.continuous && cfg.budget.nightUsd > 0),
-    continuous: (now) => continuousOf(cfg, { now, pending: pending(), idleUntil, readOnly }),
+    continuous: (now) => continuousOf(cfg, { now, pending: pending(), idleUntil: runtime.idleUntil, readOnly }),
     setContinuous: (on, now) => {
       const until = nextClock(now, cfg.schedule.stopAt).toISOString();
       writeContinuous(state, { on, until, at: now.toISOString() });
-      if (on) idleUntil = undefined;
+      if (on) runtime.idleUntil = undefined;
       say(`continuous mode ${on ? 'on' : 'off'} until ${until}`);
     },
     lastStarted: () => {
-      const times = [lastStartedAt(state), startedHere].filter(Boolean);
+      const times = [lastStartedAt(state), runtime.startedHere].filter(Boolean);
       return times.length ? new Date(Math.max(...times)) : undefined;
     },
     deps: {
       build: commitIn(root),
       live: () => liveRuns(state).map((r) => r.round),
       status: () => {
-        const runs = liveRuns(state).map((r) => (children.has(r.pid) ? { ...r, lastLine: children.get(r.pid).lastLine } : r));
+        const runs = liveRuns(state).map((r) => {
+          const lastLine = children.get(r.pid)?.lastLine || (r.nightDir ? lastLineOf(join(r.nightDir, 'night.log')) : undefined);
+          return lastLine ? { ...r, lastLine } : r;
+        });
         return { running: runs.length > 0, runs, last: lastFinished(state) ?? null };
       },
       plan: () =>
@@ -122,11 +165,12 @@ export const createTenant = (name, cfg, { readOnly = false } = {}) => {
 };
 
 /**
- * The tenants from the registry at `path`, reread on each call: an entry whose config path and read-only flag are
- * unchanged keeps its tenant (and the runs it started); a new or changed one is loaded. A registry or config that
- * fails to read keeps what was there and logs why.
+ * The tenants from the registry at `path`, reread on each call: an entry whose config path, read-only flag and config
+ * file's mtime are unchanged keeps its tenant; a new one is loaded, and a changed one reloaded, keeping the runs it
+ * started. A registry or config that fails to read keeps what was there and logs why, once.
  */
-const registryTenants = (path) => {
+export const registryTenants = (path) => {
+  /** By tenant name: `{ key, tenant, failed? }`, `failed` the key that last failed to load. */
   const known = new Map();
   let list = [];
   const refresh = async () => {
@@ -139,18 +183,27 @@ const registryTenants = (path) => {
     }
     const next = [];
     for (const e of entries) {
-      const key = `${e.name}\n${e.config}\n${Boolean(e.readOnly)}`;
-      if (!known.has(key)) {
+      let mtime = 0;
+      try {
+        mtime = statSync(e.config).mtimeMs;
+      } catch { /* loadConfig says why */ }
+      const key = `${e.config}\n${Boolean(e.readOnly)}\n${mtime}`;
+      const had = known.get(e.name);
+      if (had?.key !== key && had?.failed !== key) {
         try {
-          known.set(key, createTenant(e.name, await loadConfig({ config: e.config }), { readOnly: Boolean(e.readOnly) }));
-          log(`tenants: hosting ${e.name}${e.readOnly ? ' (read-only)' : ''} from ${e.config}`);
+          const tenant = createTenant(e.name, await loadConfig({ config: e.config, fresh: true }), { readOnly: Boolean(e.readOnly), runtime: had?.tenant.runtime });
+          known.set(e.name, { key, tenant });
+          log(`tenants: ${had ? 'reloaded' : 'hosting'} ${e.name}${e.readOnly ? ' (read-only)' : ''} from ${e.config}`);
         } catch (error) {
-          log(`tenants: ${e.name}: ${error.message}`);
-          continue;
+          log(`tenants: ${e.name}: ${error.message}${had ? '; keeping its last config' : ''}`);
+          if (had) had.failed = key;
+          else known.set(e.name, { key: undefined, tenant: undefined, failed: key });
         }
       }
-      next.push(known.get(key));
+      const tenant = known.get(e.name)?.tenant;
+      if (tenant) next.push(tenant);
     }
+    for (const name of [...known.keys()]) if (!entries.some((e) => e.name === name)) known.delete(name);
     list = next;
   };
   return { refresh, current: () => list };

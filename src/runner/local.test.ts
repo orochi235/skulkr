@@ -1,5 +1,5 @@
-import { execFileSync } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -84,6 +84,67 @@ describe('the local runner', () => {
     expect(r.status).not.toBe(0);
     expect(Date.now() - t0).toBeLessThan(10_000);
     expect(existsSync(join(r.to, 'got'))).toBe(false);
+  });
+
+  it('answers a failed job, and keeps no lease, when its clone cannot be made', async () => {
+    const s = setup();
+    rmSync(join(s.dir, 'repo', '.git', 'objects'), { recursive: true, force: true });
+    const r = await run(s, 'true');
+    expect(r.status).not.toBe(0);
+    const pool = join(s.dir, 'state', 'trees');
+    expect(existsSync(pool) ? readdirSync(pool).filter((n) => n.endsWith('.lease')) : []).toEqual([]);
+  });
+
+  it('kills a timed-out job that ignores SIGTERM once its grace runs out', async () => {
+    const s = setup();
+    const runner = createLocalRunner(resolveConfig({ name: 't', state: join(s.dir, 'state') }), { graceMs: 300 });
+    const t0 = Date.now();
+    const r = await run({ ...s, runner }, "trap '' TERM; sleep 30", { timeout: '1s' });
+    expect(r.status).not.toBe(0);
+    expect(Date.now() - t0).toBeLessThan(10_000);
+  });
+
+  it('deletes job records past a week as it runs a job', async () => {
+    const s = setup();
+    const jobs = join(s.dir, 'state', 'local-jobs');
+    mkdirSync(jobs, { recursive: true });
+    const old = join(jobs, 'old.json');
+    writeFileSync(old, '{}');
+    const week = new Date(Date.now() - 8 * 24 * 3_600_000);
+    utimesSync(old, week, week);
+    await run(s, 'true');
+    expect(existsSync(old)).toBe(false);
+    expect(readdirSync(jobs)).toHaveLength(1);
+  });
+
+  it('kills its running jobs when the process running them is told to stop', async () => {
+    const s = setup();
+    const pidFile = join(s.dir, 'job.pid');
+    const script = `
+      import { createWriteStream } from 'node:fs';
+      import { resolveConfig } from ${JSON.stringify(new URL('../config.mjs', import.meta.url).pathname)};
+      import { createLocalRunner } from ${JSON.stringify(new URL('./local.mjs', import.meta.url).pathname)};
+      const runner = createLocalRunner(resolveConfig({ name: 't', state: ${JSON.stringify(join(s.dir, 'state'))} }));
+      const job = { kind: 'fix', task: 't', ref: ${JSON.stringify(s.base)}, timeout: '1m', out: '.skulkr/out', to: ${JSON.stringify(s.dir)},
+        shell: 'echo $$ > ${pidFile}; sleep 30' };
+      runner.run(job, { cwd: ${JSON.stringify(s.frozen)}, log: createWriteStream('/dev/null') });
+    `;
+    const night = spawn(process.execPath, ['--input-type=module', '-e', script], { stdio: 'ignore' });
+    for (let i = 0; i < 100 && !existsSync(pidFile); i++) await new Promise((done) => setTimeout(done, 50));
+    const job = Number(readFileSync(pidFile, 'utf8'));
+    const alive = () => {
+      try {
+        process.kill(-job, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    expect(alive()).toBe(true);
+    night.kill('SIGTERM');
+    await new Promise((done) => night.on('close', done));
+    for (let i = 0; i < 40 && alive(); i++) await new Promise((done) => setTimeout(done, 50));
+    expect(alive()).toBe(false);
   });
 
   it('reads runner durations', () => {

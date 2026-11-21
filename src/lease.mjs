@@ -3,16 +3,30 @@
  * one process, and a lease whose process has died is taken back. Node tree slots, the merge lock and the
  * plan lock are all leases.
  */
-import { linkSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeSync, closeSync } from 'node:fs';
+import { linkSync, mkdirSync, openSync, renameSync, rmSync, writeSync, closeSync } from 'node:fs';
+import { uptime } from 'node:os';
 import { dirname } from 'node:path';
+import { sleep } from './after.mjs';
+import { readJson, writeJson } from './json.mjs';
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+/** When this machine booted, in ms since the epoch. */
+export const bootedAt = () => Date.now() - uptime() * 1000;
 
-/** Whether process `pid` is alive. EPERM means it is, owned by someone else. */
-export const pidAlive = (pid) => {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
+/** Leeway for the boot time against a record's own clock reading. */
+const BOOT_SLACK_MS = 60_000;
+
+/**
+ * Whether process `pid` is alive. EPERM means it is, owned by someone else. `since`, when given, is when the record
+ * naming `pid` was written: one written before this machine booted names a pid that may since have been reused, and is dead.
+ */
+export const pidAlive = (pid, since, booted = bootedAt()) => Number.isInteger(pid) && pid > 0 && sinceBoot(since, booted) && answers(pid);
+
+const sinceBoot = (since, booted) => !(Date.parse(since) < booted - BOOT_SLACK_MS);
+
+/** Whether `target` (a pid, or a negated process group id) takes a signal. EPERM means it is alive, someone else's. */
+const answers = (target) => {
   try {
-    process.kill(pid, 0);
+    process.kill(target, 0);
     return true;
   } catch (error) {
     return error.code === 'EPERM';
@@ -20,12 +34,17 @@ export const pidAlive = (pid) => {
 };
 
 /** What a lease file says, or `undefined` when it is gone or unreadable. */
-export const leaseAt = (path) => {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8'));
-  } catch {
-    return undefined;
-  }
+export const leaseAt = readJson;
+
+/**
+ * Whether what a record (a lease, a ticket, a run's status) names is alive: its `pid`, or its process `group` (a job
+ * that outlives the process that started it), written at its `at` or `started`.
+ */
+export const heldAlive = (record) => {
+  if (!record) return false;
+  const since = record.at ?? record.started;
+  const { group } = record;
+  return pidAlive(record.pid, since) || (Number.isInteger(group) && group > 0 && sinceBoot(since, bootedAt()) && answers(-group));
 };
 
 const create = (path, holder) => {
@@ -44,7 +63,7 @@ const create = (path, holder) => {
 const reclaim = (path) => {
   const held = leaseAt(path);
   // A half-written file reads as undefined; only a lease naming a dead pid is taken back.
-  if (!held || pidAlive(held.pid)) return false;
+  if (!held || heldAlive(held)) return false;
   const aside = `${path}.stale-${process.pid}-${Date.now()}`;
   try {
     renameSync(path, aside);
@@ -52,7 +71,7 @@ const reclaim = (path) => {
     return false;
   }
   const moved = leaseAt(aside);
-  if (moved && pidAlive(moved.pid)) {
+  if (moved && heldAlive(moved)) {
     try {
       linkSync(aside, path);
     } catch { /* someone holds it again either way */ }
@@ -85,6 +104,12 @@ export const takeLease = (path, about = {}) => {
     }
   }
   return undefined;
+};
+
+/** Adds `about` to the lease at `path` while this process holds it. */
+export const amendLease = (path, about) => {
+  const held = leaseAt(path);
+  if (held?.pid === process.pid) writeJson(path, { ...held, ...about });
 };
 
 /** Waits for the lease at `path`, polling every `pollMs`, and answers its `release`. `onWait(holder)` hears once that it waits. */

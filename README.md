@@ -277,7 +277,7 @@ A runner launches jobs on nodes. A config's `runner` picks one:
 
 | `runner` | Jobs run |
 |---|---|
-| `'local'` (default) | On this machine, as node `local`. Each job gets a clone of the project from a pool in `<state>/trees/`, sharing the project's objects (`git clone --shared`), reset to the job's commit and cleaned before it runs, so one job never sees another's leftovers; `node_modules` is kept, so a fixer installs only when the lockfile changed. The pool holds one clone per job running at once, at most `reviewSlots + fixSlots` across a run. A job past its timeout is killed with its children. |
+| `'local'` (default) | On this machine, as node `local`. Each job gets a clone of the project from a pool in `<state>/trees/`, sharing the project's objects (`git clone --shared`), reset to the job's commit and cleaned before it runs, so one job never sees another's leftovers; `node_modules` is kept, so a fixer installs only when the lockfile changed. The pool holds one clone per job running at once, at most `reviewSlots + fixSlots` across a run. A job past its timeout is sent SIGTERM with its children, and SIGKILL 30 seconds later if any are left. A run that exits or is sent SIGTERM, SIGINT or SIGHUP takes its running jobs with it; a job outliving its run (one killed with SIGKILL) keeps its clone leased until it ends. |
 | `'onto'` | On an onto fleet, one `onto do` per job with no node named: each waits in onto's queue and starts on whichever node has room first, so a busy or missing machine never holds a job. skulkr bounds only how many run at once (`concurrency`); what each node takes is its own onto policy (`onto set <node> --refuse kind:fix`, `--quiet`, `--weight`). `--nodes` still pins a run's jobs. Every node that takes reviews or fixes runs `claude -p` itself, so it needs the CLI logged in (and `claude.configDir`, if set, present there); a node that isn't should refuse those kinds. |
 | a module path | Whatever its `createRunner(cfg)` answers. |
 | an object | That object. |
@@ -307,14 +307,17 @@ requests, one JSON object a line on stdin, each echoing its `id`:
 Every request but a bare `ping` may carry `tenant`, the project it is about, and every reply to one names its
 `tenant`. Without one it means the only tenant, and is refused when there are several.
 
-Starting or restarting the service never starts a run. Anything that keeps a process alive and owns its stdin can
-host it (launchd, systemd, tmux); under onto, on the machine holding the project's checkout:
+Starting or restarting the service never starts a run, nor stops one: each run is a process group of its own and
+keeps going when the service that started it exits, and a restarted service finds it on disk and reads its latest line
+from its night log. Anything that keeps a process alive and owns its stdin can host it (launchd, systemd, tmux); under
+onto, as the service `skulkr` hosting every registered tenant, on the machine holding their checkouts:
 
-    onto sync --in skulkr-myproject orochi                     # from ~/src/skulkr
-    onto service up skulkr-myproject --in skulkr-myproject --here --prefer orochi \
-      --env SKULKR_CONFIG=$HOME/src/myproject/skulkr.config.mjs --env SKULKR_BIN=$HOME/src/skulkr/bin/skulkr.mjs \
-      --about "Runs the nightly blind-pair audit of myproject." -- bash -lc 'exec node bin/skulkr.mjs service'
-    onto call skulkr-myproject '{"id":1,"status":true}'
+    onto sync --in skulkr orochi                     # from ~/src/skulkr
+    onto service up skulkr --in skulkr --here --prefer orochi --env SKULKR_BIN=$HOME/src/skulkr/bin/skulkr.mjs \
+      --about "Runs the nightly blind-pair audits of the registered tenants." -- bash -lc 'exec node bin/skulkr.mjs service'
+    onto call skulkr '{"id":1,"status":true,"tenant":"myproject"}'
+
+`--env SKULKR_CONFIG=<a config>` makes it host that project alone instead.
 
 `SKULKR_BIN` makes each run start from the skulkr checkout rather than the service's synced copy, so a change to
 the pipeline reaches the next run without a sync.
@@ -331,7 +334,8 @@ fleet run. Continuous mode overlaps the two, keeping a tenant's rounds coming th
 
 The fleet queue is on disk, in `~/.local/state/skulkr/fleet/` (`SKULKR_FLEET` names another): `gate.lease` is the
 holder, a lease like the slots', and `waiting/` holds a ticket per waiting run, taken oldest first. A run whose
-process has died loses its lease and its ticket.
+process has died loses its lease and its ticket, and so does one written before the machine last booted, whose pid
+another process may hold now.
 
 Continuous mode is on between `startAt` and `stopAt` when the config sets `schedule.continuous: true`, or from a
 `{"start":true,"continuous":true}` request until the night's `stopAt` or a bare `{"stop":true}`, which also turns
@@ -346,8 +350,8 @@ Each tick (every 30 seconds) the service starts a tenant's next round when all o
 - the night's spend plus the next round's estimate stays within `budget.nightUsd`.
 
 The night, for the budget, runs from one `stopAt` to the next, so a round started in the afternoon counts against
-the coming night. Its spend is every round started in it, from `status.json` while live and `summary.json` after
-(run directories from the last day are never pruned). The estimate is `areasPerRound` times the mean cost per
+the coming night. Its spend is every round started in it, from `status.json` while live and `summary.json` after, or
+the last `status.json` of one that died without a summary (run directories from the last day are never pruned). The estimate is `areasPerRound` times the mean cost per
 finished area of the last five rounds, or `areasPerRound × budget.areaGuessUsd` before any. Each continuous round
 runs with `--cap-usd` set to the night's budget left or `budget.capUsd`, whichever is less. A continuous round that
 claims nothing or fails ends the chain for the night. `stopAt` still stops every run dispatching, as before.
@@ -365,11 +369,12 @@ absolute path.
 Every command takes `--tenant <name>` beside `--config` to name a tenant's config (`skulkr map --tenant weasel`).
 
 `skulkr service` with no config named hosts every tenant in the registry, reread every 30 seconds and before each
-request, so one added while it runs is picked up without a restart. Each tenant keeps its own `schedule.startAt`.
+request, so one added while it runs is picked up without a restart, and a tenant's config edited while it runs is
+reloaded, keeping the runs it started (a module the config imports keeps its first version until a restart). Each tenant keeps its own `schedule.startAt`.
 Rounds of different tenants never do their model work at once, since they share the fleet's slots: a tenant due, or
 asked to start, while another's round is in its model steps waits until that round reaches its patch step, and its
 `status` reply lists that under `waiting` (`behind` names the tenant it waits on), beside `nextStart`, its next
-scheduled start. Their gates take turns in the fleet queue. A tenant's own rounds may still run beside each other
+scheduled start. A scheduled start still waiting at its own `stopAt` is skipped until the next `startAt`. Their gates take turns in the fleet queue. A tenant's own rounds may still run beside each other
 when started by hand. A tenant added `--read-only` is shown and its live rounds hold the fleet like any other's, but
 the service never starts or stops one: its rounds run under another service.
 
@@ -420,9 +425,12 @@ npm run menubar:install      # links `skulkr` into ~/.local/bin, then perch buil
 npm run menubar:uninstall
 ```
 
-Its wording comes from `skulkr menu` (`src/menu.mjs`), which asks the service for each tenant's status the way
-`onto call` does, so it reads like the dashboard; `menubar/menubar.yaml` only lays the lines out. perch writes the
-`PATH` you install from into the item's LaunchAgent, so install from a shell where `node` and `onto` resolve.
+Its wording comes from `skulkr menu` (`src/menu.mjs`), which asks the service for each registered tenant's status
+the way `onto call` does, so it reads like the dashboard; `menubar/menubar.yaml` only lays the lines out. The service
+it asks is `SKULKR_SERVICE`, else `skulkr` (as "The service" brings it up), and the dashboard it links is
+`SKULKR_DASHBOARD_URL`, else `http://localhost:5214/`. perch writes only the `PATH` you install from into the item's
+LaunchAgent, so install from a shell where `node` and `onto` resolve, and set either variable in `menubar.yaml`'s
+`run` (`[env, SKULKR_SERVICE=skulkr-myproject, skulkr, menu]`).
 
 ## Where things go
 
@@ -433,7 +441,7 @@ Its wording comes from `skulkr menu` (`src/menu.mjs`), which asks the service fo
 | Each commit's lines changed, for `staleLines` and calibration's `lines` | `~/.cache/skulkr/<name>/churn.json` | only the commits after the oldest pass asked about: any area's last pass, or the first of a pair of passes; rewritten without the rest on each build that adds one |
 | Node tree leases | `<state>/slots/<node>/<tree>` | deleted as each job ends; one whose pid is dead is taken back |
 | The local runner's clones | `<state>/trees/t<k>` and a lease beside each | one per job running at once; reused, never more than the most jobs ever run at once |
-| The local runner's job records, for the dashboard | `<state>/local-jobs/`, a file per job | deleted after 7 days, as `jobs()` reads them |
+| The local runner's job records, for the dashboard | `<state>/local-jobs/`, a file per job | deleted after 7 days, as each job starts and as `jobs()` reads them |
 | Locks | `<state>/plan.lock`, `<state>/merge.lock` | one file each, deleted on release |
 | The fleet queue | `~/.local/state/skulkr/fleet/`: `gate.lease` and a ticket per waiting run in `waiting/` | the lease deleted on release, a ticket when its run takes the gate; a dead pid's of either is cleared |
 | Continuous mode asked for | `<state>/continuous.json` | one file, rewritten by each request |

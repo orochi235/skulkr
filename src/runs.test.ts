@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { tmpdir, uptime } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
@@ -65,6 +65,13 @@ describe('live runs', () => {
     claimRound(2, dir);
     requestStop(2, dir);
     expect([stopRequested(1, dir), stopRequested(2, dir)]).toEqual([false, true]);
+  });
+  it('leave out a status written before this machine booted, whose pid may be another process now', () => {
+    const dir = state();
+    claimRound(1, dir);
+    const before = new Date(Date.now() - uptime() * 1000 - 3_600_000).toISOString();
+    writeFileSync(join(runDir(1, dir), 'status.json'), JSON.stringify({ pid: process.pid, started: before, at: before }));
+    expect(liveRuns(dir)).toEqual([]);
   });
 });
 

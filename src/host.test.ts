@@ -8,9 +8,9 @@ const at = (hhmm: string, day = 16) => {
 };
 
 /** A tenant whose runs are `live` rounds; each start is recorded in `starts` and makes it run. */
-const tenant = (name: string, { startAt = '23:00', readOnly = false } = {}) => {
+const tenant = (name: string, { startAt = '23:00', readOnly = false, stopAt = undefined as string | undefined } = {}) => {
   const t = {
-    name, readOnly, startAt,
+    name, readOnly, startAt, stopAt,
     live: [] as number[],
     starts: [] as string[][],
     running: () => t.live.length > 0,
@@ -98,6 +98,23 @@ describe('createHost', () => {
     clock.now = at('02:10', 18);
     h.tick();
     expect(b.starts).toEqual([[]]);
+  });
+
+  it('skips a scheduled start held behind another tenant until past its stopAt', () => {
+    const clock = { now: at('22:00') };
+    const [a, b] = [tenant('a', { startAt: '23:00' }), tenant('b', { startAt: '01:00', stopAt: '07:00' })];
+    const h = host([a, b], clock);
+    h.tick();
+    clock.now = at('23:00');
+    h.tick();
+    clock.now = at('01:00', 17);
+    h.tick();
+    expect(h.queue).toMatchObject([{ tenant: 'b', auto: true }]);
+    a.live = [];
+    clock.now = at('08:00', 17);
+    h.tick();
+    expect(b.starts).toEqual([]);
+    expect(h.queue).toEqual([]);
   });
 
   it('picks up a tenant added while it runs, and never starts a read-only one', async () => {
