@@ -3,6 +3,9 @@
  * writes under `out` brought back to `to`. onto's own README covers `do`, `status` and `jobs`.
  */
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 
 const BUSY = /working tree .* is busy/;
 const REFUSED = /\bquiet\b|refuses|is offline|not reachable|unavailable/i;
@@ -77,7 +80,65 @@ export const progressOfTop = (top) => {
  * - `progress()` (optional) answers each running job's own count of its work by its task, a Map of `{ done, total }`
  *   (its first counter: a reviewer's files read, a fixer's commits of its findings), empty when it cannot say.
  */
-export const createOntoRunner = () => ({
+/** How long one job listing answers for: the dashboard asks on every poll, and onto takes seconds to list. */
+export const JOBS_TTL_MS = 10_000;
+
+/**
+ * `fetch(hours)`, onto's job listing for the last `hours`, answered from its last call for {@link JOBS_TTL_MS} when that
+ * call covered as much, and from its last good answer when a call throws: a listing that times out under load would
+ * otherwise blank every running lane.
+ */
+export const keptJobs = (fetch, { now = Date.now, store = memoryStore() } = {}) => (hours) => {
+  const last = store.read();
+  if (last && last.hours >= hours && now() - last.at < JOBS_TTL_MS) return last.jobs;
+  try {
+    const jobs = fetch(hours);
+    store.write({ hours, at: now(), jobs });
+    return jobs;
+  } catch {
+    return last?.jobs ?? [];
+  }
+};
+
+/** A store for {@link keptJobs} that lives as long as the process. */
+export const memoryStore = () => {
+  let kept = null;
+  return { read: () => kept, write: (v) => { kept = v; } };
+};
+
+/**
+ * A store for {@link keptJobs} in one file, so the `skulkr map` a dashboard spawns per build keeps the last listing past
+ * its own exit. One file, overwritten on every good listing.
+ */
+export const fileStore = (path) => ({
+  read: () => {
+    try {
+      return JSON.parse(readFileSync(path, 'utf8'));
+    } catch {
+      return null;
+    }
+  },
+  write: (v) => {
+    try {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(`${path}.tmp`, JSON.stringify(v));
+      renameSync(`${path}.tmp`, path);
+    } catch {
+      // A listing that cannot be kept is still answered.
+    }
+  },
+});
+
+/** Where the onto runner keeps its last job listing. */
+const JOBS_CACHE = join(process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'), 'skulkr', 'onto-jobs.json');
+
+export const createOntoRunner = () => {
+  const listed = keptJobs((hours) => {
+    const out = execFileSync('onto', ['jobs', '--json', '--since', `${hours}h`, '--limit', '1000'],
+      { encoding: 'utf8', timeout: 45_000, stdio: ['ignore', 'pipe', 'ignore'] });
+    return (JSON.parse(out).jobs ?? []).filter((j) => j.state === 'running' || j.finished);
+  }, { store: fileStore(JOBS_CACHE) });
+  return {
   run: async (job, { cwd, log }) => {
     const r = await ontoOnce(ontoArgs(job), cwd, log);
     return {
@@ -108,12 +169,7 @@ export const createOntoRunner = () => ({
   },
   jobs: (since) => {
     const hours = Math.max(1, Math.ceil((Date.now() - Date.parse(since)) / 3_600_000) + 1);
-    try {
-      const out = execFileSync('onto', ['jobs', '--json', '--since', `${Number.isFinite(hours) ? hours : 24}h`, '--limit', '1000'],
-        { encoding: 'utf8', timeout: 20_000, stdio: ['ignore', 'pipe', 'ignore'] });
-      return (JSON.parse(out).jobs ?? []).filter((j) => j.state === 'running' || j.finished);
-    } catch {
-      return [];
-    }
+    return listed(Number.isFinite(hours) ? hours : 24);
   },
-});
+  };
+};
