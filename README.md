@@ -277,7 +277,7 @@ A runner launches jobs on nodes. A config's `runner` picks one:
 | `runner` | Jobs run |
 |---|---|
 | `'local'` (default) | On this machine, as node `local`. Each job gets a clone of the project from a pool in `<state>/trees/`, sharing the project's objects (`git clone --shared`), reset to the job's commit and cleaned before it runs, so one job never sees another's leftovers; `node_modules` is kept, so a fixer installs only when the lockfile changed. The pool holds one clone per job running at once, at most `reviewSlots + fixSlots` across a run. A job past its timeout is killed with its children. |
-| `'onto'` | On an onto fleet, one `onto do` per job with no node named: each waits in onto's queue and starts on whichever node has room first, so a busy or missing machine never holds a job. skulkr bounds only how many run at once (`concurrency`); what each node takes is its own onto policy (`onto set <node> --refuse kind:fix`, `--quiet`, `--weight`). `--nodes` still pins a run's jobs. |
+| `'onto'` | On an onto fleet, one `onto do` per job with no node named: each waits in onto's queue and starts on whichever node has room first, so a busy or missing machine never holds a job. skulkr bounds only how many run at once (`concurrency`); what each node takes is its own onto policy (`onto set <node> --refuse kind:fix`, `--quiet`, `--weight`). `--nodes` still pins a run's jobs. Every node that takes reviews or fixes runs `claude -p` itself, so it needs the CLI logged in (and `claude.configDir`, if set, present there); a node that isn't should refuse those kinds. |
 | a module path | Whatever its `createRunner(cfg)` answers. |
 | an object | That object. |
 
