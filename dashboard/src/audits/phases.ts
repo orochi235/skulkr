@@ -156,27 +156,33 @@ function measuredOf(p: PartState): number | null {
 
 const SPAN_STATE: Readonly<Record<LaneStep['state'], SpanState>> = { waiting: 'pending', running: 'active', done: 'done', failed: 'failed' };
 
-/** How much of the patch to shade once the fixer reports: the share of the findings it answered that it fixed, all of
- *  it once the patch is applied, and none before the fixer reports or where it gives no tally. */
+/** Of the findings a done fixer answered, how many it left for later, and the share it settled, fixed or found sound;
+ *  null before it reports or where it gives no tally. */
+function settledOf(fix: LaneStep): { left: number; share: number } | null {
+  if (fix.state !== 'done' || fix.fixed === undefined) return null;
+  if (!fix.of) return { left: 0, share: 1 };
+  // A report with only a tally line says nothing of why a finding went unfixed, so all of them count as left.
+  const left = Math.max(0, fix.deferred ?? fix.of - fix.fixed);
+  return { left, share: Math.max(0, 1 - left / fix.of) };
+}
+
+/** How much of the patch to shade once the fixer reports: the share it settled, all of it once the patch is applied,
+ *  and none before the fixer reports or where it gives no tally. */
 export function patchFillOf(lane: AuditLane): number {
-  const { fix, patch } = lane.steps;
-  if (patch.state === 'done') return 1;
-  if (fix.state !== 'done' || fix.fixed === undefined) return 0;
-  return fix.of ? Math.min(1, fix.fixed / fix.of) : 1;
+  if (lane.steps.patch.state === 'done') return 1;
+  return settledOf(lane.steps.fix)?.share ?? 0;
 }
 
 /**
- * A patch span split by what its fixer left: the share it settled, fixed or found sound, shaded as the patch is,
- * then the share it left for later, filed or waiting on a question, hatched dark gray. Whole where it left nothing,
- * has not reported, or gave no tally.
+ * A patch span split by what its fixer left: the share it settled shaded as the patch is, then the share it left for
+ * later, filed or waiting on a question, hatched dark gray. Whole where it left nothing, has not reported, or gave no
+ * tally.
  */
 export function withUnfixed(span: SpanStripSpan, lane: AuditLane): SpanStripSpan[] {
   const { fix } = lane.steps;
-  if (fix.state !== 'done' || fix.fixed === undefined || !fix.of) return [span];
-  // A report with only a tally line says nothing of why a finding went unfixed, so all of them count as left.
-  const left = fix.deferred ?? fix.of - fix.fixed;
-  if (left <= 0) return [span];
-  const share = 1 - left / fix.of;
+  const settled = settledOf(fix);
+  if (!settled || settled.left === 0) return [span];
+  const { left, share } = settled;
   return [
     { ...span, ms: span.ms * share, fill: 1 },
     {
