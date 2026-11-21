@@ -16,7 +16,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
-import { TENANTS_PATH, parseTenantPath } from '../shared/routes.ts';
+import { STALE_HEADER, TENANTS_PATH, parseTenantPath } from '../shared/routes.ts';
 
 /** The pipeline's CLI, beside the dashboard in its repository. */
 export const SKULKR_BIN = fileURLToPath(new URL('../../bin/skulkr.mjs', import.meta.url));
@@ -60,12 +60,19 @@ export const FRESH_MS = 5_000;
 /** Where a tenant's last good map is kept between server runs: one file per tenant, overwritten. */
 export const mapCachePath = (tenant: string, home = homedir()) => join(home, '.cache', 'skulkr', tenant.replace(/[^\w.-]+/g, '-'), 'map.json');
 
+/** A kept map, and why the builds since it failed: null once one succeeds. */
+export interface KeptAnswer {
+  readonly text: string;
+  readonly error: string | null;
+}
+
 /**
  * `build` with its last good answer kept: a request gets the kept map at once, and starts a build in the background
  * when that map is older than `freshMs`; only with nothing kept does a request wait for the build. `file` keeps the
- * map across server restarts. A failed build keeps the last good map, and fails a request only when there is none.
+ * map across server restarts. A failed build keeps the last good map, answered with the failure beside it until a
+ * build succeeds, and fails a request only when there is none.
  */
-export function createKeptMap(build: () => Promise<string>, file: string | null, { freshMs = FRESH_MS, now = Date.now } = {}): () => Promise<string> {
+export function createKeptMap(build: () => Promise<string>, file: string | null, { freshMs = FRESH_MS, now = Date.now } = {}): () => Promise<KeptAnswer> {
   let kept: { text: string; at: number } | null = null;
   if (file) {
     try {
@@ -74,10 +81,12 @@ export function createKeptMap(build: () => Promise<string>, file: string | null,
       kept = null;
     }
   }
+  let error: string | null = null;
   let building: Promise<string> | null = null;
   const refresh = () => {
     building ??= build().then((text) => {
       kept = { text, at: now() };
+      error = null;
       if (file) {
         try {
           mkdirSync(dirname(file), { recursive: true });
@@ -87,15 +96,19 @@ export function createKeptMap(build: () => Promise<string>, file: string | null,
         }
       }
       return text;
+    }, (e: Error) => {
+      error = e.message;
+      throw e;
     }).finally(() => {
       building = null;
     });
     return building;
   };
   return () => {
-    if (!kept) return refresh();
+    if (!kept) return refresh().then((text) => ({ text, error: null }));
+    // A failure reaches the requests after it, as `error`.
     if (now() - kept.at > freshMs) refresh().catch(() => {});
-    return Promise.resolve(kept.text);
+    return Promise.resolve({ text: kept.text, error });
   };
 }
 
@@ -126,9 +139,11 @@ function createRoutes(options: SkulkrRunnerOptions) {
   const run = createSkulkrRunner(options);
   const builds = new Map<string, () => Promise<string>>();
   const keptTenants = createKeptMap(() => listTenants(run).then((list) => JSON.stringify(list)), null);
-  const json = (res: ServerResponse, body: Promise<string>) => body.then((text) => {
+  const json = (res: ServerResponse, body: Promise<string | KeptAnswer>) => body.then((answer) => {
+    const { text, error } = typeof answer === 'string' ? { text: answer, error: null } : answer;
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'no-store');
+    if (error) res.setHeader(STALE_HEADER, encodeURIComponent(error));
     res.end(text);
   }, (e: Error) => {
     res.statusCode = 500;
@@ -146,7 +161,7 @@ function createRoutes(options: SkulkrRunnerOptions) {
       return;
     }
     // The registry is kept like a map, so a tenant added while the server runs shows up within FRESH_MS.
-    const tenants = keptTenants().then((text) => JSON.parse(text) as DashTenant[]);
+    const tenants = keptTenants().then(({ text }) => JSON.parse(text) as DashTenant[]);
     if (listing) return void json(res, tenants.then((list) => JSON.stringify(list.map(({ name }) => ({ name })))));
     void json(res, tenants.then((list) => {
       const args = tenantArgs(list, route!.tenant, route!.what, new URLSearchParams(query).get('id'));

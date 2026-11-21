@@ -84,19 +84,39 @@ describe('createKeptMap', () => {
       return `map ${n}`;
     });
     const kept = createKeptMap(build, null, { freshMs: 5_000, now: () => clock });
-    expect(await kept()).toBe('map 1');
+    const text = async () => (await kept()).text;
+    expect(await text()).toBe('map 1');
     clock = 1_000;
-    expect(await kept()).toBe('map 1');
+    expect(await text()).toBe('map 1');
     expect(build).toHaveBeenCalledTimes(1);
     clock = 10_000;
-    expect(await kept()).toBe('map 1');
+    expect(await text()).toBe('map 1');
     await vi.waitFor(() => expect(build).toHaveBeenCalledTimes(2));
-    expect(await kept()).toBe('map 2');
+    expect(await text()).toBe('map 2');
     fail = true;
     clock = 20_000;
-    expect(await kept()).toBe('map 2');
+    expect(await text()).toBe('map 2');
     await vi.waitFor(() => expect(build).toHaveBeenCalledTimes(3));
-    expect(await kept()).toBe('map 2');
+    expect(await text()).toBe('map 2');
+  });
+
+  it('answers the kept map with why the builds since it failed, until one succeeds', async () => {
+    let clock = 0;
+    let fail = false;
+    const build = vi.fn(async () => {
+      if (fail) throw new Error('map.mjs crashed');
+      return 'map';
+    });
+    const kept = createKeptMap(build, null, { freshMs: 5_000, now: () => clock });
+    expect(await kept()).toEqual({ text: 'map', error: null });
+    fail = true;
+    clock = 10_000;
+    await kept();
+    await vi.waitFor(() => expect(build).toHaveBeenCalledTimes(2));
+    await vi.waitFor(async () => expect(await kept()).toEqual({ text: 'map', error: 'map.mjs crashed' }));
+    fail = false;
+    await vi.waitFor(() => expect(build).toHaveBeenCalledTimes(3));
+    await vi.waitFor(async () => expect(await kept()).toEqual({ text: 'map', error: null }));
   });
 
   it('starts from the copy kept on disk, and writes each fresh build there', async () => {
@@ -105,7 +125,7 @@ describe('createKeptMap', () => {
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, 'map from disk');
     const kept = createKeptMap(async () => 'map fresh', file, { freshMs: 5_000, now: () => Date.now() + 60_000 });
-    expect(await kept()).toBe('map from disk');
+    expect((await kept()).text).toBe('map from disk');
     await vi.waitFor(() => expect(readFileSync(file, 'utf8')).toBe('map fresh'));
     rmSync(dir, { recursive: true, force: true });
   });

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { after } from '@weasel-js/registry';
+import { STALE_HEADER } from '@shared/routes';
 import type { SkulkrMap } from './skulkrMap.types';
 
 export type SkulkrMapState =
@@ -74,7 +75,8 @@ export function useSkulkrMap(options: UseSkulkrMapOptions): SkulkrMapState {
         const map = (await res.json()) as SkulkrMap;
         if (!live) return;
         keepMap(url, map);
-        setState({ status: 'ready', map });
+        const stale = res.headers.get(STALE_HEADER);
+        setState(stale ? { status: 'ready', map, error: decodeURIComponent(stale) } : { status: 'ready', map });
       } catch (e) {
         if (!live) return;
         const error = (e as Error).message;
