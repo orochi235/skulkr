@@ -61,12 +61,23 @@ export const fixOf = (rec) => {
   return { worked: items.length > 0 || /^tally: /im.test(report) || commits > 0, items, listed, subjects: rec.subjects ?? [], text: report };
 };
 
-/** Whether `fix` acted on `finding`: names its id, gives a verdict line like it, or commits a subject like it. */
-const actsOn = (fix, finding) => {
-  if (finding.id && new RegExp(`\\b${finding.id}\\b`).test(fix.text)) return true;
-  const claims = [...fix.items.map((i) => i.claim), ...fix.subjects];
-  return claims.some((c) => likeness(c, finding.claim) >= VERDICT_LIKENESS);
-};
+const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** Whether `text` names `id`: a bare `r56-2` only where no area qualifies it, as `x/r56-2` does. */
+const names = (text, id) => new RegExp(`(?<![\\w./-])${escape(id)}(?![\\w-])`).test(text);
+
+/** Whether `fix` gives a verdict line like `finding`'s claim, or commits a subject like it. */
+const answers = (fix, finding) => [...fix.items.map((i) => i.claim), ...fix.subjects]
+  .some((c) => likeness(c, finding.claim) >= VERDICT_LIKENESS);
+
+/** Whether `fix` acted on `finding`, which it was handed: names its id, or answers its claim. */
+const actsOn = (fix, finding) => (finding.id && names(fix.text, finding.id)) || answers(fix, finding);
+
+/**
+ * The id finding `o` goes by when listed under area `to`: qualified by the area that reported it when that is not
+ * `to`, since every area audited in a round has its own `r<round>-1`.
+ */
+const idUnder = (o, to) => (to === o.area ? o.id : `${o.area}/${o.id}`);
+const QUALIFIED = /^(.+)\/(r\d+-\d+)$/;
 
 const sameDefect = (open, finding, cited) => {
   const paths = pathsOf(finding.where, cited);
@@ -84,6 +95,7 @@ const sameDefect = (open, finding, cited) => {
  */
 export const openFindings = (records, { cited, areas } = {}) => {
   const byArea = new Map();
+  const all = [];
   for (const rec of [...records].sort((x, y) => x.round - y.round)) {
     const list = byArea.get(rec.id) ?? [];
     byArea.set(rec.id, list);
@@ -96,32 +108,35 @@ export const openFindings = (records, { cited, areas } = {}) => {
         known.acted = false;
         given.push({ ...known, claim: f.claim, id: f.id, known });
       } else {
-        const o = { id: f.id, claim: f.claim, where: f.where, from: f.from, round: rec.round, rounds: [rec.round], paths: pathsOf(f.where, cited), acted: false };
+        const o = { id: f.id, area: rec.id, claim: f.claim, where: f.where, from: f.from, round: rec.round, rounds: [rec.round], paths: pathsOf(f.where, cited), acted: false };
         list.push(o);
+        all.push(o);
         given.push({ ...o, known: o });
       }
     }
     for (const c of carried) {
-      // A finding carried in after a recut was found under the area's old id, so it is looked for there too.
-      const known = list.find((o) => o.id === c.id) ?? list.find((o) => sameDefect(o, c, cited))
-        ?? [...byArea.values()].flat().find((o) => o.id === c.id && o.claim === c.claim);
+      // A carried id names its first area when that is not this one; a record from before that names none, so its
+      // id and claim together are looked for under every area before the bare id is trusted.
+      const [, area, id] = c.id.match(QUALIFIED) ?? [, rec.id, c.id];
+      const known = all.find((o) => o.area === area && o.id === id && (area !== rec.id || o.claim === c.claim))
+        ?? all.find((o) => o.id === id && o.claim === c.claim)
+        ?? list.find((o) => o.id === id) ?? list.find((o) => sameDefect(o, c, cited));
       if (known) given.push({ ...known, id: c.id, known });
     }
     const fix = fixOf(rec);
     if (!fix.worked) continue;
-    const all = fix.listed >= given.length && given.length > 0;
-    for (const g of given) if (all || actsOn(fix, g)) g.known.acted = true;
-    for (const o of list) if (!o.acted && actsOn(fix, o)) o.acted = true;
+    const every = fix.listed >= given.length && given.length > 0;
+    for (const g of given) if (every || actsOn(fix, g)) g.known.acted = true;
+    // A finding this fixer was not handed is closed only by its words: its bare id may be another area's.
+    for (const o of list) if (!o.acted && answers(fix, o)) o.acted = true;
   }
   const holder = areas && createHolderLookup(areas);
   const open = new Map();
-  for (const [id, list] of byArea) {
-    for (const { acted, paths, ...o } of list) {
-      if (acted) continue;
-      const to = holder?.(paths) ?? id;
-      if (!open.has(to)) open.set(to, []);
-      open.get(to).push(o);
-    }
+  for (const { acted, paths, ...o } of all) {
+    if (acted) continue;
+    const to = holder?.(paths) ?? o.area;
+    if (!open.has(to)) open.set(to, []);
+    open.get(to).push({ ...o, id: idUnder(o, to) });
   }
   for (const list of open.values()) list.sort((x, y) => x.round - y.round);
   return open;

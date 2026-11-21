@@ -67,7 +67,7 @@ describe('openFindings after a recut', () => {
   it('lists each open finding under the area holding its cited paths, and one citing none it holds under its old id', () => {
     const elsewhere: [string, string] = ['the docs page names a removed option', 'docs/options.md:3'];
     const open = openFindings([reported(56, [ROUNDING, LEAK, elsewhere])], { areas });
-    expect([...open].map(([id, list]) => [id, list.map((o: any) => o.id)])).toEqual([['clamp', ['r56-1']], ['ticker', ['r56-2']], ['x', ['r56-3']]]);
+    expect([...open].map(([id, list]) => [id, list.map((o: any) => o.id)])).toEqual([['clamp', ['x/r56-1']], ['ticker', ['x/r56-2']], ['x', ['r56-3']]]);
   });
 
   it("closes a finding carried into its new area's round once that fixer acts on it", () => {
@@ -75,7 +75,37 @@ describe('openFindings after a recut', () => {
     const carried = [{ id: 'r56-2', claim: LEAK[0], where: LEAK[1], from: 'A', round: 56, rounds: [56] }];
     const fix = `- [r56-2] ${LEAK[0]} (A): fixed 1a2b3c4d.\n\ntally: 1 of 1 fixed, 0 extra fixed`;
     const after = { ...reported(57, []), id: 'ticker', carried, fix };
-    expect([...openFindings([old, after], { areas })].map(([id, list]) => [id, list.map((o: any) => o.id)])).toEqual([['clamp', ['r56-1']]]);
+    expect([...openFindings([old, after], { areas })].map(([id, list]) => [id, list.map((o: any) => o.id)])).toEqual([['clamp', ['x/r56-1']]]);
+  });
+
+  // `ticker` was audited in round 56 too, so it has an `r56-2` of its own beside the one `x` hands it.
+  const TICK_ONE = ['`tick` fires once more after `stop`, because the cancel flag is read late', 'src/ticker.ts:10'] as [string, string];
+  const TICK_TWO = ['the frame budget constant overflows a 16-bit counter past 65 seconds', 'src/ticker.ts:22'] as [string, string];
+  const ownRound = () => ({ ...reported(56, [TICK_ONE, TICK_TWO]), id: 'ticker' });
+  const listed = (open: Map<string, any[]>) => [...open].map(([id, list]) => [id, list.map((o: any) => [o.id, o.claim])]);
+
+  it("names a finding handed to another area by its first area and id, so it can't be taken for the new area's own", () => {
+    const open = openFindings([reported(56, [ROUNDING, LEAK]), ownRound()], { areas });
+    expect(listed(open)).toEqual([
+      ['clamp', [['x/r56-1', ROUNDING[0]]]],
+      ['ticker', [['x/r56-2', LEAK[0]], ['r56-1', TICK_ONE[0]], ['r56-2', TICK_TWO[0]]]],
+    ]);
+    const fix = `- [x/r56-2] ${LEAK[0]} (carried): fixed 1a2b3c4d.\n\ntally: 1 of 3 fixed, 0 extra fixed`;
+    const after = { ...reported(57, []), id: 'ticker', carried: open.get('ticker'), fix };
+    expect(listed(openFindings([reported(56, [ROUNDING, LEAK]), ownRound(), after], { areas }))).toEqual([
+      ['clamp', [['x/r56-1', ROUNDING[0]]]],
+      ['ticker', [['r56-1', TICK_ONE[0]], ['r56-2', TICK_TWO[0]]]],
+    ]);
+  });
+
+  it("closes the handed finding, not the new area's own of the same id, from a record carrying it by bare id", () => {
+    const carried = [{ id: 'r56-2', claim: LEAK[0], where: LEAK[1], from: 'A', round: 56, rounds: [56] }];
+    const fix = `- [r56-2] ${LEAK[0]} (carried): fixed 1a2b3c4d.\n\ntally: 1 of 1 fixed, 0 extra fixed`;
+    const after = { ...reported(57, []), id: 'ticker', carried, fix };
+    expect(listed(openFindings([reported(56, [ROUNDING, LEAK]), ownRound(), after], { areas }))).toEqual([
+      ['clamp', [['x/r56-1', ROUNDING[0]]]],
+      ['ticker', [['r56-1', TICK_ONE[0]], ['r56-2', TICK_TWO[0]]]],
+    ]);
   });
 });
 

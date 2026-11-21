@@ -20,7 +20,8 @@ export const carriedMarkdown = (carried) => carried.map((o) => [
 export const carriedSource = (id, carried) => (carried.length === 0 ? '' : [
   `${carried.length === 1 ? 'One finding' : `${carried.length} findings`} from earlier rounds that no fixer acted on`,
   `${carried.length === 1 ? 'is' : 'are'} carried into this one, in \`${JOB_IN}/${id}/carried.md\`. The code may have`,
-  'changed since: check each still applies. Lead its verdict line with its id in brackets, `[r56-3]`.',
+  'changed since: check each still applies. Lead its verdict line with its id in brackets as it is given there,',
+  '`[r56-3]` or `[other.area/r56-3]`.',
 ].join('\n'));
 
 /**
