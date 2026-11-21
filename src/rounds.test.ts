@@ -37,7 +37,7 @@ describe('nextRound', () => {
   it('follows the highest number used by a round directory, the hardening record, or a branch', () => {
     expect(nextRound({ roundDirs: ['round-12', 'partition.json'] })).toBe(13);
     expect(nextRound({ hardening: '| rounds 28–30; method below |\n| (audit round 15) |' })).toBe(31);
-    expect(nextRound({ branches: ['main', 'audit30-ui', 'batch/2026-11-17-audit33', 'skulkr'] })).toBe(34);
+    expect(nextRound({ branches: ['main', 'audit30-ui', 'batch/2026-11-17-audit33', 'skulkr'], roundIn: weaselConfig().names.roundIn })).toBe(34);
     expect(nextRound({ roundDirs: ['round-12'], claimed: ['14', '13'] })).toBe(15);
     expect(nextRound({})).toBe(1);
   });
@@ -57,7 +57,7 @@ describe('pickAreas', () => {
   });
 
   it('skips an area an unlanded round still holds on an audit branch', () => {
-    const inFlight = areasInFlight(['audit37-b', 'audit37-core.animation', 'batch/2026-11-18-audit37', 'feature-x']);
+    const inFlight = areasInFlight(['audit37-b', 'audit37-core.animation', 'batch/2026-11-18-audit37', 'feature-x'], weaselConfig().names.areaOf);
     expect([...inFlight].sort()).toEqual(['b', 'core.animation']);
     const picked = pickAreas({ areas: ['a', 'b', 'c'].map((id) => area(id)), passes: new Map(), touched: never, count: 3, inFlight }).picked;
     expect(picked).toEqual(['a', 'c']);

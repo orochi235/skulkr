@@ -3,6 +3,7 @@
  * open when a round reported it and no fixer of that area acted on it in that round or after. README.md, "Carried
  * findings", is its documentation.
  */
+import { openItems } from './defects.mjs';
 import { parseSections, reportItems } from './findings.mjs';
 
 const STOP = new Set(['the', 'and', 'for', 'but', 'not', 'its', 'it\'s', 'with', 'that', 'this', 'from', 'into', 'when',
@@ -41,14 +42,10 @@ export const givenIn = (rec) => {
   const match = rec.match ?? { a: [], b: [], pairs: [] };
   // By claim, not index: a record from before parseFindings dropped where-less sections lists them in its match.
   const whereOf = (text) => new Map(parseSections(text ?? '').reverse().map((f) => [f.claim, f.where]));
-  const [wa, wb] = [whereOf(rec.A), whereOf(rec.B)];
-  const a = match.a ?? [], b = match.b ?? [], pairs = match.pairs ?? [];
-  const pa = new Set(pairs.map(([i]) => i)), pb = new Set(pairs.map(([, j]) => j));
-  const fresh = [
-    ...pairs.map(([i, j]) => ({ claim: a[i], where: wa.get(a[i]) || wb.get(b[j]) || '', from: 'A+B' })),
-    ...a.flatMap((claim, i) => (pa.has(i) ? [] : [{ claim, where: wa.get(claim) ?? '', from: 'A' }])),
-    ...b.flatMap((claim, j) => (pb.has(j) ? [] : [{ claim, where: wb.get(claim) ?? '', from: 'B' }])),
-  ].filter((f) => f.claim && f.where).map((f, n) => ({ ...f, id: `r${rec.round}-${n + 1}`, round: rec.round }));
+  const where = { A: whereOf(rec.A), B: whereOf(rec.B) };
+  const fresh = openItems(match, (claim, side) => where[side].get(claim))
+    .flatMap(({ claim, where: at, from }) => (claim && at ? [{ claim, where: at, from }] : []))
+    .map((f, n) => ({ ...f, id: `r${rec.round}-${n + 1}`, round: rec.round }));
   return { fresh, carried: rec.carried ?? [] };
 };
 

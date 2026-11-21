@@ -183,7 +183,7 @@ export const scaledOf = (pass) => ({ chapman: pass.chapman * (pass.share ?? 1), 
  * `batch/…-audit31`), and the rounds runs have claimed (`claimed`, numbers as strings or numbers).
  */
 /** @param {{ roundDirs?: string[], hardening?: string, branches?: string[], claimed?: (string | number)[], roundIn?: RegExp }} used */
-export const nextRound = ({ roundDirs = [], hardening = '', branches = [], claimed = [], roundIn = /(?:^|[/-])audit(\d+)(?:-|$)/ }) => {
+export const nextRound = ({ roundDirs = [], hardening = '', branches = [], claimed = [], roundIn }) => {
   const used = [0, ...claimed.map(Number)];
   for (const name of roundDirs) {
     const m = /^round-(\d+)$/.exec(name);
@@ -223,7 +223,7 @@ export const isSettled = (area, passes, touched) => {
  * (`areaOf`, the config's `names.areaOf`). Their passes are recorded only on that round's batch branch, so
  * `readPasses` cannot see them.
  */
-export const areasInFlight = (unmergedBranches, areaOf = /^audit\d+-(.+)$/) =>
+export const areasInFlight = (unmergedBranches, areaOf) =>
   new Set(unmergedBranches.flatMap((b) => areaOf.exec(b)?.[1] ?? []));
 
 /** `areasInFlight` over the branches `cfg`'s `main` has not merged, asked of `git`: the one answer night and the map use. */

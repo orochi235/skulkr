@@ -14,7 +14,7 @@ describe('areaDefects', () => {
     const root = tmp(), state = tmp();
     put(join(root, 'docs/audits/round-46/x/fix.md'), 'A thing breaks (A): fixed 1a2b3c4d. It no longer does.');
     put(join(state, 'nights/2026-11-20T00-00-00-000Z-round47/areas/x/match.json'), JSON.stringify({ pairs: [[1, 0]], a: ['one', 'two'], b: ['two too', 'three'] }));
-    expect(areaDefects(root, 'x', state)).toEqual([
+    expect(areaDefects(root, 'x', state, 'docs/audits')).toEqual([
       { round: 47, recorded: false, fixed: false, items: [
         { claim: 'two', from: 'A+B', verdict: 'open', note: '' }, { claim: 'one', from: 'A', verdict: 'open', note: '' },
         { claim: 'three', from: 'B', verdict: 'open', note: '' },

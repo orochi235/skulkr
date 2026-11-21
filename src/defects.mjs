@@ -10,15 +10,18 @@ import { reportItems } from './findings.mjs';
 
 const readIf = (file) => (existsSync(file) ? readFileSync(file, 'utf8') : null);
 
-/** The findings a match paired, as items no fixer has answered yet: shared ones once, then each reviewer's own. */
-export const openItems = (match) => {
+/**
+ * The findings a match paired, as items no fixer has answered yet: shared ones once, then each reviewer's own. With
+ * `whereOf(claim, side)`, each also has its `where`, a shared one's from A, else from B.
+ */
+export const openItems = (match, whereOf = null) => {
   const a = match.a ?? [], b = match.b ?? [], pairs = match.pairs ?? [];
   const pairedA = new Set(pairs.map(([i]) => i)), pairedB = new Set(pairs.map(([, j]) => j));
-  const open = (claim, from) => ({ claim, from, verdict: 'open', note: '' });
+  const open = (claim, from, where) => ({ claim, from, verdict: 'open', note: '', ...(whereOf ? { where: where() || '' } : {}) });
   return [
-    ...pairs.map(([i]) => open(a[i], 'A+B')),
-    ...a.flatMap((c, i) => (pairedA.has(i) ? [] : [open(c, 'A')])),
-    ...b.flatMap((c, j) => (pairedB.has(j) ? [] : [open(c, 'B')])),
+    ...pairs.map(([i, j]) => open(a[i], 'A+B', () => whereOf(a[i], 'A') || whereOf(b[j], 'B'))),
+    ...a.flatMap((c, i) => (pairedA.has(i) ? [] : [open(c, 'A', () => whereOf(c, 'A'))])),
+    ...b.flatMap((c, j) => (pairedB.has(j) ? [] : [open(c, 'B', () => whereOf(c, 'B'))])),
   ];
 };
 
@@ -46,7 +49,7 @@ const NIGHT = /-round(\d+)$/;
  * Every round that has read `id`, newest first: `{ round, recorded, fixed, items, commits? }`, from the records under
  * `recordDir` (the config's `record.dir`) and the night directories under `state`.
  */
-export const areaDefects = (root, id, state, recordDir = 'docs/audits') => {
+export const areaDefects = (root, id, state, recordDir) => {
   const found = new Map();
   const audits = join(root, recordDir);
   for (const name of existsSync(audits) ? readdirSync(audits) : []) {
