@@ -11,22 +11,22 @@ import { readJson } from './json.mjs';
 import { clearStop, liveRuns, planLock, runDir, writeStatus } from './runs.mjs';
 
 /**
- * The areas a resume of `prior` (the round's status or summary) runs again: every one it planned, less those its
- * `landed` record says reached `main` while `main` still holds that tip (`inMain(tip)`), and those `held` by a live
- * run. Answers `{ ids, landed, held }`, the last two the ids each reason left out.
+ * The areas a resume of `prior` (the round's status or summary) runs again: every one it planned, less those `held` by
+ * a live run; none once its `landed` record names a tip `main` still holds (`inMain(tip)`), as a round lands once and
+ * its record is already on `main`. Answers `{ ids, held, landed? }`, `held` the ids a live run holds and `landed`
+ * that tip.
  */
 export const resumable = ({ prior, held, inMain }) => {
+  if (prior.landed?.tip && inMain(prior.landed.tip)) return { ids: [], held: [], landed: prior.landed.tip };
   const planned = (prior.planned ?? prior.areas ?? []).map((a) => (typeof a === 'string' ? a : a.id));
-  const done = new Set(prior.landed?.tip && inMain(prior.landed.tip) ? prior.landed.areas : []);
-  const landed = planned.filter((id) => done.has(id));
-  const taken = planned.filter((id) => !done.has(id) && held.has(id));
-  return { ids: planned.filter((id) => !done.has(id) && !held.has(id)), landed, held: taken };
+  return { ids: planned.filter((id) => !held.has(id)), held: planned.filter((id) => held.has(id)) };
 };
 
 /**
  * Picks a stopped or crashed round back up: its round, commit, areas and night directory, under the code and
- * settings on disk now. Jobs whose results came home are reused, not run again (`dispatch` in area.mjs). Like a new
- * run's plan, it holds the plan lock from reading what live runs hold through writing its status.
+ * settings on disk now; or, when the round already landed, its round alone. Jobs whose results came home are reused,
+ * not run again (`dispatch` in area.mjs). Like a new run's plan, it holds the plan lock from reading what live runs
+ * hold through writing its status.
  */
 export const resume = async (cfg, root, args, say) => {
   const round = args.resume;
@@ -40,7 +40,6 @@ export const resume = async (cfg, root, args, say) => {
     const frozen = join(root, '.worktrees', cfg.names.frozen(round));
     const commit = prior.commit ?? (existsSync(frozen) ? gitIn(frozen)('rev-parse', 'HEAD') : undefined);
     if (!commit) throw new Error(`round ${round}'s commit is unknown: its status predates recording it and its frozen tree is gone`);
-    const byId = new Map(partitionAt(cfg, root, commit).map((a) => [a.id, a]));
     const git = gitIn(root);
     const inMain = (tip) => {
       try {
@@ -51,9 +50,13 @@ export const resume = async (cfg, root, args, say) => {
       }
     };
     const { ids, landed, held } = resumable({ prior, held: new Set(running.flatMap((r) => r.areas ?? [])), inMain });
-    if (landed.length) say(`resume: ${landed.join(', ')} already landed on ${cfg.git.main}; not run again`);
+    if (landed) {
+      say(`resume: round ${round} already landed on ${cfg.git.main} at ${landed.slice(0, 10)}; nothing to resume`);
+      return { p: { round } };
+    }
     if (held.length) say(`resume: ${held.join(', ')} ${held.length === 1 ? 'is' : 'are'} held by a live run; left out`);
     clearStop(round, state);
+    const byId = new Map(partitionAt(cfg, root, commit).map((a) => [a.id, a]));
     if (prior.args?.fixOnly) args.fixOnly = prior.args.fixOnly;
     const records = recordsFor(cfg, git, root);
     const p = {
@@ -62,7 +65,7 @@ export const resume = async (cfg, root, args, say) => {
     };
     const status = {
       round, commit, started: prior.started, resumed: new Date().toISOString(), step: 'freeze', areas: ids, nightDir: prior.nightDir,
-      weightedTokens: prior.weightedTokens ?? 0, costUsd: prior.costUsd ?? 0, capUsd: args.capUsd, args, ...(prior.landed ? { landed: prior.landed } : {}),
+      weightedTokens: prior.weightedTokens ?? 0, costUsd: prior.costUsd ?? 0, capUsd: args.capUsd, args,
     };
     writeStatus(round, status, state);
     say(`resuming round ${round} at ${commit.slice(0, 10)}: ${p.picked.length} areas, reusing every job whose result came home`);
