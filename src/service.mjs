@@ -141,7 +141,7 @@ export const createTenant = (name, cfg, { readOnly = false, runtime = { children
       return times.length ? new Date(Math.max(...times)) : undefined;
     },
     deps: {
-      build: commitIn(root),
+      build: () => commitIn(root),
       live: () => liveRuns(state).map((r) => r.round),
       status: () => {
         const runs = liveRuns(state).map((r) => {
@@ -231,7 +231,7 @@ export const serve = async (cfg) => {
     })()
     : registryTenants(tenantsPath());
   await source.refresh();
-  const host = createHost({ tenants: source.current, log, build: commitIn(fileURLToPath(new URL('..', import.meta.url))) });
+  const host = createHost({ tenants: source.current, log, build: () => commitIn(fileURLToPath(new URL('..', import.meta.url))) });
 
   // The first tick only arms each schedule: a restart (every `onto sync`) never starts a round by itself.
   const loop = async () => {

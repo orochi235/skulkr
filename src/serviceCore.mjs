@@ -18,6 +18,9 @@ export const shouldAutoStart = ({ now, running, lastStarted, startAt }) => {
   return !lastStarted || lastStarted < at;
 };
 
+/** A commit as a ping reports it: `build` itself, or what it answers now when it is a function. */
+export const buildOf = (build) => (typeof build === 'function' ? build() : build);
+
 const list = (v) => (Array.isArray(v) ? v.join(',') : String(v));
 
 /** `skulkr night`'s arguments for a `start` request's fields. Throws on a field it does not know. */
@@ -64,7 +67,7 @@ export const handle = async (line, deps) => {
   if (!req) return { error: 'not a JSON object' };
   const reply = (body) => ({ id: req.id, ...body });
   try {
-    if (req.ping) return reply({ pong: true, build: deps.build });
+    if (req.ping) return reply({ pong: true, build: buildOf(deps.build) });
     if (req.status) return reply(deps.status());
     if (req.plan) return reply({ plan: await deps.plan() });
     if (req.start && req.continuous !== undefined) {

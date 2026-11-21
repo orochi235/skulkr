@@ -59,6 +59,14 @@ describe('createHost', () => {
     for (const line of ['null', '7', '[1]', '"ping"']) expect(await h.request(line)).toEqual({ error: 'not a JSON object' });
   });
 
+  it('reads its commit afresh on each ping', async () => {
+    let sha = 'one';
+    const h = createHost({ tenants: () => [], now: () => at('12:00'), build: () => sha });
+    expect(await h.request('{"id":1,"ping":true}')).toMatchObject({ build: 'one' });
+    sha = 'two';
+    expect(await h.request('{"id":2,"ping":true}')).toMatchObject({ build: 'two' });
+  });
+
   it('means the only tenant when a request names none', async () => {
     const a = tenant('a');
     const h = host([a], { now: at('12:00') });
