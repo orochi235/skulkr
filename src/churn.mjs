@@ -5,7 +5,8 @@
  *
  * A commit's counts never change, so they are kept in `~/.cache/skulkr/<name>/churn.json` (outside the project's state,
  * which another service may own) and git is asked only for commits not there yet; the file holds only commits after
- * the oldest pass asked about, rewritten on each build that adds one.
+ * the oldest pass asked about, rewritten on each build that adds one. The counts hold only the paths `keep` accepted,
+ * so the file carries the caller's `cacheKey` for that filter and is dropped when it differs.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
@@ -48,9 +49,11 @@ export const parseNumstat = (text, keep = () => true) => {
   return out;
 };
 
-const readCache = (path) => {
+/** The cached counts at `path`, when they were kept under `key`; none otherwise. */
+const readCache = (path, key) => {
   try {
-    return JSON.parse(readFileSync(path, 'utf8'));
+    const file = JSON.parse(readFileSync(path, 'utf8'));
+    return file.key === key && file.commits ? file.commits : {};
   } catch {
     return {};
   }
@@ -61,11 +64,11 @@ const CHUNK = 400;
 /**
  * Lines changed since each entry's pass: `entries` are `{ id, files, commit, exclude }` (the area's files now, its
  * last pass's commit, and that pass's fix commits). `git` runs git in the project; `keep(path)` says which paths are
- * worth counting; `cacheFile` holds the counts between builds, or null for none. Answers a Map id → lines; an entry
+ * worth counting, and `cacheKey` names that filter; `cacheFile` holds the counts between builds, or null for none. Answers a Map id → lines; an entry
  * whose commit git does not know counts 0.
  */
-/** @param {(...args: string[]) => string} git @param {{ id: string, files: string[], commit: string, exclude?: string[] }[]} entries @param {{ keep?: (path: string) => boolean, cacheFile?: string | null, root?: string | null }} [opts] */
-export const churnSince = (git, entries, { keep = () => true, cacheFile = null, root = null } = {}) => {
+/** @param {(...args: string[]) => string} git @param {{ id: string, files: string[], commit: string, exclude?: string[] }[]} entries @param {{ keep?: (path: string) => boolean, cacheKey?: string, cacheFile?: string | null, root?: string | null }} [opts] */
+export const churnSince = (git, entries, { keep = () => true, cacheKey = '', cacheFile = null, root = null } = {}) => {
   const out = new Map(entries.map((e) => [e.id, 0]));
   const asked = [...new Set(entries.map((e) => e.commit).filter(Boolean))];
   if (!asked.length) return out;
@@ -84,7 +87,7 @@ export const churnSince = (git, entries, { keep = () => true, cacheFile = null, 
   graph.set(base, []);
   const merges = new Set([...graph].filter(([, ps]) => ps.length > 1).map(([sha]) => sha));
 
-  const cache = cacheFile ? readCache(cacheFile) : {};
+  const cache = cacheFile ? readCache(cacheFile, cacheKey) : {};
   const wanted = [...graph.keys()].filter((sha) => sha !== base && !merges.has(sha));
   const missing = wanted.filter((sha) => !(sha in cache));
   for (let i = 0; i < missing.length; i += CHUNK) {
@@ -93,7 +96,7 @@ export const churnSince = (git, entries, { keep = () => true, cacheFile = null, 
   if (cacheFile && (missing.length || Object.keys(cache).length > wanted.length)) {
     const kept = Object.fromEntries(wanted.map((sha) => [sha, cache[sha] ?? {}]));
     mkdirSync(dirname(cacheFile), { recursive: true });
-    writeFileSync(`${cacheFile}.tmp`, JSON.stringify(kept));
+    writeFileSync(`${cacheFile}.tmp`, JSON.stringify({ key: cacheKey, commits: kept }));
     renameSync(`${cacheFile}.tmp`, cacheFile);
   }
 

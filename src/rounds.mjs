@@ -344,7 +344,7 @@ export const areaStats = (cfg, git, areas, raw, root) => {
       entries.push({ id: `${key}\nto`, files: area.files, commit: next.commit, exclude: [] });
     });
   }
-  const lines = churnSince(git, entries, { keep: cfg.partition.isSource, cacheFile: churnCacheOf(cfg.name), root });
+  const lines = churnSince(git, entries, { keep: cfg.partition.isSource, cacheKey: cfg.partition.sourceKey, cacheFile: churnCacheOf(cfg.name), root });
   const staleLines = new Map(areas.flatMap((a) => (lines.has(a.id) ? [[a.id, lines.get(a.id)]] : [])));
   const pairLines = new Map(pairs.map((key) => [key, Math.max(0, lines.get(`${key}\nfrom`) - lines.get(`${key}\nto`))]));
   return { history, covered, staleLines, pairLines };

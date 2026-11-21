@@ -273,6 +273,8 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
       pathspec: tops,
       path: `${c.record.dir}/partition.json`,
       isSource: (path) => rootRe.test(path) && sourceRe.test(path) && !exclude.some((re) => re.test(path)),
+      /** Names what `isSource` accepts, so counts cached under another filter are not read back. */
+      sourceKey: JSON.stringify([p.roots, p.extensions, p.exclude.map(String)]),
     },
     /** The repository paths a finding's `where` line cites. */
     citedRe: tops.length ? new RegExp(`((?:${tops.map(escape).join('|')})\\/[\\w./@-]+\\.\\w+)`, 'g') : /([\w@-][\w.@-]*\/[\w./@-]+\.\w+)/g,

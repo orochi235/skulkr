@@ -44,19 +44,24 @@ describe('churnSince', () => {
       { id: 'lost', files: ['src/a.ts'], commit: 'f'.repeat(40), exclude: [] },
     ];
     const keep = (p: string) => p.startsWith('src/');
-    const lines = churnSince(gitIn(root), entries, { keep, cacheFile, root });
+    const lines = churnSince(gitIn(root), entries, { keep, cacheKey: 'src', cacheFile, root });
     // a: the third commit rewrote 2 lines into 4 (2 deleted, 4 added); the fix is not counted.
     expect(Object.fromEntries(lines)).toEqual({ a: 6, b: 4, late: 6, lost: 0 });
     expect(existsSync(cacheFile)).toBe(true);
     const cached = JSON.parse(readFileSync(cacheFile, 'utf8'));
-    expect(Object.keys(cached)).toHaveLength(2);
-    expect(Object.values(cached).some((c) => 'docs/x.md' in (c as object))).toBe(false);
+    expect(cached.key).toBe('src');
+    expect(Object.keys(cached.commits)).toHaveLength(2);
+    expect(Object.values(cached.commits).some((c) => 'docs/x.md' in (c as object))).toBe(false);
     // A second build reads the counts back rather than asking git for them.
     const noShow = (...args: string[]) => {
       if (args[0] === 'show') throw new Error('asked git for counts the cache holds');
       return gitIn(root)(...args);
     };
-    expect(Object.fromEntries(churnSince(noShow, entries.slice(0, 2), { keep, cacheFile, root }))).toEqual({ a: 6, b: 4 });
+    expect(Object.fromEntries(churnSince(noShow, entries.slice(0, 2), { keep, cacheKey: 'src', cacheFile, root }))).toEqual({ a: 6, b: 4 });
+    // Counts kept under another filter are dropped, not read back: docs/ is counted once the filter takes it.
+    const all = churnSince(gitIn(root), [{ id: 'docs', files: ['docs/x.md'], commit: pass, exclude: [] }], { cacheKey: 'all', cacheFile, root });
+    expect(all.get('docs')).toBe(50);
+    expect(JSON.parse(readFileSync(cacheFile, 'utf8')).key).toBe('all');
   });
 
   it('reads numstat output and walks a commit graph', () => {
