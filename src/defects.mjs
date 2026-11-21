@@ -2,11 +2,12 @@
  * The defects each round found in one area, for the audit page: from the round's record where it has landed, or else
  * from its night directory, each with what was broken, what became of it and what the fix changed.
  *
- *   skulkr defects <area>     the area's rounds as JSON, newest first
+ *   skulkr defects <area>     the area's rounds as JSON, newest first; an area not in the partition is refused
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { reportItems } from './findings.mjs';
+import { partitionAt } from './partition.mjs';
 
 const readIf = (file) => (existsSync(file) ? readFileSync(file, 'utf8') : null);
 
@@ -65,4 +66,13 @@ export const areaDefects = (root, id, state, recordDir) => {
     if (got) found.set(Number(m[1]), { round: Number(m[1]), recorded: false, ...got });
   }
   return [...found.values()].sort((x, y) => y.round - x.round);
+};
+
+/**
+ * `areaDefects` for `cfg`'s project, for an `id` among `areas` (the partition at HEAD) only: the id comes from the
+ * dashboard and becomes a path, so any other is refused.
+ */
+export const defectsFor = (cfg, root, id, areas = partitionAt(cfg, root, 'HEAD')) => {
+  if (!areas.some((a) => a.id === id)) throw new Error(`no area named ${JSON.stringify(id)}; see ${cfg.partition.path}`);
+  return areaDefects(root, id, cfg.state, cfg.record.dir);
 };
