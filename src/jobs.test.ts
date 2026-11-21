@@ -1,7 +1,11 @@
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ontoArgs } from './runner/onto.mjs';
 import { resolveConfig } from './config.mjs';
-import { fixShell, matchShell, repairShell, reviewShell, timeoutOf, verifyShell } from './jobs.mjs';
+import { fixShell, installLines, matchShell, repairShell, reviewShell, stoppedBeforeModel, timeoutOf, verifyShell } from './jobs.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';
 
 const claudeOf = (shell: string) => shell.split(/ && |\n/).find((part) => part.includes('claude -p'))!;
@@ -81,5 +85,31 @@ describe('verify and repair job lines', () => {
     expect(timeoutOf(cfg)).toBe(45 + 30 + 5 + 10);
     expect(timeoutOf(cfg, { model: false })).toBe(30 + 5 + 10);
     expect(timeoutOf(resolveConfig({}))).toBe(45 + 10);
+  });
+});
+
+describe('installLines', () => {
+  const runIn = (install: object) => {
+    const dir = mkdtempSync(join(tmpdir(), 'skulkr-install-'));
+    try {
+      execFileSync('bash', ['-c', ['set -e', 'mkdir -p .skulkr/out', 'echo lock > package-lock.json', ...installLines(resolveConfig({ setup: { install } })), 'echo ran > .skulkr/out/model'].join('\n')], { cwd: dir });
+      const out = join(dir, '.skulkr/out');
+      return { model: existsSync(join(out, 'model')), stopped: stoppedBeforeModel(out), log: existsSync(join(out, 'install.log')), marker: existsSync(join(dir, 'node_modules/.skulkr-lock')) };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  it('stop the job before the model when the install fails, saying so in a file beside its log', () => {
+    for (const lockfile of ['package-lock.json', null]) {
+      const got = runIn({ lockfile, command: 'false', marker: 'node_modules/.skulkr-lock' });
+      expect(got).toMatchObject({ model: false, log: true, marker: false });
+      expect(got.stopped).toBe('install failed: false; see install.log');
+    }
+  });
+
+  it('go on to the model after an install that passes, and mark the lockfile installed', () => {
+    expect(runIn({ lockfile: 'package-lock.json', command: 'mkdir -p node_modules', marker: 'node_modules/.skulkr-lock' }))
+      .toEqual({ model: true, stopped: '', log: true, marker: true });
   });
 });

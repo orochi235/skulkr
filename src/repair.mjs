@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { brief, fill, projectVars } from './brief.mjs';
 import { JOB_IN } from './config.mjs';
 import { dispatch } from './dispatch.mjs';
-import { AREA_MBOX, baselineShell, jobDir, repairShell, timeoutOf, verifyShell } from './jobs.mjs';
+import { AREA_MBOX, baselineShell, jobDir, repairShell, stoppedBeforeModel, timeoutOf, verifyShell } from './jobs.mjs';
 import { failureExcerpt, needsGui, verdictIn, verdictText, verifyOf } from './verify.mjs';
 
 export const MAX_REPAIRS = 2;
@@ -120,6 +120,8 @@ export const repairJob = async (ctx, area, { mbox, log, label, attempt, extra = 
     task: ctx.cfg.names.task(ctx.round, area.id, 'repair'), logPath: join(to, '..', `repair-${label}.log`), timeoutMin: timeoutOf(ctx.cfg),
     about: `Repairs audit round ${ctx.round}'s fixes to area ${area.id}, whose tests fail, without weakening the tests.`,
   });
+  const stopped = stoppedBeforeModel(to);
+  if (stopped) ctx.say(`repair ${area.id}: ${stopped}`);
   const next = join(to, 'fix.mbox');
   const total = patchesIn(next);
   const had = patchesIn(mbox);

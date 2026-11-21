@@ -10,7 +10,7 @@ import { citedPaths, firstJson, isFinished, matchPrompt, parseFilesRead, parseFi
 import { brief, fill, projectVars } from './brief.mjs';
 import { toCarry, writeCarried } from './carryBrief.mjs';
 import { dispatch } from './dispatch.mjs';
-import { CHECKS_IN, PROGRESS_IN, fixShell, jobDir, matchShell, progressSource, reviewShell, timeoutOf } from './jobs.mjs';
+import { CHECKS_IN, PROGRESS_IN, fixShell, jobDir, matchShell, progressSource, reviewShell, stoppedBeforeModel, timeoutOf } from './jobs.mjs';
 import { verifyAndRepair } from './repair.mjs';
 import { chapman } from './rounds.mjs';
 import { totals } from './usage.mjs';
@@ -76,8 +76,8 @@ export const fix = async (ctx, area, findings, source = reviewedSource(ctx, area
   });
   const mbox = join(to, 'fix.mbox');
   const patches = patchesIn(mbox);
-  const mismatch = readIf(join(to, 'tree-mismatch')).trim();
-  if (mismatch) ctx.say(`fix ${area.id}: ${mismatch}`);
+  const stopped = stoppedBeforeModel(to);
+  if (stopped) ctx.say(`fix ${area.id}: ${stopped}`);
   ctx.progress('fix', `${area.id} on ${run.node}: ${patches} commits, ${run.minutes.toFixed(1)} min, ${(run.usage.weightedTokens / 1e6).toFixed(2)}M weighted tokens${run.usage.budgetHit ? ', hit its ceiling' : ''}`, ctx.total.fix);
   const fixed = { mbox: patches > 0 ? mbox : undefined, patches, report: run.reply, ...run };
   if (!fixed.mbox || !verifyOf(ctx.cfg)) return fixed;
