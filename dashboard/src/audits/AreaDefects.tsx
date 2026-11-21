@@ -71,7 +71,7 @@ export function AreaDefects({ urlOf, id, version }: { urlOf: (id: string) => str
     <SidebarPanel title="Defects">
       <div className={s.id}>{id}</div>
       {state.status === 'loading' && <p className={s.hint}>Reading its rounds…</p>}
-      {state.status === 'failed' && <p className={s.hint}>Couldn&apos;t read them: {state.error}</p>}
+      {(state.status === 'failed' || state.status === 'ready' && state.error) && <p className={s.hint}>Couldn&apos;t read them: {state.error}</p>}
       {state.status === 'ready' && state.rounds.length === 0 && <p className={s.hint}>No round has read it yet.</p>}
       {state.status === 'ready' && state.rounds.map((r) => (
         <section key={r.round} className={s.round}>
