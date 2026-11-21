@@ -98,6 +98,15 @@ describe('openFindings after a recut', () => {
     ]);
   });
 
+  it("takes a handed finding that the new area's reviewers report again as the same defect", () => {
+    const again: [string, string] = ['`useTicker` keeps its interval after unmount, so remounts stack timers', 'src/ticker.ts:41'];
+    const unfixed = { ...reported(57, [again]), id: 'ticker' };
+    expect([...openFindings([reported(56, [LEAK]), unfixed], { areas })].map(([id, list]) => [id, list.map((o: any) => [o.id, o.rounds])]))
+      .toEqual([['ticker', [['x/r56-1', [56, 57]]]]]);
+    const fixed = { ...unfixed, fix: `- ${again[0]} (A): fixed 1a2b3c4d.\n\ntally: 1 of 1 fixed, 0 extra fixed` };
+    expect(openFindings([reported(56, [LEAK]), fixed], { areas }).size).toBe(0);
+  });
+
   it("closes the handed finding, not the new area's own of the same id, from a record carrying it by bare id", () => {
     const carried = [{ id: 'r56-2', claim: LEAK[0], where: LEAK[1], from: 'A', round: 56, rounds: [56] }];
     const fix = `- [r56-2] ${LEAK[0]} (carried): fixed 1a2b3c4d.\n\ntally: 1 of 1 fixed, 0 extra fixed`;

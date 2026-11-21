@@ -91,25 +91,32 @@ const sameDefect = (open, finding, cited) => {
  * reported it and `rounds` every round that did. A fixer whose report gives as many verdicts as it was handed findings
  * acted on all of them; otherwise each finding is matched to its verdicts one by one (`actsOn`). Records keep the
  * area ids of their round; with `areas`, the partition now, each finding is listed under the area holding its cited
- * paths (`createHolderLookup`), so a recut hands it to the area that holds its code.
+ * paths (`createHolderLookup`), so a recut hands it to the area that holds its code: that area's reviewers reporting it
+ * again report the same defect, and its fixer answering it closes it.
  */
 export const openFindings = (records, { cited, areas } = {}) => {
+  const holder = areas && createHolderLookup(areas);
   const byArea = new Map();
   const all = [];
+  /** An area's findings: those it reported, then those reported elsewhere that its files now hold. */
+  const viewOf = (id) => [...byArea.get(id), ...all.filter((o) => o.area !== id && o.to === id)];
   for (const rec of [...records].sort((x, y) => x.round - y.round)) {
     const list = byArea.get(rec.id) ?? [];
     byArea.set(rec.id, list);
+    const view = viewOf(rec.id);
     const { fresh, carried } = givenIn(rec);
     const given = [];
     for (const f of fresh) {
-      const known = list.find((o) => sameDefect(o, f, cited));
+      const known = view.find((o) => sameDefect(o, f, cited));
       if (known) {
         known.rounds.push(rec.round);
         known.acted = false;
         given.push({ ...known, claim: f.claim, id: f.id, known });
       } else {
-        const o = { id: f.id, area: rec.id, claim: f.claim, where: f.where, from: f.from, round: rec.round, rounds: [rec.round], paths: pathsOf(f.where, cited), acted: false };
+        const paths = pathsOf(f.where, cited);
+        const o = { id: f.id, area: rec.id, to: holder?.(paths) ?? rec.id, claim: f.claim, where: f.where, from: f.from, round: rec.round, rounds: [rec.round], paths, acted: false };
         list.push(o);
+        view.push(o);
         all.push(o);
         given.push({ ...o, known: o });
       }
@@ -120,7 +127,7 @@ export const openFindings = (records, { cited, areas } = {}) => {
       const [, area, id] = c.id.match(QUALIFIED) ?? [, rec.id, c.id];
       const known = all.find((o) => o.area === area && o.id === id && (area !== rec.id || o.claim === c.claim))
         ?? all.find((o) => o.id === id && o.claim === c.claim)
-        ?? list.find((o) => o.id === id) ?? list.find((o) => sameDefect(o, c, cited));
+        ?? list.find((o) => o.id === id) ?? view.find((o) => sameDefect(o, c, cited));
       if (known) given.push({ ...known, id: c.id, known });
     }
     const fix = fixOf(rec);
@@ -128,13 +135,11 @@ export const openFindings = (records, { cited, areas } = {}) => {
     const every = fix.listed >= given.length && given.length > 0;
     for (const g of given) if (every || actsOn(fix, g)) g.known.acted = true;
     // A finding this fixer was not handed is closed only by its words: its bare id may be another area's.
-    for (const o of list) if (!o.acted && answers(fix, o)) o.acted = true;
+    for (const o of view) if (!o.acted && answers(fix, o)) o.acted = true;
   }
-  const holder = areas && createHolderLookup(areas);
   const open = new Map();
-  for (const { acted, paths, ...o } of all) {
+  for (const { acted, paths, to, ...o } of all) {
     if (acted) continue;
-    const to = holder?.(paths) ?? o.area;
     if (!open.has(to)) open.set(to, []);
     open.get(to).push({ ...o, id: idUnder(o, to) });
   }
