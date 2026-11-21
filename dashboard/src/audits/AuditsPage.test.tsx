@@ -62,6 +62,15 @@ describe('AuditsPage', () => {
     expect(screen.getByText('1 finding, read 9 of 12 files')).toBeInTheDocument();
   });
 
+  it("lists in the run's strip every branch its batch left out, one an earlier round left out among them", async () => {
+    const leftOut = [{ area: 'ui.badge', round: 39, why: 'merge failed: lock' }, { area: 'core.ops', round: 41, why: 'conflicts in a.ts' }];
+    serve(200, { ...fixture, runs: [{ ...fixture.runs[0], leftOut }, fixture.runs[1]] });
+    renderPage();
+    const table = await screen.findByRole('table', { name: 'Round 41, left out of the batch' });
+    const rows = within(table).getAllByRole('row').slice(1).map((r) => [...r.querySelectorAll('td')].map((td) => td.textContent));
+    expect(rows).toEqual([['ui.badge', '39', 'merge failed: lock'], ['core.ops', '41', 'conflicts in a.ts']]);
+  });
+
   it('opens an area picked from the queue, through the map selection, with its defects', async () => {
     serve(200, fixture);
     renderPage();

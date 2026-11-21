@@ -1,0 +1,40 @@
+.table {
+  composes: numeric from '@weasel-js/theme/numeric.module.css';
+  grid-column: 1 / -1;
+  border-collapse: collapse;
+  font-size: var(--wzl-font-size-sm);
+}
+
+.table th,
+.table td {
+  padding: 2px var(--wzl-space-2);
+  border-bottom: 1px solid var(--audit-rule);
+  text-align: end;
+  white-space: nowrap;
+}
+
+.table th {
+  font-weight: var(--wzl-font-weight-medium);
+  color: var(--audit-muted);
+}
+
+.table .l { text-align: start; }
+
+.area {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-family: var(--wzl-font-ui);
+  color: var(--audit-ink);
+  cursor: pointer;
+}
+
+.area:hover,
+.area:focus-visible { outline: 2px solid var(--audit-ink); outline-offset: 1px; }
+
+.table .why {
+  font-family: var(--wzl-font-body);
+  color: var(--audit-phase-conflict);
+  white-space: normal;
+}
