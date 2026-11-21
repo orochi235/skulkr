@@ -236,8 +236,11 @@ const runContext = ({ cfg, runner, root, p, args, status, frozen, say, setStep }
     refuse: (node) => slots.refuse(node),
     usage: (record) => {
       appendFileSync(join(status.nightDir, 'usage.jsonl'), `${JSON.stringify({ round: p.round, ...record })}\n`);
-      status.weightedTokens += record.weightedTokens;
-      status.costUsd += record.costUsd;
+      // A reused job's spend was counted where it ran: before a resume, or in the earlier run it came from.
+      if (!record.reused) {
+        status.weightedTokens += record.weightedTokens;
+        status.costUsd += record.costUsd;
+      }
       setStep(status.step, { behind: status.behind });
     },
     acquire: async (role) => {
@@ -311,7 +314,7 @@ const resume = (cfg, root, args, say) => {
     running: liveRuns(state), open: openFindingsIn(cfg, git, root),
   };
   const started = new Date(prior.started);
-  const status = { round, commit, started: prior.started, resumed: new Date().toISOString(), step: 'freeze', areas: ids, nightDir: prior.nightDir, weightedTokens: 0, costUsd: 0, capUsd: args.capUsd, args };
+  const status = { round, commit, started: prior.started, resumed: new Date().toISOString(), step: 'freeze', areas: ids, nightDir: prior.nightDir, weightedTokens: prior.weightedTokens ?? 0, costUsd: prior.costUsd ?? 0, capUsd: args.capUsd, args };
   writeStatus(round, status, state);
   say(`resuming round ${round} at ${commit.slice(0, 10)}: ${p.picked.length} areas, reusing every job whose result came home`);
   return { p, status, started };
