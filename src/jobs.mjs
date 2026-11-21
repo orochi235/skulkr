@@ -24,9 +24,10 @@ export const CHECKS_IN = `${JOB_IN}/checks.json`;
  * home. With `progress` (the progress filter's arguments before the result path), it streams through the
  * filter, which prints onto progress lines and writes the same result envelope to `claude.json`.
  */
-const claudeLine = (cfg, promptFile, budgetUsd, flags, progress) =>
+const claudeLine = (cfg, role, promptFile, budgetUsd, flags, progress) =>
   [
     ...(cfg.claude.configDir ? [`CLAUDE_CONFIG_DIR=${cfg.claude.configDir}`] : []),
+    ...(cfg.claude.cacheTtl?.[role] ? [`CLAUDE_CODE_PROMPT_CACHE_TTL=${cfg.claude.cacheTtl[role]}`] : []),
     `perl -e 'alarm shift; exec @ARGV' ${cfg.claude.timeoutMin * 60}`,
     'claude -p "$(cat', `${q(promptFile)})"`,
     `--output-format ${progress ? 'stream-json --verbose' : 'json'} --strict-mcp-config`,
@@ -44,12 +45,12 @@ const prelude = (cfg) => (cfg.setup.prelude ? [cfg.setup.prelude] : []);
 
 /** A reviewer, counted through the files listed in `.skulkr/in/<area>/files.txt`. */
 export const reviewShell = (cfg, area, budgetUsd) =>
-  [...prelude(cfg), fresh, claudeLine(cfg, `${JOB_IN}/${area}/review.md`, budgetUsd, [
+  [...prelude(cfg), fresh, claudeLine(cfg, 'review', `${JOB_IN}/${area}/review.md`, budgetUsd, [
     '--allowedTools', q(cfg.claude.reviewTools.join(',')), '--disallowedTools', q(cfg.claude.reviewDenied.join(',')), ...model(cfg.claude.models.review), ...effort(cfg.claude.effort?.review),
   ], q(`${JOB_IN}/${area}/files.txt`))].join(' && ');
 
 export const matchShell = (cfg, area, budgetUsd) =>
-  [fresh, claudeLine(cfg, `${JOB_IN}/${area}/match.md`, budgetUsd, ['--disallowedTools', q('Bash,Edit,Write,Task,Agent'), ...model(cfg.claude.models.match), ...effort(cfg.claude.effort?.match)])].join(' && ');
+  [fresh, claudeLine(cfg, 'match', `${JOB_IN}/${area}/match.md`, budgetUsd, ['--disallowedTools', q('Bash,Edit,Write,Task,Agent'), ...model(cfg.claude.models.match), ...effort(cfg.claude.effort?.match)])].join(' && ');
 
 /** Installs when the lockfile changed since the tree's last install, or nothing when the config names no install. */
 const installLines = (cfg) => {
@@ -104,7 +105,7 @@ const fixFlags = (cfg) => ['--dangerously-skip-permissions', ...model(cfg.claude
 export const fixShell = (cfg, area, budgetUsd, findings) =>
   [
     'set -e', ...prelude(cfg), fresh, ...treeLines(cfg), 'set +e',
-    claudeLine(cfg, `${JOB_IN}/${area}/fix.md`, budgetUsd, fixFlags(cfg), `--commits ${findings} --checks ${CHECKS_IN}`),
+    claudeLine(cfg, 'fix', `${JOB_IN}/${area}/fix.md`, budgetUsd, fixFlags(cfg), `--commits ${findings} --checks ${CHECKS_IN}`),
     ...handBackLines(cfg),
   ].join('\n');
 
@@ -113,7 +114,7 @@ export const fixShell = (cfg, area, budgetUsd, findings) =>
 export const repairShell = (cfg, area, budgetUsd) =>
   [
     'set -e', ...prelude(cfg), fresh, ...treeLines(cfg), ...applyLines(area), 'set +e',
-    claudeLine(cfg, `${JOB_IN}/${area}/repair.md`, budgetUsd, fixFlags(cfg)),
+    claudeLine(cfg, 'fix', `${JOB_IN}/${area}/repair.md`, budgetUsd, fixFlags(cfg)),
     ...handBackLines(cfg),
   ].join('\n');
 

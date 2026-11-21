@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { inWindow, noFixers, nodesAt as nodesWith } from './config.mjs';
-import { weaselConfig } from '../test/weaselConfig.ts';
+import { inWindow, noFixers, nodesAt as nodesWith, resolveConfig } from './config.mjs';
 
-const nodesAt = (date: Date) => nodesWith(weaselConfig(), date);
+/** A fleet config with this Mac as a node usable only overnight, and never for a fixer. */
+const WINDOWED = resolveConfig({ runner: 'onto', nodes: { list: ['studio'], local: { name: 'orochi', from: '00:00', until: '09:00', fixers: false } } });
+const nodesAt = (date: Date) => nodesWith(WINDOWED, date);
 import { handle, msUntil, shouldAutoStart, startArgs } from './serviceCore.mjs';
 
 const at = (hhmm: string, day = 16) => {
@@ -91,6 +92,6 @@ describe('nodesAt', () => {
 
 describe('noFixers', () => {
   it('keeps fixers off a windowed local node unless it allows them', () => {
-    expect(noFixers(weaselConfig())).toEqual(['orochi']);
+    expect(noFixers(WINDOWED)).toEqual(['orochi']);
   });
 });

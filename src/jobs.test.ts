@@ -19,6 +19,14 @@ describe('job command lines', () => {
     expect(match).not.toContain('--effort');
   });
 
+  it("ask for a five-minute cache for reviews and matches, and leave a fixer's to Claude Code", () => {
+    const cfg = resolveConfig({});
+    expect(claudeOf(reviewShell(cfg, 'core', 8))).toContain('CLAUDE_CODE_PROMPT_CACHE_TTL=5m');
+    expect(claudeOf(matchShell(cfg, 'core', 1))).toContain('CLAUDE_CODE_PROMPT_CACHE_TTL=5m');
+    expect(claudeOf(fixShell(cfg, 'core', 15, 3))).not.toContain('CLAUDE_CODE_PROMPT_CACHE_TTL');
+    expect(claudeOf(reviewShell(resolveConfig({ claude: { cacheTtl: { review: null } } }), 'core', 8))).not.toContain('CACHE_TTL');
+  });
+
   it('leave the model, effort, and setting sources to the node where the config leaves them unset', () => {
     const cfg = resolveConfig({ claude: { settingSources: null } });
     const review = claudeOf(reviewShell(cfg, 'core', 8));
