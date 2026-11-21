@@ -117,3 +117,9 @@ export const writeContinuous = (state, value) => {
   mkdirSync(state, { recursive: true });
   writeJson(continuousFile(state), value);
 };
+
+/** The night directories of every other run at `commit`, newest first, from each run's status or summary. */
+export const nightsAt = (commit, state, except) => rounds(state).filter((r) => r !== except).reverse().flatMap((r) => {
+  const run = readJson(join(runDir(r, state), 'status.json')) ?? readJson(join(runDir(r, state), 'summary.json'));
+  return run?.commit === commit && run.nightDir ? [run.nightDir] : [];
+});

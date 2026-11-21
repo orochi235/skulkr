@@ -2,8 +2,8 @@
  * Launching one job of an area: on whichever slot frees first, moving to another node when one turns it away, waiting
  * while no node has room, and reusing a resumed round's result that already came home.
  */
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { cpSync, existsSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { isFinished, reviewText } from './findings.mjs';
 import { runJob } from './jobs.mjs';
 import { parseEnvelope } from './usage.mjs';
@@ -45,13 +45,32 @@ export const cameHome = (spec, role) => {
 };
 
 /**
+ * A finished review of `area` from an earlier run at this round's commit (`ctx.earlierNights`), over the same files,
+ * copied into `spec.to`: a stopped round's reviews are not paid for twice. Answers it as {@link cameHome} does.
+ */
+export const earlierReview = (ctx, area, role, spec) => {
+  if (!role.startsWith('review') || !area.files) return undefined;
+  const files = `${area.files.join('\n')}\n`;
+  for (const night of ctx.earlierNights ?? []) {
+    if (readIf(join(night, 'areas', area.id, 'files.txt')) !== files) continue;
+    const to = join(night, relative(ctx.nightDir, spec.to));
+    const found = cameHome({ to }, role);
+    if (!found) continue;
+    cpSync(to, spec.to, { recursive: true });
+    ctx.say?.(`${role} ${area.id}: reusing the finished review from ${night}`);
+    return found;
+  }
+  return undefined;
+};
+
+/**
  * Runs one job of `area` as `role`. Answers where it ran, how long it took, the model's reply, and the job's usage
  * record (also passed to `ctx.usage`, which counts it against the night and logs it); a verify job runs no model
  * and has no usage.
  */
 export const dispatch = async (ctx, area, role, spec) => {
   const model = role !== 'verify';
-  const earlier = cameHome(spec, role);
+  const earlier = cameHome(spec, role) ?? earlierReview(ctx, area, role, spec);
   if (earlier) {
     const { reply, record } = parseEnvelope(earlier.raw);
     const usage = model ? { area: area.id, role, node: 'earlier', ...record, exit: earlier.exit, reused: true } : undefined;

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { nextContinuous } from './continuous.mjs';
-import { readFleet, waitForFleet } from './fleet.mjs';
+import { gateAhead, readFleet, waitForFleet } from './fleet.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -16,6 +16,22 @@ const fleet = () => {
   return dir;
 };
 const tick = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
+
+describe('gateAhead', () => {
+  it('holds a new review, and nothing else, while a gate holds the fleet', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'skulkr-gate-ahead-'));
+    try {
+      expect(gateAhead('review', dir)).toBeNull();
+      const release = await waitForFleet(dir, { tenant: 'weasel', round: 62 });
+      expect(gateAhead('review', dir)).toMatchObject({ tenant: 'weasel', round: 62 });
+      expect(gateAhead('fix', dir)).toBeNull();
+      release();
+      expect(gateAhead('review', dir)).toBeNull();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('the fleet queue', () => {
   it('runs one gate at a time, in the order rounds reached it, and says who each waits behind', async () => {

@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { runArea } from './area.mjs';
 import { capstoneRepairer } from './capstone.mjs';
 import { gateBaseline } from './repair.mjs';
+import { gateAhead } from './fleet.mjs';
 import { openFindingsIn } from './carryRecords.mjs';
 import { addWorktree, gitIn, mainCheckout, removeWorktree } from './batch.mjs';
 import { JOB_IN, nextClock, nodesAt } from './config.mjs';
@@ -19,7 +20,7 @@ import { batchAndTest, patchAreas, patchSweep } from './land.mjs';
 import { waitForLease } from './lease.mjs';
 import { partitionAt } from './partition.mjs';
 import { areaStats, areasInFlight, gitTouched, inheritPasses, nextRound, passesIn, pickAreas, scaledOf } from './rounds.mjs';
-import { claimRound, claimedRounds, clearStatus, clearStop, liveRuns, planLock, pruneRuns, readJson, runDir, stopRequested, writeStatus, writeSummary } from './runs.mjs';
+import { claimRound, claimedRounds, clearStatus, clearStop, liveRuns, nightsAt, planLock, pruneRuns, readJson, runDir, stopRequested, writeStatus, writeSummary } from './runs.mjs';
 import { fixSweep, runSweep, sweepLine } from './sweep.mjs';
 import { mayStartArea } from './usage.mjs';
 import { verifyLine, verifyOf } from './verify.mjs';
@@ -218,6 +219,7 @@ const runContext = ({ cfg, runner, root, p, args, status, frozen, say, setStep }
   const counts = {};
   return {
     cfg, runner, root,
+    earlierNights: nightsAt(p.commit, cfg.state, p.round),
     round: p.round, commit: p.commit, date: localDate(new Date(status.started)), frozen, nightDir: status.nightDir, budget: args.budget,
     base: git('merge-base', p.commit, `${cfg.git.remote}/${cfg.git.main}`),
     frozenTree: git('rev-parse', `${p.commit}^{tree}`),
@@ -239,7 +241,14 @@ const runContext = ({ cfg, runner, root, p, args, status, frozen, say, setStep }
       setStep(status.step, { behind: status.behind });
     },
     acquire: async (role) => {
-      for (;;) {
+      for (let told = false; ;) {
+        const gate = gateAhead(role);
+        if (gate) {
+          if (!told) say(`review: holding new reviews while ${gate.tenant} round ${gate.round}'s gate runs`);
+          told = true;
+          await sleep(POLL_MS);
+          continue;
+        }
         if (Date.now() - unavailable.at > UNAVAILABLE_TTL_MS) unavailable = { at: Date.now(), nodes: runner.unavailableNodes() };
         const slot = slots.take(role, { exclude: unavailable.nodes });
         if (slot) return slot;

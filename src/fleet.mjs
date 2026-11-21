@@ -78,3 +78,9 @@ export const waitForFleet = async (dir, who, { pollMs = 15_000, onWait } = {}) =
     rmSync(mine, { force: true });
   }
 };
+
+/**
+ * The gate a new job of `role` waits behind, or null: while any gate runs, no new review starts, since a gate is a
+ * suite-sized fleet run and the runner's queue has no priorities. Fixers and verify steps go on.
+ */
+export const gateAhead = (role, dir = fleetDir()) => (role === 'review' ? readFleet(dir).holder : null);

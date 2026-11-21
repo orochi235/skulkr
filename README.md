@@ -194,6 +194,11 @@ Neither is corrected for. Every figure is recomputed from the records on each ma
 `leftCorrected` on each pass and a top-level `calibration` with the pairs, the factors, and a per-round series of
 predicted, found, and the running factor.
 
+**Reuse and holds.** A reviewer whose area, file list, and commit match a finished review of an earlier run (a
+stopped round, say) is not run again: that review is copied in, and the log says so. While any gate holds the fleet
+queue, no run starts a new review, since a gate is a suite-sized fleet run and the runner's queue has no priorities;
+reviews already running, fixers, and verify steps go on.
+
 **Limits.** Each job's model is stopped at `claude.timeoutMin` and the runner stops the job ten minutes later, so
 what it wrote still comes home. A run starts no new area after `schedule.stopAt`, nor when the areas running plus
 one more, each expected to cost the mean of this run's finished areas (`budget.areaGuessUsd` before any has),

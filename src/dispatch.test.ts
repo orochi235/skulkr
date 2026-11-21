@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { cameHome } from './dispatch.mjs';
+import { cameHome, earlierReview } from './dispatch.mjs';
 
 const dirs: string[] = [];
 const job = (files: Record<string, string>) => {
@@ -34,5 +34,33 @@ describe('cameHome', () => {
   });
   it('runs again a review that never reached its done line', () => {
     expect(cameHome(job({ exit: '0', 'claude.json': ok, 'findings.md': '1. a finding\n' }), 'review-A')).toBeUndefined();
+  });
+});
+
+describe('earlierReview', () => {
+  /** A night directory with area `x`'s file list and, when `done`, its finished reviewer A. */
+  const night = (files: string, done: boolean) => {
+    const dir = mkdtempSync(join(tmpdir(), 'skulkr-night-'));
+    dirs.push(dir);
+    mkdirSync(join(dir, 'areas', 'x'), { recursive: true });
+    writeFileSync(join(dir, 'areas', 'x', 'files.txt'), files);
+    mkdirSync(join(dir, 'jobs', 'x', 'A'), { recursive: true });
+    if (done) {
+      writeFileSync(join(dir, 'jobs', 'x', 'A', 'exit'), '0');
+      writeFileSync(join(dir, 'jobs', 'x', 'A', 'claude.json'), ok);
+      writeFileSync(join(dir, 'jobs', 'x', 'A', 'findings.md'), '## one\n<!-- done: 1 finding -->\n');
+    }
+    return dir;
+  };
+  const area = { id: 'x', files: ['a.ts', 'b.ts'] };
+
+  it("copies in an earlier run's finished review of the same files, and never a fixer's or one over other files", () => {
+    const now = night('a.ts\nb.ts\n', false);
+    const spec = { to: join(now, 'jobs', 'x', 'A') };
+    const ctx = { nightDir: now, earlierNights: [night('a.ts\n', true), night('a.ts\nb.ts\n', false), night('a.ts\nb.ts\n', true)] };
+    expect(earlierReview(ctx, area, 'fix', spec)).toBeUndefined();
+    expect(earlierReview(ctx, area, 'review-A', spec)).toBeDefined();
+    expect(cameHome(spec, 'review-A')).toBeDefined();
+    expect(earlierReview({ ...ctx, earlierNights: ctx.earlierNights.slice(0, 2) }, area, 'review-A', { to: join(night('', false), 'jobs', 'x', 'B') })).toBeUndefined();
   });
 });

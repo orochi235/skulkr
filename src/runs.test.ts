@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
-  areasHeld, claimRound, claimedRounds, clearStatus, lastFinished, lastStartedAt, liveRuns, pruneRuns, requestStop, runDir,
+  areasHeld, claimRound, claimedRounds, clearStatus, lastFinished, lastStartedAt, liveRuns, nightsAt, pruneRuns, requestStop, runDir,
   stopRequested, writeStatus, writeSummary,
 } from './runs.mjs';
 
@@ -95,5 +95,17 @@ describe('finished runs', () => {
     mkdirSync(join(runDir(2, dir), 'x'));
     pruneRuns(2, dir);
     expect(claimedRounds(dir).sort()).toEqual(['1', '4', '5']);
+  });
+});
+
+describe('nightsAt', () => {
+  it("answers the other runs' nights at one commit, newest first, from a stopped run's status or a finished one's summary", () => {
+    const dir = state();
+    for (const r of [52, 53, 54, 55]) claimRound(r, dir);
+    writeStatus(52, { commit: 'c1', nightDir: '/n/52' }, dir);
+    writeSummary(53, { commit: 'c1', nightDir: '/n/53' }, dir);
+    writeSummary(54, { commit: 'c2', nightDir: '/n/54' }, dir);
+    writeStatus(55, { commit: 'c1', nightDir: '/n/55' }, dir);
+    expect(nightsAt('c1', dir, 55)).toEqual(['/n/53', '/n/52']);
   });
 });

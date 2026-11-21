@@ -2,20 +2,9 @@
 
 Open work on skulkr. Each entry says when it closes.
 
-- [ ] (P2) Continuous rounds pile up behind each other: rounds 62–64 overlapped overnight and took 262–289 min each, 61–64%
-  of job time waiting, against 42–74 min before; round 62's gate waited 103 min behind rounds 63 and 64's reviews.
-  Closes when the next continuous round starts only when the fleet has room for its reviews, and a round's gate and
-  verify jobs go ahead of other rounds' reviews.
-- [ ] (P2) A node at its disk ceiling (`409 Conflict: teitou holds 40.1 GiB ... at or over this node's 40.0 GiB ceiling`)
-  stopped rounds 56 and 57 before they started: 38 reviews never launched, and round 57 picked the same areas and failed
-  the same way. teitou still holds the pre-rename `weasel-skulk-r1..6` and `weasel-skulk-f1..6` trees (about 12 GiB),
-  which README "Moving weasel over" says can go. Closes when those trees are dropped, and an area whose reviewer never
-  launched is re-placed rather than recorded incomplete.
 - [ ] (P3) A read-only tenant's `status` reply still gives a `nextStart`: blits, registered `--read-only` so nothing
   runs it overnight, answered `"nextStart":"2026-11-22T04:00:00.000Z"` (2026-11-21), though `src/host.mjs` never
   starts a read-only tenant. Closes when a read-only tenant's reply has no `nextStart`.
-- [ ] (P3) A stopped round's finished reviews are thrown away: round 53 re-reviewed round 52's areas at the same commit
-  (`830b463cc`), $29.41 again. Closes when a round reuses a finished review of the same area at the same commit.
 - [ ] (P3) Every job's prompt cache writes are one-hour writes (`cacheWrite5m` is 0 in every record; 72.7M one-hour write
   tokens in 24 h). If the `claude` CLI can be asked for five-minute writes, the inferred saving is about $167 a day,
   assuming a reviewer's turns stay under five minutes apart. Closes when that is checked and, if it holds, used.
