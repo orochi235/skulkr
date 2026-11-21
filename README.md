@@ -251,7 +251,7 @@ keeps no list of its own (`src/carry.mjs`, read by `src/carryRecords.mjs` from d
 | acted on | the fixer's report gives it a verdict line (fixed, not a defect, a question, …), matched by its words, or by its id when that fixer was handed it; a report with as many verdicts as findings handed over answers them all; or a fix commit's subject matches it |
 | did no work | the fix job left no report holding a verdict or a `tally:` line, and no commits: every finding it was handed stays open |
 | one defect | two rounds' findings of one area (counting those handed to it) citing a common file (or none) whose claims share enough words (`SAME_LIKENESS`); it keeps its first round's id, `r<round>-<n>` |
-| its area | the area of the partition now holding most of the paths its `where` cites, so a recut hands it on with its code; one citing no path any area holds stays under the id of the area that found it. Handed to another area, its id is qualified by the area that found it, `<area>/r<round>-<n>`, since each area's ids restart at 1 |
+| its area | the area of the partition now holding most of the paths its `where` cites, so a recut hands it on with its code; one citing no path any area holds stays under the id of the area that found it. Handed to another area, its id is qualified by the area that found it, `<area>/r<round>-<n>`, since each area's ids restart at 1. Which area held it in an earlier round, for that round's dedupe and closes, comes from that round's file lists (the partition now only for a record without one) |
 
 When a round's fixer is dispatched, its area's open findings that this round's reviewers did not report again are
 carried in: `carried.md` beside the reports, each under its id and round, and the brief's source says so. The

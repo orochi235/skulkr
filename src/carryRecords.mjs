@@ -17,9 +17,11 @@ const json = (text) => {
 /** One area's record from `read(name)`, which answers a file's text or null. */
 export const recordOf = (round, id, read) => {
   const area = json(read('area.json'));
+  const listed = read('files.txt');
   return {
     round, id, A: read('A.md') ?? '', B: read('B.md') ?? '', fix: read('fix.md') ?? '',
     match: json(read('match.json')), area, carried: json(read('carried.json'))?.findings ?? [],
+    files: area?.files ?? (listed ? listed.split('\n').filter(Boolean) : undefined),
   };
 };
 
