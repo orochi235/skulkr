@@ -71,11 +71,32 @@ export const createTenant = (name, cfg, { readOnly = false } = {}) => {
     return [...children.keys()].filter((pid) => !live.has(pid)).length;
   };
 
+  /** Starts no continuous round until the night's stop time, after one that `why`. */
+  const idle = (why) => {
+    idleUntil = nextClock(new Date(), cfg.schedule.stopAt).toISOString();
+    say(`continuous: that round ${why}; no more start until ${idleUntil}`);
+  };
+
   const start = (args, { continuous = false } = {}) => {
     const at = new Date();
+    const failed = (error) => {
+      say(`run could not start: skulkr night ${args.join(' ')}: ${error.message ?? error}`);
+      if (continuous) idle('could not start');
+    };
+    let child;
+    try {
+      // A process group of its own, so a restarting service (every `onto sync`) never takes its runs down with it.
+      child = spawn(process.execPath, [BIN, 'night', ...base, ...args], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    } catch (error) {
+      failed(error);
+      return args;
+    }
+    if (child.pid === undefined) {
+      child.on('error', failed);
+      return args;
+    }
+    child.on('error', (error) => say(`run ${child.pid}: ${error.message}`));
     startedHere = at;
-    // A process group of its own, so a restarting service (every `onto sync`) never takes its runs down with it.
-    const child = spawn(process.execPath, [BIN, 'night', ...base, ...args], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     const entry = { lastLine: '' };
     children.set(child.pid, entry);
     say(`run started: skulkr night ${args.join(' ')} (pid ${child.pid})`);
@@ -90,10 +111,7 @@ export const createTenant = (name, cfg, { readOnly = false } = {}) => {
       children.delete(child.pid);
       const claimed = (lastStartedAt(state) ?? 0) >= at;
       // A continuous round that found nothing to do, or failed, would only be followed by another like it.
-      if (continuous && (!claimed || code !== 0)) {
-        idleUntil = nextClock(new Date(), cfg.schedule.stopAt).toISOString();
-        say(`continuous: that round ${claimed ? 'failed' : 'found nothing to do'}; no more start until ${idleUntil}`);
-      }
+      if (continuous && (!claimed || code !== 0)) idle(claimed ? 'failed' : 'found nothing to do');
     });
     return args;
   };
