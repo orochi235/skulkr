@@ -48,8 +48,10 @@ export function passRoundsOf(passes: readonly AuditPass[]): AuditPass[] {
   });
 }
 
-/** An area's last round's pass, its passes from that round joined (`passRoundsOf`). */
-export const lastPassOf = (area: AuditArea): AuditPass | null => passRoundsOf(area.passes).at(-1) ?? null;
+/** The pass an area's estimate goes by: the map's `last`, or on a map without it, its last round's passes joined
+ *  (`passRoundsOf`). */
+export const lastPassOf = (area: AuditArea): AuditPass | null =>
+  area.last !== undefined ? area.last : passRoundsOf(area.passes).at(-1) ?? null;
 
 /** A pass's left, calibrated, or its own where the map has no calibration. */
 export const correctedLeftOf = (p: AuditPass): number => p.leftCorrected ?? p.left;

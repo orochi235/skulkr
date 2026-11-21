@@ -5,7 +5,7 @@ import { gitIn } from './batch.mjs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { weaselConfig } from '../test/weaselConfig.ts';
-import { areaStats, areasInFlight, areasInFlightFor, calibrationFor, chapman, drawnRoundOf, inheritPasses, lastPassIn, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf } from './rounds.mjs';
+import { areaStats, areasInFlight, areasInFlightFor, calibrationFor, chapman, drawnRoundOf, inheritPasses, lastDrawnPassIn, lastPassIn, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf } from './rounds.mjs';
 import { diskRecords } from './recordFiles.mjs';
 
 const dirs: string[] = [];
@@ -210,6 +210,18 @@ describe('history by round', () => {
     expect(pickAreas({ areas, passes: history, covered, touched: () => true, count: 2 }).picked).toEqual(['x', 'z']);
     expect(calibrationFor(history).pairs).toEqual([]);
     expect(lastPassIn(history.get('x'))!.round).toBe(10);
+  });
+
+  it("gives the map an area's estimate from its last covering round, corrected, not from a later boundary pass", () => {
+    const xs = Array.from({ length: 20 }, (_, i) => `x/${i}.ts`);
+    const ys = [...Array.from({ length: 29 }, (_, i) => `y/${i}.ts`), 'x/0.ts'];
+    const raw = new Map([['x', [pass(50, 'x', xs, 4, 4, 1, 7)]], ['y', [pass(55, 'y', ys, 3, 3, 1, 5)]]]);
+    const { history } = inheritPasses([{ id: 'x', files: xs }], raw);
+    expect(history.get('x')!.map((p) => p.round)).toEqual([50, 55]);
+    const bucket = (factor: number) => ({ pairs: 9, predicted: 1, found: factor, factor });
+    const calibration = { minPairs: 5, pairs: [], series: [], factors: { overall: bucket(2), byShared: {} } };
+    expect(lastDrawnPassIn(history.get('x'), calibration)).toMatchObject({ round: 50, left: 4.5, leftCorrected: 9 });
+    expect(lastDrawnPassIn([], calibration)).toBeUndefined();
   });
 
   it('takes two passes of one round in a merged area as one: left summed, fixes joined, no pair between them', () => {

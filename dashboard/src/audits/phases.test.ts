@@ -106,6 +106,7 @@ describe('laneViewOf', () => {
     const run = (l: typeof fixed) => ({ ...map.runs[0]!, running: true, lanes: [l] });
     expect(withLivePasses([area], [run(fixing)])[0]!.passes).toEqual([]);
     expect(withLivePasses([area], [run(fixed)])[0]!.passes).toEqual([{ ...pass, provisional: true }]);
+    expect(withLivePasses([area], [run(fixed)])[0]!.last).toEqual({ ...pass, provisional: true });
     expect(phasesOf([run(fixed)]).get('x')).toBe('done');
     // One the batch left out is a conflict on the map, as in its lane, though its pass is done.
     const leftOut = { ...lane({ match: matched(3, 2, 1), fix: done({ commits: 4 }), patch: { state: 'failed', why: 'conflicts; left out of the batch' } }), pass };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changedSincePass, defectsVersionOf, heatScaleOf, labelIn, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
+import { changedSincePass, defectsVersionOf, heatScaleOf, labelIn, lastPassOf, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
 import { continuousText, headlineOf, logTailsOf, parseJob, recentJobsOf, scrolledOf, spendOf, stepText } from './runData';
 import { stageCountsOf } from './phases';
 import { inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
@@ -246,6 +246,20 @@ describe('areas', () => {
     expect(statsFor(split)[2]!.value).toBe('4');
     // An area holding too little of the passes it inherited is still unaudited.
     expect(toneOf({ ...due, status: 'unaudited' })).toBe('unaudited');
+  });
+
+  it("reads an area's estimate from the map's last pass where it has one, and from its passes where it does not", () => {
+    const due = map.areas.find((a) => a.status === 'due' && a.passes.length)!;
+    const covering = { ...due.passes.at(-1)!, round: 50, left: 20, leftCorrected: 40 };
+    const boundary = { ...due.passes.at(-1)!, round: 55, left: 0.1, leftCorrected: 0.2, share: 0.033 };
+    const area = { ...due, passes: [covering, boundary], last: covering };
+    expect(lastPassOf(area)).toBe(covering);
+    expect(toneOf(area)).toEqual({ left: 20 });
+    expect(statsFor([area])[3]).toEqual({ value: '≈20', label: 'estimated still in audited areas (≈40 corrected)' });
+    expect(heatScaleOf([area]).top).toBe(20);
+    expect(lastPassOf({ ...area, last: null })).toBeNull();
+    const { last: _, ...kept } = area;
+    expect(lastPassOf(kept)?.round).toBe(55);
   });
 
   it('marks an area changed once any of its lines changed since its pass, however many', () => {

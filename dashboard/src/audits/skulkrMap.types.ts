@@ -28,6 +28,9 @@ export interface AuditArea {
   readonly status: AreaStatus;
   readonly queue: number | null;
   readonly passes: readonly AuditPass[];
+  /** The pass its estimate goes by, as the queue ranks it: its last round that read at least half its files, drawn as
+   *  one pass and corrected. Null with no passes; absent from maps built before 2026-11-21. */
+  readonly last?: AuditPass | null;
   readonly stage: string | null;
   /** Lines of its files changed since its last pass, that pass's own fixes aside; absent when none. */
   readonly staleLines?: number;

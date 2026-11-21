@@ -120,13 +120,16 @@ export function phasesOf(runs: readonly AuditRun[]): ReadonlyMap<string, AuditPh
 export const liveEstimatesOf = (runs: readonly AuditRun[]): ReadonlyMap<string, number> =>
   new Map(runs.filter((r) => r.running).flatMap((r) => r.lanes.flatMap((l) => (l.pass ? [[l.id, l.pass.left] as const] : []))));
 
-/** `areas`, each whose pass a live run has done carrying that pass, provisional until the round's record lands. */
+/** `areas`, each whose pass a live run has done carrying that pass, provisional until the round's record lands, as its
+ *  `last`: the run read the whole area. */
 export function withLivePasses(areas: readonly AuditArea[], runs: readonly AuditRun[]): readonly AuditArea[] {
   const live = new Map(runs.filter((r) => r.running).flatMap((r) => r.lanes.filter((l) => l.pass && passDone(l)).map((l) => [l.id, l.pass!] as const)));
   if (live.size === 0) return areas;
   return areas.map((a) => {
     const pass = live.get(a.id);
-    return pass && !a.passes.some((p) => p.round === pass.round) ? { ...a, passes: [...a.passes, { ...pass, provisional: true }] } : a;
+    if (!pass || a.passes.some((p) => p.round === pass.round)) return a;
+    const provisional = { ...pass, provisional: true };
+    return { ...a, passes: [...a.passes, provisional], last: provisional };
   });
 }
 

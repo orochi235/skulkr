@@ -12,7 +12,7 @@ import { fleetOf } from './gate.mjs';
 import { areaIcons, iconsFor } from './icons.mjs';
 import { partitionAt } from './partition.mjs';
 import { correctedLeftOf } from './calibration.mjs';
-import { COVERED, areaStats, areasInFlightFor, calibrationFor, chapman, drawnPassOf, incompleteByRound, passOf, passesIn, pickAreas } from './rounds.mjs';
+import { COVERED, areaStats, areasInFlightFor, calibrationFor, chapman, drawnPassOf, incompleteByRound, lastDrawnPassIn, passOf, passesIn, pickAreas } from './rounds.mjs';
 import { openFindingsIn } from './carryRecords.mjs';
 import { abandonedRounds, nightsByRound, recordsFor } from './recordFiles.mjs';
 import { continuousOf } from './continuousOf.mjs';
@@ -177,6 +177,7 @@ export const buildMap = (cfg, root, runner) => {
       status,
       queue: queue.get(area.id) ?? null,
       passes: history,
+      last: lastDrawnPassIn(own, calibration) ?? null,
       stage: run ? run.stages[area.id] ?? 'queued' : null,
       ...(stale ? { staleLines: stale } : {}),
       ...(open.get(area.id)?.length ? { openFindings: open.get(area.id).length, open: open.get(area.id).map(({ round, claim, where }) => ({ round, claim, where })) } : {}),

@@ -175,6 +175,17 @@ export const lastPassIn = (list) => {
   return r && combinedOf(r.passes);
 };
 
+/**
+ * The pass an area's estimate goes by as the queue and the map read it: `lastRoundIn`'s round drawn as one pass
+ * (`drawnRoundOf`), its left corrected by `calibration` (`leftCorrected`); undefined for an area with no history.
+ */
+export const lastDrawnPassIn = (list, calibration) => {
+  const r = lastRoundIn(list ?? []);
+  if (!r) return undefined;
+  const pass = drawnRoundOf(r.passes);
+  return { ...pass, leftCorrected: correctedLeftOf(pass, calibration) };
+};
+
 /** Each area's history (`inheritPasses`') as calibration reads it: its covering rounds, each drawn as one pass. */
 export const drawnHistories = (history) => new Map([...history].map(([id, list]) => [id, coveringRounds(list).map((r) => drawnRoundOf(r.passes))]));
 
@@ -276,10 +287,9 @@ export const pickAreas = ({ areas, passes, touched, count, inFlight = new Set(),
       settled.push(area.id);
       continue;
     }
-    const last = lastRoundIn(history);
+    const last = lastDrawnPassIn(history, calibration);
     const stale = staleLines.get(area.id) ?? 0;
-    const left = correctedLeftOf(drawnRoundOf(last.passes), calibration);
-    seen.push({ id: area.id, last: last.round, stale, rank: rankOf(left, stale) });
+    seen.push({ id: area.id, last: last.round, stale, rank: rankOf(last.leftCorrected, stale) });
   }
   seen.sort((x, y) => y.rank - x.rank || y.stale - x.stale || x.last - y.last || (x.id < y.id ? -1 : 1));
   return { picked: [...fresh, ...seen.map((s) => s.id)].slice(0, count), settled };
