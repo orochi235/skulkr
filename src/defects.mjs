@@ -4,11 +4,13 @@
  *
  *   skulkr defects <area>     the area's rounds as JSON, newest first; an area not in the partition is refused
  */
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { gitIn } from './batch.mjs';
 import { reportItems } from './findings.mjs';
 import { partitionAt } from './partition.mjs';
-import { ROUND_DIR, nightsByRound } from './recordFiles.mjs';
+import { abandonedRounds, nightsByRound, recordsFor } from './recordFiles.mjs';
+import { coveringRounds, inheritPasses, passesFrom } from './rounds.mjs';
 
 const readIf = (file) => (existsSync(file) ? readFileSync(file, 'utf8') : null);
 
@@ -32,43 +34,63 @@ export const commitSubjects = (mbox) =>
   [...mbox.matchAll(/^Subject: (?:\[PATCH[^\]]*\] )?(.*(?:\n[ \t].*)*)/gm)].map((m) => m[1].replace(/\n[ \t]+/g, ' ').trim());
 
 /**
- * One round's items for an area, from the directory holding its files: the fixer's report, or else the match, with
- * the commits of a fixer that left some but no report, as one stopped partway does.
+ * One round's items for an area from `read(name)`, which answers one of its files' text or null: the fixer's report,
+ * or else the match, with the commits of a fixer that left some but no report, as one stopped partway does.
  */
-const itemsIn = (dir) => {
-  const report = readIf(join(dir, 'fix.md'));
+const itemsOf = (read) => {
+  const report = read('fix.md');
   if (report !== null) return { fixed: true, items: reportItems(report) };
-  const match = readIf(join(dir, 'match.json'));
+  const match = read('match.json');
   if (match === null) return null;
-  const mbox = readIf(join(dir, 'fix.mbox'));
+  const mbox = read('fix.mbox');
   return { fixed: false, items: openItems(JSON.parse(match)), ...(mbox ? { commits: commitSubjects(mbox) } : {}) };
 };
 
+/** Several records' items (`itemsOf`') for one round as one: items and commits joined, fixed once all were. */
+const joinedOf = (got) => ({
+  fixed: got.every((g) => g.fixed), items: got.flatMap((g) => g.items),
+  ...(got.some((g) => g.commits) ? { commits: got.flatMap((g) => g.commits ?? []) } : {}),
+});
+
 /**
- * Every round that has read `id`, newest first: `{ round, recorded, fixed, items, commits? }`, from the records under
- * `recordDir` (the config's `record.dir`) and the night directories under `state`.
+ * Every round that has read area `id` of `areas`, newest first: `{ round, recorded, fixed, items, commits? }`.
+ * `records` are `recordFiles.mjs`' (`recordsFor`'s, abandoned rounds left out). An area's rounds are its covering
+ * rounds (`coveringRounds` of its `inheritPasses` history), so they follow its files across a recut, and every round
+ * holding a record of its own id; a round's records are joined. A round with no record at all, unless abandoned, is
+ * read from its night directory under `state`, unrecorded.
  */
-export const areaDefects = (root, id, state, recordDir) => {
-  const found = new Map();
-  const audits = join(root, recordDir);
-  for (const name of existsSync(audits) ? readdirSync(audits) : []) {
-    const m = ROUND_DIR.exec(name);
-    const got = m && itemsIn(join(audits, name, id));
-    if (got) found.set(Number(m[1]), { round: Number(m[1]), recorded: true, ...got });
+export const areaDefects = ({ records, areas, id, state }) => {
+  const byKey = new Map(records.map((r) => [`${r.round}\n${r.id}`, r]));
+  const history = inheritPasses(areas, passesFrom(records)).history.get(id) ?? [];
+  const keys = new Set([
+    ...coveringRounds(history).flatMap((r) => r.passes.map((p) => `${p.round}\n${p.id}`)),
+    ...records.filter((r) => r.id === id).map((r) => `${r.round}\n${r.id}`),
+  ]);
+  const byRound = new Map();
+  for (const key of keys) {
+    const rec = byKey.get(key);
+    const got = rec && itemsOf(rec.read);
+    if (!got) continue;
+    if (!byRound.has(rec.round)) byRound.set(rec.round, { recorded: !rec.ref, got: [] });
+    byRound.get(rec.round).got.push(got);
   }
-  for (const { round, dir } of nightsByRound(state).values()) {
-    if (found.get(round)?.recorded) continue;
-    const got = itemsIn(join(dir, 'areas', id));
-    if (got) found.set(round, { round, recorded: false, ...got });
+  const found = [...byRound].map(([round, { recorded, got }]) => ({ round, recorded, ...joinedOf(got) }));
+  const recordedRounds = new Set(records.map((r) => r.round));
+  const nights = nightsByRound(state);
+  const abandoned = abandonedRounds(state, nights);
+  for (const { round, dir } of nights.values()) {
+    if (recordedRounds.has(round) || abandoned.has(round)) continue;
+    const got = itemsOf((f) => readIf(join(dir, 'areas', id, f)));
+    if (got) found.push({ round, recorded: false, ...got });
   }
-  return [...found.values()].sort((x, y) => y.round - x.round);
+  return found.sort((x, y) => y.round - x.round);
 };
 
 /**
  * `areaDefects` for `cfg`'s project, for an `id` among `areas` (the partition at HEAD) only: the id comes from the
  * dashboard and becomes a path, so any other is refused.
  */
-export const defectsFor = (cfg, root, id, areas = partitionAt(cfg, root, 'HEAD')) => {
+export const defectsFor = (cfg, root, id, areas = partitionAt(cfg, root, 'HEAD'), git = gitIn(root)) => {
   if (!areas.some((a) => a.id === id)) throw new Error(`no area named ${JSON.stringify(id)}; see ${cfg.partition.path}`);
-  return areaDefects(root, id, cfg.state, cfg.record.dir);
+  return areaDefects({ records: recordsFor(cfg, git, root), areas, id, state: cfg.state });
 };
