@@ -6,7 +6,7 @@ import { SpanStrips, type SpanStripSpan, type SpanStripsRow } from '@weasel-js/u
 import { clockRuler } from './clock';
 import { GateFailures } from './GateFailures';
 import { STEP_COLUMN_COUNT, laneStepsOf, laneViewOf, passDone, runClockOf, type LaneView, PHASE_LABEL, phaseClass, stageCountsOf, BRIGHT_FILLS } from './phases';
-import { GATE_RUNS, inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
+import { gateRunsOf, inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
 import { NODE_SEP, headlineOf, lastLineOf, spendOf, startedText } from './runData';
 import { useViewerPref } from './viewerPref';
 import type { AuditLane, AuditRun } from './skulkrMap.types';
@@ -32,7 +32,7 @@ function withNode(span: SpanStripSpan): SpanStripSpan {
 }
 
 /** The capstone's runs that have failed, each with what it failed, in the shared lane's order. */
-const failedGateRuns = (run: AuditRun) => GATE_RUNS.flatMap((g) => {
+const failedGateRuns = (run: AuditRun) => gateRunsOf(run).flatMap((g) => {
   const failures = run.failures?.[g.id] ?? null;
   return failures ? [{ id: g.id, label: g.label, failures }] : [];
 });

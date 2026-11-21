@@ -9,6 +9,9 @@ import { stripAnsi } from './ansi.mjs';
 
 const NAMES = resolveConfig().names;
 
+/** The gate's parallel runs in the order the dashboard draws them, each with its label: `[{ id, label }]`. */
+export const gateRunsOf = (gate) => Object.keys(gate.progress ?? {}).map((id) => ({ id, label: gate.labels?.[id] ?? id }));
+
 /**
  * How far each of the batch gate's parallel runs has got, from the last progress line each wrote to the gate's log in
  * `nightDir` (`gate`, the config's: its `logSuffix` and `progress` prefixes): `{ <run>: { done, total } | null }`, or
@@ -166,9 +169,11 @@ export const rerunOf = (round, jobs, gate, names = NAMES) => {
   return Object.fromEntries(Object.entries(by).map(([r, js]) => [r, sum(js)]));
 };
 
-/** A run's gate runs: `fleet`, how far each has got while it runs; `gates`, each one's state ('running', 'passed',
+/** A run's gate runs: `gateRuns`, which they are and their labels; `fleet`, how far each has got while it runs; `gates`, each one's state ('running', 'passed',
  *  'failed', or null before it starts); and the nodes running them. A finished round whose batch runs again reads as running. */
-export const fleetOf = (run, running, jobs, gate, names) => {
+export const fleetOf = (run, running, jobs, gate, names) => ({ gateRuns: gateRunsOf(gate), ...fleetStateOf(run, running, jobs, gate, names) });
+
+const fleetStateOf = (run, running, jobs, gate, names) => {
   const failures = gateFailuresOf(run.nightDir, gate);
   if (running) return { fleet: fleetProgressOf(run.nightDir, gate), gates: null, rerun: false, gateNodes: gateNodesOf(run.round, jobs, gate, names), failures };
   const again = rerunOf(run.round, jobs, gate, names);

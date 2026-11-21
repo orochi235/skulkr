@@ -9,6 +9,3 @@ Open work on skulkr. Each entry says when it closes.
 - [ ] (P3) The dashboard installs weasel from tarballs on this repository's `weasel-70a055a` release, since no published
   `@weasel-js/ui` has `SpanStrip` yet (1.19.1 on 2026-11-21; `dashboard/README.md` "weasel"). Closes when a weasel
   release carries everything the dashboard imports, `package.json` pins it from npm, and the release is deleted.
-- [ ] (P3) The dashboard's two gate stripes are fixed as weasel's (`GATE_RUNS` in `phases.ts`: "fleet tests" and
-  "postbuild"), while the pipeline reads a project's gate runs from `gate.progress`. Closes when the map names the
-  gate runs and their labels and the dashboard draws whichever it is given.

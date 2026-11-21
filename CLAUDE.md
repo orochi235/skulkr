@@ -34,6 +34,7 @@ weasel cutover.
     recorded file count.
   - the queue's order among due areas by corrected defects left first (README "Which areas"), and the map's
     `leftCorrected` and `calibration` (README "Calibration"), from 2026-11-20.
+  - the map's `gateRuns`, each gate run's id and its `gate.labels` label, for the dashboard (2026-11-21).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

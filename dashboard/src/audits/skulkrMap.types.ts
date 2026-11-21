@@ -90,6 +90,12 @@ export interface AuditLane {
   readonly pass?: AuditPass;
 }
 
+/** One of the batch gate's parallel runs: its id in `fleet`, `gates`, `gateNodes` and `failures`, and its label. */
+export interface GateRunName {
+  readonly id: string;
+  readonly label: string;
+}
+
 /** One fleet run's state after its round finished. */
 export type GateState = 'running' | 'passed' | 'failed' | null;
 
@@ -117,16 +123,18 @@ export interface AuditRun {
   readonly sweepRunning: boolean;
   readonly lastLine: string | null;
   readonly lines: readonly string[];
-  /** How far the batch's two fleet runs have got while they run: its tests, and its postbuild checks. */
-  readonly fleet?: { readonly tests: FleetProgress | null; readonly build: FleetProgress | null } | null;
-  /** Each fleet run's state once the run has finished: how it ended, or 'running' while the batch runs again. */
-  readonly gates?: { readonly tests: GateState; readonly build: GateState } | null;
+  /** The batch gate's parallel runs, in drawing order, as the project's config names them. */
+  readonly gateRuns?: readonly GateRunName[];
+  /** How far each of the batch's gate runs has got while it runs, by its id. */
+  readonly fleet?: Readonly<Record<string, FleetProgress | null>> | null;
+  /** Each gate run's state once the run has finished: how it ended, or 'running' while the batch runs again. */
+  readonly gates?: Readonly<Record<string, GateState>> | null;
   /** Whether the finished round's batch is running again. */
   readonly rerun?: boolean;
   /** The nodes running each fleet run now, joined where it runs on more than one. */
-  readonly gateNodes?: { readonly tests: string | null; readonly build: string | null } | null;
+  readonly gateNodes?: Readonly<Record<string, string | null>> | null;
   /** What each gate run has failed so far: how many tests or steps, in how many files or steps, the first few named. */
-  readonly failures?: { readonly tests: GateFailures | null; readonly build: GateFailures | null } | null;
+  readonly failures?: Readonly<Record<string, GateFailures | null>> | null;
 }
 
 export interface AuditRound {

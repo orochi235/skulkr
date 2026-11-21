@@ -49,6 +49,7 @@ export default {
     progress: { tests: '' },          // its parallel runs, by the prefix of their `onto: progress` log lines (dashboard)
     outcome: {},                      // per run, the word of its closing `<word> passed|failed` log line; else the gate's own result
     jobs: {},                         // per run, a regex on its runner jobs' task names; a run without one takes the rest
+    labels: {},                       // per run, its name on the dashboard; a run without one shows its key
     blame: null,                      // or (logText, step) => paths: what a failed step's output blames; see "Verify and repair"
   },
 

@@ -109,8 +109,9 @@ export const DEFAULTS = {
    * (a regex source; '' for unprefixed lines), for the dashboard. `outcome` names, per run, the word its closing
    * `<word> passed|failed` line in the gate's log starts with; a run without one takes the whole gate's result.
    * `jobs` picks, per run, its runner jobs by a regex on their task names; a run without one takes the rest.
+   * `labels` names each run on the dashboard; a run without one shows its key.
    */
-  gate: { name: 'gate', command: ['npm', 'test'], cwd: 'batch', progress: { tests: '' }, outcome: {}, jobs: {} },
+  gate: { name: 'gate', command: ['npm', 'test'], cwd: 'batch', progress: { tests: '' }, outcome: {}, jobs: {}, labels: {} },
 
   /** How the fixer readies a node tree: a shell line before every job, and an install when the lockfile changes. */
   setup: {

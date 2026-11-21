@@ -110,6 +110,7 @@ export default {
     progress: { tests: '', build: 'postbuild\\| ' },
     outcome: { tests: 'test:fleet', build: 'test:fleet:postbuild' },
     jobs: { build: '^postbuild-' },
+    labels: { tests: 'fleet tests', build: 'postbuild' },
     failPrefix: 'fleet-fail:',
     failRun: { build: 'postbuild' },
     blame: blameStep,

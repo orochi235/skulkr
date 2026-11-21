@@ -39,6 +39,7 @@
         }
       ],
       "sweepRunning": false,
+      "gateRuns": [{ "id": "tests", "label": "fleet tests" }, { "id": "build", "label": "postbuild" }],
       "lastLine": "match 1/2 core.ops: 2 shared of 5 + 2",
       "lines": [
         "night: round 41, 2 areas",
@@ -61,6 +62,7 @@
       "stages": { "ui.badge": "patched" },
       "lanes": [],
       "sweepRunning": false,
+      "gateRuns": [{ "id": "tests", "label": "fleet tests" }, { "id": "build", "label": "postbuild" }],
       "lastLine": "fix 1/1 ui.badge on studio: 3 commits, 8.0 min, 0.79M tokens",
       "lines": ["fix 1/1 ui.badge on studio: 3 commits, 8.0 min, 0.79M tokens"]
     }

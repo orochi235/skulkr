@@ -19,13 +19,15 @@ const FLEET_WAITS: readonly string[] = ['merge-wait', 'fleet-wait'];
 export const inSharedSteps = (run: AuditRun): boolean =>
   !run.running || SHARED_STEPS.some((s) => (s.steps as readonly string[]).includes(run.step));
 
-/** The two fleet runs a batch's gate starts at once, a stripe each in the fleet column, in two of the ramp's cold
- *  colors so neither reads as a step of an area's own. */
-export const GATE_RUNS = [
-  { id: 'tests', label: 'fleet tests', phase: 'match' },
-  { id: 'build', label: 'postbuild', phase: 'review' },
-] as const;
-export type GateRun = typeof GATE_RUNS[number]['id'];
+/** The ramp's cold colors the gate's runs take in turn, a stripe each in the fleet column, so none reads as a step of
+ *  an area's own. */
+const GATE_PHASES = ['match', 'review'] as const;
+
+/** The batch gate's runs, each a stripe in the fleet column, with its color; one stripe where the map names none. */
+export const gateRunsOf = (run: AuditRun) => {
+  const named = run.gateRuns?.length ? run.gateRuns : [{ id: 'tests', label: 'fleet run' }];
+  return named.map((g, i) => ({ ...g, phase: GATE_PHASES[i % GATE_PHASES.length]! }));
+};
 
 /** A running fleet run's label: the node running it first, where known, then what it is and how far it has got. */
 const activeGateLabel = (name: string, node: string | null, fleet: FleetProgress | null, fill: number): string =>
@@ -37,14 +39,15 @@ const failedText = (f: GateFailures): string =>
 
 /** Whether a shared-lane span's label leads with the node running it, the part that pulses. */
 export const leadsWithNode = (span: SpanStripSpan, run: AuditRun): boolean =>
-  !span.id.startsWith('fleet-') || !!run.gateNodes?.[span.id.slice('fleet-'.length) as GateRun];
+  !span.id.startsWith('fleet-') || !!run.gateNodes?.[span.id.slice('fleet-'.length)];
 
 const GATE_SPAN_STATE = { running: 'active', passed: 'done', failed: 'failed' } as const;
 
-/** The run's lane for every area at once: the batch, then its two fleet runs side by side, a fleet run filled by how
+/** The run's lane for every area at once: the batch, then its gate's runs side by side, a fleet run filled by how
  *  far it has got, or saying it waits for its turn. A finished round says how each fleet run ended, and a red round
  *  whose batch runs again shows it running. */
 export function sharedSpansOf(run: AuditRun): SpanStripSpan[] {
+  const gateRuns = gateRunsOf(run);
   const red = !run.running && /^red\b/.test(run.report ?? '');
   const again = !run.running && !!run.rerun;
   const at = run.running ? SHARED_STEPS.findIndex((s) => (s.steps as readonly string[]).includes(run.step))
@@ -55,9 +58,9 @@ export function sharedSpansOf(run: AuditRun): SpanStripSpan[] {
     if (s.id !== 'fleet') {
       const state = stepState(i);
       const fill = state === 'done' ? 1 : 0;
-      return [{ id: s.id, start: i, ms: 1, trackSpan: GATE_RUNS.length, state, fill, label: s.label, color: phaseColor('fix') }];
+      return [{ id: s.id, start: i, ms: 1, trackSpan: gateRuns.length, state, fill, label: s.label, color: phaseColor('fix') }];
     }
-    return GATE_RUNS.map((g, track): SpanStripSpan => {
+    return gateRuns.map((g, track): SpanStripSpan => {
       const ended = run.gates?.[g.id] ?? null;
       const state = !run.running && ended ? GATE_SPAN_STATE[ended] : red && !again ? 'failed' : stepState(i);
       const fleet = state === 'active' ? run.fleet?.[g.id] ?? null : null;

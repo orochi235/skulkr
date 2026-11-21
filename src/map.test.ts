@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { fleetOf, fleetProgressOf, gateFailuresOf, gateNodesOf, gateOutcomesOf, nightLanes, nightRoundOf, nightStages, nightsOf, readRuns, rerunOf, withPasses } from './map.mjs';
+import { fleetOf, fleetProgressOf, gateFailuresOf, gateNodesOf, gateOutcomesOf, gateRunsOf, nightLanes, nightRoundOf, nightStages, nightsOf, readRuns, rerunOf, withPasses } from './map.mjs';
 import { progressOfTop } from './runner/onto.mjs';
 import { resolveConfig } from './config.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';
@@ -220,6 +220,10 @@ describe('gate outcomes and reruns', () => {
     expect(failed.build).toMatchObject({ count: 1, files: 1, names: ['npm run check:unnameable'] });
   });
 
+  it('names a gate\'s runs by their labels, or by their keys where the config gives none', () => {
+    expect(gateRunsOf({ progress: { tests: '' } })).toEqual([{ id: 'tests', label: 'tests' }]);
+  });
+
   it('reads every run of a capstone going again as running, the one with no job placed yet too', () => {
     const night = mkdtempSync(join(tmpdir(), 'skulkr-map-'));
     dirs.push(night);
@@ -228,6 +232,7 @@ describe('gate outcomes and reruns', () => {
     const run = { round: 49, nightDir: night };
     const again = fleetOf(run, false, jobs, cfg.gate, cfg.names);
     expect(again.gates).toEqual({ tests: 'running', build: 'running' });
+    expect(again.gateRuns).toEqual([{ id: 'tests', label: 'fleet tests' }, { id: 'build', label: 'postbuild' }]);
     expect(again.failures).toBeNull();
   });
 

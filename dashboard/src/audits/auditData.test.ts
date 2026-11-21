@@ -25,6 +25,11 @@ describe('lanes', () => {
     expect(stepText('patch', { state: 'failed', why: 'conflicts; left out of the batch' }, now)).toBe('conflicts; left out of the batch');
   });
 
+  it('draws the gate runs the map names, one stripe each under the batch', () => {
+    const one = { ...live, step: 'fleet', gateRuns: [{ id: 'suite', label: 'npm test' }], fleet: { suite: { done: 1, total: 2 } } } as const;
+    expect(sharedSpansOf(one).map((s) => [s.id, s.label, s.trackSpan ?? 1])).toEqual([['batch', 'batch', 1], ['fleet-suite', 'npm test · 50%', 1]]);
+  });
+
   it('runs the shared lane through batch and both fleet runs side by side, each fleet run filled by its count', () => {
     const states = (run: typeof live) => sharedSpansOf(run).map((s) => [s.id, s.state, s.fill]);
     expect(inSharedSteps(live)).toBe(false);

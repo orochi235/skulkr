@@ -157,7 +157,7 @@ const fixReports = (nightDir, ids) => new Map(nightDir ? ids.flatMap((id) => {
   return existsSync(file) ? [[id, parseEnvelope(readFileSync(file, 'utf8')).reply]] : [];
 }) : []);
 
-export { fleetOf, fleetProgressOf, gateFailuresOf, gateNodesOf, gateOutcomesOf, rerunOf } from './gate.mjs';
+export { fleetOf, fleetProgressOf, gateFailuresOf, gateNodesOf, gateOutcomesOf, gateRunsOf, rerunOf } from './gate.mjs';
 
 const DEFAULT_GATE = resolveConfig().gate;
 
