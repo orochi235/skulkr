@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { changedSincePass, defectsVersionOf, heatScaleOf, labelIn, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
-import { continuousText, headlineOf, parseJob, recentJobsOf, spendOf, stepText } from './runData';
+import { continuousText, headlineOf, logTailsOf, parseJob, recentJobsOf, scrolledOf, spendOf, stepText } from './runData';
 import { stageCountsOf } from './phases';
 import { inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
 import { ticksFor } from './RoundsChart';
@@ -158,6 +158,19 @@ describe('jobs', () => {
     const run = { ...map.runs[0]!, lines: ['fleet: test:batch passed', 'fleet: test:batch passed'] };
     const keys = recentJobsOf([run]).map((j) => j.key);
     expect(new Set(keys).size).toBe(2);
+  });
+
+  it('keeps a job its key while its line moves up the tail, a copy of it scrolling off the front', () => {
+    const dup = 'fleet: test:batch passed';
+    const first = { ...map.runs[0]!, lines: [dup, 'night: x', dup] };
+    const later = { ...first, lines: ['night: x', dup, 'fleet: test:build passed'] };
+    expect(scrolledOf(first.lines, later.lines)).toBe(1);
+    const tails = logTailsOf(new Map(), [first]);
+    const before = recentJobsOf([first], 14, tails).map((j) => j.key);
+    const after = recentJobsOf([later], 14, logTailsOf(tails, [later])).map((j) => j.key);
+    // The newer copy of `dup` keeps its key; only the new line is new.
+    expect(after.filter((k) => !before.includes(k))).toEqual([after[0]]);
+    expect(after[0]).toContain('test:build');
   });
 
   it('lists every run, each newest first', () => {

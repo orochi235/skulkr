@@ -137,7 +137,8 @@ export function parseJob(line: string): Job | null {
   return null;
 }
 
-/** A job and the round whose log it came from, keyed by the line that reported it and which copy of that line it is. */
+/** A job and the round whose log it came from, keyed by its line's place in the whole log, as far as the polls so far
+ *  have followed it, and its text. */
 export interface RunJob {
   readonly key: string;
   readonly line: string;
@@ -152,17 +153,38 @@ function withLaneReason(job: Job, run: AuditRun): Job {
   return patch?.state === 'failed' && patch.why ? { ...job, what: patch.why } : job;
 }
 
-/** Each run's jobs, newest first, live runs before the finished one, at most `perRun` from each. */
-export function recentJobsOf(runs: readonly AuditRun[], perRun = 14): RunJob[] {
+/** A run's log tail as last seen, and how many lines of the log came before its first. */
+export interface LogTail {
+  readonly lines: readonly string[];
+  readonly base: number;
+}
+
+/** How many lines scrolled off the front of a log's tail between `before` and `after`: the fewest whose removal
+ *  leaves `before` a prefix of `after`, or all of it where they share nothing. */
+export function scrolledOf(before: readonly string[], after: readonly string[]): number {
+  for (let d = 0; d < before.length; d++) {
+    if (before.length - d <= after.length && before.every((line, i) => i < d || line === after[i - d])) return d;
+  }
+  return before.length;
+}
+
+/** Each run's tail now, by round, its base carried on from `was`, the tails as the last poll left them. */
+export function logTailsOf(was: ReadonlyMap<number, LogTail>, runs: readonly AuditRun[]): ReadonlyMap<number, LogTail> {
+  return new Map(runs.map((run) => {
+    const prev = was.get(run.round);
+    return [run.round, { lines: run.lines, base: prev ? prev.base + scrolledOf(prev.lines, run.lines) : 0 }];
+  }));
+}
+
+/** Each run's jobs, newest first, live runs before the finished one, at most `perRun` from each. `tails` places each
+ *  run's lines in its whole log, so a job keeps its key while its line moves up the tail. */
+export function recentJobsOf(runs: readonly AuditRun[], perRun = 14, tails: ReadonlyMap<number, LogTail> = new Map()): RunJob[] {
   return runs.flatMap((run) => {
-    // `lines` is the log's tail, whose indices move every poll, so the key counts copies of the same text instead.
-    const seen = new Map<string, number>();
+    const base = tails.get(run.round)?.base ?? 0;
     return run.lines
-      .map((line) => {
-        const copy = seen.get(line) ?? 0;
-        seen.set(line, copy + 1);
+      .map((line, i) => {
         const job = parseJob(line);
-        return { key: `${run.round}:${copy}:${line}`, line, round: run.round, job: job && withLaneReason(job, run) };
+        return { key: `${run.round}:${base + i}:${line}`, line, round: run.round, job: job && withLaneReason(job, run) };
       })
       .filter((r): r is RunJob => r.job !== null)
       .reverse()
