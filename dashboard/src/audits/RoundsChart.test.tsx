@@ -28,6 +28,14 @@ describe('RoundsChart', () => {
     ]);
   });
 
+  it('keeps a round most of whose areas came back incomplete out of the scale, with no estimate, tagged by how many counted', () => {
+    const partial = { round: 3, date: '2026-11-03', areas: 1, files: 19, distinct: 13, est: 53, incomplete: 15 };
+    render(<RoundsChart rounds={[...rounds, partial]} />);
+    expect([...document.querySelectorAll('.lk-axis, text')].map((t) => t.textContent)).toContain('1 of 16');
+    expect(document.querySelectorAll('rect').length).toBe(5);
+    expect(Number([...document.querySelectorAll('text')].map((t) => Number(t.textContent)).filter((n) => !Number.isNaN(n)).sort((p, q) => q - p)[0])).toBeLessThan(13);
+  });
+
   it('names the picked area under the chart and keeps the full caption behind an info button', () => {
     render(<RoundsChart rounds={rounds} area={area} />);
     expect(screen.getByText('geom.part1').closest('span')!.textContent).toBe('geom.part1, each round that read it');

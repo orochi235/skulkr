@@ -23,6 +23,10 @@ export function ticksFor(max: number, count = 4): number[] {
 /** `n` of a round's defects per area it read, so a round of 8 areas and one of 16 stand on one scale. */
 const perArea = (n: number, r: AuditRound) => (r.areas > 0 ? n / r.areas : 0);
 
+/** A round fewer than half of whose areas finished: too few to estimate from, so it neither sets the scale nor draws
+ *  an estimate, only what it found. */
+export const isPartial = (r: AuditRound) => (r.incomplete ?? 0) > r.areas;
+
 /** An area's passes as rounds of one area each, so the chart draws them on the same terms. */
 export const areaRoundsOf = (area: AuditArea): AuditRound[] => area.passes.map((p) => ({
   round: p.round, date: p.date, areas: 1, files: area.files, distinct: p.distinct, est: p.est,
@@ -55,9 +59,9 @@ export function RoundsChart({ rounds: all, area: picked, areas = [] }: {
   const rounds = area ? areaRoundsOf(area) : all;
   const averages = area ? nthPassAverages(areas) : [];
   const unit = area ? 'defects' : 'defects per area';
-  const ticks = ticksFor(Math.max(0, ...rounds.map((r) => perArea(Math.max(r.est, r.distinct), r)), ...rounds.map((_, i) => averages[i]?.mean ?? 0)));
+  const ticks = ticksFor(Math.max(0, ...rounds.filter((r) => !isPartial(r)).map((r) => perArea(Math.max(r.est, r.distinct), r)), ...rounds.map((_, i) => averages[i]?.mean ?? 0)));
   const top = ticks.at(-1) || 1;
-  const y = (v: number) => H - M.bottom - ((H - M.top - M.bottom) * v) / top;
+  const y = (v: number) => H - M.bottom - ((H - M.top - M.bottom) * Math.min(v, top)) / top;
   const band = (W - M.left - M.right) / Math.max(1, rounds.length);
   // Beside an average, each of the area's bars takes half its share of the band, interlaced with the average's.
   const bar = area ? band * 0.4 : band * 0.75;
@@ -84,19 +88,19 @@ export function RoundsChart({ rounds: all, area: picked, areas = [] }: {
           ))}
           {rounds.map((r, i) => (
             <g key={r.round}>
-              <rect className={s.est} x={x(i)} width={bar} y={y(perArea(r.est, r))} height={y(0) - y(perArea(r.est, r))} />
-              <rect className={r.pending ? s.pending : s.found} x={x(i)} width={bar} y={y(perArea(r.distinct, r))} height={y(0) - y(perArea(r.distinct, r))}
-                fill={r.pending ? `url(#${hatch})` : undefined}>
+              {!isPartial(r) && <rect className={s.est} x={x(i)} width={bar} y={y(perArea(r.est, r))} height={y(0) - y(perArea(r.est, r))} />}
+              <rect className={r.pending || isPartial(r) ? s.pending : s.found} x={x(i)} width={bar} y={y(perArea(r.distinct, r))} height={y(0) - y(perArea(r.distinct, r))}
+                fill={r.pending || isPartial(r) ? `url(#${hatch})` : undefined}>
                 <title>{area
                   ? `round ${r.round}${r.pending ? ` (${PENDING_LABEL[r.pending]})` : ''}: ${r.distinct} found and ${r.est.toFixed(1)} estimated in ${area.id}`
-                  : `round ${r.round}${r.pending ? ` (${PENDING_LABEL[r.pending]})` : ''}: ${perArea(r.distinct, r).toFixed(1)} found and ${perArea(r.est, r).toFixed(1)} estimated per area; ${r.distinct} and ${r.est} over ${r.areas} areas`}{r.incomplete ? `; ${r.incomplete} more came back incomplete and are not counted` : ''}</title>
+                  : `round ${r.round}${r.pending ? ` (${PENDING_LABEL[r.pending]})` : ''}: ${perArea(r.distinct, r).toFixed(1)} found and ${perArea(r.est, r).toFixed(1)} estimated per area; ${r.distinct} and ${r.est} over ${r.areas} areas`}{r.incomplete ? `; ${r.incomplete} more came back incomplete and are not counted${isPartial(r) ? ', too many to estimate from' : ''}` : ''}</title>
               </rect>
               {averages[i] && (
                 <rect className={s.avg} x={x(i) + bar + band * 0.04} width={bar} y={y(averages[i]!.mean)} height={y(0) - y(averages[i]!.mean)}>
                   <title>{`an area's ${ordinal(i + 1)} pass found ${averages[i]!.mean.toFixed(1)} on average, over ${averages[i]!.of} areas`}</title>
                 </rect>
               )}
-              {!r.pending && r.incomplete ? <text className={s.tag} x={x(i) + bar / 2} y={Math.max(M.top + 6, y(perArea(Math.max(r.est, r.distinct), r)) - 3)} textAnchor="middle">{`${r.areas} of ${r.areas + r.incomplete}`}</text> : null}
+              {!r.pending && r.incomplete ? <text className={s.tag} x={x(i) + bar / 2} y={Math.max(M.top + 6, y(perArea(isPartial(r) ? r.distinct : Math.max(r.est, r.distinct), r)) - 3)} textAnchor="middle">{`${r.areas} of ${r.areas + r.incomplete}`}</text> : null}
               {r.pending && <text className={s.tag} x={x(i) + bar / 2} y={Math.max(M.top + 6, y(perArea(Math.max(r.est, r.distinct), r)) - 3)} textAnchor="middle">{PENDING_LABEL[r.pending]}</text>}
               <text className={s.axis} x={area ? M.left + (i + 0.5) * band : x(i) + bar / 2} y={H - 8} textAnchor="middle">{r.round}</text>
             </g>
