@@ -120,8 +120,13 @@ const plan = (cfg, root, args) => {
   return { commit, round, picked: picked.map((id) => byId.get(id)), passes, staleLines, running, open };
 };
 
+/** Where a run's jobs go, for its first line. */
+const nodesLine = (cfg, args) => (args.places && !args.nodes
+  ? `placed by the runner, ${cfg.concurrency.review} reviews and ${cfg.concurrency.fix} fixes at once`
+  : `${(args.nodes ?? nodesAt(cfg, new Date())).join(', ')}${args.nodes ? ' (pinned)' : ''}`);
+
 const printPlan = (cfg, p, args, say) => {
-  say(`round ${p.round} at ${p.commit.slice(0, 10)}; nodes: ${(args.nodes ?? nodesAt(cfg, new Date())).join(', ')}${args.nodes ? ' (pinned)' : ''}; stops dispatching at ${cfg.schedule.stopAt}`);
+  say(`round ${p.round} at ${p.commit.slice(0, 10)}; nodes: ${nodesLine(cfg, args)}; stops dispatching at ${cfg.schedule.stopAt}`);
   say(`budget: ${usd(args.capUsd)} tonight; per job $${args.budget.review} review, $${args.budget.match} match, $${args.budget.fix} fix`);
   if (args.fixOnly) {
     for (const area of p.picked) say(`  ${area.id}: ${plural(p.open.get(area.id).length, 'open finding')}, from rounds ${[...new Set(p.open.get(area.id).map((o) => o.round))].join(', ')}`);
@@ -173,7 +178,8 @@ const begin = async (cfg, root, args, say) => {
 const reviewAreas = async ({ ctx, git, picked, passes, open, args, status, deadline, results }) => {
   const inFlight = new Set();
   const cfg = ctx.cfg;
-  const maxAreas = Math.max(1, Math.floor(((args.nodes ?? nodesAt(cfg, new Date())).length * cfg.nodes.reviewSlots) / 2));
+  const reviews = args.places && !args.nodes ? cfg.concurrency.review : (args.nodes ?? nodesAt(cfg, new Date())).length * cfg.nodes.reviewSlots;
+  const maxAreas = Math.max(1, Math.floor(reviews / 2));
   for (const area of picked) {
     while (inFlight.size >= maxAreas) await Promise.race(inFlight);
     const affordable = mayStartArea({ used: status.costUsd, finished: results.map((r) => r.jobs.costUsd), inFlight: inFlight.size, cap: args.capUsd, guess: cfg.budget.areaGuessUsd });
@@ -206,7 +212,7 @@ const sweepSummary = (cfg, sweep, outcomes) => (sweep.ran
 /** What every job of the run reads: its round, trees, budget, logging, and the slots it takes jobs in. */
 const runContext = ({ cfg, runner, root, p, args, status, frozen, say, setStep }) => {
   const git = gitIn(root);
-  const slots = createSlots(cfg, args.nodes, { about: { round: p.round } });
+  const slots = createSlots(cfg, args.nodes, { about: { round: p.round }, places: args.places });
   let unavailable = { at: 0, nodes: new Set() };
   const counts = {};
   return {
@@ -303,10 +309,10 @@ const resume = (cfg, root, args, say) => {
 
 /** One run under `cfg`, its jobs through `runner`, each line it prints to `say`. */
 export const runNight = async (cfg, runner, argv = [], say = (line) => console.log(line)) => {
-  const args = parseArgs(cfg, argv);
+  const args = { ...parseArgs(cfg, argv), places: Boolean(runner.places) };
   if (args.sweep && !cfg.sweep) throw new Error('--sweep: the config names no sweep');
   if (args.sweep && args.fixOnly) throw new Error('--sweep and --fix-only: a fix-only round runs no checks to fix');
-  if (!args.dry && !args.nodes?.length && !cfg.nodes.list.length && !cfg.nodes.local) {
+  if (!args.dry && !args.places && !args.nodes?.length && !cfg.nodes.list.length && !cfg.nodes.local) {
     throw new Error(`the config names no nodes for the ${typeof cfg.runner === 'string' ? cfg.runner : 'configured'} runner; set nodes.list or pass --nodes`);
   }
   const root = mainCheckout(cfg);

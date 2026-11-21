@@ -6,11 +6,6 @@ Open work on skulkr. Each entry says when it closes.
   weasel's rounds from `examples/weasel.config.mjs` (2026-11-21); left are moving the config and its briefs into
   weasel and deleting `scripts/skulk/`. Closes when weasel's own `skulkr.config.mjs` drives its rounds and
   `scripts/skulk/` is gone. Waiting on the user's go.
-- [ ] (P2) A job sent to the windowed local node (`nodes.local`) waits forever when onto holds it because someone is
-  using that machine: round 65's four reviewer-B jobs, sent to orochi at 08:23 on 2026-11-21, still logged `waiting:
-  orochi unknown (someone is using it)` at 09:54, past the 09:00 window, holding four slots and blocking the round's
-  patch. `onto do` has no cap on the wait. Closes when a dispatch still waiting on a windowed node at its window's end
-  (or after a cap) is stopped and relaunched on another node, the way a refused one is.
 - [ ] (P3) The dashboard installs weasel from tarballs on this repository's `weasel-70a055a` release, since no published
   `@weasel-js/ui` has `SpanStrip` yet (1.19.1 on 2026-11-21; `dashboard/README.md` "weasel"). Closes when a weasel
   release carries everything the dashboard imports, `package.json` pins it from npm, and the release is deleted.

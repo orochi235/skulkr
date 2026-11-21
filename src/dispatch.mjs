@@ -70,9 +70,11 @@ export const dispatch = async (ctx, area, role, spec) => {
     }
     if (result.refused) {
       ctx.refuse(slot.node);
-      ctx.say(`${role} ${area.id} refused by ${slot.node}, trying another node`);
+      ctx.say(`${role} ${area.id} refused by ${result.node ?? slot.node}, trying ${slot.placed ? 'again' : 'another node'}`);
+      if (slot.placed) await sleep(RELAUNCH_WAIT_MS);
       continue;
     }
+    const node = result.node ?? slot.node;
     const exit = readIf(join(spec.to, model ? 'exit' : 'verify.exit')).trim();
     // No exit file: the job never ran on the node, so there is no reply to read, only another launch to try.
     if (result.status !== 0 && !exit && roomWaits < ROOM_WAITS && result.noRoom) {
@@ -83,15 +85,15 @@ export const dispatch = async (ctx, area, role, spec) => {
       continue;
     }
     if (result.status !== 0 && !exit && launches < LAUNCHES) {
-      ctx.say(`${role} ${area.id} did not launch on ${slot.node} (launch ${launches} of ${LAUNCHES}); trying again`);
+      ctx.say(`${role} ${area.id} did not launch${slot.placed ? '' : ` on ${slot.node}`} (launch ${launches} of ${LAUNCHES}); trying again`);
       await sleep(RELAUNCH_WAIT_MS);
       continue;
     }
-    if (!model) return { status: result.status, launched: Boolean(exit), node: slot.node, minutes: minutesSince(t0), reply: '' };
+    if (!model) return { status: result.status, launched: Boolean(exit), node, minutes: minutesSince(t0), reply: '' };
     const { reply, record } = parseEnvelope(readIf(join(spec.to, 'claude.json')));
-    const usage = { area: area.id, role, node: slot.node, ...record, exit };
+    const usage = { area: area.id, role, node, ...record, exit };
     ctx.usage(usage);
     if (usage.budgetHit) ctx.say(`${role} ${area.id} stopped at its $${ctx.budget[budgetRole(role)]} ceiling`);
-    return { status: result.status, launched: Boolean(exit), node: slot.node, minutes: minutesSince(t0), reply, usage };
+    return { status: result.status, launched: Boolean(exit), node, minutes: minutesSince(t0), reply, usage };
   }
 };

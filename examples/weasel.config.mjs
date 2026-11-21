@@ -105,16 +105,9 @@ export default {
   },
 
   runner: 'onto',
-  nodes: {
-    // Logged into the personal Claude account (`CLAUDE_CONFIG_DIR=~/.claude-msb`).
-    list: ['studio', 'teitou', 'msb-uai'],
-    // This Mac takes model jobs only overnight, and never a fixer.
-    local: { name: 'orochi', from: '00:00', until: '09:00', fixers: false },
-    noFixers: [],
-    refusedCooldownMin: 30,
-    reviewSlots: 6,
-    fixSlots: 6,
-  },
+  // onto places each job on whichever node has room as it starts; what a node takes is its own onto policy (orochi,
+  // this Mac, refuses `kind:fix` and is weighted low, and onto holds no job there while someone is using it).
+  concurrency: { review: 18, fix: 18 },
 
   claude: {
     configDir: '~/.claude-msb',

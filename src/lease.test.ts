@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createSlots } from './jobs.mjs';
+import { PLACED, createSlots } from './jobs.mjs';
 import { leaseAt, pidAlive, takeLease, waitForLease } from './lease.mjs';
 import { mergeLock } from './runs.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';
@@ -109,6 +109,23 @@ describe('createSlots over leases', () => {
     expect(a.take('fix')?.node).toBe('studio');
     expect(b.take('fix')).toMatchObject({ node: 'teitou', tree: 'weasel-skulkr-f1' });
     expect(a.take('fix')).toBeUndefined();
+  });
+});
+
+describe('placed slots', () => {
+  it('leases one pool the size of concurrency, names no node for the runner, and is never set aside on a refusal', () => {
+    const dir = state();
+    const cfg = { ...weaselConfig(dir), concurrency: { review: 2, fix: 1 } };
+    const slots = createSlots(cfg, undefined, { places: true });
+    const a = slots.take('review');
+    expect(a).toMatchObject({ node: PLACED, placed: true });
+    expect(slots.take('review')).toBeDefined();
+    expect(slots.take('review')).toBeUndefined();
+    slots.refuse(PLACED);
+    expect(slots.take('fix')).toBeDefined();
+    expect(slots.take('fix')).toBeUndefined();
+    const pinned = createSlots(cfg, ['studio'], { places: true }).take('review');
+    expect(pinned).toMatchObject({ node: 'studio', placed: false });
   });
 });
 

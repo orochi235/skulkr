@@ -89,10 +89,11 @@ export default {
 
   runner: 'local',                    // or 'onto', a module path exporting createRunner(cfg), or a runner object
   nodes: {
-    list: [],                         // nodes jobs are offered to; the local runner's is ['local']
+    list: [],                         // nodes jobs are offered to; the local runner's is ['local']; unused under onto
     local: null,                      // or { name, from: '00:00', until: '09:00', fixers: false }: a node usable only in a window
     reviewSlots: 3, fixSlots: 2,      // jobs at once per node; 6 each for a fleet runner
   },
+  concurrency: { review: 18, fix: 18 }, // jobs at once across the fleet, under a runner that places them (onto)
   claude: {
     configDir: undefined,             // CLAUDE_CONFIG_DIR for every job; unset, the CLI's default account
     models: { match: 'haiku' },       // per role (review, match, fix); unset takes what the job's settings give
@@ -195,10 +196,11 @@ predicted, found, and the running factor.
 **Limits.** Each job's model is stopped at `claude.timeoutMin` and the runner stops the job ten minutes later, so
 what it wrote still comes home. A run starts no new area after `schedule.stopAt`, nor when the areas running plus
 one more, each expected to cost the mean of this run's finished areas (`budget.areaGuessUsd` before any has),
-would pass the dollar cap. An area whose reviewers ran always gets its matcher and fixer. A node the runner
-reports unavailable is skipped; a dispatch a node refuses moves to another node and keeps that one out for
-`nodes.refusedCooldownMin`. `<state>/limits.json` (`{ "review": n, "fix": n }`) changes the slots per node for
-runs already going.
+would pass the dollar cap. An area whose reviewers ran always gets its matcher and fixer. Where skulkr picks
+nodes (a pinned run, or a runner that does not place jobs), a node the runner reports unavailable is skipped, and a
+dispatch a node refuses moves to another node and keeps that one out for `nodes.refusedCooldownMin`.
+`<state>/limits.json` (`{ "review": n, "fix": n }`) changes the slots per node, or under a placing runner the jobs at
+once, for runs already going.
 
 ## Verify and repair
 
@@ -267,7 +269,7 @@ A runner launches jobs on nodes. A config's `runner` picks one:
 | `runner` | Jobs run |
 |---|---|
 | `'local'` (default) | On this machine, as node `local`. Each job gets a clone of the project from a pool in `<state>/trees/`, sharing the project's objects (`git clone --shared`), reset to the job's commit and cleaned before it runs, so one job never sees another's leftovers; `node_modules` is kept, so a fixer installs only when the lockfile changed. The pool holds one clone per job running at once, at most `reviewSlots + fixSlots` across a run. A job past its timeout is killed with its children. |
-| `'onto'` | On the nodes of an onto fleet (`nodes.list`), one `onto do` per job. |
+| `'onto'` | On an onto fleet, one `onto do` per job with no node named: each waits in onto's queue and starts on whichever node has room first, so a busy or missing machine never holds a job. skulkr bounds only how many run at once (`concurrency`); what each node takes is its own onto policy (`onto set <node> --refuse kind:fix`, `--quiet`, `--weight`). `--nodes` still pins a run's jobs. |
 | a module path | Whatever its `createRunner(cfg)` answers. |
 | an object | That object. |
 

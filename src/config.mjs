@@ -124,6 +124,11 @@ export const DEFAULTS = {
    * `createRunner(cfg)`, or a runner object.
    */
   runner: 'local',
+  /**
+   * Jobs at once across every node, by role, under a runner that places jobs itself (onto). Unset: the per-node
+   * slots times the nodes listed, or one node's slots when none are.
+   */
+  concurrency: { review: undefined, fix: undefined },
   nodes: {
     /** Unset under the local runner: its one node, `local`. */
     list: [],
@@ -201,6 +206,12 @@ const nodesFor = (nodes, runner) => {
   };
 };
 
+/** Jobs at once by role under a runner that places them: the config's, else slots per node times the nodes. */
+const concurrencyFor = (given, nodes) => {
+  const n = Math.max(1, nodes.list.length);
+  return { review: given?.review ?? nodes.reviewSlots * n, fix: given?.fix ?? nodes.fixSlots * n };
+};
+
 const isPlain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) && !(v instanceof RegExp) && Object.getPrototypeOf(v) === Object.prototype;
 
 /** `over` laid on `base`: plain objects merge key by key; anything else, arrays included, replaces. */
@@ -244,6 +255,7 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
     name,
     file,
     nodes: nodesFor(c.nodes, c.runner),
+    concurrency: concurrencyFor(c.concurrency, nodesFor(c.nodes, c.runner)),
     root: root ?? (c.root ? resolve(base, expandHome(c.root)) : undefined),
     state: c.state ? resolve(base, expandHome(c.state)) : join(homedir(), '.local', 'state', 'skulkr', name),
     partition: {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { configPath, merge, resolveConfig } from '../src/config.mjs';
 import { loadRunner } from '../src/runner/index.mjs';
-import { ontoArgs } from '../src/runner/onto.mjs';
+import { nodeOfLaunch, ontoArgs } from '../src/runner/onto.mjs';
 import { weaselConfig } from './weaselConfig.ts';
 
 describe('resolveConfig', () => {
@@ -58,7 +58,14 @@ describe('runners', () => {
     expect(resolveConfig({}).nodes).toMatchObject({ list: ['local'], reviewSlots: 3, fixSlots: 2 });
     expect(resolveConfig({ nodes: { fixSlots: 1 } }).nodes).toMatchObject({ reviewSlots: 3, fixSlots: 1 });
     expect(resolveConfig({ runner: 'onto' }).nodes).toMatchObject({ list: [], reviewSlots: 6, fixSlots: 6 });
-    expect(weaselConfig().nodes).toMatchObject({ list: ['studio', 'teitou', 'msb-uai'], reviewSlots: 6, fixSlots: 6 });
+    expect(resolveConfig({ runner: 'onto', nodes: { list: ['a', 'b'] } }).concurrency).toEqual({ review: 12, fix: 12 });
+    expect(weaselConfig().concurrency).toEqual({ review: 18, fix: 18 });
+  });
+
+  it('reads the node onto started a job on, and names none when skulkr leaves the choice to it', () => {
+    expect(nodeOfLaunch('  delta  18 file(s)\n  job    a121b063 on teitou\n')).toBe('teitou');
+    expect(nodeOfLaunch('waiting: studio ~4m')).toBeUndefined();
+    expect(ontoArgs({ kind: 'review', ref: 'abc', timeout: '1m', expect: '8m', task: 't', about: 'a', out: 'o', to: '/to', shell: 'true' })).not.toContain('--node');
   });
 
   it('takes a runner object from the config, and refuses one missing part of the interface', async () => {

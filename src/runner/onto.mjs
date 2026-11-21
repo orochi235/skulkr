@@ -2,13 +2,16 @@
  * The onto runner: each job is one `onto do` from the frozen tree, in a node tree named by the job, with what the job
  * writes under `out` brought back to `to`. onto's own README covers `do`, `status` and `jobs`.
  */
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 const BUSY = /working tree .* is busy/;
 const REFUSED = /\bquiet\b|refuses|is offline|not reachable|unavailable/i;
+/** The node onto started a job on, from its `job <id> on <node>` line. */
+export const nodeOfLaunch = (text) => /^\s*job\s+\S+\s+on\s+(\S+)/m.exec(text)?.[1];
+
 /** onto's answer when every node it tried is at its ceiling of working trees. */
 export const NO_ROOM = /at or over this node's [\d.]+ \w+ ceiling|will not take a new tree/;
 
@@ -67,10 +70,13 @@ export const progressOfTop = (top) => {
 /**
  * The runner interface, as onto answers it:
  *
- * - `run(job, { cwd, log })` launches one job and answers `{ status, busy, refused, noRoom }`: `busy` when the node's
+ * - `places` (optional), true when the runner picks each job's node itself as the job starts: skulkr then names no
+ *   node, bounds only how many jobs run at once (`concurrency`), and reads where each ran from `run`'s `node`.
+ * - `run(job, { cwd, log })` launches one job and answers `{ status, busy, refused, noRoom, node? }`: `busy` when the node's
  *   tree is in use and nothing ran (the caller waits and tries again); `refused` when the node turned it away as quiet
  *   or unavailable before anything ran (the caller tries another node); `noRoom` when no node had room for a tree and
- *   nothing ran (the caller waits a minute, without counting it as a failed launch). `job` is `{ kind, node?, tree, ref?, task,
+ *   nothing ran (the caller waits a minute, without counting it as a failed launch); `node`, where it ran, when the
+ *   runner placed it. `job` is `{ kind, node?, tree, ref?, task,
  *   about, expect, timeout, icon?, gui?, out, to, env?, shell }`: `kind` `review` | `fix` | `test`; `tree` the node
  *   tree's name; `ref` the commit the tree syncs against; `expect` a duration or `none`; `timeout` a duration;
  *   `out` the directory in the tree brought back into the local directory `to`; `shell` a bash script.
@@ -139,6 +145,9 @@ export const createOntoRunner = () => {
     return (JSON.parse(out).jobs ?? []).filter((j) => j.state === 'running' || j.finished);
   }, { store: fileStore(JOBS_CACHE) });
   return {
+  // Unpinned, a job waits in onto's queue and starts on whichever node has room first, so no one busy machine
+  // holds it; each node's own policy (`onto set --refuse`, `--quiet`, `--weight`) says what it takes.
+  places: true,
   run: async (job, { cwd, log }) => {
     const r = await ontoOnce(ontoArgs(job), cwd, log);
     return {
@@ -146,19 +155,11 @@ export const createOntoRunner = () => {
       busy: BUSY.test(r.stderr),
       refused: r.status !== 0 && REFUSED.test(r.stderr) && !/job .* (failed|exited)/.test(r.stderr),
       noRoom: r.status !== 0 && NO_ROOM.test(r.tail),
+      node: nodeOfLaunch(r.tail),
     };
   },
-  unavailableNodes: () => {
-    const run = spawnSync('onto', ['status', '--json'], { encoding: 'utf8', timeout: 30_000 });
-    if (run.status !== 0) return new Set();
-    try {
-      const rows = JSON.parse(run.stdout);
-      const list = Array.isArray(rows) ? rows : Object.entries(rows).map(([name, row]) => ({ name, ...row }));
-      return new Set(list.filter((r) => r.quiet || r.available === false || r.online === false).map((r) => r.name ?? r.node));
-    } catch {
-      return new Set();
-    }
-  },
+  // onto places each job where there is room, so no node needs ruling out here.
+  unavailableNodes: () => new Set(),
   progress: () => {
     try {
       const out = execFileSync('onto', ['top', '--json', '--once'], { encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'] });
