@@ -26,6 +26,11 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 /** How many times a job that never reached its node is launched before its area is recorded incomplete. */
 const LAUNCHES = 3;
 const RELAUNCH_WAIT_MS = 60_000;
+/** How many minutes a job waits, one launch a minute, for a node to make room for its tree: a refusal for room
+ *  never counts toward {@link LAUNCHES}, since no node being free is not the job failing. */
+const ROOM_WAITS = 120;
+/** onto's answer when every node it tried is at its ceiling of working trees. */
+const NO_ROOM = /at or over this node's [\d.]+ \w+ ceiling|will not take a new tree/;
 const cents = (n) => Number(n.toFixed(2));
 
 /**
@@ -55,6 +60,7 @@ const dispatch = async (ctx, area, role, spec) => {
     ctx.usage(usage);
     return { status: 0, launched: true, node: 'earlier', minutes: 0, reply, usage };
   }
+  let roomWaits = 0;
   for (let launches = 1; ; launches++) {
     const slot = await ctx.acquire(role === 'fix' ? 'fix' : 'review');
     const t0 = Date.now();
@@ -71,6 +77,13 @@ const dispatch = async (ctx, area, role, spec) => {
     }
     const exit = readIf(join(spec.to, 'exit')).trim();
     // No exit file: the job never ran on the node, so there is no reply to read, only another launch to try.
+    if (result.status !== 0 && !exit && roomWaits < ROOM_WAITS && NO_ROOM.test(readIf(spec.logPath).slice(-4000))) {
+      roomWaits += 1;
+      launches -= 1;
+      if (roomWaits === 1 || roomWaits % 10 === 0) ctx.say(`${role} ${area.id}: no node has room for its tree (${roomWaits} min waited); waiting`);
+      await sleep(RELAUNCH_WAIT_MS);
+      continue;
+    }
     if (result.status !== 0 && !exit && launches < LAUNCHES) {
       ctx.say(`${role} ${area.id} did not launch on ${slot.node} (launch ${launches} of ${LAUNCHES}); trying again`);
       await sleep(RELAUNCH_WAIT_MS);

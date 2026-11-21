@@ -76,6 +76,24 @@ export const unlandedBatches = (git, batchPrefix, main) =>
 export const passesIn = (cfg, git, root) =>
   withBatchPasses(readPasses(root, cfg.record.dir), git, cfg.record.dir, unlandedBatches(git, cfg.naming.batchPrefix, cfg.git.main));
 
+/** How many areas each round under `recordDir` recorded incomplete, by round: passes `readPasses` leaves out. */
+export const incompleteByRound = (root, recordDir) => {
+  const dir = join(root, recordDir);
+  const counts = new Map();
+  if (!existsSync(dir)) return counts;
+  for (const name of readdirSync(dir)) {
+    const round = Number(/^round-(\d+)$/.exec(name)?.[1]);
+    if (!round) continue;
+    for (const area of readdirSync(join(dir, name), { withFileTypes: true })) {
+      const at = join(dir, name, area.name, 'area.json');
+      if (area.isDirectory() && existsSync(at) && JSON.parse(readFileSync(at, 'utf8')).incomplete?.length) {
+        counts.set(round, (counts.get(round) ?? 0) + 1);
+      }
+    }
+  }
+  return counts;
+};
+
 /** An area counts as audited once at least this share of its files were read by some pass. */
 export const COVERED = 0.5;
 

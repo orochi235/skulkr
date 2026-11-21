@@ -89,13 +89,14 @@ export function RoundsChart({ rounds: all, area: picked, areas = [] }: {
                 fill={r.pending ? `url(#${hatch})` : undefined}>
                 <title>{area
                   ? `round ${r.round}${r.pending ? ` (${PENDING_LABEL[r.pending]})` : ''}: ${r.distinct} found and ${r.est.toFixed(1)} estimated in ${area.id}`
-                  : `round ${r.round}${r.pending ? ` (${PENDING_LABEL[r.pending]})` : ''}: ${perArea(r.distinct, r).toFixed(1)} found and ${perArea(r.est, r).toFixed(1)} estimated per area; ${r.distinct} and ${r.est} over ${r.areas} areas`}</title>
+                  : `round ${r.round}${r.pending ? ` (${PENDING_LABEL[r.pending]})` : ''}: ${perArea(r.distinct, r).toFixed(1)} found and ${perArea(r.est, r).toFixed(1)} estimated per area; ${r.distinct} and ${r.est} over ${r.areas} areas`}{r.incomplete ? `; ${r.incomplete} more came back incomplete and are not counted` : ''}</title>
               </rect>
               {averages[i] && (
                 <rect className={s.avg} x={x(i) + bar + band * 0.04} width={bar} y={y(averages[i]!.mean)} height={y(0) - y(averages[i]!.mean)}>
                   <title>{`an area's ${ordinal(i + 1)} pass found ${averages[i]!.mean.toFixed(1)} on average, over ${averages[i]!.of} areas`}</title>
                 </rect>
               )}
+              {!r.pending && r.incomplete ? <text className={s.tag} x={x(i) + bar / 2} y={Math.max(M.top + 6, y(perArea(Math.max(r.est, r.distinct), r)) - 3)} textAnchor="middle">{`${r.areas} of ${r.areas + r.incomplete}`}</text> : null}
               {r.pending && <text className={s.tag} x={x(i) + bar / 2} y={Math.max(M.top + 6, y(perArea(Math.max(r.est, r.distinct), r)) - 3)} textAnchor="middle">{PENDING_LABEL[r.pending]}</text>}
               <text className={s.axis} x={area ? M.left + (i + 0.5) * band : x(i) + bar / 2} y={H - 8} textAnchor="middle">{r.round}</text>
             </g>

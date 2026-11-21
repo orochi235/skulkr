@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { areasInFlight, chapman, inheritPasses, isSettled, nextRound, pickAreas, readPasses, scaledOf, withBatchPasses } from './rounds.mjs';
+import { areasInFlight, chapman, inheritPasses, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf, withBatchPasses } from './rounds.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -159,5 +159,18 @@ describe('withBatchPasses', () => {
     withBatchPasses(passes, git, 'docs/audits', ['b/new']);
     expect(passes.get('ui')!.map((p) => [p.round, p.distinct])).toEqual([[4, 3], [5, 2]]);
     expect(passes.has('gone')).toBe(false);
+  });
+});
+
+describe('incompleteByRound', () => {
+  it('counts the areas each round recorded incomplete, which readPasses leaves out', () => {
+    const root = fixture([
+      { round: 56, id: 'ui', distinct: 0, files: ['a.ts'], incomplete: ['A', 'B'] },
+      { round: 56, id: 'theme', distinct: 0, files: ['b.ts'], incomplete: ['B'] },
+      { round: 56, id: 'Badge', distinct: 13, files: ['c.ts'] },
+      { round: 55, id: 'ui', distinct: 4, files: ['a.ts'] },
+    ]);
+    expect([...incompleteByRound(root, 'docs/audits')]).toEqual([[56, 2]]);
+    expect(readPasses(root, 'docs/audits').get('ui')!.map((p) => p.round)).toEqual([55]);
   });
 });

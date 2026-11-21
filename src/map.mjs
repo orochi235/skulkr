@@ -10,7 +10,7 @@ import { resolveConfig } from './config.mjs';
 import { fixTallyOf } from './findings.mjs';
 import { fleetOf } from './gate.mjs';
 import { partitionAt } from './partition.mjs';
-import { COVERED, areaStats, chapman, gitTouched, passesIn, pickAreas } from './rounds.mjs';
+import { COVERED, areaStats, chapman, gitTouched, incompleteByRound, passesIn, pickAreas } from './rounds.mjs';
 import { continuousOf } from './continuousOf.mjs';
 import { lastFinished, liveRuns, readJson } from './runs.mjs';
 import { parseEnvelope } from './usage.mjs';
@@ -299,6 +299,12 @@ export const buildMap = (cfg, root, runner) => {
       rounds.set(p.round, r);
     });
     delete a._raw;
+  }
+
+  // A round whose areas came back incomplete says how many, so a bar drawn from the few that finished reads as that.
+  for (const [round, incomplete] of incompleteByRound(root, cfg.record.dir)) {
+    const r = rounds.get(round) ?? { round, date: null, areas: 0, files: 0, distinct: 0, est: 0 };
+    rounds.set(round, { ...r, incomplete });
   }
 
   // A round whose record is not on this branch yet is drawn from its night directory, marked as such.

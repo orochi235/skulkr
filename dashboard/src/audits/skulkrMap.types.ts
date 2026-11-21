@@ -118,6 +118,8 @@ export interface AuditRound {
   readonly est: number;
   /** A round with no committed record, read from its run's night directory: still running, or not merged. */
   readonly pending?: 'live' | 'unmerged';
+  /** Areas the round recorded incomplete, a reviewer never run or never finished: left out of every count above. */
+  readonly incomplete?: number;
 }
 
 /** Where a project's areas come from: its partition file, and the most source files one area holds. */
