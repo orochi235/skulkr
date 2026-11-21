@@ -37,6 +37,8 @@ weasel cutover.
   - an area's history taken by round, and only its covering rounds (README "History follows files"): the queue's
     order, `staleLines`, settling, calibration's pairs and factors, and the record's "last left" (2026-11-21).
   - the map's queue numbers, which skip areas held by unmerged `audit<N>-<area>` branches as the plan does (2026-11-21).
+  - an abandoned round's batch left out of history, carry, and calibration, and a round read from a batch marked
+    `pending: 'unmerged'` on the rounds chart (2026-11-21).
   - the map's `gateRuns`, each gate run's id and its `gate.labels` label, for the dashboard (2026-11-21).
   - the map's run `leftOut` and a left-out lane's patch `why`, read from `land.mjs`'s `left out:` lines (2026-11-21).
   - reports the parsers used to misread (2026-11-21): a capitalized `Fixed <sha>` verdict counts as fixed;

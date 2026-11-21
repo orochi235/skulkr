@@ -14,7 +14,7 @@ import { partitionAt } from './partition.mjs';
 import { correctedLeftOf } from './calibration.mjs';
 import { COVERED, areaStats, areasInFlightFor, calibrationFor, chapman, drawnPassOf, gitTouched, incompleteByRound, passOf, passesIn, pickAreas } from './rounds.mjs';
 import { openFindingsIn } from './carryRecords.mjs';
-import { recordsFor } from './recordFiles.mjs';
+import { abandonedRounds, recordsFor } from './recordFiles.mjs';
 import { continuousOf } from './continuousOf.mjs';
 import { lastFinished, liveRuns, readJson } from './runs.mjs';
 import { parseEnvelope } from './usage.mjs';
@@ -268,13 +268,13 @@ export const nightsOf = (runs, state) => {
   const dir = join(state, 'nights');
   if (!existsSync(dir)) return [];
   const live = new Set(runs.filter((r) => r.running).map((r) => r.round));
+  const abandoned = abandonedRounds(state);
   const latest = new Map();
   for (const name of readdirSync(dir).sort()) {
     const m = /^(\d{4}-\d{2}-\d{2})T.*-round(\d+)$/.exec(name);
-    if (m && existsSync(join(dir, name, 'abandoned'))) latest.delete(Number(m[2]));
-    else if (m) latest.set(Number(m[2]), { round: Number(m[2]), started: m[1], nightDir: join(dir, name), running: live.has(Number(m[2])) });
+    if (m) latest.set(Number(m[2]), { round: Number(m[2]), started: m[1], nightDir: join(dir, name), running: live.has(Number(m[2])) });
   }
-  return [...latest.values()];
+  return [...latest.values()].filter((n) => !abandoned.has(n.round));
 };
 
 /** The whole map for the project at `root` under `cfg`, its runs' jobs asked of `runner`. */
@@ -326,6 +326,7 @@ export const buildMap = (cfg, root, runner) => {
     a._raw.forEach((raw, i) => {
       const p = a.passes[i];
       const r = rounds.get(p.round) ?? { round: p.round, date: p.date, areas: 0, files: 0, distinct: 0, est: 0 };
+      if (raw.unmerged) r.pending = 'unmerged';
       const key = `${raw.round}\n${raw.id}`;
       if (!counted.has(key)) {
         counted.add(key);

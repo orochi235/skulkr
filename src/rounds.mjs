@@ -12,9 +12,12 @@ export const QUIET_PASS = 1;
 /** Chapman's estimate of how many defects the area held, from two lists of `a` and `b` sharing `m`. */
 export const chapman = (a, b, m) => (a + 1) * (b + 1) / (m + 1) - 1;
 
-/** A record's pass (`recordFiles.mjs`): its `area.json` with its `round`, and its `files.txt` where that lists no files. */
+/**
+ * A record's pass (`recordFiles.mjs`): its `area.json` with its `round`, and its `files.txt` where that lists no files;
+ * `unmerged` when it is read from a batch `main` has not merged.
+ */
 const passOfRecord = (rec) => {
-  const pass = { round: rec.round, ...JSON.parse(rec.read('area.json')) };
+  const pass = { round: rec.round, ...JSON.parse(rec.read('area.json')), ...(rec.ref ? { unmerged: true } : {}) };
   const listed = Array.isArray(pass.files) ? null : rec.read('files.txt');
   if (listed !== null) pass.files = listed.split('\n').filter(Boolean);
   return pass;

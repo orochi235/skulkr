@@ -73,9 +73,31 @@ export const unlandedBatches = (git, batchPrefix, main) =>
   git('for-each-ref', `--no-merged=${main}`, '--sort=-refname', '--format=%(refname:short)', `refs/heads/${batchPrefix}/`)
     .split('\n').filter(Boolean);
 
-/** Every area record `cfg`'s project holds (`diskRecords`, then `refRecords` over its unlanded batches). */
+const NIGHT = /^\d{4}-\d{2}-\d{2}T.*-round(\d+)$/;
+
+/**
+ * The rounds given up for good: those whose latest night directory under `state`'s `nights/` (`<started>-round<N>`)
+ * holds an `abandoned` file (its reason). Such a round never lands.
+ */
+export const abandonedRounds = (state) => {
+  const dir = join(state, 'nights');
+  if (!existsSync(dir)) return new Set();
+  const latest = new Map();
+  for (const name of readdirSync(dir).sort()) {
+    const m = NIGHT.exec(name);
+    if (m) latest.set(Number(m[1]), name);
+  }
+  return new Set([...latest].flatMap(([round, name]) => (existsSync(join(dir, name, 'abandoned')) ? [round] : [])));
+};
+
+/**
+ * Every area record `cfg`'s project holds (`diskRecords`, then `refRecords` over its unlanded batches, less those of
+ * abandoned rounds). A batch record carries `ref`, its branch.
+ */
 export const recordsFor = (cfg, git, root) => {
   const disk = diskRecords(root, cfg.record.dir);
-  const refs = unlandedBatches(git, cfg.naming.batchPrefix, cfg.git.main);
+  const abandoned = abandonedRounds(cfg.state);
+  const refs = unlandedBatches(git, cfg.naming.batchPrefix, cfg.git.main)
+    .filter((ref) => !abandoned.has(Number(cfg.names.roundIn.exec(ref)?.[1])));
   return [...disk, ...refRecords(git, root, cfg.record.dir, refs, new Set(disk.map((r) => r.round)))];
 };
