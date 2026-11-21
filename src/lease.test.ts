@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { tmpdir, uptime } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { PLACED, createSlots } from './jobs.mjs';
@@ -63,6 +63,16 @@ describe('takeLease', () => {
     release();
     expect(leaseAt(path)).toMatchObject({ round: 2 });
     other();
+  });
+  it('takes back a lease written before this machine booted, though its pid is alive again', () => {
+    const path = join(state(), 'lease');
+    const before = new Date(Date.now() - uptime() * 1000 - 3_600_000).toISOString();
+    writeFileSync(path, JSON.stringify({ pid: process.pid, at: before, round: 1 }));
+    expect(pidAlive(process.pid, before)).toBe(false);
+    expect(pidAlive(process.pid, new Date().toISOString())).toBe(true);
+    const release = takeLease(path, { round: 2 });
+    expect(leaseAt(path)).toMatchObject({ round: 2 });
+    release!();
   });
 });
 

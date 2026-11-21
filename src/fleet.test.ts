@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { tmpdir, uptime } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { nextContinuous } from './continuous.mjs';
@@ -34,6 +34,15 @@ describe('gateAhead', () => {
 });
 
 describe('the fleet queue', () => {
+  it('has no holder, nor waiter, written before this machine booted', () => {
+    const dir = fleet();
+    const before = new Date(Date.now() - uptime() * 1000 - 3_600_000).toISOString();
+    writeFileSync(join(dir, 'gate.lease'), JSON.stringify({ pid: process.pid, at: before, tenant: 'weasel', round: 1 }));
+    mkdirSync(join(dir, 'waiting'));
+    writeFileSync(join(dir, 'waiting', '1.json'), JSON.stringify({ pid: process.pid, at: before, tenant: 'weasel', round: 2 }));
+    expect(readFleet(dir)).toEqual({ holder: null, waiting: [] });
+  });
+
   it('runs one gate at a time, in the order rounds reached it, and says who each waits behind', async () => {
     const dir = fleet();
     const heard: unknown[] = [];

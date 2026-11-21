@@ -4,13 +4,24 @@
  * plan lock are all leases.
  */
 import { linkSync, mkdirSync, openSync, renameSync, rmSync, writeSync, closeSync } from 'node:fs';
+import { uptime } from 'node:os';
 import { dirname } from 'node:path';
 import { sleep } from './after.mjs';
 import { readJson } from './json.mjs';
 
-/** Whether process `pid` is alive. EPERM means it is, owned by someone else. */
-export const pidAlive = (pid) => {
+/** When this machine booted, in ms since the epoch. */
+export const bootedAt = () => Date.now() - uptime() * 1000;
+
+/** Leeway for the boot time against a record's own clock reading. */
+const BOOT_SLACK_MS = 60_000;
+
+/**
+ * Whether process `pid` is alive. EPERM means it is, owned by someone else. `since`, when given, is when the record
+ * naming `pid` was written: one written before this machine booted names a pid that may since have been reused, and is dead.
+ */
+export const pidAlive = (pid, since, booted = bootedAt()) => {
   if (!Number.isInteger(pid) || pid <= 0) return false;
+  if (since !== undefined && Date.parse(since) < booted - BOOT_SLACK_MS) return false;
   try {
     process.kill(pid, 0);
     return true;
@@ -21,6 +32,9 @@ export const pidAlive = (pid) => {
 
 /** What a lease file says, or `undefined` when it is gone or unreadable. */
 export const leaseAt = readJson;
+
+/** Whether the process a record (a lease, a ticket, a run's status) names is alive: by its `pid`, written at its `at` or `started`. */
+export const heldAlive = (record) => Boolean(record) && pidAlive(record.pid, record.at ?? record.started);
 
 const create = (path, holder) => {
   const fd = openSync(path, 'wx');
@@ -38,7 +52,7 @@ const create = (path, holder) => {
 const reclaim = (path) => {
   const held = leaseAt(path);
   // A half-written file reads as undefined; only a lease naming a dead pid is taken back.
-  if (!held || pidAlive(held.pid)) return false;
+  if (!held || heldAlive(held)) return false;
   const aside = `${path}.stale-${process.pid}-${Date.now()}`;
   try {
     renameSync(path, aside);
@@ -46,7 +60,7 @@ const reclaim = (path) => {
     return false;
   }
   const moved = leaseAt(aside);
-  if (moved && pidAlive(moved.pid)) {
+  if (moved && heldAlive(moved)) {
     try {
       linkSync(aside, path);
     } catch { /* someone holds it again either way */ }

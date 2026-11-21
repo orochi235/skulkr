@@ -6,7 +6,7 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readJson, writeJson as writeJsonAt } from './json.mjs';
-import { pidAlive } from './lease.mjs';
+import { heldAlive } from './lease.mjs';
 
 // night.mjs still imports readJson from here.
 export { readJson };
@@ -37,7 +37,9 @@ export const claimRound = (from, state) => {
   }
 };
 
-export const writeStatus = (round, status, state) => writeJson(join(runDir(round, state), 'status.json'), { ...status, pid: process.pid });
+/** `at`, when it was written, tells a live run from one whose pid a reboot handed to another process (`heldAlive`). */
+export const writeStatus = (round, status, state) =>
+  writeJson(join(runDir(round, state), 'status.json'), { ...status, pid: process.pid, at: new Date().toISOString() });
 export const writeSummary = (round, summary, state) => writeJson(join(runDir(round, state), 'summary.json'), summary);
 /** A finished run's status goes, so nothing reads it as live while its pid is reused. */
 export const clearStatus = (round, state) => rmSync(join(runDir(round, state), 'status.json'), { force: true });
@@ -48,7 +50,7 @@ const rounds = (state) => claimedRounds(state).map(Number).sort((a, b) => a - b)
 export const liveRuns = (state) =>
   rounds(state).flatMap((round) => {
     const status = readJson(join(runDir(round, state), 'status.json'));
-    return status && pidAlive(status.pid) ? [{ ...status, round }] : [];
+    return heldAlive(status) ? [{ ...status, round }] : [];
   });
 
 /** The summary of the run that ended last, or `undefined`. */

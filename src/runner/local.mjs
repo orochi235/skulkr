@@ -8,7 +8,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { JOB_IN } from '../config.mjs';
-import { pidAlive, takeLease } from '../lease.mjs';
+import { heldAlive, takeLease } from '../lease.mjs';
 
 /** How long a finished job's record is kept for `jobs()`. */
 const KEEP_JOBS_MS = 7 * 24 * 3_600_000;
@@ -113,7 +113,7 @@ export const createLocalRunner = (cfg) => {
         } catch {
           continue;
         }
-        if (j.state === 'running' && !pidAlive(j.pid)) j = { ...j, state: 'failed', finished: j.started };
+        if (j.state === 'running' && !heldAlive(j)) j = { ...j, state: 'failed', finished: j.started };
         if (j.state === 'running' || Date.parse(j.finished) >= after || !Number.isFinite(after)) out.push(j);
       }
       return out;

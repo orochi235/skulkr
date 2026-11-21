@@ -331,7 +331,8 @@ fleet run. Continuous mode overlaps the two, keeping a tenant's rounds coming th
 
 The fleet queue is on disk, in `~/.local/state/skulkr/fleet/` (`SKULKR_FLEET` names another): `gate.lease` is the
 holder, a lease like the slots', and `waiting/` holds a ticket per waiting run, taken oldest first. A run whose
-process has died loses its lease and its ticket.
+process has died loses its lease and its ticket, and so does one written before the machine last booted, whose pid
+another process may hold now.
 
 Continuous mode is on between `startAt` and `stopAt` when the config sets `schedule.continuous: true`, or from a
 `{"start":true,"continuous":true}` request until the night's `stopAt` or a bare `{"stop":true}`, which also turns
