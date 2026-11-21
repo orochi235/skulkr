@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { catchUpWithMain, commitRecord, gitIn, makeBatch, runGate } from './batch.mjs';
+import { leftOutIn, leftOutWhy, recordLeftOut } from './leftOut.mjs';
 import { resolveConfig } from './config.mjs';
 
 const dirs: string[] = [];
@@ -71,6 +72,11 @@ describe('catchUpWithMain', () => {
     expect(git('status', '--porcelain')).toBe('');
   });
 
+  it('answers a merge that fails without conflicting as failed, with git\'s message', () => {
+    const { dir } = repo('main.txt', 'batch.txt');
+    expect(catchUpWithMain(dir, 'nowhere')).toEqual({ moved: false, failed: expect.stringMatching(/nowhere/) });
+  });
+
   it('answers a conflict and leaves the batch as it was', () => {
     const { dir, git } = repo('same.txt', 'same.txt');
     const tip = git('rev-parse', 'HEAD');
@@ -84,6 +90,29 @@ const area = (id: string) => ({
   id, files: [`src/${id}/a.ts`], a: 2, b: 1, m: 1, distinct: 2, chapman: 2, unfound: 0, read: { A: 1, B: 1 }, patches: 1, questions: 0,
   jobs: { weightedTokens: 1e6, costUsd: 1.5 }, fixCommits: [],
 });
+
+/** A repo on main with a branch per name, each adding a file of its own. */
+const branched = (names: string[]) => {
+  const { dir, git } = repo('main.txt', 'batch.txt');
+  git('checkout', '-q', 'main');
+  git('branch', '-q', '-D', 'batch');
+  const frozen = git('rev-parse', 'HEAD');
+  for (const name of names) {
+    git('checkout', '-q', '-b', name, frozen);
+    writeFileSync(join(dir, `${name}.txt`), name);
+    git('add', '.');
+    git('commit', '-q', '-m', name);
+  }
+  git('checkout', '-q', 'main');
+  return { dir, git, frozen };
+};
+
+/** A git hook in `git`'s repo. */
+const hookIn = (git: (...a: string[]) => string, name: string, body: string) => {
+  const dir = join(git('rev-parse', '--path-format=absolute', '--git-common-dir'), 'hooks');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, name), `#!/bin/sh\n${body}\n`, { mode: 0o755 });
+};
 
 describe('makeBatch', () => {
   it('builds on main as it is now, leaving out only a branch that conflicts with it', () => {
@@ -100,8 +129,78 @@ describe('makeBatch', () => {
     git('branch', '-q', '-D', 'batch');
     const made = makeBatch(resolveConfig({}), dir, { round: 9, date: '2026-11-20', commit: frozen, branches: ['a-clean', 'a-clash'] });
     expect(made.merged).toEqual(['a-clean']);
-    expect(made.conflicted).toEqual(['a-clash']);
+    expect(made.conflicted).toEqual([{ branch: 'a-clash', paths: ['main.txt'] }]);
+    expect(made.failed).toEqual([]);
     expect(gitIn(made.tree)('merge-base', '--is-ancestor', 'main', 'HEAD')).toBe('');
+    expect(gitIn(made.tree)('status', '--porcelain')).toBe('');
+  });
+
+  it('waits out another git\'s index lock and merges once it clears', () => {
+    const { dir, git, frozen } = branched(['one', 'two']);
+    // After the first merge, plant a lock in the batch worktree's git dir, as another git holding it would.
+    hookIn(git, 'post-merge', '[ -e "$(git rev-parse --git-common-dir)/planted" ] && exit 0\ntouch "$(git rev-parse --git-common-dir)/planted" "$(git rev-parse --git-path index.lock)"');
+    const waits: number[] = [];
+    let tree = '';
+    const wait = (ms: number) => {
+      waits.push(ms);
+      rmSync(gitIn(tree)('rev-parse', '--path-format=absolute', '--git-path', 'index.lock'));
+    };
+    const cfg = resolveConfig({});
+    tree = join(dir, '.worktrees', cfg.names.batchTree('2026-11-20', 9));
+    const made = makeBatch(cfg, dir, { round: 9, date: '2026-11-20', commit: frozen, branches: ['one', 'two'], retryMs: [5, 10], wait });
+    expect(waits).toEqual([5]);
+    expect(made.merged).toEqual(['one', 'two']);
+    expect(made.conflicted).toEqual([]);
+    expect(made.failed).toEqual([]);
+  });
+
+  it('gives up on a lock that never clears, as a failed merge naming it', () => {
+    const { dir, git, frozen } = branched(['one']);
+    const cfg = resolveConfig({});
+    const tree = join(dir, '.worktrees', cfg.names.batchTree('2026-11-20', 9));
+    const lock = () => gitIn(tree)('rev-parse', '--path-format=absolute', '--git-path', 'index.lock');
+    hookIn(git, 'post-checkout', 'touch "$(git rev-parse --git-path index.lock)"');
+    const waits: number[] = [];
+    const made = makeBatch(cfg, dir, { round: 9, date: '2026-11-20', commit: frozen, branches: ['one'], retryMs: [1, 2], wait: (ms: number) => waits.push(ms) });
+    expect(waits).toEqual([1, 2]);
+    expect(made.merged).toEqual([]);
+    expect(made.conflicted).toEqual([]);
+    expect(made.failed).toHaveLength(1);
+    expect(made.failed[0].error).toMatch(/index\.lock': File exists/);
+    expect(existsSync(lock())).toBe(true);
+  });
+
+  it('records a merge that fails for another reason as failed with git\'s message, not a conflict', () => {
+    const { dir, frozen } = branched(['one']);
+    const made = makeBatch(resolveConfig({}), dir, { round: 9, date: '2026-11-20', commit: frozen, branches: ['one', 'gone'], wait: () => { throw new Error('no wait for a non-lock failure'); } });
+    expect(made.merged).toEqual(['one']);
+    expect(made.conflicted).toEqual([]);
+    expect(made.failed).toEqual([{ branch: 'gone', error: expect.stringMatching(/gone/) }]);
+    expect(leftOutWhy(made.failed[0])).toMatch(/^merge failed: .*gone/);
+  });
+});
+
+describe('leftOut', () => {
+  it('phrases each kind for the README, escaping pipes and shortening long path lists', () => {
+    expect(leftOutWhy({ paths: ['a.ts', 'b.ts'] })).toBe('merge conflict in a.ts, b.ts');
+    expect(leftOutWhy({ paths: ['1', '2', '3', '4', '5', '6', '7'] })).toBe('merge conflict in 1, 2, 3, 4, 5, and 2 more');
+    expect(leftOutWhy({ error: 'fatal: x | y' })).toBe('merge failed: fatal: x \\| y');
+  });
+
+  it('keeps a left-out branch until main holds it or it is deleted', () => {
+    const { git } = branched(['audit3-a', 'audit3-b', 'audit4-c']);
+    const state = mkdtempSync(join(tmpdir(), 'skulkr-state-'));
+    dirs.push(state);
+    expect(leftOutIn(state)).toEqual([]);
+    const entry = (branch: string, round: number) => ({ branch, round, why: 'merge conflict in x' });
+    recordLeftOut(state, git, 'main', [entry('audit3-a', 3), entry('audit3-b', 3)]);
+    expect(leftOutIn(state).map((e: { branch: string }) => e.branch)).toEqual(['audit3-a', 'audit3-b']);
+
+    git('merge', '-q', '--no-edit', 'audit3-a');
+    git('branch', '-q', '-D', 'audit3-b');
+    const kept = recordLeftOut(state, git, 'main', [entry('audit4-c', 4)]);
+    expect(kept).toEqual([entry('audit4-c', 4)]);
+    expect(leftOutIn(state)).toEqual([entry('audit4-c', 4)]);
   });
 });
 

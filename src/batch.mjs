@@ -67,8 +67,40 @@ export const applyFix = (cfg, root, { round, area, commit, mbox }) => {
   }
 };
 
-/** Merges each branch into a new batch branch at `commit`; one that conflicts is left out. */
-export const makeBatch = (cfg, root, { round, date, commit, branches }) => {
+/** How long a merge that met another git's lock waits before each retry. */
+export const LOCK_RETRY_MS = [500, 1000, 2000];
+const LOCKED = /\.lock'?: File exists/;
+/** @param {number} ms */
+const sleep = (ms) => {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+};
+const firstLines = (text, n = 2) => text.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, n).join(' ');
+const unmergedIn = (git) => {
+  const run = tryGit(git, 'diff', '--name-only', '--diff-filter=U');
+  return run.ok ? run.out.split('\n').filter(Boolean) : [];
+};
+
+/**
+ * `git merge <args>`, retried after `retryMs` while another git holds a lock. Answers `{ ok: true }`, `{ conflict }`
+ * with the unmerged paths and the merge left in progress, or `{ error }`, git's first lines, with any half-state aborted.
+ */
+export const mergeIn = (git, args, { retryMs = LOCK_RETRY_MS, wait = sleep } = {}) => {
+  for (let attempt = 0; ; attempt++) {
+    const run = tryGit(git, 'merge', ...args);
+    if (run.ok) return { ok: true };
+    const conflict = unmergedIn(git);
+    if (conflict.length) return { ok: false, conflict };
+    tryGit(git, 'merge', '--abort');
+    if (!LOCKED.test(run.out) || attempt >= retryMs.length) return { ok: false, error: firstLines(run.out) };
+    wait(retryMs[attempt]);
+  }
+};
+
+/**
+ * Merges each branch into a new batch branch at `commit`. One that conflicts is left out in `conflicted` with its
+ * unmerged `paths`; one whose merge failed otherwise, in `failed` with git's `error`.
+ */
+export const makeBatch = (cfg, root, { round, date, commit, branches, retryMs = LOCK_RETRY_MS, wait = sleep }) => {
   const name = cfg.names.batch(date, round);
   // On main as it is now, so whatever landed since the round froze is in from the start and a branch that conflicts
   // with it is left out here, alone, rather than failing the whole batch's catch-up later.
@@ -78,15 +110,16 @@ export const makeBatch = (cfg, root, { round, date, commit, branches }) => {
   const git = gitIn(tree);
   const merged = [];
   const conflicted = [];
+  const failed = [];
   for (const branch of branches) {
-    const run = tryGit(git, 'merge', '--no-ff', '--no-edit', '-m', `Merge branch '${branch}' into ${name}`, branch);
+    const run = mergeIn(git, ['--no-ff', '--no-edit', '-m', `Merge branch '${branch}' into ${name}`, branch], { retryMs, wait });
     if (run.ok) merged.push(branch);
-    else {
+    else if (run.conflict) {
       tryGit(git, 'merge', '--abort');
-      conflicted.push(branch);
-    }
+      conflicted.push({ branch, paths: run.conflict });
+    } else failed.push({ branch, error: run.error });
   }
-  return { name, tree, merged, conflicted };
+  return { name, tree, merged, conflicted, failed };
 };
 
 /** Writes the round's raw lists, README, partition and ledger row into the batch, and commits them. */
@@ -144,19 +177,22 @@ export const runGate = (cfg, { root, batch, logPath }) =>
     child.on('close', (status) => log.end(() => done(status ?? 1)));
   });
 
-/** Merges `main` into the batch checked out at `tree` unless it already holds it. Answers whether it moved, the new tip, or a conflict.
+/** Merges `main` into the batch checked out at `tree` unless it already holds it. Answers whether it moved, the new tip, a
+ *  conflict, or a merge that `failed` otherwise, with git's message.
  *  A conflict only in `ledger` (the config's `record.ledger`, which every round appends a row to) is two rounds' rows
  *  at one spot: it takes main's copy and appends the batch's own rows to it again.
  * @param {string} tree
  * @param {string} [main]
  * @param {{ path: string, section?: string } | null} [ledger]
+ * @param {{ retryMs?: number[], wait?: (ms: number) => void }} [retry]
  */
-export const catchUpWithMain = (tree, main = 'main', ledger = null) => {
+export const catchUpWithMain = (tree, main = 'main', ledger = null, retry = {}) => {
   const git = gitIn(tree);
   if (tryGit(git, 'merge-base', '--is-ancestor', main, 'HEAD').ok) return { moved: false };
-  const run = tryGit(git, 'merge', '--no-edit', '-m', `Merge branch '${main}' into the batch`, main);
-  if (!run.ok) {
-    const unmerged = tryGit(git, 'diff', '--name-only', '--diff-filter=U').out?.split('\n').filter(Boolean) ?? [];
+  const run = mergeIn(git, ['--no-edit', '-m', `Merge branch '${main}' into the batch`, main], retry);
+  if (run.error) return { moved: false, failed: run.error };
+  if (run.conflict) {
+    const unmerged = run.conflict;
     if (ledger && unmerged.length === 1 && unmerged[0] === ledger.path && rejoinLedger(git, tree, main, ledger)) {
       return { moved: true, tip: git('rev-parse', 'HEAD') };
     }

@@ -10,6 +10,7 @@ import { applyFix, catchUpWithMain, commitRecord, fastForwardMain, makeBatch, re
 import { TEST_PATH, capstoneText, repairCapstone } from './capstone.mjs';
 import { failedWhereIn } from './gate.mjs';
 import { fleetDir, waitForFleet } from './fleet.mjs';
+import { leftOutIn, leftOutWhy, recordLeftOut, retryable } from './leftOut.mjs';
 import { waitForLease } from './lease.mjs';
 import { mergeLock } from './runs.mjs';
 /** How many times a green batch merges a moved main in and tests again before leaving the fast-forward to fail. */
@@ -85,9 +86,10 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
       say(`batch: ${main} moved; merged it in at ${tip.slice(0, 10)} and testing that`);
       return true;
     }
-    if (!caught.conflict) return false;
+    if (!caught.conflict && !caught.failed) return false;
     ({ batch, tip } = rebuild());
-    say(`batch: ${main} moved and merging it conflicted; rebuilt the batch on it at ${tip.slice(0, 10)} and testing that`);
+    const why = caught.conflict ? 'conflicted' : `failed (${caught.failed})`;
+    say(`batch: ${main} moved and merging it ${why}; rebuilt the batch on it at ${tip.slice(0, 10)} and testing that`);
     return true;
   };
   // Another run may have landed while this one waited for the lock: test with its work in, not twice.
@@ -107,25 +109,45 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
  * gate gets one capstone repair cycle where `repair` is given (`capstone.mjs`): its failures go to the branches that
  * caused them, the batch is rebuilt from the repaired ones, and the gate runs once more. Still red, it lands anyway
  * where `baseline(files)` says every failure left is a test file that fails on the frozen commit too: `main` has
- * those failures already, so landing leaves it no worse.
+ * those failures already, so landing leaves it no worse. A branch left out because it would not merge is recorded
+ * (`leftOut.mjs`), and the next round's batch tries it again after its own branches.
  */
 export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, baseline }) => {
   const idOf = (branch) => branch.replace(cfg.names.area(round, ''), '');
   const fixCommits = new Map(results.map((a) => [a.id, a.fixCommits]));
-  let landing = [...branches];
+  const main = cfg.git.main;
+  const earlier = new Map(retryable(git, leftOutIn(cfg.state), main).filter((e) => !branches.includes(e.branch)).map((e) => [e.branch, e]));
+  if (earlier.size) say(`batch: retrying ${earlier.size} branches left out of earlier rounds: ${[...earlier.keys()].join(', ')}`);
+  let landing = [...branches, ...earlier.keys()];
+  let left = [];
+  let retried = { merged: 0, out: 0 };
   /** The batch on main as it is now, with the round's record committed on it. */
   const build = () => {
     const made = makeBatch(cfg, root, { round, date, commit, branches: landing });
+    retried = { merged: made.merged.filter((b) => earlier.has(b)).length, out: 0 };
     for (const branch of made.merged) {
+      if (earlier.has(branch)) {
+        say(`batch: ${branch}, left out of round ${earlier.get(branch).round}, merged`);
+        continue;
+      }
       outcomes[idOf(branch)] = `\`${branch}\``;
       const area = results.find((a) => a.id === idOf(branch));
       if (area) area.fixCommits = fixCommits.get(area.id);
     }
-    for (const branch of made.conflicted) {
-      outcomes[idOf(branch)] = `\`${branch}\`, left out: merge conflict`;
+    left = [];
+    for (const out of [...made.conflicted, ...made.failed]) {
+      const { branch } = out;
+      const why = leftOutWhy(out);
+      const before = earlier.get(branch);
+      left.push({ branch, round: before?.round ?? round, why });
+      say(`batch: ${branch}${before ? ` (round ${before.round})` : ''} left out: ${why}`);
+      if (before) {
+        retried.out += 1;
+        continue;
+      }
+      outcomes[idOf(branch)] = `\`${branch}\`, left out: ${why}`;
       const area = results.find((a) => a.id === idOf(branch));
       if (area) area.fixCommits = [];
-      say(`batch: ${branch} conflicts; left out`);
     }
     const tip = commitRecord(cfg, made.tree, { round, commit, date, nightDir, areas: results, sweep, outcomes });
     say(`record: ${cfg.record.dir}/round-${round}/ committed on ${made.name} at ${tip.slice(0, 10)}`);
@@ -162,7 +184,8 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
       say(`capstone: rebuilt ${batch.name} with ${cycle.repaired.length} repaired and ${cycle.dropped.length} left out; testing again`);
     }
     const retested = cycle && (cycle.repaired.length || cycle.dropped.length) ? !tested.report : undefined;
-    let tried = cycle ? `; ${capstoneText(cycle, idOf, retested)}` : '';
+    let tried = earlier.size ? `; retried ${earlier.size} branches left out of earlier rounds, ${retried.merged} merged and ${retried.out} still left out` : '';
+    if (cycle) tried += `; ${capstoneText(cycle, idOf, retested)}`;
     const over = tested.report && baseline ? await alreadyFailing(cfg, tested.log, baseline) : null;
     if (over) {
       say(`gate: every failure left (${over.length}) fails on ${commit.slice(0, 10)} too; landing over them`);
@@ -171,11 +194,21 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     removeWorktree(root, batch.tree);
     if (!merge) return `green; --no-merge, so ${cfg.git.main} is untouched and ${batch.name} and its branches are kept${tried}`;
     const result = fastForwardMain(root, tested.tip, cfg.git.main);
-    if (result.startsWith(`${cfg.git.main} fast-forwarded`)) for (const b of [...batch.merged, batch.name]) git('branch', '-D', b);
+    if (result.startsWith(`${cfg.git.main} fast-forwarded`)) {
+      // Another round may have landed and deleted a branch both took from the left-out record.
+      for (const b of [...batch.merged, batch.name]) tryDelete(git, b);
+    }
     return `${result}${tried}`;
   } finally {
+    recordLeftOut(cfg.state, git, main, left);
     release();
   }
+};
+
+const tryDelete = (git, branch) => {
+  try {
+    git('branch', '-D', branch);
+  } catch {}
 };
 
 /**
