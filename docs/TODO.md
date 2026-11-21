@@ -17,6 +17,9 @@ Open work on skulkr. Each entry says when it closes.
   the same way. teitou still holds the pre-rename `weasel-skulk-r1..6` and `weasel-skulk-f1..6` trees (about 12 GiB),
   which README "Moving weasel over" says can go. Closes when those trees are dropped, and an area whose reviewer never
   launched is re-placed rather than recorded incomplete.
+- [ ] (P3) A read-only tenant's `status` reply still gives a `nextStart`: blits, registered `--read-only` so nothing
+  runs it overnight, answered `"nextStart":"2026-11-22T04:00:00.000Z"` (2026-11-21), though `src/host.mjs` never
+  starts a read-only tenant. Closes when a read-only tenant's reply has no `nextStart`.
 - [ ] (P3) A stopped round's finished reviews are thrown away: round 53 re-reviewed round 52's areas at the same commit
   (`830b463cc`), $29.41 again. Closes when a round reuses a finished review of the same area at the same commit.
 - [ ] (P3) Every job's prompt cache writes are one-hour writes (`cacheWrite5m` is 0 in every record; 72.7M one-hour write
