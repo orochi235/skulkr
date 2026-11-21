@@ -142,8 +142,9 @@ export const verifyAndRepair = async (ctx, area, fixed, dir) => {
   ctx.say(`verify ${area.id}: ${verdictText(verdict)}`);
   const repairs = [];
   const usage = [];
-  // A run that timed out says nothing a repair could act on; the area lands, and the capstone is its check.
-  while (!verdict.ok && !verdict.timedOut && repairs.length < MAX_REPAIRS) {
+  // A run that timed out says nothing a repair could act on; the area lands, and the capstone is its check. One that
+  // never ran (a failed install, a tree mismatch) fails the same way for a repair job, so none is paid for.
+  while (!verdict.ok && !verdict.timedOut && !verdict.unrun && repairs.length < MAX_REPAIRS) {
     const attempt = repairs.length + 1;
     const run = await repairJob(ctx, area, { mbox, log: verdict.log, label: String(attempt), attempt, baseline: verdict.baseline });
     if (run.usage) usage.push(run.usage);
@@ -153,6 +154,7 @@ export const verifyAndRepair = async (ctx, area, fixed, dir) => {
     ctx.say(`repair ${area.id} ${attempt}/${MAX_REPAIRS} on ${run.node}: ${run.added} commits, ${run.minutes.toFixed(1)} min; verify ${verdict.ok ? 'passed' : verdictText(verdict)}`);
   }
   if (verdict.timedOut) ctx.say(`verify ${area.id}: timed out unverified; kept for the capstone to check`);
+  else if (verdict.unrun) ctx.say(`verify ${area.id}: did not run (${verdict.why}); left out of the batch, no repair tried`);
   else if (!verdict.ok) ctx.say(`verify ${area.id}: still failing after ${repairs.length} repairs; left out of the batch`);
   return { ok: verdict.ok, mbox, verify: summaryOf(verdict), repairs, usage };
 };

@@ -75,6 +75,15 @@ describe('verifyAndRepair', () => {
     expect(h.jobs.filter((j) => j.task === 'audit7-a-verify')).toHaveLength(1);
   });
 
+  it('pays for no repair when the verify step never ran', async () => {
+    const h = harness({ command: 'run {files}' }, { verify: [{}], repair: [] });
+    write(h.fixDir, { 'fix.mbox': mbox(2) });
+    const got = await verifyAndRepair(h.ctx, h.area, { mbox: join(h.fixDir, 'fix.mbox') }, h.fixDir);
+    expect(got).toMatchObject({ ok: false, repairs: [] });
+    expect(h.jobs.filter((j) => j.task.endsWith('-repair'))).toHaveLength(0);
+    expect(h.said.at(-1)).toBe('verify a: did not run (no verdict came home); left out of the batch, no repair tried');
+  });
+
   it('runs the GUI part on a GUI node where the probe lists a browser test, and repairs what fails there', async () => {
     const verify = { command: 'run {files}', gui: { probe: 'list {related}', command: 'run-gui {files}' } };
     const h = harness(verify, {
