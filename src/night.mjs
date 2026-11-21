@@ -9,7 +9,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node
 import { basename, join } from 'node:path';
 import { runArea } from './area.mjs';
 import { parseArgs } from './args.mjs';
-import { capstoneRepairer } from './capstone.mjs';
+import { capstoneRepairer, repairRefusal } from './capstone.mjs';
 import { gateBaseline } from './repair.mjs';
 import { gateAhead } from './fleet.mjs';
 import { areasAtOnce, startAreas } from './admit.mjs';
@@ -72,6 +72,7 @@ const runContext = ({ cfg, runner, root, p, args, status, frozen, say, setStep }
   let unavailable = { at: 0, nodes: new Set() };
   const counts = {};
   const spent = new Map();
+  const fixingOutsideAreas = new Set();
   return {
     cfg, runner, root,
     earlierNights: nightsAt(p.commit, cfg.state, p.round),
@@ -86,6 +87,10 @@ const runContext = ({ cfg, runner, root, p, args, status, frozen, say, setStep }
     stopped: () => stopRequested(p.round, cfg.state),
     /** What area `id`'s jobs have cost so far, a reused job's included as its area's mean counts it. */
     spentOn: (id) => spent.get(id) ?? 0,
+    /** Marks job `id`'s fixer, run outside any area (the sweep's), as running or finished, for {@link reservedUsd}. */
+    fixingOutside: (id, running) => (running ? fixingOutsideAreas.add(id) : fixingOutsideAreas.delete(id)),
+    /** What fixers running outside any area may still spend: each one's ceiling less what it has spent. */
+    reservedUsd: () => [...fixingOutsideAreas].reduce((sum, id) => sum + Math.max(0, args.budget.fix - (spent.get(id) ?? 0)), 0),
     /** One runner job from the frozen tree outside the slots (a sweep's), tried again while its tree is busy. */
     runFree: (job, logPath) => runUntilFree(runner, job, { cwd: frozen, logPath }),
     say,
@@ -126,10 +131,11 @@ const startSweep = (ctx, onSweep) => runSweep(ctx).then(
     ctx.say(sweepLine(ctx.cfg.sweep, ran));
     if (!ran.dead?.length) return undefined;
     ctx.total.fix += 1;
+    ctx.fixingOutside(ctx.cfg.sweep.id, true);
     return fixSweep(ctx, ran.dead).catch((error) => {
       ctx.say(`fix ${ctx.cfg.sweep.id} failed: ${error.stack ?? error}`);
       return undefined;
-    });
+    }).finally(() => ctx.fixingOutside(ctx.cfg.sweep.id, false));
   },
   (error) => {
     const failed = { ran: false, why: String(error.message ?? error) };
@@ -198,7 +204,8 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     const mboxOf = (id) => (id === cfg.sweep?.id ? sweepFixed?.mbox : undefined);
     const repair = verifyOf(cfg) ? capstoneRepairer(ctx, { root, results, mboxOf }) : undefined;
     const baseline = verifyOf(cfg) ? gateBaseline(ctx) : undefined;
-    report = await batchAndTest({ ...landing, git, date: ctx.date, nightDir: status.nightDir, branches, results, sweep, merge: args.merge, setStep, repair, baseline,
+    const mayRepair = (started) => repairRefusal({ stopped: ctx.stopped(), used: status.costUsd, started, fix: args.budget.fix, cap: args.capUsd });
+    report = await batchAndTest({ ...landing, git, date: ctx.date, nightDir: status.nightDir, branches, results, sweep, merge: args.merge, setStep, repair, mayRepair, baseline,
       onLanded: (landed) => {
         status.landed = { tip: landed.tip, areas: [...new Set([...(status.landed?.areas ?? []), ...landed.areas])] };
         writeStatus(p.round, status, cfg.state);

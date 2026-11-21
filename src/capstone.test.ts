@@ -3,9 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { gitIn } from './batch.mjs';
-import { excerptFor } from './capstone.mjs';
+import { excerptFor, repairRefusal } from './capstone.mjs';
 import { resolveConfig } from './config.mjs';
 import { batchAndTest } from './land.mjs';
+import { leftOutIn } from './leftOut.mjs';
 
 const dirs: string[] = [];
 const scratch = () => {
@@ -56,15 +57,16 @@ const summary = (id: string) => ({
   jobs: { minutes: {}, weightedTokens: 0, costUsd: 0 },
 });
 
-const land = async (r: ReturnType<typeof round>, repair?: (id: string, files: string[], log: string) => Promise<{ ok: boolean }>, gate: object = {}, baseline?: (files: string[]) => Promise<string[]>, state = scratch()) => {
+const land = async (r: ReturnType<typeof round>, repair?: (id: string, files: string[], log: string) => Promise<{ ok: boolean }>, gate: object = {}, baseline?: (files: string[]) => Promise<string[]>, state = scratch(), mayRepair?: (started: number) => string) => {
   const said: string[] = [];
   const cfg = resolveConfig({ name: 't', state, gate: { name: 'test', command: ['bash', '-c', GATE], cwd: 'batch', failPrefix: 'fleet-fail:', ...gate } });
   const results = r.branches.map((b) => summary(b.replace('audit5-', '')));
+  const outcomes: Record<string, string> = {};
   const report = await batchAndTest({
     cfg, root: r.root, git: r.git, round: 5, commit: r.commit, date: '2026-11-20', nightDir: scratch(), branches: r.branches, results,
-    sweep: undefined, outcomes: {}, merge: true, say: (l: string) => said.push(l), setStep: () => {}, repair, baseline,
+    sweep: undefined, outcomes, merge: true, say: (l: string) => said.push(l), setStep: () => {}, repair, mayRepair, baseline,
   });
-  return { report, said, results };
+  return { report, said, results, outcomes };
 };
 
 describe('a red capstone', () => {
@@ -129,6 +131,23 @@ describe('a red capstone', () => {
     expect(said).toContain('repair audit4-src capstone: left out, not repairable this round');
     expect(report).toMatch(/^main fast-forwarded to \w+; .*capstone repair: left out audit4-src, not repairable this round; the capstone ran again green$/);
     expect(report).not.toContain('still failed');
+    // Kept and recorded, every later round would merge it, go red, and run a capstone and a second gate over it.
+    expect(r.git('branch', '--list', 'audit4-src')).toBe('');
+    expect(leftOutIn(state)).toEqual([]);
+  });
+
+  it('starts a repair only while the dollar cap and stop requests allow, leaving out the branches it does not repair', async () => {
+    const r = round({ src: { 'src/a.ts': 'broken' }, docs: { 'docs/d.md': 'e' } });
+    const asked: string[] = [];
+    const { report, said, outcomes } = await land(r, async (id) => {
+      asked.push(id);
+      return { ok: true };
+    }, {}, undefined, scratch(), () => 'stop requested');
+    expect(asked).toEqual([]);
+    expect(said).toContain('repair src capstone: not started, stop requested');
+    expect(outcomes.src).toBe('`audit5-src`, left out: its capstone repair never started, for the dollar cap or a stop request');
+    expect(report).toMatch(/^main fast-forwarded to \w+; capstone repair: left out src, whose repair the dollar cap or a stop request kept from starting; the capstone ran again green$/);
+    expect(r.git('branch', '--list', 'audit5-src')).toBe('');
   });
 
   it('stays red with no repair given, as before', async () => {
@@ -136,6 +155,15 @@ describe('a red capstone', () => {
     const { report } = await land(r);
     expect(report).toMatch(/^red: batch\/2026-11-20-audit5 and its branches kept/);
     expect(report).not.toContain('capstone repair');
+  });
+});
+
+describe('repairRefusal', () => {
+  it('refuses on a stop request, and once the fixer ceiling of this repair and those started before it would pass the cap', () => {
+    expect(repairRefusal({ stopped: true, used: 0, started: 0, fix: 15, cap: 160 })).toBe('stop requested');
+    expect(repairRefusal({ stopped: false, used: 130, started: 1, fix: 15, cap: 160 })).toBe('');
+    expect(repairRefusal({ stopped: false, used: 131, started: 1, fix: 15, cap: 160 })).toBe('a repair at its $15.00 ceiling would cross the $160.00 cap ($131.00 used, 1 repairs started)');
+    expect(repairRefusal({ stopped: false, used: 150, started: 0, fix: 15, cap: 160 })).toBe('a repair at its $15.00 ceiling would cross the $160.00 cap ($150.00 used)');
   });
 });
 

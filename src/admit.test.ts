@@ -50,6 +50,14 @@ describe('startAreas, against the cap', () => {
   });
 });
 
+describe('startAreas, beside a fixer outside any area', () => {
+  it("counts what the sweep's fixer may still spend against the cap", async () => {
+    const h = harness({ costUsd: 80 });
+    await startAreas({ ...h, ctx: { ...h.ctx, reservedUsd: () => 15 }, picked: [{ id: 'a' }], deadline: later, results: [], maxAreas: () => 1 });
+    expect(h.said).toEqual(['not starting a: the next area would cross the $100.00 cap ($80.00 used)']);
+  });
+});
+
 describe('areas at once', () => {
   it('follow limits.json, read again on every ask, pinned or placed', () => {
     const state = mkdtempSync(join(tmpdir(), 'skulkr-admit-'));
