@@ -1,20 +1,20 @@
 /** Reading a reviewer's findings file and checking the matcher's answer against the two lists. */
 import { FIXED_MARK } from './progress.mjs';
 
-/** The `##` sections of a findings file, each `{ claim, where, body }`. */
-export const parseFindings = (text) => {
-  const sections = text.split(/^## /m).slice(1);
-  return sections.map((section) => {
-    const [claim, ...rest] = section.split('\n');
-    const body = rest.join('\n').replace(/<!--[\s\S]*?-->/g, '').trim();
-    const where = /^- where:\s*(.+)$/m.exec(body)?.[1].trim() ?? '';
-    return { claim: claim.trim(), where, body };
-  }).filter((f) => f.claim.length > 0 && f.claim.toLowerCase() !== 'files read');
-};
+/** Every `##` section of a findings file, each `{ claim, where, body }`, `where` empty where it has no `where:` line. */
+export const parseSections = (text) => text.split(/^## /m).slice(1).map((section) => {
+  const [claim, ...rest] = section.split('\n');
+  const body = rest.join('\n').replace(/<!--[\s\S]*?-->/g, '').trim();
+  const where = /^[-*]\s*(?:\*\*)?where(?::\*\*|\*\*:|:)\s*(.+)$/im.exec(body)?.[1].trim() ?? '';
+  return { claim: claim.trim(), where, body };
+});
+
+/** The findings of a findings file: its `##` sections that cite a `where:`; a summary or the files-read list is not one. */
+export const parseFindings = (text) => parseSections(text).filter((f) => f.claim.length > 0 && f.where.length > 0);
 
 /** The files a reviewer says it read: the lines under a `## Files read` heading. */
 export const parseFilesRead = (text) => {
-  const m = /^## Files read\s*\n([\s\S]*?)(?=^## |<!--|$(?![\s\S]))/im.exec(text);
+  const m = /^## Files read:?[ \t]*\n([\s\S]*?)(?=^## |<!--|$(?![\s\S]))/im.exec(text);
   if (!m) return [];
   return m[1].split('\n').map((line) => line.replace(/^[-*]\s*/, '').replace(/`/g, '').trim()).filter(Boolean);
 };

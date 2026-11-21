@@ -32,6 +32,13 @@ describe('parseFindings', () => {
     expect(parseFilesRead(REPORT)).toEqual(['packages/core/src/cache.ts', 'packages/core/src/view.ts']);
   });
 
+  it('counts only sections citing a where, so a clean pass has no findings, and reads any files-read heading', () => {
+    const clean = '# Audit\n\n## Summary\nNo defects.\n\n## Files Read:\n- a.ts\n- b.ts\n\n<!-- done: 0 findings, files read: 2 -->\n';
+    expect(parseFindings(clean)).toEqual([]);
+    expect(parseFilesRead(clean)).toEqual(['a.ts', 'b.ts']);
+    expect(parseFindings('## A leak\n- **where:** a.ts:1\n')[0]).toMatchObject({ claim: 'A leak', where: 'a.ts:1' });
+  });
+
   it('answers nothing for an empty report', () => {
     expect(parseFindings('')).toEqual([]);
     expect(parseFilesRead('')).toEqual([]);
