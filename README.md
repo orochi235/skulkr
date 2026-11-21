@@ -9,14 +9,24 @@ rounds so far.
 
 This README is for whoever adopts skulkr in a project or runs it.
 
-Everything is plain Node (24 or later). The model calls are `claude -p` jobs run on fleet nodes through a *runner*:
-onto (`~/src/onto`) by default, swappable (see "Runners").
+## Trying it
+
+You need Node 24 or later, git, and the [Claude Code](https://claude.com/claude-code) CLI, logged in: every model
+call is a `claude -p` job. By default each job runs on the machine you start the round from (see "Runners").
+
+    git clone <this repository> skulkr && (cd skulkr && npm link)   # puts `skulkr` on PATH; there is nothing to build
+    cd ~/src/myproject
+    skulkr init                 # writes skulkr.config.mjs, guessed from the repository; read it and fix what it got wrong
+    skulkr partition            # writes docs/audits/partition.json; check the areas look like units worth reading together
+    skulkr night --dry          # the plan a run would make, and nothing else
+    skulkr night --areas 1      # one real round of one area
+
+A real round spends money and moves your local `main`. Reviewers and matchers only read, but each area's fixer
+runs with permissions bypassed (in a clone of its own, never your checkout), and a batch whose test gate passes
+fast-forwards local `main` (never pushed). `--no-merge` leaves `main` alone, and the batch branch for you to read.
+The config `init` writes caps a run at $40 list price, 4 areas a round.
 
 ## Adopting it
-
-A project adopts skulkr by committing one file, `skulkr.config.mjs`, at its root. It is an ES module whose default
-export is a plain object (or a function answering one). Everything left out takes the default below.
-`examples/weasel.config.mjs` is a full one.
 
 ```js
 // skulkr.config.mjs
@@ -77,14 +87,14 @@ export default {
     install: { lockfile: 'package-lock.json', command: 'npm ci --no-audit --no-fund' }, // or null
   },
 
-  runner: 'onto',                     // or a module path exporting createRunner(cfg), or a runner object
+  runner: 'local',                    // or 'onto', a module path exporting createRunner(cfg), or a runner object
   nodes: {
-    list: ['studio', 'teitou'],       // nodes jobs are offered to
-    local: { name: 'orochi', from: '00:00', until: '09:00', fixers: false }, // a node usable only in a window
-    reviewSlots: 6, fixSlots: 6,      // jobs at once per node, each in a tree of its own
+    list: [],                         // nodes jobs are offered to; the local runner's is ['local']
+    local: null,                      // or { name, from: '00:00', until: '09:00', fixers: false }: a node usable only in a window
+    reviewSlots: 3, fixSlots: 2,      // jobs at once per node; 6 each for a fleet runner
   },
   claude: {
-    configDir: '~/.claude-msb',
+    configDir: undefined,             // CLAUDE_CONFIG_DIR for every job; unset, the CLI's default account
     models: { match: 'haiku' },       // per role (review, match, fix); unset takes what the job's settings give
     effort: {},                       // per role, `--effort`; unset likewise
     settingSources: 'project,local',  // `--setting-sources`: the node account's own settings stay out; null omits it
@@ -99,12 +109,6 @@ export default {
   icons: null,                        // the map's area icons; see "Area icons"
 };
 ```
-
-Then, from the project's checkout:
-
-    node ~/src/skulkr/bin/skulkr.mjs partition       # writes docs/audits/partition.json; check the areas look right
-    node ~/src/skulkr/bin/skulkr.mjs night --dry     # the plan a run would make
-    node ~/src/skulkr/bin/skulkr.mjs night           # one run
 
 Every command finds the config through `--config <file>`, else `SKULKR_CONFIG`, else `skulkr.config.mjs` in
 `--root`, `SKULKR_ROOT`, or the working directory. The project root is the main worktree of the repository holding
@@ -258,11 +262,19 @@ weasel's control sweep, `examples/weasel/sweep.mjs`, is the example.
 
 ## Runners
 
-A runner launches jobs on nodes. `src/runner/onto.mjs` is the onto one and documents the interface:
-`run(job, { cwd, log })` answering `{ status, busy, refused }`, `unavailableNodes()`, `jobs(sinceIso)` (what
-the dashboard's lanes are drawn from), and optionally `progress()`, each running job's own count by task (a running
-step's fill). A config's `runner` may be a module path exporting `createRunner(cfg)`, or
-the object itself.
+A runner launches jobs on nodes. A config's `runner` picks one:
+
+| `runner` | Jobs run |
+|---|---|
+| `'local'` (default) | On this machine, as node `local`. Each job gets a clone of the project from a pool in `<state>/trees/`, sharing the project's objects (`git clone --shared`), reset to the job's commit and cleaned before it runs, so one job never sees another's leftovers; `node_modules` is kept, so a fixer installs only when the lockfile changed. The pool holds one clone per job running at once, at most `reviewSlots + fixSlots` across a run. A job past its timeout is killed with its children. |
+| `'onto'` | On the nodes of an onto fleet (`nodes.list`), one `onto do` per job. |
+| a module path | Whatever its `createRunner(cfg)` answers. |
+| an object | That object. |
+
+The interface, documented in `src/runner/onto.mjs`: `run(job, { cwd, log })` answering `{ status, busy, refused,
+noRoom }`, `unavailableNodes()`, `jobs(sinceIso)` (what the dashboard's lanes are drawn from), and optionally
+`progress()`, each running job's own count by task (a running step's fill). `src/runner/local.mjs` is the smallest
+complete one.
 
 ## The service
 
@@ -284,7 +296,8 @@ requests, one JSON object a line on stdin, each echoing its `id`:
 Every request but a bare `ping` may carry `tenant`, the project it is about, and every reply to one names its
 `tenant`. Without one it means the only tenant, and is refused when there are several.
 
-Starting or restarting the service never starts a run. Under onto, on the machine holding the project's checkout:
+Starting or restarting the service never starts a run. Anything that keeps a process alive and owns its stdin can
+host it (launchd, systemd, tmux); under onto, on the machine holding the project's checkout:
 
     onto sync --in skulkr-myproject orochi                     # from ~/src/skulkr
     onto service up skulkr-myproject --in skulkr-myproject --here --prefer orochi \
@@ -349,9 +362,9 @@ scheduled start. Their gates take turns in the fleet queue. A tenant's own round
 when started by hand. A tenant added `--read-only` is shown and its live rounds hold the fleet like any other's, but
 the service never starts or stops one: its rounds run under another service.
 
-weasel is registered read-only (`examples/weasel.config.mjs`, root `~/src/weasel`, state
-`~/.local/state/weasel-skulkr`), so the dashboard reads its live state while weasel's own service runs its rounds.
-Cutting over drops `--read-only` (see "Moving weasel over").
+On the machine this was extracted on, weasel is registered from `examples/weasel.config.mjs` (root `~/src/weasel`,
+state `~/.local/state/weasel-skulkr`), not read-only: the `skulkr` service there runs weasel's rounds, and weasel's
+own `skulk` service is down (2026-11-21). What is left of the cutover is in "Moving weasel over".
 
 ## The dashboard
 
@@ -362,7 +375,8 @@ map at `api/t/<name>/map` and an area's defects at `api/t/<name>/area?id=<area>`
 `skulkr defects` with `--tenant`. The page's title is a menu of the tenants; the one shown is in the URL hash
 (`#weasel`), and each viewer's last choice is remembered. `dashboard/README.md` says how to start it.
 
-`skulkr map [--out <file>]` writes the same JSON for anything else that draws it.
+For now it installs only beside local checkouts of weasel and wake (`dashboard/README.md`); everything else here
+works without it. `skulkr map [--out <file>]` writes the same JSON for anything else that draws it.
 
 ### Area icons
 
@@ -392,6 +406,8 @@ the `icons.table.json` files its icon generator writes, as text, so nothing of w
 | A run's claim, status, stop request, and summary | `<state>/runs/<N>/`: the directory is the claim; `status.json` (with its pid) while it runs, `stop` when asked, `summary.json` when it ends | the newest `keepNights`, never a live one nor one started in the last day; pruned when a run starts |
 | Each commit's lines changed, for `staleLines` and calibration's `lines` | `~/.cache/skulkr/<name>/churn.json` | only the commits after the oldest pass asked about: any area's last pass, or the first of a pair of passes; rewritten without the rest on each build that adds one |
 | Node tree leases | `<state>/slots/<node>/<tree>` | deleted as each job ends; one whose pid is dead is taken back |
+| The local runner's clones | `<state>/trees/t<k>` and a lease beside each | one per job running at once; reused, never more than the most jobs ever run at once |
+| The local runner's job records, for the dashboard | `<state>/local-jobs/`, a file per job | deleted after 7 days, as `jobs()` reads them |
 | Locks | `<state>/plan.lock`, `<state>/merge.lock` | one file each, deleted on release |
 | The fleet queue | `~/.local/state/skulkr/fleet/`: `gate.lease` and a ticket per waiting run in `waiting/` | the lease deleted on release, a ticket when its run takes the gate; a dead pid's of either is cleared |
 | Continuous mode asked for | `<state>/continuous.json` | one file, rewritten by each request |
@@ -413,7 +429,7 @@ to the originals' (`project` aside, a field the map gained). Cutting over, with 
 | Delete from weasel | `scripts/skulk/` (code, tests, briefs, README); `apps/draw/src/dev/audits/`; `apps/draw/vite-plugin-skulk-map.ts` and its plugin in `apps/draw/vite.config.ts`; the `#/dev/audits` route in `apps/draw/src/main.tsx` and `apps/draw/src/dev/devRoutes.ts`, and its row in `RegistryInspector.test.tsx`; the `vite-plugin-skulk-map.ts` mention in `scripts/lib/fleet-triggers.mjs`. |
 | Repoint docs | `docs/fleet.md` cites `scripts/skulk/README.md` for the control sweep; the config's round README intro and ledger row say "run by `scripts/skulk`" and cite `scripts/skulk/usage.mjs` — change the text to skulkr if wanted. Rows already in `docs/hardening.md` stay as written. |
 | State | weasel's state is in `~/.local/state/weasel-skulk`; the config's `state` is `~/.local/state/weasel-skulkr`, so move the directory across. `runs/`, `nights/`, `limits.json`, and the locks keep their format; `slots/` names the old trees, and with no run live it can be emptied. Node trees are renamed (`weasel-skulkr-r<k>`, `weasel-skulkr-f<k>`), so each node syncs fresh ones and the old `weasel-skulk-r<k>`, `weasel-skulk-f<k>` can go. |
-| The onto service | It changes from weasel's tree and `WEASEL_ROOT` to skulkr's tree and `SKULKR_CONFIG`: `onto sync --in skulkr-weasel orochi` from `~/src/skulkr`, then `onto service up skulkr --in skulkr-weasel --here --prefer orochi --env SKULKR_CONFIG=/Users/mike/src/weasel/skulkr.config.mjs --env SKULKR_BIN=/Users/mike/src/skulkr/bin/skulkr.mjs --about "Runs the nightly blind-pair audit of weasel." -- bash -lc 'exec node bin/skulkr.mjs service'`, which writes `~/.config/onto/services/skulkr/`; then take down weasel's own `skulk` service, and its `weasel-skulk` service tree can go. Requests are unchanged; each reply also names its `tenant`. To host every tenant instead, leave out `SKULKR_CONFIG`: the service then reads the registry. |
+| The onto service | It changes from weasel's tree and `WEASEL_ROOT` to skulkr's tree and `SKULKR_CONFIG`: `onto sync --in skulkr-weasel orochi` from `~/src/skulkr`, then `onto service up skulkr --in skulkr-weasel --here --prefer orochi --env SKULKR_CONFIG=$HOME/src/weasel/skulkr.config.mjs --env SKULKR_BIN=$HOME/src/skulkr/bin/skulkr.mjs --about "Runs the nightly blind-pair audit of weasel." -- bash -lc 'exec node bin/skulkr.mjs service'`, which writes `~/.config/onto/services/skulkr/`; then take down weasel's own `skulk` service, and its `weasel-skulk` service tree can go. Requests are unchanged; each reply also names its `tenant`. To host every tenant instead, leave out `SKULKR_CONFIG`: the service then reads the registry. |
 | The dashboard | Already reads weasel as a tenant; re-register it from its new config: `skulkr tenants rm weasel`, then `skulkr tenants add ~/src/weasel/skulkr.config.mjs` (no `--read-only`, now that this host runs its rounds). The config's `root: '~/src/weasel'` line goes: unset is the repository holding the config. |
 | Log wording | The gate's log line reads `gate: test:batch passed` where weasel's read `fleet: test:batch passed`, and its log is `<batch>.test-batch.log` as before. Nothing parses it. |
 

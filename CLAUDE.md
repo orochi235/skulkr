@@ -7,10 +7,12 @@ weasel cutover.
 
 ## Layout
 
-- `bin/skulkr.mjs` — the one command (`night`, `partition`, `map`, `defects`, `service`, `config`).
+- `bin/skulkr.mjs` — the one command (`init`, `night`, `partition`, `map`, `defects`, `service`, `config`, `tenants`).
 - `src/` — the pipeline, plain Node ESM `.mjs` with no build. `config.mjs` holds every default and derives the
   names and regexes the rest reads; no other file may hold a project-specific value.
-- `src/runner/` — the runner interface (documented in `onto.mjs`) and its onto implementation.
+- `src/runner/` — the runner interface (documented in `onto.mjs`): `local.mjs`, the default, runs every job on this
+  machine; `onto.mjs` runs them on an onto fleet. Jobs launch only through the runner; outside `src/runner/`, onto
+  appears only where `gate.mjs` reads `onto: progress` lines out of the gate command's own log.
 - `briefs/` — the shipped default briefs. `examples/weasel.config.mjs` and `examples/weasel/` are weasel's config,
   briefs, and control-sweep adapter, kept to reproduce weasel's behavior exactly.
 - `dashboard/` — the standalone Vite app, its own package (not a workspace); `dashboard/README.md`.
