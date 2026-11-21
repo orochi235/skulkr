@@ -1,9 +1,20 @@
-.box { width: 100%; }
+/* As tall as the pane it sits in, less its caption, so dragging the seam above the lanes grows the chart. */
+.frame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.box {
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 120px;
+}
 
 .chart {
   display: block;
   width: 100%;
-  height: 190px;
+  height: 100%;
 }
 
 .grid { stroke: var(--audit-rule); }
@@ -49,6 +60,7 @@
 }
 
 .foot {
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--wzl-space-2);

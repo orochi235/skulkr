@@ -1,6 +1,7 @@
 import { niceDomain, stepTicks, tickStep } from '@weasel-js/scale';
 import { useId, useRef } from 'react';
 import { useElementSize } from '@weasel-js/routing/react';
+import { ordinal } from './ordinal';
 import { Button, DialogTrigger } from 'react-aria-components';
 import { Icon } from '@weasel-js/ui/components/Icon';
 import { Popover, PopoverDialog } from '@weasel-js/ui/components/Popover';
@@ -9,7 +10,7 @@ import type { AuditArea, AuditRound } from './skulkrMap.types';
 import s from './RoundsChart.module.css';
 
 /** The chart's drawing size before its box is measured; it then draws at its box's width, so the bars take the room. */
-const FALLBACK_W = 272, H = 190;
+const FALLBACK_W = 272, FALLBACK_H = 190;
 const PENDING_LABEL = { live: 'live', unmerged: 'unmerged' } as const;
 const M = { top: 8, right: 6, bottom: 22, left: 40 };
 
@@ -43,7 +44,6 @@ export function nthPassAverages(areas: readonly AuditArea[]): { mean: number; of
   return out.map(({ sum, of }) => ({ mean: of ? sum / of : 0, of }));
 }
 
-const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 const passesText = (n: number) => (n === 0 ? 'has not been audited yet' : `has ${n === 1 ? 'one pass' : `${n} passes`}; every round shown`);
 
 /** Each round's distinct defects found per area, against Chapman's estimate per area of what its areas held; or,
@@ -53,8 +53,9 @@ export function RoundsChart({ rounds: all, area: picked, areas = [] }: {
   rounds: readonly AuditRound[]; area?: AuditArea | null; areas?: readonly AuditArea[];
 }) {
   const box = useRef<HTMLDivElement>(null);
-  const measured = useElementSize(box).width;
-  const W = measured > 0 ? measured : FALLBACK_W;
+  const measured = useElementSize(box);
+  const W = measured.width > 0 ? measured.width : FALLBACK_W;
+  const H = measured.height > 0 ? measured.height : FALLBACK_H;
   const area = picked && picked.passes.length >= AREA_CHART_PASSES ? picked : null;
   const rounds = area ? areaRoundsOf(area) : all;
   const averages = area ? nthPassAverages(areas) : [];
@@ -68,7 +69,7 @@ export function RoundsChart({ rounds: all, area: picked, areas = [] }: {
   const x = (i: number) => M.left + i * band + (area ? band * 0.08 : (band - bar) / 2);
   const hatch = useId();
   return (
-    <>
+    <div className={s.frame}>
       <div ref={box} className={s.box}>
       {rounds.length > 0 && (
         // Keyed by scope, so leaving an area's chart draws on a fresh svg rather than patching its bars in place.
@@ -124,6 +125,6 @@ export function RoundsChart({ rounds: all, area: picked, areas = [] }: {
           </Popover>
         </DialogTrigger>
       </div>
-    </>
+    </div>
   );
 }
