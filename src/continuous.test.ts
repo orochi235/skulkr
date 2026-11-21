@@ -64,6 +64,8 @@ describe('nextContinuous', () => {
     expect(nextContinuous(inputs(['patch']))).toEqual({ start: true, capUsd: 160 });
     expect(nextContinuous(inputs(['fleet-wait'], { spentUsd: 120 }))).toEqual({ start: true, capUsd: 80 });
     expect(nextContinuous(inputs([]))).toEqual({ start: true, capUsd: 160 });
+    // Its capstone repair runs a model again, so the next waits for that too.
+    expect(nextContinuous(inputs(['repair']))).toMatchObject({ start: false, behind: 50 });
   });
 
   it('waits for a round that has started but not claimed one', () => {

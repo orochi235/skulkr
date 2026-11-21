@@ -1,15 +1,15 @@
 /**
  * Continuous rounds, as decisions apart from the disk and the clock so they can be tested: README.md "Continuous
  * rounds". A tenant's rounds come as two queues. The model queue holds at most one round per tenant in its model steps
- * (review, match, fix); once that round reaches its patch step the next may start, while the night's budget allows.
- * The fleet queue holds at most one gate run across every tenant (`fleet.mjs`); a round reaching its gate while
- * another's runs waits its turn.
+ * (review, match, fix, and a capstone repair); once that round reaches its patch step the next may start, while the
+ * night's budget allows. The fleet queue holds at most one gate run across every tenant (`fleet.mjs`); a round
+ * reaching its gate while another's runs waits its turn.
  */
 import { inWindow, nextClock } from './config.mjs';
 import { usd } from './usage.mjs';
 
-/** A run's steps before its patch step: everything its model jobs do. */
-export const MODEL_STEPS = ['freeze', 'review'];
+/** A run's steps whose jobs run a model: everything before its patch step, and the capstone repair after its gate. */
+export const MODEL_STEPS = ['freeze', 'review', 'repair'];
 
 /** Whether a live run is still in its model steps. A run with no step yet (started, not claimed) counts as one. */
 export const inModelSteps = (run) => run.step === undefined || MODEL_STEPS.includes(run.step);
