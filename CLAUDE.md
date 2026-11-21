@@ -48,6 +48,8 @@ weasel cutover.
   - a branch the batch leaves out: its outcome names the conflicting paths or git's message, a merge that meets a
     lock is retried, and later rounds' batches try it again (README "batch" step, 2026-11-21).
   - `turns`, each job's model turns, on its `usage.jsonl` record (2026-11-21).
+  - the map's gate progress, outcomes and failures, read from the night's newest gate log rather than the first listed
+    (2026-11-21).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

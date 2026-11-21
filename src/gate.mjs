@@ -2,7 +2,7 @@
  * What the map says of a batch's gate runs: how far each has got, how each ended, the nodes running them, and a
  * finished round's batch running again. `gate` is the config's; `names` its `names`.
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { stripAnsi } from './ansi.mjs';
 
@@ -15,7 +15,7 @@ export const gateRunsOf = (gate) => Object.keys(gate.progress ?? {}).map((id) =>
  * null before the gate has a log.
  */
 export const fleetProgressOf = (nightDir, gate) => {
-  const file = nightDir ? readdirSafe(nightDir).find((f) => f.endsWith(gate.logSuffix)) : undefined;
+  const file = gateLogIn(nightDir, gate);
   if (!file) return null;
   const lines = stripAnsi(readFileSync(join(nightDir, file), 'utf8')).split('\n');
   const last = (prefix) => {
@@ -38,12 +38,29 @@ const readdirSafe = (dir) => {
 };
 
 /**
+ * The name of the gate's newest log in `nightDir`, or undefined before it has one: a round that tests its batch again
+ * (after merging a moved `main` in, or after the capstone) writes a log per pass.
+ */
+const gateLogIn = (nightDir, gate) => {
+  if (!nightDir) return undefined;
+  const logs = readdirSafe(nightDir).filter((f) => f.endsWith(gate.logSuffix));
+  const mtime = (f) => {
+    try {
+      return statSync(join(nightDir, f)).mtimeMs;
+    } catch {
+      return -Infinity;
+    }
+  };
+  return logs.map((f) => ({ f, t: mtime(f) })).sort((a, b) => b.t - a.t)[0]?.f;
+};
+
+/**
  * How each of a finished batch's gate runs ended: `{ <run>: 'passed' | 'failed' | null }`. A run the config's
  * `gate.outcome` names is read from the last `<name> passed|failed` in the gate's log; any other from the night log's
  * `gate: <gate name> passed|failed` line, the gate as a whole. Null where neither says.
  */
 export const gateOutcomesOf = (nightDir, gate) => {
-  const file = nightDir ? readdirSafe(nightDir).find((f) => f.endsWith(gate.logSuffix)) : undefined;
+  const file = gateLogIn(nightDir, gate);
   const text = file ? stripAnsi(readFileSync(join(nightDir, file), 'utf8')) : '';
   const lastIn = (body, name) => {
     const m = [...body.matchAll(new RegExp(`\\b${escapeRe(name)} (passed|failed)\\b`, 'g'))].at(-1);
@@ -98,7 +115,7 @@ const failedByFile = (tests) => {
  * a run has failed nothing.
  */
 export const gateFailuresOf = (nightDir, gate) => {
-  const file = nightDir ? readdirSafe(nightDir).find((f) => f.endsWith(gate.logSuffix)) : undefined;
+  const file = gateLogIn(nightDir, gate);
   if (!file || !gate.failPrefix) return null;
   return gateFailuresIn(readFileSync(join(nightDir, file), 'utf8'), gate);
 };
