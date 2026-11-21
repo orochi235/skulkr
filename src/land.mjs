@@ -7,11 +7,17 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { applyFix, catchUpWithMain, commitRecord, fastForwardMain, makeBatch, removeWorktree, runGate } from './batch.mjs';
+import { capstoneText, repairCapstone } from './capstone.mjs';
 import { fleetDir, waitForFleet } from './fleet.mjs';
 import { waitForLease } from './lease.mjs';
 import { mergeLock } from './runs.mjs';
 /** How many times a green batch merges a moved main in and tests again before leaving the fast-forward to fail. */
 const MAIN_CATCH_UPS = 2;
+
+/** Whether a fixer's verify step failed for good: a run that timed out lands, for the capstone to check. */
+export const failedVerify = (verify) => verify?.ok === false && !verify.timedOut;
+/** An area's outcome when its verify step still fails after its repairs. */
+const leftOutText = (verify) => `left out: verify still failing after ${verify.repairs ?? 0} repairs (${verify.why})`;
 
 /** Each fixer's mbox onto its own `audit<N>-<area>` branch. Answers the branches that took their patches. */
 export const patchAreas = ({ cfg, root, round, commit, nightDir, results, outcomes, say }) => {
@@ -20,6 +26,11 @@ export const patchAreas = ({ cfg, root, round, commit, nightDir, results, outcom
     const mbox = join(nightDir, 'areas', summary.id, 'fix.mbox');
     if (!existsSync(mbox)) {
       outcomes[summary.id] = summary.distinct > 0 ? 'no commits' : 'nothing to fix';
+      continue;
+    }
+    if (failedVerify(summary.verify)) {
+      outcomes[summary.id] = leftOutText(summary.verify);
+      say(`patch ${summary.id}: ${outcomes[summary.id]}`);
       continue;
     }
     const applied = applyFix(cfg, root, { round, area: summary.id, commit, mbox });
@@ -42,6 +53,11 @@ export const patchSweep = ({ cfg, root, round, commit, fixed, branches, outcomes
     outcomes[SWEEP_ID] = 'no commits';
     return { patches: 0, commits: [], report: fixed.report };
   }
+  if (failedVerify(fixed.verify)) {
+    outcomes[SWEEP_ID] = leftOutText(fixed.verify);
+    say(`patch ${SWEEP_ID}: ${outcomes[SWEEP_ID]}`);
+    return { patches: fixed.patches, commits: [], report: fixed.report };
+  }
   const applied = applyFix(cfg, root, { round, area: SWEEP_ID, commit, mbox: fixed.mbox });
   if (applied.error) {
     outcomes[SWEEP_ID] = 'patches did not apply';
@@ -55,9 +71,10 @@ export const patchSweep = ({ cfg, root, round, commit, fixed, branches, outcomes
 
 /** Tests the batch with the config's gate, merging a moved `main` in first and between passes. Where that merge
  *  conflicts, `rebuild` makes the batch again on the new `main`, leaving out the branches that now conflict, and the
- *  round goes on with the rest. Answers the batch and the tip to land, or `{ report }`. */
-const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild }) => {
-  const logName = batch.name.replace(/\//g, '-');
+ *  round goes on with the rest. Answers the batch and the tip to land, or, red, the batch, its gate log, and `{ report }`;
+ *  `tag` marks the gate's logs apart from an earlier test of the round's batch. */
+const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild, tag = '' }) => {
+  const logName = `${batch.name.replace(/\//g, '-')}${tag}`;
   const main = cfg.git.main;
   const gate = cfg.gate.name;
   const catchUp = () => {
@@ -79,18 +96,23 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild 
     const log = join(nightDir, `${logName}${suffix}${cfg.gate.logSuffix}`);
     const status = await runGate(cfg, { root, batch, logPath: log });
     say(`gate: ${gate} ${status === 0 ? 'passed' : `failed (${status}); its log is ${log}`}`);
-    if (status !== 0) return { report: `red: ${batch.name} and its branches kept; worktree ${batch.tree}; logs in ${nightDir}` };
+    if (status !== 0) return { batch, log, report: `red: ${batch.name} and its branches kept; worktree ${batch.tree}; logs in ${nightDir}` };
     if (!merge || pass === MAIN_CATCH_UPS + 1 || !catchUp()) return { batch, tip };
   }
 };
 
-/** Merges the branches into the batch, records the round there, runs the gate on its tip, and merges if green. */
-export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep }) => {
+/**
+ * Merges the branches into the batch, records the round there, runs the gate on its tip, and merges if green. A red
+ * gate gets one capstone repair cycle where `repair` is given (`capstone.mjs`): its failures go to the branches that
+ * caused them, the batch is rebuilt from the repaired ones, and the gate runs once more.
+ */
+export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair }) => {
   const idOf = (branch) => branch.replace(cfg.names.area(round, ''), '');
   const fixCommits = new Map(results.map((a) => [a.id, a.fixCommits]));
+  let landing = [...branches];
   /** The batch on main as it is now, with the round's record committed on it. */
   const build = () => {
-    const made = makeBatch(cfg, root, { round, date, commit, branches });
+    const made = makeBatch(cfg, root, { round, date, commit, branches: landing });
     for (const branch of made.merged) {
       outcomes[idOf(branch)] = `\`${branch}\``;
       const area = results.find((a) => a.id === idOf(branch));
@@ -116,29 +138,53 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     },
   });
   try {
-    setStep('fleet-wait');
-    const releaseFleet = await waitForFleet(fleetDir(), { tenant: cfg.name, round }, {
-      onWait: ({ holder, ahead }) => {
-        const behind = holder ? `${holder.tenant} round ${holder.round}` : ahead[0] ? `${ahead[0].tenant} round ${ahead[0].round}` : undefined;
-        say(`batch: waiting for the fleet${behind ? `, behind ${behind}` : ''}${ahead.length ? ` (${ahead.length} ahead)` : ''}`);
-        setStep('fleet-wait', behind ? { behind } : {});
-      },
-    });
     let tested;
-    try {
-      setStep('fleet');
-      tested = await testBatch({ cfg, root, batch, nightDir, merge, say, tip: recorded, rebuild: build });
-      if (tested.batch) batch = tested.batch;
-    } finally {
-      releaseFleet();
+    let cycle;
+    for (;;) {
+      tested = await gateOnFleet({ cfg, root, batch, nightDir, merge, say, setStep, round, tip: recorded, rebuild: build, tag: cycle ? '.capstone' : '' });
+      batch = tested.batch ?? batch;
+      if (!tested.report || cycle || !repair) break;
+      setStep('repair');
+      cycle = await repairCapstone({ cfg, root, round, commit, batch, logPath: tested.log, repair, say });
+      for (const id of cycle.repaired.map(idOf)) fixCommits.set(id, results.find((a) => a.id === id)?.fixCommits);
+      for (const branch of cycle.dropped) {
+        fixCommits.set(idOf(branch), []);
+        const area = results.find((a) => a.id === idOf(branch));
+        if (area) area.fixCommits = [];
+        outcomes[idOf(branch)] = `\`${branch}\`, left out: its capstone failures still failed after a repair`;
+      }
+      if (!cycle.repaired.length && !cycle.dropped.length) break;
+      landing = landing.filter((b) => !cycle.dropped.includes(b));
+      ({ batch, tip: recorded } = build());
+      say(`capstone: rebuilt ${batch.name} with ${cycle.repaired.length} repaired and ${cycle.dropped.length} left out; testing again`);
     }
-    if (tested.report) return tested.report;
+    const retested = cycle && (cycle.repaired.length || cycle.dropped.length) ? !tested.report : undefined;
+    const tried = cycle ? `; ${capstoneText(cycle, idOf, retested)}` : '';
+    if (tested.report) return `${tested.report}${tried}`;
     removeWorktree(root, batch.tree);
-    if (!merge) return `green; --no-merge, so ${cfg.git.main} is untouched and ${batch.name} and its branches are kept`;
+    if (!merge) return `green; --no-merge, so ${cfg.git.main} is untouched and ${batch.name} and its branches are kept${tried}`;
     const result = fastForwardMain(root, tested.tip, cfg.git.main);
     if (result.startsWith(`${cfg.git.main} fast-forwarded`)) for (const b of [...batch.merged, batch.name]) git('branch', '-D', b);
-    return result;
+    return `${result}${tried}`;
   } finally {
     release();
+  }
+};
+
+/** The gate on the batch, in its turn in the fleet queue, which it holds only while it runs. */
+const gateOnFleet = async ({ cfg, setStep, round, say, ...test }) => {
+  setStep('fleet-wait');
+  const releaseFleet = await waitForFleet(fleetDir(), { tenant: cfg.name, round }, {
+    onWait: ({ holder, ahead }) => {
+      const behind = holder ? `${holder.tenant} round ${holder.round}` : ahead[0] ? `${ahead[0].tenant} round ${ahead[0].round}` : undefined;
+      say(`batch: waiting for the fleet${behind ? `, behind ${behind}` : ''}${ahead.length ? ` (${ahead.length} ahead)` : ''}`);
+      setStep('fleet-wait', behind ? { behind } : {});
+    },
+  });
+  try {
+    setStep('fleet');
+    return await testBatch({ cfg, say, ...test });
+  } finally {
+    releaseFleet();
   }
 };

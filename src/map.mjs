@@ -39,6 +39,26 @@ export const nightStages = (log, names = NAMES) => {
 
 const LANE_STEPS = ['A', 'B', 'match', 'fix', 'patch'];
 
+/**
+ * A lane's repair step from one of the log's `verify` or `repair` lines (`repair.mjs`): made by the first, running
+ * while a failing verdict waits on a repair, done once one passes or times out, and failed once the area is left out.
+ * `attempts` counts the repairs, `minutes` their time.
+ */
+const repairStep = (steps, line) => {
+  const step = (steps.repair ??= { state: 'waiting', attempts: 0 });
+  let m;
+  if (/^verify \S+: passed/.test(line)) Object.assign(step, { state: 'done', outcome: 'passed' });
+  else if (/^verify \S+: timed out/.test(line)) Object.assign(step, { state: 'done', outcome: 'timed out' });
+  else if ((m = /^verify \S+: still failing after (\d+) repairs/.exec(line))) Object.assign(step, { state: 'failed', outcome: 'failed', why: `still failing after ${m[1]} repairs` });
+  else if (/^verify \S+: failed/.test(line)) Object.assign(step, { state: 'running', outcome: 'failed' });
+  else if ((m = /^repair \S+ \S+ on (\S+): (\d+) commits, ([\d.]+) min; verify (passed)?/.exec(line))) {
+    Object.assign(step, {
+      attempts: (step.attempts ?? 0) + 1, node: m[1], minutes: Number(((step.minutes ?? 0) + Number(m[3])).toFixed(1)),
+      ...(m[4] ? { state: 'done', outcome: 'passed' } : { state: 'running', outcome: 'failed' }),
+    });
+  }
+};
+
 /** The finished onto job that most likely ran a step the log says took `minutes`: the one whose run is nearest that. */
 const bestFinished = (jobs, minutes) => {
   const took = (j) => (Date.parse(j.finished) - Date.parse(j.started)) / 60_000;
@@ -68,6 +88,10 @@ export const nightLanes = (log, areas, jobs = [], reports = new Map(), names = N
       Object.assign(at(m[1], 'patch') ?? {}, { state: 'done', commits: Number(m[2]) });
     } else if ((m = /^patch (\S+): did not apply/.exec(line))) {
       Object.assign(at(m[1], 'patch') ?? {}, { state: 'failed', why: 'did not apply' });
+    } else if ((m = /^patch (\S+): left out: (.+)$/.exec(line))) {
+      Object.assign(at(m[1], 'patch') ?? {}, { state: 'failed', why: m[2] });
+    } else if ((m = /^(?:verify|repair) ([^\s:]+)/.exec(line)) && lanes.has(m[1])) {
+      repairStep(lanes.get(m[1]), line);
     } else if ((m = names.conflict.exec(line))) {
       Object.assign(at(m[1], 'patch') ?? {}, { state: 'failed', why: 'conflicts; left out of the batch' });
     }
@@ -82,12 +106,17 @@ export const nightLanes = (log, areas, jobs = [], reports = new Map(), names = N
   const finished = new Map();
   for (const job of jobs) {
     const m = names.step.exec(job.task ?? '');
+    // A verify job and a repair job are both the lane's repair step.
+    if (m && (m[2] === 'verify' || m[2] === 'repair')) {
+      m[2] = 'repair';
+      if (!job.finished && lanes.has(m[1])) lanes.get(m[1]).repair ??= { state: 'waiting' };
+    }
     const step = m && at(m[1], m[2]);
     if (!step) continue;
     if (job.finished) {
       const key = `${m[1]}\n${m[2]}`;
       finished.set(key, [...(finished.get(key) ?? []), job]);
-    } else if (step.state === 'waiting') {
+    } else if (step.state === 'waiting' || (m[2] === 'repair' && step.state === 'running')) {
       Object.assign(step, { state: 'running', node: job.node, since: job.started, ...(job.progress ? { done: job.progress.done, total: job.progress.total } : {}) });
     }
   }

@@ -39,7 +39,8 @@ What you write ships under the repo owner's name.
 ## Before reporting
 
 - Each test file you touched, one at a time: `npx vitest run --maxWorkers=1 <file>` from the tree root (a
-  `*.browser.test.*` file cannot run here — list it as unrun).
+  `*.browser.test.*` file cannot run here — list it as unrun). After you exit, the controller runs every test
+  file related to your commits itself, browser ones on a GUI node, and hands any failure back to be repaired.
 - `npm run checks:gate`, run here directly: every check the batch's gate runs, the root `npm run typecheck`
   and every `check:*` among them, in about three minutes. Fix each failure and rerun it until all pass;
   a check you skip here fails the whole batch later.

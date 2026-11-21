@@ -5,6 +5,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { resolveConfig } from './config.mjs';
+import { stripAnsi } from './ansi.mjs';
 
 const NAMES = resolveConfig().names;
 
@@ -16,7 +17,7 @@ const NAMES = resolveConfig().names;
 export const fleetProgressOf = (nightDir, gate) => {
   const file = nightDir ? readdirSafe(nightDir).find((f) => f.endsWith(gate.logSuffix)) : undefined;
   if (!file) return null;
-  const lines = readFileSync(join(nightDir, file), 'utf8').replace(/\x1b\[[0-9;]*m/g, '').split('\n');
+  const lines = stripAnsi(readFileSync(join(nightDir, file), 'utf8')).split('\n');
   const last = (prefix) => {
     const progress = new RegExp(`^${prefix}onto: progress (\\d+)\\/(\\d+)`);
     for (let i = lines.length - 1; i >= 0; i--) {
@@ -43,7 +44,7 @@ const readdirSafe = (dir) => {
  */
 export const gateOutcomesOf = (nightDir, gate) => {
   const file = nightDir ? readdirSafe(nightDir).find((f) => f.endsWith(gate.logSuffix)) : undefined;
-  const text = file ? readFileSync(join(nightDir, file), 'utf8').replace(/\x1b\[[0-9;]*m/g, '') : '';
+  const text = file ? stripAnsi(readFileSync(join(nightDir, file), 'utf8')) : '';
   const lastIn = (body, name) => {
     const m = [...body.matchAll(new RegExp(`\\b${escapeRe(name)} (passed|failed)\\b`, 'g'))].at(-1);
     return m ? m[1] : null;
@@ -99,8 +100,22 @@ const failedByFile = (tests) => {
 export const gateFailuresOf = (nightDir, gate) => {
   const file = nightDir ? readdirSafe(nightDir).find((f) => f.endsWith(gate.logSuffix)) : undefined;
   if (!file || !gate.failPrefix) return null;
-  const all = readFileSync(join(nightDir, file), 'utf8').replace(/\x1b\[[0-9;]*m/g, '').split('\n');
-  const lines = all.filter((l) => l.startsWith(gate.failPrefix)).map((l) => l.slice(gate.failPrefix.length).trim());
+  return gateFailuresIn(readFileSync(join(nightDir, file), 'utf8'), gate);
+};
+
+const failLinesIn = (lines, gate) => lines.filter((l) => l.startsWith(gate.failPrefix)).map((l) => l.slice(gate.failPrefix.length).trim());
+/** Where a `fleet-fail:` line failed: a test's line names its project, file and test; a step's names its command. */
+const whereOf = (l) => (l.includes(' :: ') ? l.split(' :: ')[0].split(' ').at(-1) : l.replace(/^\S+ /, ''));
+
+/** Every file or step a gate log's `fleet-fail:` lines name, once each, across its runs. */
+export const failedWhereIn = (text, gate) =>
+  (gate.failPrefix ? [...new Set(failLinesIn(stripAnsi(text).split('\n'), gate).map(whereOf))] : []);
+
+/** {@link gateFailuresOf} for one gate log's text. */
+export const gateFailuresIn = (text, gate) => {
+  if (!gate.failPrefix) return null;
+  const all = stripAnsi(text).split('\n');
+  const lines = failLinesIn(all, gate);
   const owned = Object.entries(gate.failRun ?? {});
   const runOf = (line) => owned.find(([, word]) => line.startsWith(`${word} `))?.[0];
   const runs = Object.keys(gate.progress ?? {});
@@ -108,9 +123,7 @@ export const gateFailuresOf = (nightDir, gate) => {
   return Object.fromEntries(runs.map((run) => {
     const mine = [...new Set(lines.filter((l) => (runOf(l) ?? fallback) === run))];
     if (!mine.length) return [run, null];
-    // A test's line names its project, file and test; a step's names its command.
-    const where = (l) => (l.includes(' :: ') ? l.split(' :: ')[0].split(' ').at(-1) : l.replace(/^\S+ /, ''));
-    const files = [...new Set(mine.map(where))];
+    const files = [...new Set(mine.map(whereOf))];
     // A test run's failures, by file with each test's error; a run of steps lists the steps alone.
     const tests = failedTestsIn(all).filter((t) => files.includes(t.file));
     const list = tests.length ? failedByFile(tests) : files.slice(0, FAILED_FILES_LISTED).map((step) => ({ file: step, count: 1, tests: [] }));

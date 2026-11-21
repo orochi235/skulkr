@@ -7,95 +7,18 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { join } from 'node:path';
 import { JOB_IN, JOB_OUT } from './config.mjs';
 import { citedPaths, firstJson, isFinished, matchPrompt, parseFilesRead, parseFindings, reviewText, validPairs } from './findings.mjs';
-import { CHECKS_IN, PROGRESS_IN, fixShell, jobDir, matchShell, progressSource, reviewShell, runJob } from './jobs.mjs';
+import { brief, fill, projectVars } from './brief.mjs';
+import { dispatch } from './dispatch.mjs';
+import { CHECKS_IN, PROGRESS_IN, fixShell, jobDir, matchShell, progressSource, reviewShell, timeoutOf } from './jobs.mjs';
+import { verifyAndRepair } from './repair.mjs';
 import { chapman } from './rounds.mjs';
-import { parseEnvelope, totals } from './usage.mjs';
+import { totals } from './usage.mjs';
+import { verifyOf } from './verify.mjs';
 
-/** The brief for `role` (`reviewer`, `matcher` or `fixer`): the config's template, or the shipped default. */
-const brief = (cfg, role) => readFileSync(cfg.briefPath(role), 'utf8');
-export const fill = (text, vars) => text.replace(/\{\{(\w+)\}\}/g, (_, k) => String(vars[k] ?? ''));
-/** What every brief may name besides its own variables: the project and its rules and checks. */
-const projectVars = (cfg, role) => ({
-  project: cfg.name, rules: cfg.rules[role] ?? '',
-  test: cfg.checks.test, typecheck: cfg.checks.typecheck, lint: cfg.checks.lint,
-});
 const readIf = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : '');
-const minutesSince = (t0) => (Date.now() - t0) / 60_000;
 const round1 = (n) => Number(n.toFixed(1));
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-/** How many times a job that never reached its node is launched before its area is recorded incomplete. */
-const LAUNCHES = 3;
-const RELAUNCH_WAIT_MS = 60_000;
-/** How many minutes a job waits, one launch a minute, for a node to make room for its tree: a refusal for room
- *  never counts toward {@link LAUNCHES}, since no node being free is not the job failing. */
-const ROOM_WAITS = 120;
-/** onto's answer when every node it tried is at its ceiling of working trees. */
-const NO_ROOM = /at or over this node's [\d.]+ \w+ ceiling|will not take a new tree/;
 const cents = (n) => Number(n.toFixed(2));
-
-/**
- * A job's earlier result, when a resumed round finds one that came home whole: an exit code, a reply that is
- * not an error (a usage-limit refusal is), and for a fixer its mbox. Answers undefined to run it again.
- */
-export const cameHome = (spec, role) => {
-  const exit = readIf(join(spec.to, 'exit')).trim();
-  if (exit === '' || (role === 'fix' && !existsSync(join(spec.to, 'fix.mbox')))) return undefined;
-  const raw = readIf(join(spec.to, 'claude.json'));
-  if (!raw.trim() || /"is_error":\s*true/.test(raw)) return undefined;
-  if (role.startsWith('review') && !isFinished(reviewText(readIf(join(spec.to, 'findings.md')), parseEnvelope(raw).reply))) return undefined;
-  return { exit, raw };
-};
-
-/**
- * Runs one job on whichever slot frees first, moving to another node when one turns it away. Answers
- * where it ran, how long it took, the model's reply, and the job's usage record (also passed to
- * `ctx.usage`, which counts it against the night and logs it).
- */
-
-const dispatch = async (ctx, area, role, spec) => {
-  const earlier = cameHome(spec, role);
-  if (earlier) {
-    const { reply, record } = parseEnvelope(earlier.raw);
-    const usage = { area: area.id, role, node: 'earlier', ...record, exit: earlier.exit, reused: true };
-    ctx.usage(usage);
-    return { status: 0, launched: true, node: 'earlier', minutes: 0, reply, usage };
-  }
-  let roomWaits = 0;
-  for (let launches = 1; ; launches++) {
-    const slot = await ctx.acquire(role === 'fix' ? 'fix' : 'review');
-    const t0 = Date.now();
-    let result;
-    try {
-      result = await runJob({ ...spec, cfg: ctx.cfg, runner: ctx.runner, frozen: ctx.frozen, base: ctx.base, slot });
-    } finally {
-      slot.release();
-    }
-    if (result.refused) {
-      ctx.refuse(slot.node);
-      ctx.say(`${role} ${area.id} refused by ${slot.node}, trying another node`);
-      continue;
-    }
-    const exit = readIf(join(spec.to, 'exit')).trim();
-    // No exit file: the job never ran on the node, so there is no reply to read, only another launch to try.
-    if (result.status !== 0 && !exit && roomWaits < ROOM_WAITS && NO_ROOM.test(readIf(spec.logPath).slice(-4000))) {
-      roomWaits += 1;
-      launches -= 1;
-      if (roomWaits === 1 || roomWaits % 10 === 0) ctx.say(`${role} ${area.id}: no node has room for its tree (${roomWaits} min waited); waiting`);
-      await sleep(RELAUNCH_WAIT_MS);
-      continue;
-    }
-    if (result.status !== 0 && !exit && launches < LAUNCHES) {
-      ctx.say(`${role} ${area.id} did not launch on ${slot.node} (launch ${launches} of ${LAUNCHES}); trying again`);
-      await sleep(RELAUNCH_WAIT_MS);
-      continue;
-    }
-    const { reply, record } = parseEnvelope(readIf(join(spec.to, 'claude.json')));
-    const usage = { area: area.id, role, node: slot.node, ...record, exit };
-    ctx.usage(usage);
-    if (usage.budgetHit) ctx.say(`${role} ${area.id} stopped at its $${ctx.budget[role.startsWith('review') ? 'review' : role]} ceiling`);
-    return { status: result.status, launched: Boolean(exit), node: slot.node, minutes: minutesSince(t0), reply, usage };
-  }
-};
+const patchesIn = (mbox) => (existsSync(mbox) ? (readFileSync(mbox, 'utf8').match(/^From [0-9a-f]{40} /gm) ?? []).length : 0);
 
 const review = async (ctx, area, side) => {
   const to = jobDir(ctx.nightDir, area.id, side);
@@ -145,17 +68,23 @@ export const fix = async (ctx, area, findings, source = reviewedSource(ctx, area
   const vars = { ...projectVars(ctx.cfg, 'fixer'), round: ctx.round, area: area.id, commit: ctx.commit, source };
   writeFileSync(join(ctx.frozen, JOB_IN, area.id, 'fix.md'), fill(brief(ctx.cfg, 'fixer'), vars));
   const run = await dispatch(ctx, area, 'fix', {
-    kind: 'fix', expect: 'none', shell: fixShell(ctx.cfg, area.id, ctx.budget.fix, findings), to,
+    kind: 'fix', expect: 'none', shell: fixShell(ctx.cfg, area.id, ctx.budget.fix, findings), to, timeoutMin: timeoutOf(ctx.cfg),
     env: { FROZEN_TREE: ctx.frozenTree, ...ctx.identity },
     task: ctx.cfg.names.task(ctx.round, area.id, 'fix'), logPath: join(to, '..', 'fix.log'),
     about: `Fixer for audit round ${ctx.round}, area ${area.id}: verifies, tests and fixes its findings.`,
   });
   const mbox = join(to, 'fix.mbox');
-  const patches = existsSync(mbox) ? (readFileSync(mbox, 'utf8').match(/^From [0-9a-f]{40} /gm) ?? []).length : 0;
+  const patches = patchesIn(mbox);
   const mismatch = readIf(join(to, 'tree-mismatch')).trim();
   if (mismatch) ctx.say(`fix ${area.id}: ${mismatch}`);
   ctx.progress('fix', `${area.id} on ${run.node}: ${patches} commits, ${run.minutes.toFixed(1)} min, ${(run.usage.weightedTokens / 1e6).toFixed(2)}M weighted tokens${run.usage.budgetHit ? ', hit its ceiling' : ''}`, ctx.total.fix);
-  return { mbox: patches > 0 ? mbox : undefined, patches, report: run.reply, ...run };
+  const fixed = { mbox: patches > 0 ? mbox : undefined, patches, report: run.reply, ...run };
+  if (!fixed.mbox || !verifyOf(ctx.cfg)) return fixed;
+  const checked = await verifyAndRepair(ctx, area, fixed, to);
+  return {
+    ...fixed, mbox: checked.mbox, patches: patchesIn(checked.mbox), verify: { ...checked.verify, repairs: checked.repairs.length },
+    repairs: checked.repairs, repairUsage: checked.usage,
+  };
 };
 
 /**
@@ -190,7 +119,7 @@ export const runArea = async (ctx, area, { previous, changedSince }) => {
   if (fixed?.report) writeFileSync(join(dir, 'fix.md'), fixed.report);
   if (fixed?.mbox) copyFileSync(fixed.mbox, join(dir, 'fix.mbox'));
   const changed = new Set(changedSince);
-  const records = [a.usage, b.usage, matched.usage, fixed?.usage].filter(Boolean);
+  const records = [a.usage, b.usage, matched.usage, fixed?.usage, ...(fixed?.repairUsage ?? [])].filter(Boolean);
   const spent = totals(records);
   return {
     id: area.id, commit: ctx.commit, date: ctx.date, files: area.files,
@@ -200,10 +129,14 @@ export const runArea = async (ctx, area, { previous, changedSince }) => {
     newCode: previous ? { since: previous.round, changedFiles: changed.size, findings: [...a.findings, ...b.findings].filter((f) => citedPaths(f, ctx.cfg.citedRe).some((p) => changed.has(p))).length } : undefined,
     previous: previous ? { round: previous.round, chapman: previous.chapman, unfound: previous.unfound } : undefined,
     patches: fixed?.patches ?? 0,
+    ...(fixed?.verify ? { verify: fixed.verify } : {}),
     questions: (fixed?.report.match(/\bquestion\b/gi) ?? []).length,
     budgetHit: records.filter((r) => r.budgetHit).map((r) => r.role),
     jobs: {
-      minutes: { A: round1(a.minutes), B: round1(b.minutes), match: round1(matched.minutes), fix: round1(fixed?.minutes ?? 0) },
+      minutes: {
+        A: round1(a.minutes), B: round1(b.minutes), match: round1(matched.minutes), fix: round1(fixed?.minutes ?? 0),
+        ...(fixed?.repairs?.length ? { repair: round1(fixed.repairs.reduce((t, r) => t + r.minutes, 0)) } : {}),
+      },
       nodes: { A: a.node, B: b.node, fix: fixed?.node },
       weightedTokens: spent.weightedTokens,
       costUsd: cents(spent.costUsd),
