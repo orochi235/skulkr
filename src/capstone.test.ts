@@ -89,6 +89,8 @@ describe('a red capstone', () => {
     const { report, results } = await land(r, async () => ({ ok: false }));
     expect(report).toContain('capstone repair: left out src, whose repair still failed; the capstone ran again green');
     expect(results[0]!.fixCommits).toEqual([]);
+    // Kept, the branch would hold the area out of every later round's plan.
+    expect(r.git('branch', '--list', 'audit5-src')).toBe('');
   });
 
   it("lays a failed step at the branches that changed what the config's blame reads from its output", async () => {
