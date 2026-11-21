@@ -6,7 +6,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { JOB_IN, JOB_OUT } from './config.mjs';
-import { citedPaths, firstJson, isFinished, matchPrompt, parseFilesRead, parseFindings, reviewText, validPairs } from './findings.mjs';
+import { citedPaths, firstJson, isFinished, matchPrompt, parseFilesRead, parseFindings, questionsIn, reviewText, validPairs } from './findings.mjs';
 import { brief, fill, projectVars } from './brief.mjs';
 import { toCarry, writeCarried } from './carryBrief.mjs';
 import { dispatch } from './dispatch.mjs';
@@ -136,7 +136,7 @@ export const runArea = async (ctx, area, { previous, changedSince, carried = [] 
     patches: fixed?.patches ?? 0,
     ...(carry.length ? { carried: carry.length } : {}),
     ...(fixed?.verify ? { verify: fixed.verify } : {}),
-    questions: (fixed?.report.match(/\bquestion\b/gi) ?? []).length,
+    questions: questionsIn(fixed?.report),
     budgetHit: records.filter((r) => r.budgetHit).map((r) => r.role),
     jobs: {
       minutes: {

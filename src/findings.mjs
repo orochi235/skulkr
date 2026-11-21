@@ -130,6 +130,9 @@ export const reportItems = (report) => {
   return body.flatMap((p, i) => (VERDICT.test(p) && !/^tally: /i.test(p) && !EXTRAS.test(p) ? [itemOf(p, cut !== -1 && i > cut)] : []));
 };
 
+/** How many findings a fixer's report answers with a question ({@link reportItems}). */
+export const questionsIn = (report) => reportItems(report ?? '').filter((i) => i.verdict === 'question').length;
+
 /**
  * What a fixer's report says it did: of the `of` findings it answered, how many it `fixed`, the `extra` defects nobody
  * had listed that it fixed besides, how many it left `deferred` for later, and how many it `dismissed` as no defect.

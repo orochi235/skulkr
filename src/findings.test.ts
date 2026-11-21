@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { citedPaths, firstJson, fixTallyOf, isFinished, reportItems, parseFilesRead, parseFindings, reviewText, validPairs } from './findings.mjs';
+import { citedPaths, firstJson, fixTallyOf, isFinished, questionsIn, reportItems, parseFilesRead, parseFindings, reviewText, validPairs } from './findings.mjs';
 import { appendRecordRow } from './record.mjs';
 import { mayStartArea, parseEnvelope } from './usage.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';
@@ -85,6 +85,12 @@ describe('fixTallyOf', () => {
 });
 
 describe('reportItems', () => {
+  it('counts question verdicts, not the word', () => {
+    const report = 'A leak (A): question: which owner frees it?\nA race (B): fixed 1a2b3c4d. No question remains.\n\nChecks: the question of flakes';
+    expect(questionsIn(report)).toBe(1);
+    expect(questionsIn(undefined)).toBe(0);
+  });
+
   it('reads what was broken and what the fix changed from either way a fixer writes a line', () => {
     const report = [
       'Held routes go stale after undo (A+B): fixed b34f6924a4. The pass now drops them on every write.',
