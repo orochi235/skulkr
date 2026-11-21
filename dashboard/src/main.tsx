@@ -10,6 +10,7 @@ import { IconRegistryProvider } from '@weasel-js/icons/react';
 import { defineTheme } from '@weasel-js/theme';
 import { ThemeProvider } from '@weasel-js/theme/react';
 import { AuditsPage } from '@dash/audits/AuditsPage';
+import { ColorModeProvider } from '@dash/colorMode';
 import { ICONS } from '@dash/icons';
 
 const theme = defineTheme({ name: 'skulkr-dashboard' });
@@ -20,11 +21,15 @@ if (!container) throw new Error('Missing #root element');
 createRoot(container).render(
   <StrictMode>
     <IconRegistryProvider icons={ICONS}>
-      <ThemeProvider theme={theme} selection={{ mode: 'auto' }} className="app-theme">
-        <WeaselProvider>
-          <AuditsPage />
-        </WeaselProvider>
-      </ThemeProvider>
+      <ColorModeProvider>
+        {(mode) => (
+          <ThemeProvider theme={theme} selection={{ mode }} className="app-theme">
+            <WeaselProvider>
+              <AuditsPage />
+            </WeaselProvider>
+          </ThemeProvider>
+        )}
+      </ColorModeProvider>
     </IconRegistryProvider>
   </StrictMode>,
 );

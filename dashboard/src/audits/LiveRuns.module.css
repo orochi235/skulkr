@@ -62,6 +62,7 @@
   margin-inline-end: 4px;
   border-radius: 50%;
   background: var(--audit-phase);
+  box-shadow: 0 0 0 1px var(--audit-phase-edge, transparent);
 }
 
 .started {
@@ -139,9 +140,9 @@
   white-space: nowrap;
 }
 
-/* Every lane label inks black, filled or not, so a running step's node name pulses the same way in each: between
-   20% and 80% white while the job runs. */
-.lanes { --span-ink: #000; }
+/* On a light page every lane label inks black, filled or not, so a running step's node name pulses the same way in
+   each: between 20% and 80% white while the job runs. */
+.lanes { --span-ink: var(--audit-lane-ink); }
 
 @media (prefers-reduced-motion: no-preference) {
   .lanes [data-state='active'] .node { animation: node-pulse 1.34s infinite; }

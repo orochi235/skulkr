@@ -41,7 +41,13 @@
     var(--audit-phase-fix));
   --audit-phase-conflict: var(--wzl-danger);
   --audit-phase-done: var(--wzl-fg-muted);
+  /* A lane label's ink, filled or not. */
+  --audit-lane-ink: #000;
 }
+
+/* Black can't read on the dark track, so a dark page sets no lane ink and each span takes its strip's own: the page's
+   ink on the track, black or white by its fill's lightness where filled. */
+:global([data-wzl-mode='dark']) .palette { --audit-lane-ink: initial; }
 
 /* An element wearing a phase reads `--audit-phase`. */
 .phase-review { --audit-phase: var(--audit-phase-review); }
