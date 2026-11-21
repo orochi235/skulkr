@@ -1,0 +1,25 @@
+.picker {
+  display: flex;
+  align-items: center;
+  gap: var(--wzl-space-2);
+  margin-bottom: var(--wzl-space-2);
+  font-size: var(--wzl-font-size-sm);
+  color: var(--audit-muted);
+}
+
+.caption { flex: none; }
+
+.slider {
+  flex: 1 1 0;
+  min-width: 120px;
+  max-width: 480px;
+}
+
+/* Sized for "after round 999" and last in the row, so the slider holds still as it changes. */
+.readout {
+  composes: numeric from '@weasel-js/theme/numeric.module.css';
+  flex: none;
+  min-width: 15ch;
+  font-weight: var(--wzl-font-weight-bold);
+  color: var(--audit-ink);
+}

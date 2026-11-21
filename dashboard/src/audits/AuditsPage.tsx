@@ -10,10 +10,13 @@ import { LaneViewControls, LiveRuns, useLaneView, type LaneSettings } from './Li
 import { Stats } from './Stats';
 import { TopTabs } from './TopTabs';
 import { Treemap } from './Treemap';
+import { RoundPicker } from './RoundPicker';
+import { areasAsOf, pastRoundsOf } from './asOf';
+import { useAsOfRound } from './useAsOfRound';
 import { NEXT_UP_ROUNDS, defectsVersionOf, heatScaleOf, nextUpOf, runHolding, statsFor } from './areaData';
 import { heatColorOf } from './heat';
 import { createAuditScene } from './auditScene';
-import { liveEstimatesOf, phasesOf, withLivePasses } from './phases';
+import { liveEstimatesOf, phasesOf, withLivePasses, type AuditPhase } from './phases';
 import { continuousText } from './runData';
 import { useAuditPalette } from './useAuditPalette';
 import { useSkulkrMap } from './useSkulkrMap';
@@ -48,7 +51,15 @@ function AreaNote({ map }: { map: SkulkrMap | null }) {
   return <>Each area is a directory of at most {partition.maxFiles} source files (<code>{partition.path}</code>).</>;
 }
 
-function Chart({ map, areaUrl, view }: { map: SkulkrMap; areaUrl: (id: string) => string; view: LaneSettings }) {
+const NO_PHASES: ReadonlyMap<string, AuditPhase> = new Map<string, AuditPhase>();
+
+/** The round the map is shown after, and how to change it. */
+interface AsOf {
+  readonly round: number | null;
+  readonly choose: (round: number | null) => void;
+}
+
+function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: string) => string; view: LaneSettings; asOf: AsOf }) {
   const [scene] = useState(createAuditScene);
   const selection = useSelection({ scene, mode: 'single' });
   const [hovered, setHovered] = useState<string | null>(null);
@@ -71,13 +82,16 @@ function Chart({ map, areaUrl, view }: { map: SkulkrMap; areaUrl: (id: string) =
   const picked = selection.current[0] ?? null;
   const shownId = hovered ?? picked;
   const areas = useMemo(() => withLivePasses(map.areas, map.runs), [map.areas, map.runs]);
+  const pastRounds = useMemo(() => pastRoundsOf(map), [map]);
+  const past = asOf.round !== null && pastRounds.includes(asOf.round) ? asOf.round : null;
+  const shown = useMemo(() => (past === null ? areas : areasAsOf(map.areas, past)), [areas, map.areas, past]);
   const heatOf = useMemo(() => {
     const { at } = heatScaleOf(areas);
     return (left: number) => heatColorOf(colors.depth, at, left);
   }, [areas, colors.depth]);
-  const area = areas.find((a) => a.id === shownId);
+  const area = shown.find((a) => a.id === shownId);
   const pickedArea = picked ? areas.find((a) => a.id === picked) ?? null : null;
-  const stats = useMemo(() => statsFor(areas), [areas]);
+  const stats = useMemo(() => statsFor(shown, past), [shown, past]);
   const unmerged = useMemo(() => new Set(map.rounds.filter((r) => r.pending === 'unmerged').map((r) => r.round)), [map.rounds]);
   const next = useMemo(() => nextUpOf(areas, NEXT_UP_ROUNDS * (map.areasPerRound ?? 16)), [areas, map.areasPerRound]);
   const phases = useMemo(() => phasesOf(map.runs), [map.runs]);
@@ -91,7 +105,10 @@ function Chart({ map, areaUrl, view }: { map: SkulkrMap; areaUrl: (id: string) =
       <div className={s.top}>
         <div className={s.runs}><LiveRuns runs={map.runs} unmerged={unmerged} now={Date.parse(map.generated)} on={on} view={view} focus={picked} /></div>
         <ResizeHandle className={s.vseam} value={tabsWidth} min={TABS.min} max={TABS.max} invert onInput={setTabsWidth} onChange={keepTabs} aria-label="Resize the rounds and queue tabs" />
-        <TopTabs rounds={map.rounds} calibration={map.calibration} area={pickedArea} areas={areas} heatOf={heatOf} next={next} onPick={pick} onLight={setLit} />
+        <TopTabs
+          rounds={map.rounds} calibration={map.calibration} area={pickedArea} areas={areas} heatOf={heatOf} next={next}
+          nextNote={past === null ? undefined : `The queue now, not after round ${past}.`} onPick={pick} onLight={setLit}
+        />
       </div>
       <ResizeHandle
         className={s.seam} orientation="horizontal" value={topHeight} min={TOP.min} max={TOP.max}
@@ -99,10 +116,14 @@ function Chart({ map, areaUrl, view }: { map: SkulkrMap; areaUrl: (id: string) =
       />
       <Stats stats={stats} />
       <div ref={mainRef} className={s.main}>
-        <Treemap scene={scene} selection={selection} areas={areas} palette={colors} phases={phases} estimates={estimates} onHover={setHovered} lit={lit} areasPerRound={map.areasPerRound} glyphs={map.icons} />
+        <Treemap
+          scene={scene} selection={selection} areas={shown} palette={colors} phases={past === null ? phases : NO_PHASES}
+          {...(past === null ? { estimates } : {})} onHover={setHovered} lit={lit} areasPerRound={map.areasPerRound} glyphs={map.icons}
+          asOf={past} header={pastRounds.length ? <RoundPicker rounds={pastRounds} value={past} onChange={asOf.choose} /> : null}
+        />
         <ResizeHandle value={asideWidth} min={ASIDE.min} max={ASIDE.max} invert onInput={setAsideWidth} onChange={keepAside} aria-label="Resize the side panel" />
         <aside className={s.aside} aria-label="Area">
-          <AreaDetail area={area} holder={area && runHolding(map.runs, area.id)} />
+          <AreaDetail area={area} holder={area && past === null ? runHolding(map.runs, area.id) : undefined} asOf={past} />
           {picked && <AreaDefects urlOf={areaUrl} id={picked} version={defectsVersionOf(map, picked)} />}
         </aside>
       </div>
@@ -131,6 +152,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
   const tenants = useTenants({ url: tenantsUrl(base), dev });
   const names = tenants.status === 'ready' ? tenants.names : [];
   const [tenant, choose] = useTenantChoice(names);
+  const [asOfRound, chooseAsOf] = useAsOfRound(tenant);
   const state = useSkulkrMap({ url: tenant === null ? null : mapUrl(base, tenant), everyMs: SNAPSHOT ? Infinity : everyMs, dev });
   const map = state.status === 'ready' ? state.map : null;
   const view = useLaneView();
@@ -168,7 +190,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
         {state.status === 'ready' && tenant !== null && (
           <>
             {state.error && <p className={s.note}>The last refresh failed ({state.error}); showing the map before it.</p>}
-            <Chart key={tenant} map={state.map} areaUrl={areaUrlFor(base, tenant)} view={view} />
+            <Chart key={tenant} map={state.map} areaUrl={areaUrlFor(base, tenant)} view={view} asOf={{ round: asOfRound, choose: chooseAsOf }} />
           </>
         )}
         <p className={s.foot}>

@@ -4,7 +4,10 @@ A live page of each tenant's audit rounds: the areas as a treemap shaded by what
 running round's lanes, the rounds chart, the jobs coming back, the queue, and an area's defects. Its data comes from
 the pipeline's CLI (`../bin/skulkr.mjs tenants ls`, `map` and `defects <area>`), which a small Vite plugin
 (`server/plugin.ts`) runs on each request at `api/tenants`, `api/t/<name>/map` and `api/t/<name>/area?id=<area>`.
-The title's menu switches tenants; the URL hash names the one shown.
+The title's menu switches tenants; the URL hash names the one shown. A slider above the treemap shows it as it stood
+after an earlier round, shaded only by what was left then (settling, changes and live runs are known only of now);
+the hash carries the round after an `@` (`#weasel@41`), so the view survives a reload and can be shared. Maps without
+`lastByRound`, the demo's among them, show no slider.
 
 ```sh
 npm install

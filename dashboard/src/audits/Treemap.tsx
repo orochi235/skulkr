@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { SceneCanvas, asNodeId, registerCanvasFont, type SelectionApi } from '@weasel-js/core';
 import { useAnimator } from '@weasel-js/animator/react';
 import { usePrefersReducedMotion, watchResize } from '@weasel-js/react';
@@ -32,6 +32,10 @@ export interface TreemapProps {
   readonly areasPerRound?: number;
   /** Each icon's glyph, by the name an area's `icon` gives. */
   readonly glyphs?: Readonly<Record<string, string>>;
+  /** The past round `areas` stand as of (`areasAsOf`), whose settling, changes and live runs are not known; null for now. */
+  readonly asOf?: number | null;
+  /** What sits above the map: the round picker. */
+  readonly header?: ReactNode;
 }
 
 /** Every audit area as a cell of a treemap drawn on the scene graph: hover and click pick through the canvas's
@@ -45,7 +49,7 @@ const readHalves = (v: string): number | undefined => {
   return Number.isInteger(n) && n >= 0 && n <= MAX_HALVES ? n : undefined;
 };
 
-export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS }: TreemapProps) {
+export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, header }: TreemapProps) {
   // How many half-rounds of the queue's head to number on the map, each in its area's corner.
   const [halves, setHalves, keepHalves] = useViewerPref('upcomingHalves', 6, readHalves);
   const places = halves * (areasPerRound / 2);
@@ -93,6 +97,7 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
 
   return (
     <div className={s.chart}>
+      {header}
       <div ref={hostRef} className={s.host} role="img" aria-label="Treemap of every audit area, sized by source files">
         <SceneCanvas
           className={s.canvas}
@@ -108,34 +113,45 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
       <div className={s.legend}>
         <span><i className={`${s.key} ${s.uncharted}`} />never audited</span>
         <span>
-          audited, estimated defects left after the last pass:
+          audited, estimated defects left after {asOf === null ? 'the last pass' : `round ${asOf}`}:
           <HeatLegend heat={heat} />
         </span>
-        <span><i className={`${s.key} ${s.worn}`} />changed since its pass</span>
-        <span><i className={`${s.key} ${s.settled}`} />settled</span>
-        <span className={s.phases}>
-          in a live run:
-          <span className={s.phaseRamp}>
-            <i className={s.phaseBar} />
-            {/* Every step keeps its place under the ramp; the one between review and match goes uncaptioned. */}
-            <span className={s.phaseNames}>{SWEEP.map((p) => <span key={p}>{p === 'reviewed' ? '' : PHASE_LABEL[p]}</span>)}</span>
-          </span>
-          {OFF_PIPELINE.map((p) => <span key={p} className={phaseClass(p)}><i className={`${s.key} ${s.live}`} />{PHASE_LABEL[p]}</span>)}
-        </span>
         <span>· a dot per pass</span>
-        <span className={s.upcoming}>
-          numbered upcoming:
-          <Slider
-            className={s.upcomingSlider} aria-label="Upcoming areas to number on the map, in half rounds"
-            min={0} max={MAX_HALVES} step={1} stops={HALF_STOPS} showStops snap="strict" thumbShape="dot"
-            trackHeight="var(--wzl-slider-track-h)" thumbSize="var(--wzl-slider-thumb-size)"
-            thumbs={[{ value: halves, valueText: `${places} areas, ${halves / 2} rounds` }]}
-            onInput={([t]) => setHalves(t!.value)} onChange={([t]) => keepHalves(t!.value)}
-            readoutPlacement="none"
-          />
-          <span className={s.upcomingCount}>{places}</span>
-        </span>
+        {asOf === null && <NowLegend halves={halves} places={places} onInput={setHalves} onChange={keepHalves} />}
       </div>
     </div>
+  );
+}
+
+/** The legend's keys for what is known only of now: changes since a pass, settling, live runs, the queue numbers. */
+function NowLegend({ halves, places, onInput, onChange }: {
+  halves: number; places: number; onInput: (halves: number) => void; onChange: (halves: number) => void;
+}) {
+  return (
+    <>
+      <span><i className={`${s.key} ${s.worn}`} />changed since its pass</span>
+      <span><i className={`${s.key} ${s.settled}`} />settled</span>
+      <span className={s.phases}>
+        in a live run:
+        <span className={s.phaseRamp}>
+          <i className={s.phaseBar} />
+          {/* Every step keeps its place under the ramp; the one between review and match goes uncaptioned. */}
+          <span className={s.phaseNames}>{SWEEP.map((p) => <span key={p}>{p === 'reviewed' ? '' : PHASE_LABEL[p]}</span>)}</span>
+        </span>
+        {OFF_PIPELINE.map((p) => <span key={p} className={phaseClass(p)}><i className={`${s.key} ${s.live}`} />{PHASE_LABEL[p]}</span>)}
+      </span>
+      <span className={s.upcoming}>
+        numbered upcoming:
+        <Slider
+          className={s.upcomingSlider} aria-label="Upcoming areas to number on the map, in half rounds"
+          min={0} max={MAX_HALVES} step={1} stops={HALF_STOPS} showStops snap="strict" thumbShape="dot"
+          trackHeight="var(--wzl-slider-track-h)" thumbSize="var(--wzl-slider-thumb-size)"
+          thumbs={[{ value: halves, valueText: `${places} areas, ${halves / 2} rounds` }]}
+          onInput={([t]) => onInput(t!.value)} onChange={([t]) => onChange(t!.value)}
+          readoutPlacement="none"
+        />
+        <span className={s.upcomingCount}>{places}</span>
+      </span>
+    </>
   );
 }

@@ -405,7 +405,9 @@ jobs feed, the queue, and an area's defects. Its dev server lists the tenants at
 or with none registered the one project `SKULKR_CONFIG` or the working directory names), and serves each tenant's
 map at `api/t/<name>/map` and an area's defects at `api/t/<name>/area?id=<area>`, by running `skulkr map` and
 `skulkr defects` with `--tenant` (which refuses an id not in the partition). The page's title is a menu of the tenants; the one shown is in the URL hash
-(`#weasel`), and each viewer's last choice is remembered. `dashboard/README.md` says how to start it.
+(`#weasel`), and each viewer's last choice is remembered. A slider above the treemap shows the areas as they stood after
+an earlier round, from each area's `lastByRound` (see "History follows files"), the round after an `@` in the hash
+(`#weasel@41`). `dashboard/README.md` says how to start it.
 
 A frozen copy of it, over weasel's audits, is at [michaelbaker.tech/skulkr](https://michaelbaker.tech/skulkr/).
 `skulkr map [--out <file>]` writes the same JSON for anything else that draws it.

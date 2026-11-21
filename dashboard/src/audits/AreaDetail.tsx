@@ -70,17 +70,19 @@ function Venn({ a, both, b }: { a: ReactNode; both: ReactNode; b: ReactNode }) {
   );
 }
 
-/** The area under the pointer, or else the one picked: its status, its counts, and every pass over it. */
-export function AreaDetail({ area, holder }: { area: AuditArea | undefined; holder: AuditRun | undefined }) {
+/** The area under the pointer, or else the one picked: its status, its counts, and every pass over it; as of a past
+ *  round (`areasAsOf`), only whether it had been audited by then. */
+export function AreaDetail({ area, holder, asOf = null }: { area: AuditArea | undefined; holder: AuditRun | undefined; asOf?: number | null }) {
   const last = area && lastPassOf(area);
+  const grade = area && asOf === null ? GRADE[area.status] : undefined;
+  const badge = !area ? '' : asOf !== null ? `${area.status === 'unaudited' ? 'not audited' : 'audited'} by round ${asOf}`
+    : holder ? `in round ${holder.round}` : STATUS_LABEL[area.status];
   return (
     <SidebarPanel title="Area">
       {!area ? <p className={s.hint}>Hover or click an area for its passes.</p> : (
         <div className={s.body}>
           <div className={s.id}>{area.id}</div>
-          <div><Badge shape="pill" size="sm" variant="solid" {...(GRADE[area.status] ? { grade: GRADE[area.status] } : {})}>
-            {holder ? `in round ${holder.round}` : STATUS_LABEL[area.status]}
-          </Badge></div>
+          <div><Badge shape="pill" size="sm" variant="solid" {...(grade ? { grade } : {})}>{badge}</Badge></div>
           <DetailList values="figures" columns="auto">
             <DetailRow label="source files">{area.files}</DetailRow>
             <DetailRow label="passes">{area.passes.length}</DetailRow>

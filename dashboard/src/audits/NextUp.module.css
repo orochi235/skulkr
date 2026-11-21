@@ -41,3 +41,9 @@
 .page { flex: none; }
 
 .fresh::before { content: ' · '; }
+
+.note {
+  margin: 0 0 var(--wzl-space-2);
+  font-size: var(--wzl-font-size-sm);
+  color: var(--audit-muted);
+}

@@ -92,6 +92,47 @@ describe('AuditsPage', () => {
     expect(screen.getByText('in round 41')).toBeInTheDocument();
   });
 
+  it('shows the map as it stood after a past round, picked from the keyboard and kept in the hash', async () => {
+    const past: Record<string, unknown> = {
+      'core.scene': [{ round: 33, left: 2 }], 'ui.badge': [{ round: 38, left: 3 }, { round: 40, left: 0 }], geom: [{ round: 39, left: 5 }],
+    };
+    const withPast = { ...fixture, areas: fixture.areas.map((a) => (past[a.id] ? { ...a, lastByRound: past[a.id] } : a)) };
+    serve(200, withPast);
+    renderPage();
+    const picker = await screen.findByRole('slider', { name: 'Show the map as it stood after a round' });
+    expect(picker).toHaveAttribute('aria-valuetext', 'now');
+    expect(screen.getByText('settled')).toBeInTheDocument();
+
+    fireEvent.keyDown(picker, { key: 'Home' });
+    expect(picker).toHaveAttribute('aria-valuetext', 'after round 39');
+    expect(screen.getByText('after round 39', { selector: 'output' })).toBeInTheDocument();
+    expect(window.location.hash).toBe('#example@39');
+    expect(screen.getByText(/estimated defects left after round 39/)).toBeInTheDocument();
+    expect(screen.queryByText('settled')).toBeNull();
+    const stats = screen.getByRole('region', { name: 'Headline stats' });
+    expect(within(stats).getByText('areas audited by round 39')).toBeInTheDocument();
+    expect(within(stats).getByText('3 / 6')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Next up' }));
+    expect(await screen.findByText('The queue now, not after round 39.')).toBeInTheDocument();
+
+    fireEvent.keyDown(picker, { key: 'End' });
+    expect(picker).toHaveAttribute('aria-valuetext', 'now');
+    expect(window.location.hash).toBe('#example');
+
+    cleanup();
+    window.location.hash = '#example@40';
+    serve(200, withPast);
+    renderPage();
+    expect(await screen.findByRole('slider', { name: 'Show the map as it stood after a round' })).toHaveAttribute('aria-valuetext', 'after round 40');
+
+    cleanup();
+    serve(200, fixture);
+    renderPage();
+    expect(await screen.findByText('Round 41 running · fix · 2 areas')).toBeInTheDocument();
+    expect(screen.queryByRole('slider', { name: 'Show the map as it stood after a round' })).toBeNull();
+    window.location.hash = '';
+  });
+
   it('says it needs the dev server where there is none', async () => {
     renderPage(false);
     expect(screen.getByText(/reads the audit map from the dashboard's dev server/)).toBeInTheDocument();
