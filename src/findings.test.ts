@@ -105,12 +105,12 @@ describe('usage', () => {
 
   it('weights every kind of token in an envelope and flags a job stopped by its dollar ceiling', () => {
     const { reply, record } = parseEnvelope(JSON.stringify({
-      result: 'ok', total_cost_usd: 1.5, duration_ms: 900, terminal_reason: 'completed', subtype: 'success',
+      result: 'ok', total_cost_usd: 1.5, duration_ms: 900, num_turns: 12, terminal_reason: 'completed', subtype: 'success',
       usage: { input_tokens: 2, output_tokens: 10, cache_creation_input_tokens: 100, cache_read_input_tokens: 1000 },
       modelUsage: { 'claude-x': { costUSD: 1.5 } },
     }));
     expect(reply).toBe('ok');
-    expect(record).toMatchObject({ weightedTokens: 277, costUsd: 1.5, models: ['claude-x'], budgetHit: false });
+    expect(record).toMatchObject({ weightedTokens: 277, costUsd: 1.5, models: ['claude-x'], budgetHit: false, turns: 12 });
     expect(parseEnvelope(JSON.stringify({ subtype: 'error_max_budget_usd' })).record.budgetHit).toBe(true);
     expect(parseEnvelope('').record).toMatchObject({ weightedTokens: 0, terminalReason: 'no envelope' });
   });

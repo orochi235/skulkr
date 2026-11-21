@@ -37,6 +37,7 @@ export const parseEnvelope = (raw) => {
       weightedTokens: weightedTokens(tokens),
       costUsd: env.total_cost_usd ?? Object.values(env.modelUsage ?? {}).reduce((s, m) => s + (m.costUSD ?? 0), 0),
       durationMs: env.duration_ms ?? 0,
+      turns: env.num_turns ?? 0,
       terminalReason: reason,
       subtype: env.subtype,
       budgetHit: /budget/i.test(`${env.subtype ?? ''} ${env.terminal_reason ?? ''}`),
