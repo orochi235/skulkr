@@ -4,7 +4,7 @@
  */
 import { calibrationOf, correctedLeftOf } from './calibration.mjs';
 import { churnCacheOf, churnSince } from './churn.mjs';
-import { diskRecords, recordsFor } from './recordFiles.mjs';
+import { ROUND_DIR, diskRecords, recordsFor } from './recordFiles.mjs';
 
 /** A pass that found at most this many distinct defects counts toward settling its area. */
 export const QUIET_PASS = 1;
@@ -193,7 +193,7 @@ export const scaledOf = (pass) => ({ chapman: pass.chapman * (pass.share ?? 1), 
 export const nextRound = ({ roundDirs = [], hardening = '', branches = [], claimed = [], roundIn }) => {
   const used = [0, ...claimed.map(Number)];
   for (const name of roundDirs) {
-    const m = /^round-(\d+)$/.exec(name);
+    const m = ROUND_DIR.exec(name);
     if (m) used.push(Number(m[1]));
   }
   for (const m of hardening.matchAll(/\brounds? (\d+)(?:\s*[–-]\s*(\d+))?/g)) used.push(Number(m[1]), Number(m[2] ?? 0));

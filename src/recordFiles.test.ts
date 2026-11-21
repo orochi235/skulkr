@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { gitIn } from './batch.mjs';
-import { diskRecords, recordsFor } from './recordFiles.mjs';
+import { ROUND_DIR, abandonedRounds, diskRecords, nightsByRound, recordsFor } from './recordFiles.mjs';
 import { passesIn } from './rounds.mjs';
 import { recordsIn } from './carryRecords.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';
@@ -81,5 +81,24 @@ describe('recordsFor', () => {
       if (abandoned) writeFileSync(join(state, 'nights', name, 'abandoned'), 'given up');
     }
     expect(recordsFor({ ...cfg, state }, gitIn(root), root).map((r: any) => r.round)).toEqual([7]);
+  });
+});
+
+describe('nightsByRound', () => {
+  it("takes each round's latest night directory, by round in order of its first night, and only `<started>-round<N>` names", () => {
+    const state = mkdtempSync(join(tmpdir(), 'skulkr-records-state-'));
+    dirs.push(state);
+    for (const name of ['2026-11-20T01-00-00-000Z-round8', '2026-11-20T00-00-00-000Z-round9', '2026-11-20T03-00-00-000Z-round8', 'scratch-round10', 'round-11']) {
+      mkdirSync(join(state, 'nights', name), { recursive: true });
+    }
+    writeFileSync(join(state, 'nights', '2026-11-20T01-00-00-000Z-round8', 'abandoned'), 'given up, then resumed');
+    writeFileSync(join(state, 'nights', '2026-11-20T00-00-00-000Z-round9', 'abandoned'), 'given up');
+    expect([...nightsByRound(state).values()]).toEqual([
+      { round: 9, started: '2026-11-20', dir: join(state, 'nights', '2026-11-20T00-00-00-000Z-round9') },
+      { round: 8, started: '2026-11-20', dir: join(state, 'nights', '2026-11-20T03-00-00-000Z-round8') },
+    ]);
+    expect([...abandonedRounds(state)]).toEqual([9]);
+    expect(nightsByRound(join(state, 'missing')).size).toBe(0);
+    expect(['round-12', 'round-x', 'xround-3'].map((n) => ROUND_DIR.exec(n)?.[1] ?? null)).toEqual(['12', null, null]);
   });
 });

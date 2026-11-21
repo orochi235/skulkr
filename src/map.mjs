@@ -14,7 +14,7 @@ import { partitionAt } from './partition.mjs';
 import { correctedLeftOf } from './calibration.mjs';
 import { COVERED, areaStats, areasInFlightFor, calibrationFor, chapman, drawnPassOf, gitTouched, incompleteByRound, passOf, passesIn, pickAreas } from './rounds.mjs';
 import { openFindingsIn } from './carryRecords.mjs';
-import { abandonedRounds, recordsFor } from './recordFiles.mjs';
+import { abandonedRounds, nightsByRound, recordsFor } from './recordFiles.mjs';
 import { continuousOf } from './continuousOf.mjs';
 import { readJson } from './json.mjs';
 import { lastFinished, liveRuns } from './runs.mjs';
@@ -146,13 +146,7 @@ export const nightLeftOut = (log, round, names = NAMES) => log.split('\n').flatM
 });
 
 /** A run's night directory: the one its record names, or else the one `night.mjs` named for its round. */
-const nightDirOf = (run, state) => {
-  if (run.nightDir) return run.nightDir;
-  const nights = join(state, 'nights');
-  if (!existsSync(nights)) return null;
-  const name = readdirSync(nights).filter((n) => n.endsWith(`-round${run.round}`)).sort().at(-1);
-  return name ? join(nights, name) : null;
-};
+const nightDirOf = (run, state) => run.nightDir ?? nightsByRound(state).get(run.round)?.dir ?? null;
 
 /** Each lane with the pass its round has made of the area once matched, as the record will hold it. */
 export const withPasses = (lanes, run) => lanes.map((lane) => {
@@ -261,21 +255,15 @@ export const nightRoundOf = (run) => {
 };
 
 /**
- * Every round's night directory under `state`'s `nights/` (`<started>-round<N>`), the latest where a round has more
- * than one, each `running` while a live run in `runs` holds its round. A night holding an `abandoned` file (its reason)
- * is a round given up for good, which never lands: it is left out.
+ * Every round's night directory (`nightsByRound`'), each `running` while a live run in `runs` holds its round. A round
+ * given up for good (`abandonedRounds`) never lands: it is left out.
  */
 export const nightsOf = (runs, state) => {
-  const dir = join(state, 'nights');
-  if (!existsSync(dir)) return [];
   const live = new Set(runs.filter((r) => r.running).map((r) => r.round));
-  const abandoned = abandonedRounds(state);
-  const latest = new Map();
-  for (const name of readdirSync(dir).sort()) {
-    const m = /^(\d{4}-\d{2}-\d{2})T.*-round(\d+)$/.exec(name);
-    if (m) latest.set(Number(m[2]), { round: Number(m[2]), started: m[1], nightDir: join(dir, name), running: live.has(Number(m[2])) });
-  }
-  return [...latest.values()].filter((n) => !abandoned.has(n.round));
+  const nights = nightsByRound(state);
+  const abandoned = abandonedRounds(state, nights);
+  return [...nights.values()].filter((n) => !abandoned.has(n.round))
+    .map((n) => ({ round: n.round, started: n.started, nightDir: n.dir, running: live.has(n.round) }));
 };
 
 /** The whole map for the project at `root` under `cfg`, its runs' jobs asked of `runner`. */

@@ -8,6 +8,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { reportItems } from './findings.mjs';
 import { partitionAt } from './partition.mjs';
+import { ROUND_DIR, nightsByRound } from './recordFiles.mjs';
 
 const readIf = (file) => (existsSync(file) ? readFileSync(file, 'utf8') : null);
 
@@ -43,9 +44,6 @@ const itemsIn = (dir) => {
   return { fixed: false, items: openItems(JSON.parse(match)), ...(mbox ? { commits: commitSubjects(mbox) } : {}) };
 };
 
-const ROUND = /^round-(\d+)$/;
-const NIGHT = /-round(\d+)$/;
-
 /**
  * Every round that has read `id`, newest first: `{ round, recorded, fixed, items, commits? }`, from the records under
  * `recordDir` (the config's `record.dir`) and the night directories under `state`.
@@ -54,16 +52,14 @@ export const areaDefects = (root, id, state, recordDir) => {
   const found = new Map();
   const audits = join(root, recordDir);
   for (const name of existsSync(audits) ? readdirSync(audits) : []) {
-    const m = ROUND.exec(name);
+    const m = ROUND_DIR.exec(name);
     const got = m && itemsIn(join(audits, name, id));
     if (got) found.set(Number(m[1]), { round: Number(m[1]), recorded: true, ...got });
   }
-  const nights = join(state, 'nights');
-  for (const name of existsSync(nights) ? readdirSync(nights).sort() : []) {
-    const m = NIGHT.exec(name);
-    if (!m || found.get(Number(m[1]))?.recorded) continue;
-    const got = itemsIn(join(nights, name, 'areas', id));
-    if (got) found.set(Number(m[1]), { round: Number(m[1]), recorded: false, ...got });
+  for (const { round, dir } of nightsByRound(state).values()) {
+    if (found.get(round)?.recorded) continue;
+    const got = itemsIn(join(dir, 'areas', id));
+    if (got) found.set(round, { round, recorded: false, ...got });
   }
   return [...found.values()].sort((x, y) => y.round - x.round);
 };

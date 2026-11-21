@@ -9,7 +9,8 @@ import { join } from 'node:path';
 /** The files of an area's record any reader takes. */
 const FILES = new Set(['area.json', 'files.txt', 'A.md', 'B.md', 'match.json', 'fix.md', 'carried.json']);
 
-const ROUND_DIR = /^round-(\d+)$/;
+/** A round's record directory under `record.dir`: `round-<N>`. */
+export const ROUND_DIR = /^round-(\d+)$/;
 
 /**
  * Every area record on disk under `recordDir`, rounds ascending: `{ round, id, read }`, `read(name)` answering a file's
@@ -73,22 +74,29 @@ export const unlandedBatches = (git, batchPrefix, main) =>
   git('for-each-ref', `--no-merged=${main}`, '--sort=-refname', '--format=%(refname:short)', `refs/heads/${batchPrefix}/`)
     .split('\n').filter(Boolean);
 
-const NIGHT = /^\d{4}-\d{2}-\d{2}T.*-round(\d+)$/;
+const NIGHT = /^(\d{4}-\d{2}-\d{2})T.*-round(\d+)$/;
 
 /**
- * The rounds given up for good: those whose latest night directory under `state`'s `nights/` (`<started>-round<N>`)
- * holds an `abandoned` file (its reason). Such a round never lands.
+ * Each round's night directory under `state`'s `nights/` (`<started>-round<N>`), the latest where a round has more
+ * than one: a Map by round, in order of each round's first night, of `{ round, started, dir }`, `started` its date.
  */
-export const abandonedRounds = (state) => {
+export const nightsByRound = (state) => {
   const dir = join(state, 'nights');
-  if (!existsSync(dir)) return new Set();
   const latest = new Map();
+  if (!existsSync(dir)) return latest;
   for (const name of readdirSync(dir).sort()) {
     const m = NIGHT.exec(name);
-    if (m) latest.set(Number(m[1]), name);
+    if (m) latest.set(Number(m[2]), { round: Number(m[2]), started: m[1], dir: join(dir, name) });
   }
-  return new Set([...latest].flatMap(([round, name]) => (existsSync(join(dir, name, 'abandoned')) ? [round] : [])));
+  return latest;
 };
+
+/**
+ * The rounds given up for good: those whose latest night directory (`nightsByRound`') holds an `abandoned` file (its
+ * reason). Such a round never lands.
+ */
+export const abandonedRounds = (state, nights = nightsByRound(state)) =>
+  new Set([...nights.values()].flatMap((n) => (existsSync(join(n.dir, 'abandoned')) ? [n.round] : [])));
 
 /**
  * Every area record `cfg`'s project holds (`diskRecords`, then `refRecords` over its unlanded batches, less those of
