@@ -54,6 +54,11 @@ describe('createHost', () => {
     expect(await h.request('{"id":4,"status":true}'.replace('}', ',"tenant":"a"}'))).toMatchObject({ tenant: 'a', running: false });
   });
 
+  it('answers a request that is not an object with an error rather than throwing', async () => {
+    const h = host([tenant('a')], { now: at('12:00') });
+    for (const line of ['null', '7', '[1]', '"ping"']) expect(await h.request(line)).toEqual({ error: 'not a JSON object' });
+  });
+
   it('means the only tenant when a request names none', async () => {
     const a = tenant('a');
     const h = host([a], { now: at('12:00') });

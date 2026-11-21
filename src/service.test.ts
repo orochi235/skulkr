@@ -1,6 +1,8 @@
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { resolveConfig } from './config.mjs';
 import { createTenant, lastLineOf, registryTenants } from './service.mjs';
@@ -68,5 +70,28 @@ describe('the registry\'s tenants', () => {
     writeFileSync(registry, JSON.stringify([{ name: 'p', config }]));
     await source.refresh();
     expect(source.current()[0].running()).toBe(false);
+  });
+});
+
+describe('skulkr service', () => {
+  it('answers a request line that is not an object with an error, and keeps serving', () => {
+    const dir = tmp();
+    const config = join(dir, 'skulkr.config.mjs');
+    writeFileSync(config, `export default { name: 'p', state: ${JSON.stringify(join(dir, 'state'))} };\n`);
+    const bin = fileURLToPath(new URL('../bin/skulkr.mjs', import.meta.url));
+    const out = spawnSync(process.execPath, [bin, 'service', '--config', config, '--root', dir], {
+      input: 'null\n[1]\n7\n{"id":2,"ping":true}\n',
+      encoding: 'utf8',
+      timeout: 20_000,
+      env: { ...process.env, SKULKR_TENANTS: join(dir, 'tenants.json'), SKULKR_FLEET: join(dir, 'fleet') },
+    });
+    const replies = out.stdout.split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    expect(replies).toEqual([
+      { error: 'not a JSON object' },
+      { error: 'not a JSON object' },
+      { error: 'not a JSON object' },
+      expect.objectContaining({ id: 2, pong: true }),
+    ]);
+    expect(out.status).toBe(0);
   });
 });

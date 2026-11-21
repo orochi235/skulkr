@@ -15,6 +15,7 @@ import { loadConfig, nextClock } from './config.mjs';
 import { inModelSteps } from './continuous.mjs';
 import { continuousOf } from './continuousOf.mjs';
 import { createHost } from './host.mjs';
+import { requestOf } from './serviceCore.mjs';
 import { clearIdle, lastFinished, lastStartedAt, liveRuns, requestStop, writeContinuous, writeIdle } from './runs.mjs';
 import { readTenants, tenantsPath } from './tenants.mjs';
 
@@ -226,8 +227,12 @@ export const serve = async (cfg) => {
 
   // The first tick only arms each schedule: a restart (every `onto sync`) never starts a round by itself.
   const loop = async () => {
-    await source.refresh();
-    host.tick();
+    try {
+      await source.refresh();
+      host.tick();
+    } catch (error) {
+      log(`tick: ${error.stack ?? error}`);
+    }
     after(TICK_MS, loop);
   };
   await loop();
@@ -238,10 +243,20 @@ export const serve = async (cfg) => {
   input.on('line', (line) => {
     if (!line.trim()) return;
     answered = answered.then(async () => {
-      await source.refresh();
-      const reply = await host.request(line);
+      let reply;
+      try {
+        await source.refresh();
+        reply = await host.request(line);
+      } catch (error) {
+        log(`request ${line}: ${error.stack ?? error}`);
+        reply = { id: requestOf(line)?.id, error: error.message ?? String(error) };
+      }
       process.stdout.write(`${JSON.stringify(reply)}\n`);
-      host.tick();
+      try {
+        host.tick();
+      } catch (error) {
+        log(`tick: ${error.stack ?? error}`);
+      }
     });
   });
   input.on('close', () => answered.then(() => process.exit(0)));

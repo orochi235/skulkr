@@ -32,6 +32,7 @@ describe('handle', () => {
     expect(await handle('{"id":8,"plan":true}', d)).toEqual({ id: 8, plan: ['round 31'] });
     expect(await handle('{"id":9}', d)).toMatchObject({ id: 9, error: expect.any(String) });
     expect(await handle('nope', d)).toEqual({ error: 'not a JSON object' });
+    for (const line of ['null', '7', '[1]']) expect(await handle(line, d)).toEqual({ error: 'not a JSON object' });
   });
 
   it('starts a run with the request\'s limits, and another beside it while one runs', async () => {

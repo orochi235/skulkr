@@ -49,13 +49,19 @@ export const startArgs = (req) => {
  * `start` starts a run whatever else runs, or with `continuous` turns continuous mode on or off; `stop` stops the run
  * `round` names, or every one and continuous mode with them. Every reply echoes the request's `id`.
  */
-export const handle = async (line, deps) => {
-  let req;
+/** A request line as its object, or undefined when it is not JSON or not an object (`null`, a number, an array). */
+export const requestOf = (line) => {
   try {
-    req = JSON.parse(line);
+    const req = JSON.parse(line);
+    return req !== null && typeof req === 'object' && !Array.isArray(req) ? req : undefined;
   } catch {
-    return { error: 'not a JSON object' };
+    return undefined;
   }
+};
+
+export const handle = async (line, deps) => {
+  const req = requestOf(line);
+  if (!req) return { error: 'not a JSON object' };
   const reply = (body) => ({ id: req.id, ...body });
   try {
     if (req.ping) return reply({ pong: true, build: deps.build });

@@ -10,7 +10,7 @@
  * nothing starts it.
  */
 import { inWindow } from './config.mjs';
-import { handle, msUntil, shouldAutoStart } from './serviceCore.mjs';
+import { handle, msUntil, requestOf, shouldAutoStart } from './serviceCore.mjs';
 
 /**
  * Which tenant a request means: the one its `tenant` names, or the only one. Throws when it names none there is, or
@@ -156,12 +156,8 @@ export const createHost = ({ tenants, now = () => new Date(), log = () => {}, bu
   };
 
   const request = async (line) => {
-    let req;
-    try {
-      req = JSON.parse(line);
-    } catch {
-      return { error: 'not a JSON object' };
-    }
+    const req = requestOf(line);
+    if (!req) return { error: 'not a JSON object' };
     const list = tenants();
     if (req.ping && req.tenant === undefined) {
       return { id: req.id, pong: true, build, tenants: list.map((t) => t.name), ...(list.length === 1 ? { project: list[0].deps.build } : {}) };
