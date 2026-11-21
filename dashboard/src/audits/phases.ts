@@ -87,6 +87,9 @@ export function phaseOf(lane: AuditLane): AuditPhase {
   return part ? partPhase(part) : 'done';
 }
 
+/** The color of a span of `part` drawn in `phase`: the controller's verify and repair in magenta of their own, unless failed. */
+const partColor = (part: Part, phase: AuditPhase): string => (part === 'repair' && phase !== 'conflict' ? 'var(--audit-repair)' : phaseColor(phase));
+
 /** The phase a part's color stands for: a review with one of its two reports in has gone a step further. */
 function partPhase(p: PartState): AuditPhase {
   if (p.state === 'failed') return 'conflict';
@@ -251,7 +254,7 @@ export function laneViewOf(lane: AuditLane, now: number, roundStart: number): La
     cursor = end;
     const title = STEPS_OF[p.part].map((name) => `${name}: ${stepText(name, stepOf(lane, name), now)}`).join('; ');
     return {
-      id: p.part, label: partLabel(lane, p, now), start, ms: Math.max(0, end - start), color: phaseColor(phase), state: SPAN_STATE[p.state], title,
+      id: p.part, label: partLabel(lane, p, now), start, ms: Math.max(0, end - start), color: partColor(p.part, phase), state: SPAN_STATE[p.state], title,
       ...(waitsForBatch ? { fill: patchFillOf(lane) } : p.state === 'waiting' ? { fill: 0 } : {}),
     };
   }).flatMap((span) => (span.id === 'patch' ? withUnfixed(span, lane) : [span]))
@@ -328,7 +331,7 @@ export function laneStepsOf(lane: AuditLane, now: number): SpanStripSpan[] {
     return {
       id: step, start, ms: width, track, trackSpan, fill, state: SPAN_STATE[s.state], title: `${step}: ${stepText(step, s, now)}`,
       label: step === 'patch' && s.state !== 'failed' ? tallyOf(lane) : s.state === 'waiting' ? '' : stepText(step, s, now),
-      color: phaseColor(s.state === 'failed' ? 'conflict' : phase),
+      color: partColor(part, s.state === 'failed' ? 'conflict' : phase),
     };
   }).flatMap((span) => (span.id === 'patch' && span.state !== 'failed' ? withUnfixed(span, lane) : span.id === 'fix' ? [fixWhileChecking(span, lane.steps.fix), ...(repairing(lane) ? [] : [checksSpan(lane.steps.fix)])] : [span]))
     .map((span) => withInk(span));

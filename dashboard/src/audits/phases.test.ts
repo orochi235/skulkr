@@ -165,6 +165,12 @@ describe('the repair step', () => {
     expect(laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, repair: { state: 'waiting' } } }, NOW).map((s) => s.id)).toContain('checks');
   });
 
+  it('draws the verify and repair in magenta in both views, and a failed one as a conflict', () => {
+    const repairing: AuditLane = { id: 'x', steps: { ...lane(fixed).steps, repair: running(at(25)) } };
+    expect(laneStepsOf(repairing, NOW).find((s) => s.id === 'repair')!.color).toBe('var(--audit-repair)');
+    expect(laneViewOf(repairing, NOW, START).spans.find((s) => s.id === 'repair')!.color).toBe('var(--audit-repair)');
+  });
+
   it('says how many repairs ran and how its verify ended, in its own column', () => {
     const steps = (repair: LaneStep) => laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, repair } }, NOW).find((s) => s.id === 'repair')!;
     expect(steps(done({ attempts: 0, outcome: 'passed' })).label).toBe('verified');
