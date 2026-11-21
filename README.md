@@ -149,6 +149,7 @@ file is regenerated, and the ledger, when the config names one, gets a row.
 | `--dry` | | print the plan and stop |
 | `--no-merge` | | leave `main` alone even when the batch is green |
 | `--sweep` | | run the configured sweep too |
+| `--fix-only [a,b]` | | a fix-only round for these areas, or every area with open findings; see "Carried findings" |
 | `--resume N` | | pick round N back up, reusing every job whose result came home |
 | `--cap-usd N` | `budget.capUsd` | list-price dollars the run may spend |
 | `--budget-review`, `--budget-match`, `--budget-fix` | `budget.*` | each job's `--max-budget-usd` |
@@ -202,6 +203,29 @@ step after the fix.
 weasel's config runs `npx vitest related --run` from the tree root over every project but `gate` and the browser
 ones, with four workers, and the browser projects with two on a GUI node.
 
+## Carried findings
+
+A fix job that never really ran (no node had room, a usage limit) leaves its area's findings unfixed, and the next
+round's reviewers need not report them again. skulkr derives which findings are still open from the records, and
+keeps no list of its own (`src/carry.mjs`, read by `src/carryRecords.mjs` from disk and unlanded batches).
+
+| Term | Means |
+|---|---|
+| open | a round reported it, and no fixer of that area acted on it in that round or after |
+| acted on | the fixer's report gives it a verdict line (fixed, not a defect, a question, …), matched by its id or by its words; a report with as many verdicts as findings handed over answers them all; or a fix commit's subject matches it |
+| did no work | the fix job left no report holding a verdict or a `tally:` line, and no commits: every finding it was handed stays open |
+| one defect | two rounds' findings citing a common file (or none) whose claims share enough words (`SAME_LIKENESS`); it keeps its first round's id, `r<round>-<n>` |
+
+When a round's fixer is dispatched, its area's open findings that this round's reviewers did not report again are
+carried in: `carried.md` beside the reports, each under its id and round, and the brief's source says so. The
+fixer checks each still applies and leads its verdict with the id. The record keeps them as `carried.json`.
+
+`--fix-only` (the service's `start` with `fixOnly: true` or a list of areas) runs a round of fixers alone, for
+areas with open findings and not held by a live run or an unlanded branch, then verify, repair, batch, and capstone
+as any round. It takes a round number and a record of its own; its `area.json` says `fixOnly`, and gives no pass to
+an area's history. The map gives each area `openFindings`, a count, and `open`, the list, which the area panel
+shows with each one's round.
+
 ## A sweep
 
 A config's `sweep` is an extra check run once per round beside the reviews, whose findings go to one fixer. It is
@@ -239,7 +263,7 @@ requests, one JSON object a line on stdin, each echoing its `id`:
 | `{"ping":true}` | `pong`, skulkr's commit (`build`), and the tenants hosted; with `tenant`, that project checkout's commit |
 | `{"status":true}` | `runs`: every live run's round, step, areas, flags, dollars used against its cap, and `behind`, what a waiting one waits for; `last`: the summary of the run that ended last; `continuous`: the mode, what the next round waits on (`next`), and `nightUsd`, `spentUsd`, `leftUsd`, and `estimateUsd`; `queues`: the round in its model steps (`model`) and the fleet queue's holder and waiters (`fleet`) |
 | `{"plan":true}` | what a run started now would pick |
-| `{"start":true}` | starts a run now, beside any already running; takes `areas`, `only`, `nodes`, `capUsd`, `budget` (`{review, match, fix}`), `merge: false`, `sweep: true`, and `resume` |
+| `{"start":true}` | starts a run now, beside any already running; takes `areas`, `only`, `nodes`, `capUsd`, `budget` (`{review, match, fix}`), `merge: false`, `sweep: true`, `fixOnly` (`true` or a list of areas), and `resume` |
 | `{"start":true,"continuous":true}` | turns continuous mode on until the night's `stopAt`, and starts its first round if the queues and budget allow; takes no other field. `"continuous":false` turns it off |
 | `{"stop":true}` | with `round`, that run; without, every live run and continuous mode until the night's `stopAt`: no new jobs start, running ones finish, then each run patches, batches, and records what completed |
 
