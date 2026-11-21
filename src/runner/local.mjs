@@ -51,30 +51,44 @@ const syncTree = (dir, from, ref) => {
   if (existsSync(join(from, JOB_IN))) cpSync(join(from, JOB_IN), join(dir, JOB_IN), { recursive: true });
 };
 
-/** Runs `bash -lc shell` in `cwd`, its output to `log`, killed with its children after `timeoutMs`. Answers the exit status. */
-const runShell = (shell, { cwd, env, log, timeoutMs }) =>
+/** How long a timed-out job's process group has after SIGTERM before it gets SIGKILL. */
+const KILL_GRACE_MS = 30_000;
+
+const signalGroup = (pid, signal) => {
+  try {
+    process.kill(-pid, signal);
+  } catch { /* already gone */ }
+};
+
+/**
+ * Runs `bash -lc shell` in `cwd`, its output to `log`, killed with its children after `timeoutMs`: SIGTERM, then
+ * SIGKILL `graceMs` later if it has not closed. Answers the exit status.
+ */
+const runShell = (shell, { cwd, env, log, timeoutMs, graceMs = KILL_GRACE_MS }) =>
   new Promise((done) => {
     const child = spawn('bash', ['-lc', shell], { cwd, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     child.stdout.pipe(log, { end: false });
     child.stderr.pipe(log, { end: false });
+    let kill;
     const timer = timeoutMs && setTimeout(() => {
       log.write(`\nskulkr local runner: timed out after ${timeoutMs / 60_000} min\n`);
-      try {
-        process.kill(-child.pid, 'SIGTERM');
-      } catch { /* already gone */ }
+      signalGroup(child.pid, 'SIGTERM');
+      kill = setTimeout(() => signalGroup(child.pid, 'SIGKILL'), graceMs);
     }, timeoutMs);
     child.on('error', (error) => {
       log.write(`${error}\n`);
       done(1);
     });
     child.on('close', (status) => {
-      if (timer) clearTimeout(timer);
+      clearTimeout(timer);
+      clearTimeout(kill);
       done(status ?? 1);
     });
   });
 
 /** The runner interface (documented in `onto.mjs`), with every job on this machine as node `local`. */
-export const createLocalRunner = (cfg) => {
+/** `graceMs`: how long a timed-out job has between SIGTERM and SIGKILL. */
+export const createLocalRunner = (cfg, { graceMs } = {}) => {
   const jobsDir = join(cfg.state, 'local-jobs');
   const record = (file, job) => {
     mkdirSync(jobsDir, { recursive: true });
@@ -90,7 +104,7 @@ export const createLocalRunner = (cfg) => {
       try {
         tree = leaseTree(cfg.state, git(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']));
         syncTree(tree.dir, cwd, job.ref ?? git(cwd, ['rev-parse', 'HEAD']));
-        status = await runShell(job.shell, { cwd: tree.dir, env: job.env, log, timeoutMs: durationMs(job.timeout) });
+        status = await runShell(job.shell, { cwd: tree.dir, env: job.env, log, timeoutMs: durationMs(job.timeout), graceMs });
         const out = join(tree.dir, job.out);
         if (existsSync(out)) cpSync(out, job.to, { recursive: true });
       } catch (error) {

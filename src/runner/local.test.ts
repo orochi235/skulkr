@@ -95,6 +95,15 @@ describe('the local runner', () => {
     expect(existsSync(pool) ? readdirSync(pool).filter((n) => n.endsWith('.lease')) : []).toEqual([]);
   });
 
+  it('kills a timed-out job that ignores SIGTERM once its grace runs out', async () => {
+    const s = setup();
+    const runner = createLocalRunner(resolveConfig({ name: 't', state: join(s.dir, 'state') }), { graceMs: 300 });
+    const t0 = Date.now();
+    const r = await run({ ...s, runner }, "trap '' TERM; sleep 30", { timeout: '1s' });
+    expect(r.status).not.toBe(0);
+    expect(Date.now() - t0).toBeLessThan(10_000);
+  });
+
   it('reads runner durations', () => {
     expect([durationMs('55m'), durationMs('90s'), durationMs('2h'), durationMs('none')]).toEqual([3_300_000, 90_000, 7_200_000, undefined]);
   });
