@@ -16,7 +16,8 @@ export interface AuditPass {
   readonly leftCorrected?: number;
   /** The part of the pass's files this area holds, when it holds only some: `est` and `left` are scaled by it. */
   readonly share?: number;
-  /** A live run's pass, its area's pass done and its round's record not yet landed. */
+  /** A live run's pass, its area's pass done and its round's record not yet landed. Never in the map's JSON: the page
+   *  sets it (`withLivePasses`) on the lane's pass it adds to the area. */
   readonly provisional?: boolean;
 }
 
@@ -139,7 +140,8 @@ export interface AuditRun {
 
 export interface AuditRound {
   readonly round: number;
-  readonly date: string;
+  /** Null for a round known only from areas it recorded incomplete. */
+  readonly date: string | null;
   readonly areas: number;
   readonly files: number;
   readonly distinct: number;

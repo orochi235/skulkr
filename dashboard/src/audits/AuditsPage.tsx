@@ -10,7 +10,7 @@ import { LaneViewControls, LiveRuns, useLaneView, type LaneSettings } from './Li
 import { Stats } from './Stats';
 import { TopTabs } from './TopTabs';
 import { Treemap } from './Treemap';
-import { NEXT_UP_ROUNDS, heatScaleOf, nextUpOf, runHolding, statsFor } from './areaData';
+import { NEXT_UP_ROUNDS, defectsVersionOf, heatScaleOf, nextUpOf, runHolding, statsFor } from './areaData';
 import { heatColorOf } from './heat';
 import { createAuditScene } from './auditScene';
 import { liveEstimatesOf, phasesOf, withLivePasses } from './phases';
@@ -103,7 +103,7 @@ function Chart({ map, areaUrl, view }: { map: SkulkrMap; areaUrl: (id: string) =
         <ResizeHandle value={asideWidth} min={ASIDE.min} max={ASIDE.max} invert onInput={setAsideWidth} onChange={keepAside} aria-label="Resize the side panel" />
         <aside className={s.aside} aria-label="Area">
           <AreaDetail area={area} holder={area && runHolding(map.runs, area.id)} />
-          {picked && <AreaDefects urlOf={areaUrl} id={picked} version={map.generated} />}
+          {picked && <AreaDefects urlOf={areaUrl} id={picked} version={defectsVersionOf(map, picked)} />}
         </aside>
       </div>
       <ResizeHandle

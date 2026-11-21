@@ -4,6 +4,17 @@ import type { ReactNode } from 'react';
 import type { GateFailures as Failures } from './skulkrMap.types';
 import s from './GateFailures.module.css';
 
+/** `items` each keyed by `keyOf` and which copy of that key it is: a parameterized test repeats its name. */
+export function keyedByCopy<T>(items: readonly T[], keyOf: (item: T) => string): { key: string; item: T }[] {
+  const seen = new Map<string, number>();
+  return items.map((item) => {
+    const k = keyOf(item);
+    const copy = seen.get(k) ?? 0;
+    seen.set(k, copy + 1);
+    return { key: `${k}\n${copy}`, item };
+  });
+}
+
 /** A button opening what a failed capstone run failed, by file, each test with the first line of its error. */
 export function GateFailures({ label, run, failures }: { label: ReactNode; run: string; failures: Failures }) {
   const shown = failures.list.reduce((n, f) => n + f.count, 0);
@@ -23,8 +34,8 @@ export function GateFailures({ label, run, failures }: { label: ReactNode; run: 
                 {f.count > 1 && <span className={s.count}> {f.count} failed</span>}
                 {f.tests.length > 0 && (
                   <ul className={s.tests}>
-                    {f.tests.map((t) => (
-                      <li key={t.test}>
+                    {keyedByCopy(f.tests, (t) => `${t.test}\n${t.error}`).map(({ key, item: t }) => (
+                      <li key={key}>
                         <span className={s.test}>{t.test}</span>
                         {t.error && <code className={s.error}>{t.error}</code>}
                       </li>

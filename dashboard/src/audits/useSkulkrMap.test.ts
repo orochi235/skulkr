@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useSkulkrMap } from './useSkulkrMap';
 import fixture from './fixture.map.json';
+import { STALE_HEADER } from '@shared/routes';
 
 const URL = '/test/__skulkr/map';
 const json = () => new Response(JSON.stringify(fixture), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -34,6 +35,27 @@ describe('useSkulkrMap', () => {
     serve(json, () => new Response('', { status: 404 }));
     const { result } = renderHook(() => useSkulkrMap({ url: URL, everyMs: 10, dev: true }));
     await waitFor(() => expect(result.current).toMatchObject({ status: 'ready', error: expect.any(String) }));
+  });
+
+  it("says why the server's map is stale when its builds since failed", async () => {
+    serve(() => new Response(JSON.stringify(fixture), {
+      status: 200, headers: { 'content-type': 'application/json', [STALE_HEADER]: encodeURIComponent('map.mjs: TypeError: x is undefined') },
+    }));
+    const { result } = renderHook(() => useSkulkrMap({ url: URL, everyMs: 60_000, dev: true }));
+    await waitFor(() => expect(result.current).toMatchObject({ status: 'ready', error: 'map.mjs: TypeError: x is undefined' }));
+  });
+
+  it("never answers one url's map for another, not even for the render before its effect runs", async () => {
+    serve(json, () => new Promise<Response>(() => {}) as unknown as Response);
+    const seen: { url: string; status: string }[] = [];
+    const { result, rerender } = renderHook(({ url }) => {
+      const state = useSkulkrMap({ url, everyMs: 60_000, dev: true });
+      seen.push({ url, status: state.status });
+      return state;
+    }, { initialProps: { url: URL } });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    rerender({ url: '/test/__skulkr/other' });
+    expect(seen.filter((s) => s.url !== URL).map((s) => s.status)).not.toContain('ready');
   });
 
   it('asks at once when the page is shown again, though no ask came due while it was hidden', async () => {

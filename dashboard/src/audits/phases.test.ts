@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { STEP_COLUMN_COUNT, CLOCK_AHEAD_MINUTES, TYPICAL_MINUTES, isFinished, laneStepsOf, laneViewOf, passDone, phaseColor, phaseOf, phasesOf, runClockOf, withLivePasses } from './phases';
+import { CLOCK_AHEAD_MINUTES, laneViewOf, runClockOf } from './clockLane';
+import { TYPICAL_MINUTES, isFinished, passDone, phaseColor, phaseOf, phasesOf, withLivePasses } from './phases';
+import { STEP_COLUMN_COUNT, laneStepsOf } from './stepsLane';
 import fixture from './fixture.map.json';
 import type { AuditLane, AuditRun, LaneStep, LaneStepName, SkulkrMap } from './skulkrMap.types';
 
@@ -87,6 +89,9 @@ describe('laneViewOf', () => {
     expect(laneStepsOf(lane(sound), NOW).at(-1)?.label).toBe('3 of 4 fixed · 1 FP');
     expect(laneStepsOf(lane(fixed), NOW).find((s) => s.id === 'patch')?.label).toBe('2 of 4 fixed · 1 filed');
     expect(laneStepsOf(lane(sound), NOW).map((s) => s.id)).not.toContain('patch-unfixed');
+    // Settled whole, so shaded whole, in both views, before the batch applies it.
+    expect(laneStepsOf(lane(sound), NOW).find((s) => s.id === 'patch')?.fill).toBe(1);
+    expect(laneViewOf(lane(sound), NOW, START).spans.find((s) => s.id === 'patch')?.fill).toBe(1);
     // A tally line alone says nothing of why, so everything unfixed is left.
     const tallied = { ...fixed, fix: done({ minutes: 9, commits: 6, fixed: 3, of: 4 }) };
     expect(laneStepsOf(lane(tallied), NOW).find((s) => s.id === 'patch-unfixed')?.ms).toBeCloseTo(0.6 * 0.25);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { changedSincePass, heatScaleOf, labelIn, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
-import { continuousText, headlineOf, parseJob, recentJobsOf, spendOf, stepText } from './runData';
+import { changedSincePass, defectsVersionOf, heatScaleOf, labelIn, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
+import { continuousText, headlineOf, logTailsOf, parseJob, recentJobsOf, scrolledOf, spendOf, stepText } from './runData';
 import { stageCountsOf } from './phases';
 import { inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
 import { ticksFor } from './RoundsChart';
@@ -82,6 +82,18 @@ describe('lanes', () => {
   });
 });
 
+describe('defectsVersionOf', () => {
+  it("changes when the area's passes or lane do, and not when only the map's stamp or another area does", () => {
+    const v = defectsVersionOf(map, 'core.ops');
+    expect(defectsVersionOf({ ...map, generated: '2030-01-01T00:00:00Z' } as SkulkrMap, 'core.ops')).toBe(v);
+    const other = { ...live, lanes: live.lanes.map((l) => (l.id === 'core.ops' ? l : { ...l, steps: { ...l.steps, B: { state: 'done' as const } } })) };
+    expect(defectsVersionOf({ ...map, runs: [other, finished] }, 'core.ops')).toBe(v);
+    const ops = live.lanes[0]!;
+    const fixed = { ...live, lanes: [{ ...ops, steps: { ...ops.steps, fix: { state: 'done' as const, commits: 2 } } }] };
+    expect(defectsVersionOf({ ...map, runs: [fixed, finished] }, 'core.ops')).not.toBe(v);
+  });
+});
+
 describe('jobs', () => {
   it('reads each kind of log line, and marks a review that skipped files', () => {
     expect(parseJob('review 3/4 core.debug A on teitou: 1 findings, 9/12 files read, 1.5 min, 0.40M tokens')).toEqual({
@@ -90,7 +102,7 @@ describe('jobs', () => {
     });
     expect(parseJob('fix 2/4 core.ops on studio: 3 commits, 12.0 min, 0.81M weighted tokens')).toMatchObject({ kind: 'fix', tokens: 0.81 });
     expect(parseJob('match 1/4 core.ops: 2 shared of 5 + 4')).toMatchObject({ kind: 'match', what: '2 shared, 5 unique' });
-    expect(parseJob('batch: audit41-core.ops conflicts; left out')?.bad).toBe(true);
+    expect(parseJob('batch: audit41-core.ops conflicts; left out')).toMatchObject({ kind: 'batch', area: 'core.ops', bad: true });
     expect(parseJob('fleet: 2 failed')).toMatchObject({ kind: 'fleet', bad: true });
     expect(parseJob('something else')).toBeNull();
   });
@@ -129,10 +141,36 @@ describe('jobs', () => {
     expect(parseJob(`${line}, hit its ceiling`)).toMatchObject({ what: '2 findings, read 12 of 12 files, hit its ceiling', bad: false });
   });
 
+  it("reads a branch the batch left out, whatever the project names its branches, and the lane's reason where the map gives one", () => {
+    expect(parseJob('batch: audit41-core.ops left out: conflicts in a.ts, b.ts')).toEqual({
+      kind: 'batch', label: 'batch', area: 'core.ops', what: 'left out: conflicts in a.ts, b.ts', bad: true,
+    });
+    expect(parseJob('batch: sk7-ui.p-touch (round 6) left out: merge failed: lock')).toMatchObject({ area: 'ui.p-touch', earlier: true, bad: true });
+    expect(parseJob('batch: audit40-core.ops, left out of round 40, merged')).toMatchObject({ kind: 'night', bad: false });
+    const ops = live.lanes[0]!;
+    const lines = ['batch: audit41-core.ops left out: conflicts in a.ts'];
+    const withReason = { ...live, lines, lanes: [{ ...ops, steps: { ...ops.steps, patch: { state: 'failed' as const, why: 'conflicts in a.ts, b.ts' } } }] };
+    expect(recentJobsOf([withReason])[0]!.job.what).toBe('conflicts in a.ts, b.ts');
+    expect(recentJobsOf([{ ...live, lines }])[0]!.job.what).toBe('left out: conflicts in a.ts');
+  });
+
   it('keys two identical lines of one log apart', () => {
     const run = { ...map.runs[0]!, lines: ['fleet: test:batch passed', 'fleet: test:batch passed'] };
     const keys = recentJobsOf([run]).map((j) => j.key);
     expect(new Set(keys).size).toBe(2);
+  });
+
+  it('keeps a job its key while its line moves up the tail, a copy of it scrolling off the front', () => {
+    const dup = 'fleet: test:batch passed';
+    const first = { ...map.runs[0]!, lines: [dup, 'night: x', dup] };
+    const later = { ...first, lines: ['night: x', dup, 'fleet: test:build passed'] };
+    expect(scrolledOf(first.lines, later.lines)).toBe(1);
+    const tails = logTailsOf(new Map(), [first]);
+    const before = recentJobsOf([first], 14, tails).map((j) => j.key);
+    const after = recentJobsOf([later], 14, logTailsOf(tails, [later])).map((j) => j.key);
+    // The newer copy of `dup` keeps its key; only the new line is new.
+    expect(after.filter((k) => !before.includes(k))).toEqual([after[0]]);
+    expect(after[0]).toContain('test:build');
   });
 
   it('lists every run, each newest first', () => {

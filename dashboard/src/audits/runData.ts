@@ -82,6 +82,8 @@ export interface Job {
   readonly of?: string;
   /** Whether it went wrong: a review that skipped files or did not finish, a patch that did not apply, a conflict, a failed fleet run. */
   readonly bad: boolean;
+  /** A batch job about a branch an earlier round left out, rather than one of this round's. */
+  readonly earlier?: boolean;
 }
 
 /** A match's result: how many findings both reviews made, then how many only one did. */
@@ -119,7 +121,11 @@ export function parseJob(line: string): Job | null {
   if ((m = /^repair (\S+) (\S+) on (\S+): (\d+) commits, ([\d.]+) min; verify (.*)$/.exec(line))) {
     return { kind: 'fix', label: `repair ${m[2]}`, area: m[1]!, what: `${plural(Number(m[4]), 'commit')}; verify ${m[6]}`, node: m[3], minutes: Number(m[5]), bad: m[6] !== 'passed' };
   }
-  if ((m = /^batch: audit\d+-(\S+) conflicts/.exec(line))) {
+  // A branch is `<prefix><round>-<area>`, the prefix the project's own. Logs before 2026-11-21 said `<branch> conflicts`.
+  if ((m = /^batch: \S*?\d+-(\S+?)( \(round \d+\))? left out: (.*)$/.exec(line))) {
+    return { kind: 'batch', label: 'batch', area: m[1]!, what: `left out: ${m[3]}`, bad: true, ...(m[2] ? { earlier: true } : {}) };
+  }
+  if ((m = /^batch: \S*?\d+-(\S+) conflicts/.exec(line))) {
     return { kind: 'batch', label: 'batch', area: m[1]!, what: 'conflicts; left out of the batch', bad: true };
   }
   // The plan's own `control sweep:` line, printed at start-up, reports no job; only a count or a failure does.
@@ -131,7 +137,8 @@ export function parseJob(line: string): Job | null {
   return null;
 }
 
-/** A job and the round whose log it came from, keyed by the line that reported it and which copy of that line it is. */
+/** A job and the round whose log it came from, keyed by its line's place in the whole log, as far as the polls so far
+ *  have followed it, and its text. */
 export interface RunJob {
   readonly key: string;
   readonly line: string;
@@ -139,16 +146,45 @@ export interface RunJob {
   readonly job: Job;
 }
 
-/** Each run's jobs, newest first, live runs before the finished one, at most `perRun` from each. */
-export function recentJobsOf(runs: readonly AuditRun[], perRun = 14): RunJob[] {
+/** A batch job leaving out one of the run's own areas, saying why as that area's lane does where the map gives a reason. */
+function withLaneReason(job: Job, run: AuditRun): Job {
+  if (job.kind !== 'batch' || !job.bad || job.earlier) return job;
+  const patch = run.lanes.find((l) => l.id === job.area)?.steps.patch;
+  return patch?.state === 'failed' && patch.why ? { ...job, what: patch.why } : job;
+}
+
+/** A run's log tail as last seen, and how many lines of the log came before its first. */
+export interface LogTail {
+  readonly lines: readonly string[];
+  readonly base: number;
+}
+
+/** How many lines scrolled off the front of a log's tail between `before` and `after`: the fewest whose removal
+ *  leaves `before` a prefix of `after`, or all of it where they share nothing. */
+export function scrolledOf(before: readonly string[], after: readonly string[]): number {
+  for (let d = 0; d < before.length; d++) {
+    if (before.length - d <= after.length && before.every((line, i) => i < d || line === after[i - d])) return d;
+  }
+  return before.length;
+}
+
+/** Each run's tail now, by round, its base carried on from `was`, the tails as the last poll left them. */
+export function logTailsOf(was: ReadonlyMap<number, LogTail>, runs: readonly AuditRun[]): ReadonlyMap<number, LogTail> {
+  return new Map(runs.map((run) => {
+    const prev = was.get(run.round);
+    return [run.round, { lines: run.lines, base: prev ? prev.base + scrolledOf(prev.lines, run.lines) : 0 }];
+  }));
+}
+
+/** Each run's jobs, newest first, live runs before the finished one, at most `perRun` from each. `tails` places each
+ *  run's lines in its whole log, so a job keeps its key while its line moves up the tail. */
+export function recentJobsOf(runs: readonly AuditRun[], perRun = 14, tails: ReadonlyMap<number, LogTail> = new Map()): RunJob[] {
   return runs.flatMap((run) => {
-    // `lines` is the log's tail, whose indices move every poll, so the key counts copies of the same text instead.
-    const seen = new Map<string, number>();
+    const base = tails.get(run.round)?.base ?? 0;
     return run.lines
-      .map((line) => {
-        const copy = seen.get(line) ?? 0;
-        seen.set(line, copy + 1);
-        return { key: `${run.round}:${copy}:${line}`, line, round: run.round, job: parseJob(line) };
+      .map((line, i) => {
+        const job = parseJob(line);
+        return { key: `${run.round}:${base + i}:${line}`, line, round: run.round, job: job && withLaneReason(job, run) };
       })
       .filter((r): r is RunJob => r.job !== null)
       .reverse()

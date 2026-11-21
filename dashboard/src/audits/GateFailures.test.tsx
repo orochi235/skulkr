@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { GateFailures } from './GateFailures';
+import { GateFailures, keyedByCopy } from './GateFailures';
 
 afterEach(cleanup);
 
@@ -14,5 +14,11 @@ describe('GateFailures', () => {
     expect(button.textContent).toBe('fleet tests · 3 failed in 2 files');
     // Opening it is checked in a browser: React Aria's popover does not open under jsdom.
     expect(button.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('keys each failed test apart, a parameterized one repeating its name among them', () => {
+    const tests = [{ test: 'adds %i', error: 'e' }, { test: 'adds %i', error: 'e' }, { test: 'b', error: '' }];
+    const keys = keyedByCopy(tests, (t) => `${t.test}\n${t.error}`).map((k) => k.key);
+    expect(new Set(keys).size).toBe(3);
   });
 });
