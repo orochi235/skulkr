@@ -215,7 +215,7 @@ dispatch a node refuses moves to another node and keeps that one out for `nodes.
 A job that failed before its model started is launched up to three times; one whose model started (it writes
 `started` first) and left no `exit` was cut off mid-run and is never launched again, since it was paid for.
 `<state>/limits.json` (`{ "review": n, "fix": n }`) changes the slots per node, or under a placing runner the jobs at
-once, for runs already going.
+once, and with them how many areas a run keeps going at once, for runs already going.
 
 ## Verify and repair
 

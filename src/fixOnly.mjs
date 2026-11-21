@@ -52,6 +52,6 @@ export const fixCarried = async (ctx, area, carried) => {
 
 /** Every picked area's fixer, started as `startAreas` admits them; resolves when all finish. */
 export const fixOnlyAreas = ({ ctx, picked, open, args, status, deadline, results }) => startAreas({
-  ctx, picked, args, status, deadline, results, maxAreas: areasAtOnce(ctx.cfg, args, 'fix', 1),
+  ctx, picked, args, status, deadline, results, maxAreas: () => areasAtOnce(ctx.cfg, args, 'fix', 1),
   start: (area) => fixCarried(ctx, area, open.get(area.id) ?? []),
 });

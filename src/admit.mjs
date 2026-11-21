@@ -1,16 +1,17 @@
 /** Which of a run's picked areas start, and when: README.md, "A run", under "Limits". */
 import { nodesAt } from './config.mjs';
+import { slotsPerNode } from './slots.mjs';
 import { mayStartArea, usd } from './usage.mjs';
 
 /** How many areas a run keeps going at once when each takes `jobsPerArea` jobs of `role` at a time. */
 export const areasAtOnce = (cfg, args, role, jobsPerArea) => {
-  const perNode = role === 'fix' ? cfg.nodes.fixSlots : cfg.nodes.reviewSlots;
-  const slots = args.places && !args.nodes ? cfg.concurrency[role] : (args.nodes ?? nodesAt(cfg, new Date())).length * perNode;
+  const slots = args.places && !args.nodes ? slotsPerNode(cfg, role, cfg.concurrency) : (args.nodes ?? nodesAt(cfg, new Date())).length * slotsPerNode(cfg, role);
   return Math.max(1, Math.floor(slots / jobsPerArea));
 };
 
 /**
- * Starts each of `picked` with `start(area)`, at most `maxAreas` at once, each only while the run has no stop
+ * Starts each of `picked` with `start(area)`, at most `maxAreas()` at once, asked again before each area so a change to
+ * `limits.json` reaches a run already going, each only while the run has no stop
  * request, is before `deadline`, and has the dollars for one more area; resolves when every started one has finished,
  * its summary pushed to `results`.
  */
@@ -18,7 +19,7 @@ export const startAreas = async ({ ctx, picked, args, status, deadline, results,
   const inFlight = new Map();
   const cfg = ctx.cfg;
   for (const area of picked) {
-    while (inFlight.size >= maxAreas) await Promise.race(inFlight.keys());
+    while (inFlight.size >= maxAreas()) await Promise.race(inFlight.keys());
     const running = [...inFlight.values()].map((id) => ctx.spentOn?.(id) ?? 0);
     const affordable = mayStartArea({ used: status.costUsd, finished: results.map((r) => r.jobs.costUsd), running, cap: args.capUsd, guess: cfg.budget.areaGuessUsd });
     const why = ctx.stopped() ? 'stop requested'

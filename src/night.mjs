@@ -65,7 +65,7 @@ const changedSince = (git, files, from, exclude) => {
 
 /** Each picked area's reviews, matcher and fixer, started as `startAreas` admits them; resolves when all finish. */
 const reviewAreas = ({ ctx, git, picked, passes, open, args, status, deadline, results }) => startAreas({
-  ctx, picked, args, status, deadline, results, maxAreas: areasAtOnce(ctx.cfg, args, 'review', 2),
+  ctx, picked, args, status, deadline, results, maxAreas: () => areasAtOnce(ctx.cfg, args, 'review', 2),
   start: (area) => {
     const last = lastPassIn(passes.get(area.id));
     const previous = last && { ...last, ...scaledOf(last) };
