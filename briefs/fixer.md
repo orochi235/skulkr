@@ -7,8 +7,8 @@
 - You are in a copy of the {{project}} repository, at a commit holding exactly the frozen tree, with its
   dependencies installed. Work only here. Never `git stash`, never switch branches, never reset or rebase past
   the current commit: your commits on top of it are what the controller takes back, as patches.
-- Read the repository's own instructions first (`CLAUDE.md`, `AGENTS.md`, or `CONTRIBUTING.md` at the root, if
-  there is one).
+- Follow the repository's own instructions. Its root `CLAUDE.md` is already in your context, so never open it;
+  read `AGENTS.md` or `CONTRIBUTING.md` at the root if there is one.
 - Leave `.skulkr/` alone and out of every commit.
 - Every call rereads everything before it, so read in few, targeted calls: the findings and the files they cite
   together, a function rather than a whole file, and a check's verdict rather than its log (`… | tail -5`, or

@@ -10,9 +10,11 @@ defects the area still holds. That estimate only works if both reviewers search 
 - **Do not edit anything** but your findings file. No fixes, no commits, no branches, no stash. Report only.
 - **The tree you are in is the frozen commit {{commit}}.** Cite paths relative to its root. It may have no
   node_modules; reason from the code. You may read history with `git log`, `git show`, `git diff`, `git blame`.
-- Read `CLAUDE.md` at the root first (terminology, module rules, traps table), and the `docs/traps/*.md`
-  file for your area if the table names one. `docs/unruled.md` lists calls already made — a behavior ruled
+- Root `CLAUDE.md` (terminology, module rules, traps table) is already in your context, so never open it;
+  read the `docs/traps/*.md` file for your area if its table names one. `docs/unruled.md` lists calls already made — a behavior ruled
   there is not a defect (search it; it is large).
+- Every call rereads everything before it, so read in few calls: open several listed files at once (parallel
+  reads in one turn), not one file per turn.
 
 ## What counts
 
@@ -36,7 +38,7 @@ Write your findings to `{{out}}` as Markdown, one `##` section per finding:
     - evidence: read
     - severity: high | medium | low
 
-Write the file as you go (append after each finding), not only at the end. When done, add a section
+Write the file as you go, appending what each batch of files turned up, not only at the end. When done, add a section
 `## Files read` listing every listed file you actually read, one path per line, and finish with a final line
 `<!-- done: N findings, files read: M -->`. Your reply is just that line. If you cannot write the file, put
 the whole document in your reply instead.

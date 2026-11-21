@@ -17,9 +17,11 @@ The check was `{{command}}`, over the files the commits change. Its failing outp
 - You are in a copy of the {{project}} repository: the frozen tree with the area's commits applied on top, and its
   dependencies installed. Work only here. Never `git stash`, never switch branches, never reset or rebase past the
   current commit: your commits on top of it are what the controller takes back, as patches.
-- Read the repository's own instructions first (`CLAUDE.md`, `AGENTS.md`, or `CONTRIBUTING.md` at the root, if
-  there is one).
+- Follow the repository's own instructions. Its root `CLAUDE.md` is already in your context, so never open it;
+  read `AGENTS.md` or `CONTRIBUTING.md` at the root if there is one.
 - Leave `.skulkr/` alone and out of every commit.
+- Every call rereads everything before it, so read in few, targeted calls, and a check's verdict rather than its
+  log (`… | tail -5`).
 
 {{rules}}
 
