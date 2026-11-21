@@ -30,14 +30,14 @@ export default {
   record: {
     dir: 'docs/audits',
     intro: [
-      'Blind pairs at `{{commit}}` ({{date}}), run by `scripts/skulk`. Each area\'s directory holds its file',
+      'Blind pairs at `{{commit}}` ({{date}}), run by skulkr. Each area\'s directory holds its file',
       'list (`files.txt`), both reviewers\' findings (`A.md`, `B.md`), the matching (`match.json`), the fixer\'s',
       'report (`fix.md`) and the numbers below (`area.json`). The method is `docs/hardening.md`, "Blind pairs".',
       '',
       '"Read" is how many listed files each reviewer says it read. "Est." is Chapman\'s estimate of what the area held,',
       '"left" that less the distinct findings, and "last left" the previous pass\'s figure, which this pass tests.',
       '"New code" counts findings citing a file changed since that pass. "Commits" is what the fixer committed.',
-      '"Weighted tokens" counts each kind of token at its price against an input token (`TOKEN_WEIGHTS` in `scripts/skulk/usage.mjs`); "cost" is list price.',
+      '"Weighted tokens" counts each kind of token at its price against an input token (`TOKEN_WEIGHTS` in skulkr's `src/usage.mjs`); "cost" is list price.',
       'One record per job is in `usage.jsonl`. The shas in `fix.md` are the fixer\'s, on its node; the same commits',
       'as applied here are `fixCommits` in `area.json`.',
     ],
@@ -49,7 +49,7 @@ export default {
         const fixed = areas.reduce((s, a) => s + a.patches, 0);
         const each = areas.map((a) => `${a.id} ${a.a}/${a.b}/${a.m}, ${a.chapman === undefined ? 'incomplete' : `est. ${a.chapman.toFixed(1)}`}`).join('; ');
         return `| ${date} | ${areas.map((a) => a.id).join(', ')} (audit round ${round}, nightly) | blind pairs | 0 | ${found} / ${fixed} commits | `
-          + `Run by \`scripts/skulk\` with one file list per area; raw lists in \`docs/audits/round-${round}/\`. A/B/shared and Chapman's estimate per area: ${each}. |`;
+          + `Run by skulkr with one file list per area; raw lists in \`docs/audits/round-${round}/\`. A/B/shared and Chapman's estimate per area: ${each}. |`;
       },
     },
     trailer: 'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>',
