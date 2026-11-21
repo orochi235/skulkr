@@ -186,6 +186,33 @@ export const lastDrawnPassIn = (list, calibration) => {
   return { ...pass, leftCorrected: correctedLeftOf(pass, calibration) };
 };
 
+/**
+ * What `lastDrawnPassIn` said of an area after each past round, for the dashboard's view of an earlier round: one
+ * `{ round, left, leftCorrected }` per round the answer changed, oldest first, `leftCorrected` left out where it equals
+ * `left`, and `pass` naming the round the answer comes from where that is an earlier one. Rounds before passes had
+ * read COVERED of `files` (the area's files now) give none, the area counting as never audited then. Every entry uses
+ * today's `calibration`.
+ */
+export const lastByRoundIn = (list, files, calibration) => {
+  const mine = new Set(files);
+  const read = new Set();
+  let whole = false;
+  let shown = null;
+  const entries = [];
+  for (const r of roundsIn(list ?? [])) {
+    for (const p of r.passes) {
+      if (!p.files?.length) whole = true;
+      else for (const f of p.files) if (mine.has(f)) read.add(f);
+    }
+    if (!whole && (files.length ? read.size / files.length : 0) < COVERED) continue;
+    const pass = lastDrawnPassIn(list.filter((p) => p.round <= r.round), calibration);
+    if (pass.round === shown) continue;
+    shown = pass.round;
+    entries.push({ round: r.round, ...(pass.round !== r.round ? { pass: pass.round } : {}), left: pass.left, ...(pass.leftCorrected !== pass.left ? { leftCorrected: pass.leftCorrected } : {}) });
+  }
+  return entries;
+};
+
 /** Each area's history (`inheritPasses`') as calibration reads it: its covering rounds, each drawn as one pass. */
 export const drawnHistories = (history) => new Map([...history].map(([id, list]) => [id, coveringRounds(list).map((r) => drawnRoundOf(r.passes))]));
 

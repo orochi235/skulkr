@@ -12,7 +12,7 @@ import { fleetOf } from './gate.mjs';
 import { areaIcons, iconsFor } from './icons.mjs';
 import { partitionAt } from './partition.mjs';
 import { correctedLeftOf } from './calibration.mjs';
-import { COVERED, areaStats, areasInFlightFor, calibrationFor, chapman, drawnPassOf, incompleteByRound, lastDrawnPassIn, passOf, passesIn, pickAreas } from './rounds.mjs';
+import { COVERED, areaStats, areasInFlightFor, calibrationFor, chapman, drawnPassOf, incompleteByRound, lastByRoundIn, lastDrawnPassIn, passOf, passesIn, pickAreas } from './rounds.mjs';
 import { openFindingsIn } from './carryRecords.mjs';
 import { abandonedRounds, nightsByRound, recordsFor } from './recordFiles.mjs';
 import { continuousOf } from './continuousOf.mjs';
@@ -143,6 +143,12 @@ export const nightsOf = (runs, state) => {
     .map((n) => ({ round: n.round, started: n.started, nightDir: n.dir, running: live.has(n.round) }));
 };
 
+/** An area's `lastByRound` (`lastByRoundIn`), left out for an area no round has audited yet. */
+const lastByRoundOf = (own, files, calibration) => {
+  const entries = lastByRoundIn(own, files, calibration);
+  return entries.length ? { lastByRound: entries } : {};
+};
+
 /** The whole map for the project at `root` under `cfg`, its runs' jobs asked of `runner`. */
 export const buildMap = (cfg, root, runner) => {
   const git = gitIn(root);
@@ -178,6 +184,7 @@ export const buildMap = (cfg, root, runner) => {
       queue: queue.get(area.id) ?? null,
       passes: history,
       last: lastDrawnPassIn(own, calibration) ?? null,
+      ...lastByRoundOf(own, area.files, calibration),
       stage: run ? run.stages[area.id] ?? 'queued' : null,
       ...(stale ? { staleLines: stale } : {}),
       ...(open.get(area.id)?.length ? { openFindings: open.get(area.id).length, open: open.get(area.id).map(({ round, claim, where }) => ({ round, claim, where })) } : {}),

@@ -5,7 +5,7 @@ import { gitIn } from './batch.mjs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { weaselConfig } from '../test/weaselConfig.ts';
-import { areaStats, areasInFlight, areasInFlightFor, calibrationFor, chapman, drawnRoundOf, inheritPasses, lastDrawnPassIn, lastPassIn, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf } from './rounds.mjs';
+import { areaStats, areasInFlight, areasInFlightFor, calibrationFor, chapman, drawnRoundOf, inheritPasses, lastByRoundIn, lastDrawnPassIn, lastPassIn, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf } from './rounds.mjs';
 import { diskRecords } from './recordFiles.mjs';
 
 const dirs: string[] = [];
@@ -222,6 +222,26 @@ describe('history by round', () => {
     const calibration = { minPairs: 5, pairs: [], series: [], factors: { overall: bucket(2), byShared: {} } };
     expect(lastDrawnPassIn(history.get('x'), calibration)).toMatchObject({ round: 50, left: 4.5, leftCorrected: 9 });
     expect(lastDrawnPassIn([], calibration)).toBeUndefined();
+  });
+
+  it("gives an area's estimate as of each round it changed, from once passes had read half its files", () => {
+    const xs = Array.from({ length: 20 }, (_, i) => `x/${i}.ts`);
+    const raw = new Map([
+      ['a', [pass(40, 'a', xs.slice(0, 8), 4, 4, 1, 7)]], // 40% of x, left 4.5
+      ['b', [pass(45, 'b', xs.slice(8, 12), 1, 1, 0, 1)]], // 20% more: x audited, still by round 40
+      ['x', [pass(50, 'x', xs, 0, 0, 0, 0), pass(60, 'x', xs, 4, 4, 1, 7)]],
+      ['y', [pass(55, 'y', ['x/0.ts', 'y/1.ts'], 3, 3, 1, 5)]], // a boundary pass: no change
+    ]);
+    const { history } = inheritPasses([{ id: 'x', files: xs }], raw);
+    const bucket = (factor: number) => ({ pairs: 9, predicted: 1, found: factor, factor });
+    const calibration = { minPairs: 5, pairs: [], series: [], factors: { overall: bucket(2), byShared: {} } };
+    expect(lastByRoundIn(history.get('x'), xs, calibration)).toEqual([
+      { round: 45, pass: 40, left: 4.5, leftCorrected: 9 },
+      { round: 50, left: 0 },
+      { round: 60, left: 4.5, leftCorrected: 9 },
+    ]);
+    expect(lastByRoundIn(history.get('x'), xs, calibration).at(-1)).toMatchObject({ left: lastDrawnPassIn(history.get('x'), calibration)!.left });
+    expect(lastByRoundIn([], xs, calibration)).toEqual([]);
   });
 
   it('takes two passes of one round in a merged area as one: left summed, fixes joined, no pair between them', () => {
