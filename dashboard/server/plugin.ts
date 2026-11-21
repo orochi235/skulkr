@@ -130,25 +130,58 @@ export async function listTenants(run: SkulkrRunner): Promise<DashTenant[]> {
 export function tenantArgs(tenants: readonly DashTenant[], name: string, what: 'map' | 'area', area: string | null): string[] | null {
   const t = tenants.find((x) => x.name === name);
   if (!t) return null;
+  // Options first, so an area id the CLI would read as a flag is never placed before them.
   const pick = t.registered ? ['--tenant', t.name] : [];
-  return what === 'map' ? ['map', ...pick] : ['defects', area ?? '', ...pick];
+  return what === 'map' ? ['map', ...pick] : ['defects', ...pick, area ?? ''];
 }
 
-/** The data routes' handler, with its kept tenants and maps. */
-function createRoutes(options: SkulkrRunnerOptions) {
-  const run = createSkulkrRunner(options);
-  const builds = new Map<string, () => Promise<string>>();
+/** A request the routes refuse, told to the client as it is. */
+class Refusal extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+  }
+}
+
+/** The part of a CLI failure worth showing a viewer: its `Error:` line, else its first, never the stack. */
+export function summaryOf(message: string): string {
+  const lines = message.split('\n').map((l) => l.trim()).filter(Boolean);
+  return (lines.find((l) => /^\w*Error: /.test(l)) ?? lines[0] ?? 'failed').slice(0, 300);
+}
+
+/** The area ids in a map's JSON, read once per map text. */
+function createAreaIds(): (text: string) => ReadonlySet<string> {
+  let last: { text: string; ids: ReadonlySet<string> } | null = null;
+  return (text) => {
+    if (last?.text !== text) last = { text, ids: new Set((JSON.parse(text) as { areas: { id: string }[] }).areas.map((a) => a.id)) };
+    return last.ids;
+  };
+}
+
+/** The data routes' handler, with its kept tenants and maps. Each CLI failure is logged here in full, and a viewer sees its summary. */
+export function createRoutes(options: SkulkrRunnerOptions, cli: SkulkrRunner = createSkulkrRunner(options), log: (text: string) => void = console.error) {
+  const run: SkulkrRunner = (args) => cli(args).catch((e: Error) => {
+    log(`skulkr ${args.join(' ')} failed:\n${e.message}`);
+    throw e;
+  });
+  const maps = new Map<string, { kept: () => Promise<KeptAnswer>; ids: (text: string) => ReadonlySet<string> }>();
+  const mapOf = (tenant: string, args: readonly string[]) => {
+    const key = args.join('\n');
+    if (!maps.has(key)) {
+      maps.set(key, { kept: createKeptMap(createMapBuilder(run, args), options.cache === false ? null : mapCachePath(tenant)), ids: createAreaIds() });
+    }
+    return maps.get(key)!;
+  };
   const keptTenants = createKeptMap(() => listTenants(run).then((list) => JSON.stringify(list)), null);
   const json = (res: ServerResponse, body: Promise<string | KeptAnswer>) => body.then((answer) => {
     const { text, error } = typeof answer === 'string' ? { text: answer, error: null } : answer;
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'no-store');
-    if (error) res.setHeader(STALE_HEADER, encodeURIComponent(error));
+    if (error) res.setHeader(STALE_HEADER, encodeURIComponent(summaryOf(error)));
     res.end(text);
   }, (e: Error) => {
-    res.statusCode = 500;
+    res.statusCode = e instanceof Refusal ? e.status : 500;
     res.setHeader('Content-Type', 'text/plain');
-    res.end(e.message);
+    res.end(e instanceof Refusal ? e.message : summaryOf(e.message));
   });
   return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     const [path, query = ''] = (req.url ?? '').split('?') as [string, string?];
@@ -163,13 +196,15 @@ function createRoutes(options: SkulkrRunnerOptions) {
     // The registry is kept like a map, so a tenant added while the server runs shows up within FRESH_MS.
     const tenants = keptTenants().then(({ text }) => JSON.parse(text) as DashTenant[]);
     if (listing) return void json(res, tenants.then((list) => JSON.stringify(list.map(({ name }) => ({ name })))));
-    void json(res, tenants.then((list) => {
-      const args = tenantArgs(list, route!.tenant, route!.what, new URLSearchParams(query).get('id'));
-      if (!args) throw new Error(`no tenant ${route!.tenant}; this dashboard reads ${list.map((t) => t.name).join(', ')}`);
-      if (route!.what === 'area') return run(args);
-      const key = args.join('\n');
-      if (!builds.has(key)) builds.set(key, createKeptMap(createMapBuilder(run, args), options.cache === false ? null : mapCachePath(route!.tenant)));
-      return builds.get(key)!();
+    const { tenant, what } = route!;
+    void json(res, tenants.then(async (list) => {
+      const mapArgs = tenantArgs(list, tenant, 'map', null);
+      if (!mapArgs) throw new Refusal(400, `no tenant ${tenant}; this dashboard reads ${list.map((t) => t.name).join(', ')}`);
+      const map = mapOf(tenant, mapArgs);
+      if (what === 'map') return map.kept();
+      const id = new URLSearchParams(query).get('id') ?? '';
+      if (id.startsWith('-') || !map.ids((await map.kept()).text).has(id)) throw new Refusal(400, `no area ${JSON.stringify(id)} in ${tenant}`);
+      return run(tenantArgs(list, tenant, 'area', id)!);
     }));
   };
 }
