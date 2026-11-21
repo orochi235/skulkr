@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cameHome, dispatch, earlierReview } from './dispatch.mjs';
 
 const dirs: string[] = [];
@@ -94,6 +94,40 @@ describe('dispatch of a model job cut off mid-run', () => {
     const got = await dispatch(ctx, { id: 'a' }, 'match', { ...spec, logPath: join(spec.to, 'j.log') });
     expect(got).toMatchObject({ launched: false, reply: '' });
     expect(usages).toMatchObject([{ costUsd: 0, terminalReason: 'no envelope' }]);
+  });
+});
+
+describe('dispatch of a refused job', () => {
+  it('spends none of its launch retries on refusals', async () => {
+    const spec = { ...job({}), kind: 'review', shell: 'true', task: 't', timeoutMin: 5 };
+    const answers = ['refused', 'refused', 'failed', 'ran'];
+    let runs = 0;
+    const ctx = {
+      cfg: {}, frozen: '/nowhere', base: 'b', say: () => {}, usage: () => {}, refuse: () => {}, budget: { match: 1 },
+      acquire: async () => ({ node: 'studio', placed: false, release: () => {} }),
+      runner: { run: async () => {
+        const answer = answers[runs++];
+        if (answer === 'refused') return { status: 1, refused: true };
+        if (answer === 'failed') return { status: 1 };
+        writeFileSync(join(spec.to, 'exit'), '0');
+        writeFileSync(join(spec.to, 'claude.json'), ok);
+        return { status: 0 };
+      } },
+    };
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      let settled = false;
+      const done = dispatch(ctx, { id: 'a' }, 'match', { ...spec, logPath: join(spec.to, 'j.log') }).finally(() => (settled = true));
+      // Each relaunch wait is set after file work the fake clock does not drive, so step it until dispatch answers.
+      for (let i = 0; i < 20 && !settled; i++) {
+        await new Promise((r) => setImmediate(r));
+        await vi.advanceTimersByTimeAsync(60_000);
+      }
+      expect(await done).toMatchObject({ launched: true, reply: 'done' });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(runs).toBe(4);
   });
 });
 

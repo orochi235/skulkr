@@ -101,6 +101,8 @@ export const dispatch = async (ctx, area, role, spec) => {
       if (!gaveUp) {
         ctx.say(`${role} ${area.id} refused by ${result.node ?? slot.node}, trying ${slot.placed ? 'again' : 'another node'}`);
         if (slot.placed) await sleep(RELAUNCH_WAIT_MS);
+        // A refusal has its own limit, REFUSALS; it spends none of the launches a failed launch may retry with.
+        launches -= 1;
         continue;
       }
       ctx.say(`${role} ${area.id} refused by ${result.node ?? slot.node}; ${stopped ? 'stop requested' : `refused ${refusals} times`}, so not launched`);
