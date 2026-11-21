@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { gitIn } from './batch.mjs';
-import { churnSince, commitsAfter, parseNumstat } from './churn.mjs';
+import { churnSince, commitsAfter, parseNumstat, reachedBy } from './churn.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -68,5 +68,17 @@ describe('churnSince', () => {
     expect(parseNumstat('@abc\n3\t1\tsrc/a.ts\n-\t-\timg.png\n@def\n1\t0\tsrc/b.ts\n')).toEqual({ abc: { 'src/a.ts': 4, 'img.png': 0 }, def: { 'src/b.ts': 1 } });
     const graph = new Map([['d', ['c', 'b']], ['c', ['a']], ['b', ['a']], ['a', []]]);
     expect(commitsAfter(graph, 'b').sort()).toEqual(['c', 'd']);
+  });
+
+  it('marks in one walk which of many commits reach each commit, past one word of bits', () => {
+    // c39 → c38 → … → c0, newest first; c_i reaches every c_j with j <= i.
+    const chain = Array.from({ length: 40 }, (_, i) => `c${39 - i}`);
+    const graph = new Map(chain.map((sha, i) => [sha, i + 1 < chain.length ? [chain[i + 1]!] : []]));
+    const from = [...chain].reverse();
+    const { masks } = reachedBy(graph, from);
+    const reaching = (sha: string) => from.filter((_, k) => masks.get(sha)![k >> 5]! & (1 << (k & 31)));
+    expect(reaching('c0')).toHaveLength(40);
+    expect(reaching('c35')).toEqual(['c35', 'c36', 'c37', 'c38', 'c39']);
+    expect(reaching('c39')).toEqual(['c39']);
   });
 });

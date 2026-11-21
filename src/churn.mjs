@@ -19,17 +19,37 @@ const parentsOf = (text) => new Map(text.split('\n').filter(Boolean).map((line) 
   return [sha, parents];
 }));
 
-/** The commits in `graph` (each commit's parents) that `from` does not reach: `from..HEAD` within it. */
-export const commitsAfter = (graph, from) => {
-  const behind = new Set();
-  const stack = [from];
-  while (stack.length) {
-    const sha = stack.pop();
-    if (behind.has(sha)) continue;
-    behind.add(sha);
-    for (const p of graph.get(sha) ?? []) if (graph.has(p)) stack.push(p);
+/**
+ * For each commit of `graph` (each commit's parents, children listed before parents), which of `from` reach it: a
+ * bitmask by index into `from`, set for a commit `from[k]` is or descends from. Built in one walk, parents taking
+ * their children's bits.
+ */
+export const reachedBy = (graph, from) => {
+  const index = new Map(from.map((sha, k) => [sha, k]));
+  const words = Math.max(1, Math.ceil(from.length / 32));
+  const masks = new Map();
+  const maskOf = (sha) => {
+    let m = masks.get(sha);
+    if (!m) masks.set(sha, (m = new Uint32Array(words)));
+    return m;
+  };
+  for (const [sha, parents] of graph) {
+    const m = maskOf(sha);
+    const k = index.get(sha);
+    if (k !== undefined) m[k >> 5] |= 1 << (k & 31);
+    for (const p of parents) {
+      if (!graph.has(p)) continue;
+      const pm = maskOf(p);
+      for (let w = 0; w < words; w++) pm[w] |= m[w];
+    }
   }
-  return [...graph.keys()].filter((sha) => !behind.has(sha));
+  return { masks, index };
+};
+
+/** The commits in `graph` (each commit's parents, children listed first) that `from` does not reach: `from..HEAD` within it. */
+export const commitsAfter = (graph, from) => {
+  const { masks } = reachedBy(graph, [from]);
+  return [...graph.keys()].filter((sha) => !(masks.get(sha)[0] & 1));
 };
 
 /** `git show --numstat --format=@%H` output → each commit's lines changed by path, for paths `keep` accepts. */
@@ -83,7 +103,7 @@ export const churnSince = (git, entries, { keep = () => true, cacheKey = '', cac
     if (!known.length) return out;
     base = known.length === 1 ? known[0] : git('merge-base', '--octopus', ...known);
   }
-  const graph = parentsOf(git('log', '--format=%H %P', `${base}..HEAD`));
+  const graph = parentsOf(git('log', '--topo-order', '--format=%H %P', `${base}..HEAD`));
   graph.set(base, []);
   const merges = new Set([...graph].filter(([, ps]) => ps.length > 1).map(([sha]) => sha));
 
@@ -100,21 +120,25 @@ export const churnSince = (git, entries, { keep = () => true, cacheKey = '', cac
     renameSync(`${cacheFile}.tmp`, cacheFile);
   }
 
-  // Per pass commit, every later commit's lines summed by path; a pass's own fixes are taken back out after.
-  const after = new Map();
-  for (const c of known) {
-    const later = new Set(commitsAfter(graph, c).filter((sha) => !merges.has(sha)));
-    const byPath = new Map();
-    for (const sha of later) for (const [path, n] of Object.entries(cache[sha] ?? {})) byPath.set(path, (byPath.get(path) ?? 0) + n);
-    after.set(c, { later, byPath });
+  // One walk marks which pass commits reach each commit; each entry then sums only its own files' changes.
+  const { masks, index } = reachedBy(graph, known);
+  const later = (sha, k) => !(masks.get(sha)?.[k >> 5] & (1 << (k & 31)));
+  const files = new Set(entries.flatMap((e) => (index.has(e.commit) ? e.files : [])));
+  const touches = new Map();
+  for (const sha of wanted) {
+    for (const [path, n] of Object.entries(cache[sha] ?? {})) {
+      if (!files.has(path)) continue;
+      if (!touches.has(path)) touches.set(path, []);
+      touches.get(path).push([sha, n]);
+    }
   }
   for (const e of entries) {
-    const since = after.get(e.commit);
-    if (!since) continue;
+    const k = index.get(e.commit);
+    if (k === undefined) continue;
     let lines = 0;
-    for (const f of e.files) lines += since.byPath.get(f) ?? 0;
+    for (const f of e.files) for (const [sha, n] of touches.get(f) ?? []) if (later(sha, k)) lines += n;
     for (const sha of new Set(e.exclude ?? [])) {
-      if (!since.later.has(sha)) continue;
+      if (!graph.has(sha) || merges.has(sha) || !later(sha, k)) continue;
       for (const f of e.files) lines -= cache[sha]?.[f] ?? 0;
     }
     out.set(e.id, lines);

@@ -71,10 +71,14 @@ export const inheritPasses = (areas, raw) => {
   const unlisted = new Map();
   for (const pass of [...raw.values()].flat()) {
     if (!pass.files?.length) {
-      unlisted.set(pass.id, [...(unlisted.get(pass.id) ?? []), pass]);
+      if (!unlisted.has(pass.id)) unlisted.set(pass.id, []);
+      unlisted.get(pass.id).push(pass);
       continue;
     }
-    for (const f of pass.files) byFile.set(f, [...(byFile.get(f) ?? []), pass]);
+    for (const f of pass.files) {
+      if (!byFile.has(f)) byFile.set(f, []);
+      byFile.get(f).push(pass);
+    }
   }
   const history = new Map();
   const covered = new Map();
