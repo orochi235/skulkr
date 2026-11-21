@@ -4,6 +4,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { calibrationOf, correctedLeftOf } from './calibration.mjs';
 import { churnCacheOf, churnSince } from './churn.mjs';
 
 /** A pass that found at most this many distinct defects counts toward settling its area. */
@@ -136,6 +137,28 @@ export const inheritPasses = (areas, raw) => {
   return { history, covered };
 };
 
+/**
+ * A pass as the map draws it: the reviews' counts, Chapman's estimate of what the area held, and what is left, the
+ * last two scaled by `share`, the part of the pass's files the area holds (marked when under 1).
+ */
+export const passOf = (round, date, a, b, shared, distinct, share = 1) => {
+  const est = chapman(a, b, shared);
+  const r = (n) => Math.round(n * 10) / 10;
+  return {
+    round, date, a, b, shared, distinct, est: r(est * share), left: Math.max(0, r((est - distinct) * share)),
+    ...(share < 1 ? { share: Math.round(share * 1000) / 1000 } : {}),
+  };
+};
+
+/** A recorded pass (an `area.json` with its `round` and `share`) as the map draws it. */
+export const drawnPassOf = (p) => passOf(p.round, p.date, p.a ?? 0, p.b ?? 0, p.m ?? 0, p.distinct ?? 0, p.share);
+
+/** Each area's history (`inheritPasses`') as the map draws its passes. */
+export const drawnHistories = (history) => new Map([...history].map(([id, list]) => [id, list.map(drawnPassOf)]));
+
+/** `calibrationOf` over each area's history (`inheritPasses`'), with `pairLines` (`areaStats`') where known. */
+export const calibrationFor = (history, pairLines) => calibrationOf(drawnHistories(history), pairLines);
+
 /** A pass's estimate and what it left, scaled by the share of its files the area holds. */
 export const scaledOf = (pass) => ({ chapman: pass.chapman * (pass.share ?? 1), unfound: pass.unfound * (pass.share ?? 1) });
 
@@ -184,12 +207,19 @@ export const areasInFlight = (unmergedBranches, areaOf = /^audit\d+-(.+)$/) =>
   new Set(unmergedBranches.flatMap((b) => areaOf.exec(b)?.[1] ?? []));
 
 /**
- * Tonight's areas: never audited first, in partition order, then the due ones, most lines changed since their last
- * pass first (`staleLines`, by id), then the longest since their last pass; settled areas, and areas an unlanded
- * round still holds (`inFlight`), are skipped. An area counts as never audited when its `covered` share is under
- * COVERED. `passes` is each area's history (`inheritPasses`'). Answers `{ picked, settled }`, each a list of ids.
+ * Where a due area ranks: what its last pass left, corrected (`correctedLeftOf`), in whole defects, and at least 1
+ * once any of its lines changed since, so a changed area with nothing left competes with one holding about one.
  */
-export const pickAreas = ({ areas, passes, touched, count, inFlight = new Set(), covered = new Map(), staleLines = new Map() }) => {
+export const rankOf = (left, stale) => Math.max(Math.round(left), stale > 0 ? 1 : 0);
+
+/**
+ * Tonight's areas: never audited first, in partition order, then the due ones by `rankOf`, then most lines changed
+ * since their last pass (`staleLines`, by id), then the longest since their last pass; settled areas, and areas an
+ * unlanded round still holds (`inFlight`), are skipped. An area counts as never audited when its `covered` share is
+ * under COVERED. `passes` is each area's history (`inheritPasses`'); `calibration` is `calibrationFor`'s over it,
+ * computed when not given. Answers `{ picked, settled }`, each a list of ids.
+ */
+export const pickAreas = ({ areas, passes, touched, count, inFlight = new Set(), covered = new Map(), staleLines = new Map(), calibration = calibrationFor(passes) }) => {
   const settled = [];
   const fresh = [];
   const seen = [];
@@ -200,10 +230,16 @@ export const pickAreas = ({ areas, passes, touched, count, inFlight = new Set(),
       fresh.push(area.id);
       continue;
     }
-    if (isSettled(area, history, touched)) settled.push(area.id);
-    else seen.push({ id: area.id, last: history.at(-1).round, stale: staleLines.get(area.id) ?? 0 });
+    if (isSettled(area, history, touched)) {
+      settled.push(area.id);
+      continue;
+    }
+    const p = history.at(-1);
+    const stale = staleLines.get(area.id) ?? 0;
+    const left = correctedLeftOf(drawnPassOf(p), calibration);
+    seen.push({ id: area.id, last: p.round, stale, rank: rankOf(left, stale) });
   }
-  seen.sort((x, y) => y.stale - x.stale || x.last - y.last || (x.id < y.id ? -1 : 1));
+  seen.sort((x, y) => y.rank - x.rank || y.stale - x.stale || x.last - y.last || (x.id < y.id ? -1 : 1));
   return { picked: [...fresh, ...seen.map((s) => s.id)].slice(0, count), settled };
 };
 
@@ -222,14 +258,29 @@ export const gitTouched = (git) => (files, from, exclude) => {
 
 /**
  * What the plan and the map read of each area's past for `cfg`'s project: its inherited `history` and `covered`
- * share (`inheritPasses`), and `staleLines`, the lines of its files changed since its last pass, its fixes aside.
+ * share (`inheritPasses`), `staleLines`, the lines of its files changed since its last pass, its fixes aside, and
+ * `pairLines`, keyed `<area>\n<round>`, the lines of its files changed from each pass to the next, that pass's fixes
+ * aside: what changed since the first less what changed since the second.
  */
 export const areaStats = (cfg, git, areas, raw, root) => {
   const { history, covered } = inheritPasses(areas, raw);
-  const entries = areas.flatMap((area) => {
-    const last = history.get(area.id)?.at(-1);
-    return last?.commit ? [{ id: area.id, files: area.files, commit: last.commit, exclude: last.fixCommits ?? [] }] : [];
-  });
-  const staleLines = churnSince(git, entries, { keep: cfg.partition.isSource, cacheFile: churnCacheOf(cfg.name), root });
-  return { history, covered, staleLines };
+  const entries = [];
+  const pairs = [];
+  for (const area of areas) {
+    const list = history.get(area.id) ?? [];
+    const last = list.at(-1);
+    if (last?.commit) entries.push({ id: area.id, files: area.files, commit: last.commit, exclude: last.fixCommits ?? [] });
+    list.forEach((k, i) => {
+      const next = list[i + 1];
+      if (!next || !k.commit || !next.commit) return;
+      const key = `${area.id}\n${k.round}`;
+      pairs.push(key);
+      entries.push({ id: `${key}\nfrom`, files: area.files, commit: k.commit, exclude: k.fixCommits ?? [] });
+      entries.push({ id: `${key}\nto`, files: area.files, commit: next.commit, exclude: [] });
+    });
+  }
+  const lines = churnSince(git, entries, { keep: cfg.partition.isSource, cacheFile: churnCacheOf(cfg.name), root });
+  const staleLines = new Map(areas.flatMap((a) => (lines.has(a.id) ? [[a.id, lines.get(a.id)]] : [])));
+  const pairLines = new Map(pairs.map((key) => [key, Math.max(0, lines.get(`${key}\nfrom`) - lines.get(`${key}\nto`))]));
+  return { history, covered, staleLines, pairLines };
 };

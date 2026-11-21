@@ -75,6 +75,8 @@
   background: oklch(from var(--wzl-swatch-fuchsia) l calc(c * 0.35) h / 0.3);
 }
 
+.corrected { color: var(--audit-muted); }
+
 .share {
   color: var(--audit-muted);
   text-decoration: none;

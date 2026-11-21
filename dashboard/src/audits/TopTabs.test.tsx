@@ -18,15 +18,14 @@ const render = () => renderWithIcons(
 afterEach(cleanup);
 
 describe('TopTabs', () => {
-  it('puts the chart and the queue side by side where the pane fits both, and a tab each where it does not', () => {
+  it('puts the charts, a tab each, beside the queue where the pane fits both, and a tab each of all three where it does not', () => {
     width.px = BOTH_FIT_PX;
     render();
-    expect(screen.getByRole('heading', { name: 'Rounds' })).toBeInTheDocument();
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Rounds', 'Calibration']);
     expect(screen.getByRole('heading', { name: 'Next up' })).toBeInTheDocument();
-    expect(screen.queryByRole('tab')).toBeNull();
     cleanup();
     width.px = BOTH_FIT_PX - 1;
     render();
-    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Rounds', 'Next up']);
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Rounds', 'Calibration', 'Next up']);
   });
 });
