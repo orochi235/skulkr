@@ -309,14 +309,15 @@ Every request but a bare `ping` may carry `tenant`, the project it is about, and
 
 Starting or restarting the service never starts a run, nor stops one: each run is a process group of its own and
 keeps going when the service that started it exits, and a restarted service finds it on disk and reads its latest line
-from its night log. Anything that keeps a process alive and owns its stdin can
-host it (launchd, systemd, tmux); under onto, on the machine holding the project's checkout:
+from its night log. Anything that keeps a process alive and owns its stdin can host it (launchd, systemd, tmux); under
+onto, as the service `skulkr` hosting every registered tenant, on the machine holding their checkouts:
 
-    onto sync --in skulkr-myproject orochi                     # from ~/src/skulkr
-    onto service up skulkr-myproject --in skulkr-myproject --here --prefer orochi \
-      --env SKULKR_CONFIG=$HOME/src/myproject/skulkr.config.mjs --env SKULKR_BIN=$HOME/src/skulkr/bin/skulkr.mjs \
-      --about "Runs the nightly blind-pair audit of myproject." -- bash -lc 'exec node bin/skulkr.mjs service'
-    onto call skulkr-myproject '{"id":1,"status":true}'
+    onto sync --in skulkr orochi                     # from ~/src/skulkr
+    onto service up skulkr --in skulkr --here --prefer orochi --env SKULKR_BIN=$HOME/src/skulkr/bin/skulkr.mjs \
+      --about "Runs the nightly blind-pair audits of the registered tenants." -- bash -lc 'exec node bin/skulkr.mjs service'
+    onto call skulkr '{"id":1,"status":true,"tenant":"myproject"}'
+
+`--env SKULKR_CONFIG=<a config>` makes it host that project alone instead.
 
 `SKULKR_BIN` makes each run start from the skulkr checkout rather than the service's synced copy, so a change to
 the pipeline reaches the next run without a sync.
@@ -424,9 +425,12 @@ npm run menubar:install      # links `skulkr` into ~/.local/bin, then perch buil
 npm run menubar:uninstall
 ```
 
-Its wording comes from `skulkr menu` (`src/menu.mjs`), which asks the service for each tenant's status the way
-`onto call` does, so it reads like the dashboard; `menubar/menubar.yaml` only lays the lines out. perch writes the
-`PATH` you install from into the item's LaunchAgent, so install from a shell where `node` and `onto` resolve.
+Its wording comes from `skulkr menu` (`src/menu.mjs`), which asks the service for each registered tenant's status
+the way `onto call` does, so it reads like the dashboard; `menubar/menubar.yaml` only lays the lines out. The service
+it asks is `SKULKR_SERVICE`, else `skulkr` (as "The service" brings it up), and the dashboard it links is
+`SKULKR_DASHBOARD_URL`, else `http://localhost:5214/`. perch writes only the `PATH` you install from into the item's
+LaunchAgent, so install from a shell where `node` and `onto` resolve, and set either variable in `menubar.yaml`'s
+`run` (`[env, SKULKR_SERVICE=skulkr-myproject, skulkr, menu]`).
 
 ## Where things go
 

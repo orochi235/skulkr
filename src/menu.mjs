@@ -5,8 +5,11 @@
 import { execFileSync } from 'node:child_process';
 import { readTenants } from './tenants.mjs';
 
-/** Where the dashboard serves, as `emilia up` starts it (`DEV_PORT` in `dashboard/vite.config.ts`). */
-export const DASHBOARD_URL = 'http://localhost:5214/';
+/** The service `onto call` asks: `SKULKR_SERVICE`, else `skulkr`. */
+export const serviceName = (env = process.env) => env.SKULKR_SERVICE ?? 'skulkr';
+
+/** Where the dashboard serves: `SKULKR_DASHBOARD_URL`, else as `emilia up` starts it (`DEV_PORT` in `dashboard/vite.config.ts`). */
+export const dashboardUrl = (env = process.env) => env.SKULKR_DASHBOARD_URL ?? 'http://localhost:5214/';
 
 const money = (usd) => `$${(usd ?? 0).toFixed(2)}`;
 const clock = (iso) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -23,7 +26,7 @@ const verdictOf = (report) => /^(\w+)/.exec(report ?? '')?.[1] ?? 'ended';
  * none. Answers `{ title, live, rows, last, problems, dashboard }`; `live` counts the rounds running, `rows` are one
  * per live round with its last log line under it, `last` one per tenant's last finished round.
  */
-export const menuOf = (answers, now = Date.now()) => {
+export const menuOf = (answers, now = Date.now(), dashboard = dashboardUrl()) => {
   const rows = [];
   const last = [];
   const problems = [];
@@ -42,13 +45,13 @@ export const menuOf = (answers, now = Date.now()) => {
   }
   const live = rows.length;
   const title = live ? `${live} round${live === 1 ? '' : 's'} running` : 'No round running';
-  return { title, live, rows, last, problems, dashboard: DASHBOARD_URL, at: new Date(now).toISOString() };
+  return { title, live, rows, last, problems, dashboard, at: new Date(now).toISOString() };
 };
 
 /** The service's status for `tenant`, or null when `onto call` fails or does not answer in time. */
 const statusOf = (tenant) => {
   try {
-    const out = execFileSync('onto', ['call', 'skulkr', JSON.stringify({ id: 1, status: true, tenant })],
+    const out = execFileSync('onto', ['call', serviceName(), JSON.stringify({ id: 1, status: true, tenant })],
       { encoding: 'utf8', timeout: 15_000, stdio: ['ignore', 'pipe', 'ignore'] });
     const reply = JSON.parse(out);
     return reply.error ? null : reply;
