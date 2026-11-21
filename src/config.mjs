@@ -156,10 +156,10 @@ export const DEFAULTS = {
     settingSources: 'project,local',
     /**
      * The prompt cache's lifetime per role (`CLAUDE_CODE_PROMPT_CACHE_TTL`: `5m` or `1h`); unset takes Claude Code's
-     * default (null, or unset), an hour on a subscription's plan usage. A review's and a match's turns come seconds apart, so a five-minute
-     * write (1.25× input, against 2× for an hour's) loses nothing; a fixer's can wait out a test run, so it keeps the default.
+     * default (null, or unset), an hour on a subscription's plan usage. A five-minute write costs 1.25× input against 2× for
+     * an hour's; a fixer (and a repair, which shares its role) loses on it only when a turn waits more than five minutes.
      */
-    cacheTtl: { review: '5m', match: '5m', fix: undefined },
+    cacheTtl: { review: '5m', match: '5m', fix: '5m' },
     timeoutMin: 45,
     /**
      * A reviewer's `--expect`, drawn only when it prints no progress of its own: weasel's rounds 38–40 ran 6.9 min

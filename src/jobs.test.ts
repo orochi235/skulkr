@@ -23,11 +23,12 @@ describe('job command lines', () => {
     expect(match).not.toContain('--effort');
   });
 
-  it("ask for a five-minute cache for reviews and matches, and leave a fixer's to Claude Code", () => {
+  it('ask for a five-minute cache for every role, and none where the config unsets it', () => {
     const cfg = resolveConfig({});
     expect(claudeOf(reviewShell(cfg, 'core', 8))).toContain('CLAUDE_CODE_PROMPT_CACHE_TTL=5m');
     expect(claudeOf(matchShell(cfg, 'core', 1))).toContain('CLAUDE_CODE_PROMPT_CACHE_TTL=5m');
-    expect(claudeOf(fixShell(cfg, 'core', 15, 3))).not.toContain('CLAUDE_CODE_PROMPT_CACHE_TTL');
+    expect(claudeOf(fixShell(cfg, 'core', 15, 3))).toContain('CLAUDE_CODE_PROMPT_CACHE_TTL=5m');
+    expect(claudeOf(repairShell(cfg, 'core', 15))).toContain('CLAUDE_CODE_PROMPT_CACHE_TTL=5m');
     expect(claudeOf(reviewShell(resolveConfig({ claude: { cacheTtl: { review: null } } }), 'core', 8))).not.toContain('CACHE_TTL');
   });
 

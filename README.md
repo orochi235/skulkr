@@ -101,7 +101,7 @@ export default {
     models: { match: 'haiku' },       // per role (review, match, fix); unset takes what the job's settings give
     effort: {},                       // per role, `--effort`; unset likewise
     settingSources: 'project,local',  // `--setting-sources`: the node account's own settings stay out; null omits it
-    cacheTtl: { review: '5m', match: '5m' }, // per role, the prompt cache's lifetime; unset takes Claude Code's default
+    cacheTtl: { review: '5m', match: '5m', fix: '5m' }, // per role, the prompt cache's lifetime; unset takes Claude Code's default
     timeoutMin: 45,
   },
 
