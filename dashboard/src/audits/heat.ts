@@ -33,3 +33,6 @@ export function rampAt(stops: readonly string[], f: number): string {
   const mix = (x: number, y: number) => lerp(x, y, t);
   return `oklch(${mix(a[0], b[0]).toFixed(4)} ${mix(a[1], b[1]).toFixed(4)} ${hueBetween(a[2], b[2], t).toFixed(2)})`;
 }
+
+/** The treemap's fill for an area with `left` defects estimated left, on the heat scale `at` sets, along `depth`. */
+export const heatColorOf = (depth: readonly string[], at: (left: number) => number, left: number): string => rampAt(depth, at(left));

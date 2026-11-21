@@ -20,15 +20,16 @@ export const BOTH_FIT_PX = 560;
 
 /** The rounds and calibration charts and the queue beside the run lanes: the charts a tab each beside the queue where
  *  the pane has room for both, else a tab each of all three, with the viewer's choice kept. */
-export function TopTabs({ rounds, calibration, area, areas, next, onPick, onLight }: {
+export function TopTabs({ rounds, calibration, area, areas, heatOf, next, onPick, onLight }: {
   rounds: readonly AuditRound[]; calibration?: AuditCalibration | undefined; area?: AuditArea | null; areas: readonly AuditArea[];
+  heatOf?: (left: number) => string;
   next: readonly AuditArea[]; onPick: (id: string) => void; onLight: (id: string | null) => void;
 }) {
   const [tab, setTab, keep] = useViewerPref<TopTab>('topTab', 'rounds', readTab);
   const choose = (key: TopTab) => { setTab(key); keep(key); };
   const box = useRef<HTMLDivElement>(null);
   const both = useElementSize(box).width >= BOTH_FIT_PX;
-  const chart = <RoundsChart rounds={rounds} area={area} areas={areas} />;
+  const chart = <RoundsChart rounds={rounds} area={area} areas={areas} heatOf={heatOf} />;
   const calib = <CalibrationChart calibration={calibration} />;
   const queue = <NextUp areas={next} onPick={onPick} onLight={onLight} />;
   return (

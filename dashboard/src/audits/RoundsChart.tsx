@@ -49,8 +49,10 @@ const passesText = (n: number) => (n === 0 ? 'has not been audited yet' : `has $
 /** Each round's distinct defects found per area, against Chapman's estimate per area of what its areas held; or,
  *  given an `area` with at least {@link AREA_CHART_PASSES} passes, each of that area's passes, each beside what an
  *  area's pass in the same place found on average across `areas`. */
-export function RoundsChart({ rounds: all, area: picked, areas = [] }: {
+export function RoundsChart({ rounds: all, area: picked, areas = [], heatOf }: {
   rounds: readonly AuditRound[]; area?: AuditArea | null; areas?: readonly AuditArea[];
+  /** The treemap's fill for an area with this many defects left; an area's bars take the one each pass left it at. */
+  heatOf?: (left: number) => string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const measured = useElementSize(box);
@@ -90,8 +92,8 @@ export function RoundsChart({ rounds: all, area: picked, areas = [] }: {
           {rounds.map((r, i) => (
             <g key={r.round}>
               {!isPartial(r) && <rect className={s.est} x={x(i)} width={bar} y={y(perArea(r.est, r))} height={y(0) - y(perArea(r.est, r))} />}
-              <rect className={r.pending || isPartial(r) ? s.pending : s.found} x={x(i)} width={bar} y={y(perArea(r.distinct, r))} height={y(0) - y(perArea(r.distinct, r))}
-                fill={r.pending || isPartial(r) ? `url(#${hatch})` : undefined}>
+              <rect className={r.pending || isPartial(r) ? s.pending : area && heatOf ? s.heat : s.found} x={x(i)} width={bar} y={y(perArea(r.distinct, r))} height={y(0) - y(perArea(r.distinct, r))}
+                fill={r.pending || isPartial(r) ? `url(#${hatch})` : area && heatOf ? heatOf(area.passes[i]!.left) : undefined}>
                 <title>{area
                   ? `round ${r.round}${r.pending ? ` (${PENDING_LABEL[r.pending]})` : ''}: ${r.distinct} found and ${r.est.toFixed(1)} estimated in ${area.id}`
                   : `round ${r.round}${r.pending ? ` (${PENDING_LABEL[r.pending]})` : ''}: ${perArea(r.distinct, r).toFixed(1)} found and ${perArea(r.est, r).toFixed(1)} estimated per area; ${r.distinct} and ${r.est} over ${r.areas} areas`}{r.incomplete ? `; ${r.incomplete} more came back incomplete and are not counted${isPartial(r) ? ', too many to estimate from' : ''}` : ''}</title>
@@ -120,7 +122,7 @@ export function RoundsChart({ rounds: all, area: picked, areas = [] }: {
             <PopoverDialog aria-label="What the rounds chart shows" className={s.aboutText}>
               {area ? <><strong>{area.id}</strong>, each round that read it.</> : 'Per area the round read.'} Solid: distinct defects
               found. Dashed: Chapman&apos;s estimate of what those areas held. Hatched: a round not merged yet, or still running,
-              read from its run&apos;s own results.{area ? ' Gray: what an area\'s pass in the same place (its first, second, …) found on average, across every area.' : ''}
+              read from its run&apos;s own results.{area && heatOf ? ' Each pass is colored as the map would have drawn the area after it, by the defects it left.' : ''}{area ? ' Gray: what an area\'s pass in the same place (its first, second, …) found on average, across every area.' : ''}
             </PopoverDialog>
           </Popover>
         </DialogTrigger>

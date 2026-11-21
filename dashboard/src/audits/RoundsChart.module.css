@@ -40,6 +40,9 @@
 
 .found { fill: var(--audit-depth-2); }
 
+/* An area's pass, filled by the `fill` attribute with the heat the map gives what it left, so no `fill` here. */
+.heat { stroke: var(--audit-muted); stroke-width: 0.5; }
+
 /* What an area's pass in the same place found on average, beside the picked area's own. */
 .avg { fill: var(--audit-muted); opacity: 0.55; }
 

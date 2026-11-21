@@ -10,7 +10,8 @@ import { LaneViewControls, LiveRuns, useLaneView, type LaneSettings } from './Li
 import { Stats } from './Stats';
 import { TopTabs } from './TopTabs';
 import { Treemap } from './Treemap';
-import { NEXT_UP_ROUNDS, nextUpOf, runHolding, statsFor } from './areaData';
+import { NEXT_UP_ROUNDS, heatScaleOf, nextUpOf, runHolding, statsFor } from './areaData';
+import { heatColorOf } from './heat';
 import { createAuditScene } from './auditScene';
 import { liveEstimatesOf, phasesOf, withLivePasses } from './phases';
 import { continuousText } from './runData';
@@ -70,6 +71,10 @@ function Chart({ map, areaUrl, view }: { map: SkulkrMap; areaUrl: (id: string) =
   const picked = selection.current[0] ?? null;
   const shownId = hovered ?? picked;
   const areas = useMemo(() => withLivePasses(map.areas, map.runs), [map.areas, map.runs]);
+  const heatOf = useMemo(() => {
+    const { at } = heatScaleOf(areas);
+    return (left: number) => heatColorOf(colors.depth, at, left);
+  }, [areas, colors.depth]);
   const area = areas.find((a) => a.id === shownId);
   const pickedArea = picked ? areas.find((a) => a.id === picked) ?? null : null;
   const stats = useMemo(() => statsFor(areas), [areas]);
@@ -86,7 +91,7 @@ function Chart({ map, areaUrl, view }: { map: SkulkrMap; areaUrl: (id: string) =
       <div className={s.top}>
         <div className={s.runs}><LiveRuns runs={map.runs} unmerged={unmerged} now={Date.parse(map.generated)} on={on} view={view} focus={picked} /></div>
         <ResizeHandle className={s.vseam} value={tabsWidth} min={TABS.min} max={TABS.max} invert onInput={setTabsWidth} onChange={keepTabs} aria-label="Resize the rounds and queue tabs" />
-        <TopTabs rounds={map.rounds} calibration={map.calibration} area={pickedArea} areas={areas} next={next} onPick={pick} onLight={setLit} />
+        <TopTabs rounds={map.rounds} calibration={map.calibration} area={pickedArea} areas={areas} heatOf={heatOf} next={next} onPick={pick} onLight={setLit} />
       </div>
       <ResizeHandle
         className={s.seam} orientation="horizontal" value={topHeight} min={TOP.min} max={TOP.max}

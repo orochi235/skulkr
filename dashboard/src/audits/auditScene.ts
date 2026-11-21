@@ -4,7 +4,7 @@ import { deepEqual } from '@weasel-js/registry';
 import { AUDIT_PAINTER, type AuditCellData, type AuditFrameData, type AuditNodeData } from './auditPainter';
 import { glyphPathsOf } from './glyph';
 import { changedSincePass, heatScaleOf, labelIn, toneOf, wrapAtDots, type HeatScale } from './areaData';
-import { rampAt } from './heat';
+import { heatColorOf, rampAt } from './heat';
 import type { MapCell, MapFrame } from './mapLayout';
 import type { AuditPhase } from './phases';
 import type { AuditArea } from './skulkrMap.types';
@@ -117,7 +117,7 @@ function cellData(
   // An estimate older than its files' last changes wears a cut corner; its color stays the heat its estimate gives,
   // since a color washed toward the panel reads as another estimate.
   const worn = typeof tone === 'object' && changedSincePass(area);
-  const fill = tone === 'settled' ? palette.settled : tone === 'unaudited' ? palette.uncharted : rampAt(palette.depth, heat.at(tone.left));
+  const fill = tone === 'settled' ? palette.settled : tone === 'unaudited' ? palette.uncharted : heatColorOf(palette.depth, heat.at, tone.left);
   const ink = tone === 'unaudited' ? palette.ink : inkOn(fill, palette);
   const live = area.status === 'tonight';
   const labeled = cell.width > 52 && cell.height > 28;
