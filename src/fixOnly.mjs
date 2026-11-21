@@ -2,17 +2,9 @@
  * A fix-only round: fixers, with no reviewers, for areas holding open findings (`carry.mjs`), then verify, repair,
  * batch, and capstone as any round does after matching. README.md, "Carried findings", is its documentation.
  */
-import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { areasAtOnce, startAreas } from './admit.mjs';
-import { fix } from './area.mjs';
+import { fixInto, fixedPart, jobsPart, makeRecordDir, stageIn } from './area.mjs';
 import { writeCarried } from './carryBrief.mjs';
-import { JOB_IN } from './config.mjs';
-import { CHECKS_IN, PROGRESS_IN, progressSource } from './jobs.mjs';
-import { totals } from './usage.mjs';
-
-const round1 = (n) => Number(n.toFixed(1));
-const cents = (n) => Number(n.toFixed(2));
 
 /** `--fix-only`'s value: `true` for every area with open findings, else the list of areas it names. */
 export const fixOnlyArg = (value) => (value === undefined ? undefined : value === '' || value === 'all' ? true : value.split(',').filter(Boolean));
@@ -44,32 +36,16 @@ const carriedOnlySource = (ctx) => `No reviewer ran in this round. Every finding
 
 /** One area's fixer on its carried findings alone. Answers its summary, the shape `runArea`'s takes. */
 export const fixCarried = async (ctx, area, carried) => {
-  const inDir = join(ctx.frozen, JOB_IN, area.id);
-  mkdirSync(inDir, { recursive: true });
-  copyFileSync(progressSource(), join(ctx.frozen, PROGRESS_IN));
-  writeFileSync(join(ctx.frozen, CHECKS_IN), `${JSON.stringify(ctx.cfg.checks.tally ?? {})}\n`);
-  const dir = join(ctx.nightDir, 'areas', area.id);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'files.txt'), `${area.files.join('\n')}\n`);
+  stageIn(ctx, area);
+  const dir = makeRecordDir(ctx, area);
   const source = [carriedOnlySource(ctx), writeCarried(ctx, area.id, carried, dir)].join('\n\n');
-  const fixed = await fix(ctx, area, carried.length, source);
-  if (fixed.report) writeFileSync(join(dir, 'fix.md'), fixed.report);
-  if (fixed.mbox) copyFileSync(fixed.mbox, join(dir, 'fix.mbox'));
+  const fixed = await fixInto(ctx, area, dir, carried.length, source);
   const records = [fixed.usage, ...(fixed.repairUsage ?? [])].filter(Boolean);
-  const spent = totals(records);
   return {
     id: area.id, commit: ctx.commit, date: ctx.date, files: area.files, fixOnly: true, carried: carried.length,
     a: 0, b: 0, m: 0, distinct: 0, read: { A: 0, B: 0 },
-    patches: fixed.patches ?? 0,
-    ...(fixed.verify ? { verify: fixed.verify } : {}),
-    questions: (fixed.report?.match(/\bquestion\b/gi) ?? []).length,
-    budgetHit: records.filter((r) => r.budgetHit).map((r) => r.role),
-    jobs: {
-      minutes: { fix: round1(fixed.minutes ?? 0), ...(fixed.repairs?.length ? { repair: round1(fixed.repairs.reduce((t, r) => t + r.minutes, 0)) } : {}) },
-      nodes: { fix: fixed.node },
-      weightedTokens: spent.weightedTokens,
-      costUsd: cents(spent.costUsd),
-    },
+    ...fixedPart(fixed, records),
+    jobs: jobsPart({}, { fix: fixed.node }, fixed, records),
     fixCommits: [],
   };
 };

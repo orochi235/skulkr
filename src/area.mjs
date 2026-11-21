@@ -88,22 +88,62 @@ export const fix = async (ctx, area, findings, source = reviewedSource(ctx, area
   };
 };
 
+/** Readies the frozen tree's `.skulkr/in` for `area`'s jobs: its directory, the progress filter, and the tally checks. Answers the directory. */
+export const stageIn = (ctx, area) => {
+  const inDir = join(ctx.frozen, JOB_IN, area.id);
+  mkdirSync(inDir, { recursive: true });
+  copyFileSync(progressSource(), join(ctx.frozen, PROGRESS_IN));
+  writeFileSync(join(ctx.frozen, CHECKS_IN), `${JSON.stringify(ctx.cfg.checks.tally ?? {})}\n`);
+  return inDir;
+};
+
+/** Makes the night's record directory of `area`, with its file list. Answers it. */
+export const makeRecordDir = (ctx, area) => {
+  const dir = join(ctx.nightDir, 'areas', area.id);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'files.txt'), `${area.files.join('\n')}\n`);
+  return dir;
+};
+
+/** {@link fix}, its report and commits then copied into the area's record directory `dir`. */
+export const fixInto = async (ctx, area, dir, findings, source) => {
+  const fixed = await fix(ctx, area, findings, source);
+  if (fixed.report) writeFileSync(join(dir, 'fix.md'), fixed.report);
+  if (fixed.mbox) copyFileSync(fixed.mbox, join(dir, 'fix.mbox'));
+  return fixed;
+};
+
+/** The fixer's part of an area's summary, `fixed` its result if it ran and `records` every usage record of the area. */
+export const fixedPart = (fixed, records, carried = 0) => ({
+  patches: fixed?.patches ?? 0,
+  ...(carried ? { carried } : {}),
+  ...(fixed?.verify ? { verify: fixed.verify } : {}),
+  questions: (fixed?.report?.match(/\bquestion\b/gi) ?? []).length,
+  budgetHit: records.filter((r) => r.budgetHit).map((r) => r.role),
+});
+
+/** An area's `jobs`: `minutes` of the jobs before the fixer, then the fixer's and its repairs', `nodes`, and what `records` spent. */
+export const jobsPart = (minutes, nodes, fixed, records) => {
+  const spent = totals(records);
+  return {
+    minutes: { ...minutes, fix: round1(fixed?.minutes ?? 0), ...(fixed?.repairs?.length ? { repair: round1(fixed.repairs.reduce((t, r) => t + r.minutes, 0)) } : {}) },
+    nodes,
+    weightedTokens: spent.weightedTokens,
+    costUsd: cents(spent.costUsd),
+  };
+};
+
 /**
  * The whole area. `previous` is its last pass, if any, `changedSince` the files of the area that changed after it,
  * and `carried` its open findings from earlier rounds. Answers the area's summary, which becomes its `area.json`.
  */
 export const runArea = async (ctx, area, { previous, changedSince, carried = [] }) => {
-  const inDir = join(ctx.frozen, JOB_IN, area.id);
-  mkdirSync(inDir, { recursive: true });
+  const inDir = stageIn(ctx, area);
   const vars = { ...projectVars(ctx.cfg, 'reviewer'), round: ctx.round, area: area.id, commit: ctx.commit, out: `${JOB_OUT}/findings.md`, files: area.files.map((f) => `- ${f}`).join('\n') };
   writeFileSync(join(inDir, 'review.md'), fill(brief(ctx.cfg, 'reviewer'), vars));
   writeFileSync(join(inDir, 'files.txt'), `${area.files.join('\n')}\n`);
-  copyFileSync(progressSource(), join(ctx.frozen, PROGRESS_IN));
-  writeFileSync(join(ctx.frozen, CHECKS_IN), `${JSON.stringify(ctx.cfg.checks.tally ?? {})}\n`);
   const [a, b] = await Promise.all([review(ctx, area, 'A'), review(ctx, area, 'B')]);
-  const dir = join(ctx.nightDir, 'areas', area.id);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'files.txt'), `${area.files.join('\n')}\n`);
+  const dir = makeRecordDir(ctx, area);
   for (const [name, text] of [['A.md', a.text], ['B.md', b.text]]) {
     writeFileSync(join(dir, name), text);
     writeFileSync(join(inDir, name), text);
@@ -119,13 +159,10 @@ export const runArea = async (ctx, area, { previous, changedSince, carried = [] 
   const carry = toCarry(carried, [...a.findings, ...b.findings]);
   const carriedText = writeCarried(ctx, area.id, carry, dir);
   const fixed = distinct + carry.length > 0
-    ? await fix(ctx, area, distinct + carry.length, [reviewedSource(ctx, area.id), carriedText].filter(Boolean).join('\n\n'))
+    ? await fixInto(ctx, area, dir, distinct + carry.length, [reviewedSource(ctx, area.id), carriedText].filter(Boolean).join('\n\n'))
     : undefined;
-  if (fixed?.report) writeFileSync(join(dir, 'fix.md'), fixed.report);
-  if (fixed?.mbox) copyFileSync(fixed.mbox, join(dir, 'fix.mbox'));
   const changed = new Set(changedSince);
   const records = [a.usage, b.usage, matched.usage, fixed?.usage, ...(fixed?.repairUsage ?? [])].filter(Boolean);
-  const spent = totals(records);
   return {
     id: area.id, commit: ctx.commit, date: ctx.date, files: area.files,
     a: na, b: nb, m, distinct,
@@ -133,20 +170,8 @@ export const runArea = async (ctx, area, { previous, changedSince, carried = [] 
     read: { A: a.read, B: b.read },
     newCode: previous ? { since: previous.round, changedFiles: changed.size, findings: [...a.findings, ...b.findings].filter((f) => citedPaths(f, ctx.cfg.citedRe).some((p) => changed.has(p))).length } : undefined,
     previous: previous ? { round: previous.round, chapman: previous.chapman, unfound: previous.unfound } : undefined,
-    patches: fixed?.patches ?? 0,
-    ...(carry.length ? { carried: carry.length } : {}),
-    ...(fixed?.verify ? { verify: fixed.verify } : {}),
-    questions: (fixed?.report.match(/\bquestion\b/gi) ?? []).length,
-    budgetHit: records.filter((r) => r.budgetHit).map((r) => r.role),
-    jobs: {
-      minutes: {
-        A: round1(a.minutes), B: round1(b.minutes), match: round1(matched.minutes), fix: round1(fixed?.minutes ?? 0),
-        ...(fixed?.repairs?.length ? { repair: round1(fixed.repairs.reduce((t, r) => t + r.minutes, 0)) } : {}),
-      },
-      nodes: { A: a.node, B: b.node, fix: fixed?.node },
-      weightedTokens: spent.weightedTokens,
-      costUsd: cents(spent.costUsd),
-    },
+    ...fixedPart(fixed, records, carry.length),
+    jobs: jobsPart({ A: round1(a.minutes), B: round1(b.minutes), match: round1(matched.minutes) }, { A: a.node, B: b.node, fix: fixed?.node }, fixed, records),
     fixCommits: [],
   };
 };
