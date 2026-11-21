@@ -151,6 +151,21 @@ describe('a red capstone', () => {
     expect(leftOutIn(state).map((e: { branch: string }) => e.branch)).toEqual(['audit4-src']);
   });
 
+  it("deletes an earlier round's blamed branch whose own failure went away without it, though the batch lands over an old one", async () => {
+    const r = round({ docs: { 'docs/d.md': 'e' } });
+    r.git('checkout', '-q', '-b', 'audit4-src', r.commit);
+    writeFileSync(join(r.root, 'src/a.ts'), 'broken');
+    r.git('commit', '-qam', 'fix src in round 4');
+    r.git('checkout', '-q', 'main');
+    const state = scratch();
+    writeFileSync(join(state, 'left-out.json'), JSON.stringify({ branches: [{ branch: 'audit4-src', round: 4, why: 'merge conflict in x' }] }));
+    const gate = `echo "fleet-fail: core src/x.test.ts :: x > old"; echo " FAIL  src/x.test.ts > x > old"; ${GATE}; exit 1`;
+    const { report } = await land(r, async () => ({ ok: false }), { command: ['bash', '-c', gate] }, async (files) => files.filter((f) => f === 'src/x.test.ts'), state);
+    expect(report).toMatch(/^main fast-forwarded to \w+; .*landed over 1 failures main already has \(src\/x\.test\.ts\)/);
+    expect(r.git('branch', '--list', 'audit4-src')).toBe('');
+    expect(leftOutIn(state)).toEqual([]);
+  });
+
   it('starts a repair only while the dollar cap and stop requests allow, leaving out the branches it does not repair', async () => {
     const r = round({ src: { 'src/a.ts': 'broken' }, docs: { 'docs/d.md': 'e' } });
     const asked: string[] = [];

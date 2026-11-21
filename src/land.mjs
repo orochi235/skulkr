@@ -201,12 +201,16 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
       onLanded({ tip: tested.tip, areas: batch.merged.filter((b) => !earlier.has(b)).map(idOf) });
       // Another round may have landed and deleted a branch both took from the left-out record. A branch the capstone
       // dropped goes too, as a verify failure leaves no branch: kept, it would hold its area out of every later plan.
-      // One blamed but never repaired (an earlier round's, or one the cap skipped) goes only once the gate without it
-      // came back green; landed over failures main already has, the blame is unproven, so it is kept for a retry.
-      const unproven = [...(cycle?.skipped ?? []), ...(cycle?.unrepairable ?? [])];
-      const proven = !tested.report;
-      for (const b of [...batch.merged, batch.name, ...(cycle?.dropped ?? []), ...(proven ? unproven : [])]) tryDelete(git, b);
-      if (!proven) for (const b of cycle?.skipped ?? []) left.push({ branch: b, round, why: 'its capstone repair never started, and the gate stayed red only on failures main already has' });
+      // One blamed but never repaired (an earlier round's, or one the cap skipped) goes when a failure laid at it went
+      // away without it. It is kept for a retry only when every failure laid at it is one main already has, so the
+      // blame is unproven; deleting it then would destroy good fixes, and keeping a proven one would retry it forever.
+      const already = new Set(over ?? []);
+      const laidAt = (b) => cycle.byBranch[b] ?? cycle.byBranch[idOf(b)] ?? [];
+      const unproven = (b) => laidAt(b).length > 0 && laidAt(b).every((f) => already.has(f));
+      const unrepaired = [...(cycle?.skipped ?? []), ...(cycle?.unrepairable ?? [])];
+      const kept = unrepaired.filter(unproven);
+      for (const b of [...batch.merged, batch.name, ...(cycle?.dropped ?? []), ...unrepaired.filter((b) => !kept.includes(b))]) tryDelete(git, b);
+      for (const b of (cycle?.skipped ?? []).filter((b) => kept.includes(b))) left.push({ branch: b, round, why: 'its capstone repair never started, and every failure laid at it is one main already has' });
     }
     return `${result}${tried}`;
   } finally {
