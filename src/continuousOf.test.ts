@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -36,5 +37,14 @@ describe('continuousOf', () => {
     expect(now.next).toMatchObject({ start: false, why: expect.stringContaining('the night\'s budget') });
     expect(now.queues).toEqual({ model: null, fleet });
     expect(continuousOf(cfg, { now: at('23:50'), fleet, pending: 1 }).next).toMatchObject({ why: 'a round is starting' });
+  });
+
+  it('counts a round that died without a summary at its last status\'s spend', () => {
+    const state = mkdtempSync(join(tmpdir(), 'skulkr-cont-'));
+    dirs.push(state);
+    const cfg = resolveConfig({ name: 'p', state, areasPerRound: 4, budget: { nightUsd: 100 } });
+    const dead = spawnSync(process.execPath, ['-e', '']).pid;
+    write(state, 43, 'status.json', { started: at('23:00').toISOString(), step: 'review', costUsd: 25, pid: dead });
+    expect(continuousOf(cfg, { now: at('23:50'), fleet }).budget).toMatchObject({ spentUsd: 25 });
   });
 });

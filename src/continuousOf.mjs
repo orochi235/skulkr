@@ -1,7 +1,7 @@
 /** A tenant's continuous mode as its state on disk says now: what the service decides from, and what status shows. */
 import { budgetNight, modeOf, nextContinuous, queuesOf, roundEstimate, spentSince } from './continuous.mjs';
 import { readFleet } from './fleet.mjs';
-import { finishedRuns, liveRuns, readContinuous } from './runs.mjs';
+import { finishedRuns, lastWords, liveRuns, readContinuous } from './runs.mjs';
 
 const cents = (n) => Math.round(n * 100) / 100;
 
@@ -14,9 +14,8 @@ const cents = (n) => Math.round(n * 100) / 100;
 export const continuousOf = (cfg, { now = new Date(), pending = 0, idleUntil, readOnly = false, fleet } = {}) => {
   const live = liveRuns(cfg.state);
   const finished = finishedRuns(cfg.state);
-  const liveRounds = new Set(live.map((r) => r.round));
   const night = budgetNight(now, cfg.schedule.stopAt);
-  const spentUsd = spentSince([...live, ...finished.filter((f) => !liveRounds.has(f.round))], night.from);
+  const spentUsd = spentSince(lastWords(cfg.state), night.from);
   const estimate = roundEstimate({ finished, areasPerRound: cfg.areasPerRound, areaGuessUsd: cfg.budget.areaGuessUsd });
   const nightUsd = cfg.budget.nightUsd ?? null;
   const mode = modeOf({ now, schedule: cfg.schedule, nightUsd, override: readContinuous(cfg.state) });

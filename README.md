@@ -347,8 +347,8 @@ Each tick (every 30 seconds) the service starts a tenant's next round when all o
 - the night's spend plus the next round's estimate stays within `budget.nightUsd`.
 
 The night, for the budget, runs from one `stopAt` to the next, so a round started in the afternoon counts against
-the coming night. Its spend is every round started in it, from `status.json` while live and `summary.json` after
-(run directories from the last day are never pruned). The estimate is `areasPerRound` times the mean cost per
+the coming night. Its spend is every round started in it, from `status.json` while live and `summary.json` after, or
+the last `status.json` of one that died without a summary (run directories from the last day are never pruned). The estimate is `areasPerRound` times the mean cost per
 finished area of the last five rounds, or `areasPerRound × budget.areaGuessUsd` before any. Each continuous round
 runs with `--cap-usd` set to the night's budget left or `budget.capUsd`, whichever is less. A continuous round that
 claims nothing or fails ends the chain for the night. `stopAt` still stops every run dispatching, as before.

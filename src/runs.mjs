@@ -85,6 +85,16 @@ export const finishedRuns = (state) => rounds(state).flatMap((round) => {
   return summary ? [{ ...summary, round }] : [];
 });
 
+/**
+ * Every run's last word on itself, by round: its summary once it ended, else its status, whether it still runs or died
+ * without a summary. What a night's spend is summed from, so a crashed round still counts at its last `costUsd`.
+ */
+export const lastWords = (state) => rounds(state).flatMap((round) => {
+  const dir = runDir(round, state);
+  const last = readJson(join(dir, 'summary.json')) ?? readJson(join(dir, 'status.json'));
+  return last ? [{ ...last, round }] : [];
+});
+
 const DAY_MS = 24 * 3_600_000;
 
 /**
@@ -95,7 +105,8 @@ export const pruneRuns = (keep, state, now = new Date()) => {
   const live = new Set(liveRuns(state).map((r) => r.round));
   const all = rounds(state);
   const recent = (round) => {
-    const started = readJson(join(runDir(round, state), 'summary.json'))?.started;
+    const dir = runDir(round, state);
+    const started = (readJson(join(dir, 'summary.json')) ?? readJson(join(dir, 'status.json')))?.started;
     return started && now - new Date(started) < DAY_MS;
   };
   for (const round of all.slice(0, Math.max(0, all.length - keep))) {
