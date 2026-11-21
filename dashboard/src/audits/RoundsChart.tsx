@@ -6,7 +6,8 @@ import { Button, DialogTrigger } from 'react-aria-components';
 import { Icon } from '@weasel-js/ui/components/Icon';
 import { Popover, PopoverDialog } from '@weasel-js/ui/components/Popover';
 import { icon } from '@dash/icons.gen';
-import type { AuditArea, AuditPass, AuditRound } from './skulkrMap.types';
+import type { AuditArea, AuditRound } from './skulkrMap.types';
+import { passRoundsOf } from './areaData';
 import s from './RoundsChart.module.css';
 
 /** The chart's drawing size before its box is measured; it then draws at its box's width, so the bars take the room. */
@@ -27,27 +28,6 @@ const perArea = (n: number, r: AuditRound) => (r.areas > 0 ? n / r.areas : 0);
 /** A round fewer than half of whose areas finished: too few to estimate from, so it neither sets the scale nor draws
  *  an estimate, only what it found. */
 export const isPartial = (r: AuditRound) => (r.incomplete ?? 0) > r.areas;
-
-const r1 = (n: number) => Math.round(n * 10) / 10;
-
-/** An area's passes with each round's as one, as the map's `drawnRoundOf` joins them for calibration: counts summed,
- *  `distinct` by share, `est` and `left` (already scaled by share) summed. An area whose files came from two areas of
- *  one round inherits a pass from each. */
-export function passRoundsOf(passes: readonly AuditPass[]): AuditPass[] {
-  const byRound = new Map<number, AuditPass[]>();
-  for (const p of passes) byRound.set(p.round, [...(byRound.get(p.round) ?? []), p]);
-  return [...byRound.values()].map((group) => {
-    if (group.length === 1) return group[0]!;
-    const sum = (f: (p: AuditPass) => number) => group.reduce((n, p) => n + f(p), 0);
-    const corrected = group.some((p) => p.leftCorrected !== undefined);
-    return {
-      round: group[0]!.round, date: group[0]!.date, a: sum((p) => p.a), b: sum((p) => p.b), shared: sum((p) => p.shared),
-      distinct: r1(sum((p) => p.distinct * (p.share ?? 1))), est: r1(sum((p) => p.est)), left: r1(sum((p) => p.left)),
-      ...(corrected ? { leftCorrected: r1(sum((p) => p.leftCorrected ?? p.left)) } : {}),
-      ...(group.some((p) => p.provisional) ? { provisional: true } : {}),
-    };
-  });
-}
 
 /** An area's passes as rounds of one area each, so the chart draws them on the same terms: a pass pending as its round
  *  in `rounds` is, and a provisional one, which no round lists yet, live. */

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { RoundsChart, areaRoundsOf, nthPassAverages, passRoundsOf } from './RoundsChart';
+import { RoundsChart, areaRoundsOf, nthPassAverages } from './RoundsChart';
+import { lastPassOf, passRoundsOf } from './areaData';
 import type { AuditArea, AuditRound } from './skulkrMap.types';
 
 const rounds: AuditRound[] = [
@@ -90,6 +91,7 @@ describe('RoundsChart', () => {
     expect(passes.map((p) => [p.round, p.a, p.distinct, p.est, p.left, p.leftCorrected])).toEqual([[1, 6, 4, 5, 1.5, 2.5], [2, 2, 2, 2, 0, undefined]]);
     expect(areaRoundsOf(halves, rounds).map((r) => r.round)).toEqual([1, 2]);
     expect(nthPassAverages([halves])).toEqual([{ mean: 4, of: 1 }, { mean: 2, of: 1 }]);
+    expect(lastPassOf({ ...halves, passes: halves.passes.slice(0, 2) } as AuditArea)).toMatchObject({ round: 1, left: 1.5 });
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     const heat: number[] = [];
     render(<RoundsChart rounds={rounds} area={halves} heatOf={(left) => { heat.push(left); return 'red'; }} />);

@@ -27,7 +27,29 @@ const STAGE_LABEL: Readonly<Record<string, string>> = {
 /** What a live run's stage reads as: its label, or the stage's own name when it has none. */
 export const stageLabelOf = (stage: string): string => getOwn(STAGE_LABEL, stage) ?? stage;
 
-export const lastPassOf = (area: AuditArea): AuditPass | null => area.passes.at(-1) ?? null;
+const r1 = (n: number) => Math.round(n * 10) / 10;
+
+/** An area's passes with each round's as one, as the map's `drawnRoundOf` joins them for calibration: counts summed,
+ *  `distinct` by share, `est` and `left` (already scaled by share) summed. An area whose files came from two areas of
+ *  one round inherits a pass from each. */
+export function passRoundsOf(passes: readonly AuditPass[]): AuditPass[] {
+  const byRound = new Map<number, AuditPass[]>();
+  for (const p of passes) byRound.set(p.round, [...(byRound.get(p.round) ?? []), p]);
+  return [...byRound.values()].map((group) => {
+    if (group.length === 1) return group[0]!;
+    const sum = (f: (p: AuditPass) => number) => group.reduce((n, p) => n + f(p), 0);
+    const corrected = group.some((p) => p.leftCorrected !== undefined);
+    return {
+      round: group[0]!.round, date: group[0]!.date, a: sum((p) => p.a), b: sum((p) => p.b), shared: sum((p) => p.shared),
+      distinct: r1(sum((p) => p.distinct * (p.share ?? 1))), est: r1(sum((p) => p.est)), left: r1(sum((p) => p.left)),
+      ...(corrected ? { leftCorrected: r1(sum((p) => p.leftCorrected ?? p.left)) } : {}),
+      ...(group.some((p) => p.provisional) ? { provisional: true } : {}),
+    };
+  });
+}
+
+/** An area's last round's pass, its passes from that round joined (`passRoundsOf`). */
+export const lastPassOf = (area: AuditArea): AuditPass | null => passRoundsOf(area.passes).at(-1) ?? null;
 
 /** A pass's left, calibrated, or its own where the map has no calibration. */
 export const correctedLeftOf = (p: AuditPass): number => p.leftCorrected ?? p.left;
