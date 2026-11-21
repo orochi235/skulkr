@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { JOBS_TTL_MS, fileStore, keptJobs, launchOf } from './onto.mjs';
+import { JOBS_TTL_MS, createOntoOutput, fileStore, keptJobs, launchOf } from './onto.mjs';
 
 describe('keptJobs', () => {
   it('answers from its last call within the TTL, and from its last good answer when a call throws', () => {
@@ -65,5 +65,29 @@ describe('launchOf', () => {
   it('reads no room only from onto\'s lines before the job started', () => {
     expect(at('studio at or over this node\'s 6 tree ceiling\nonto do: no node has room\n')).toMatchObject({ noRoom: true });
     expect(at('  job 1a2b on studio\nexpect(log).toMatch(/will not take a new tree/)\nonto do: job exited 1 on studio after 5000ms\n')).toMatchObject({ noRoom: false });
+  });
+});
+
+describe('createOntoOutput', () => {
+  it('keeps the launch line past any amount of job output, and reads no room only from before it', () => {
+    const out = createOntoOutput();
+    out.add('onto: placing\n', { err: true });
+    out.add('  job 1a2b on studio\n');
+    for (let i = 0; i < 200; i++) out.add(`${'x'.repeat(80)} will not take a new tree\n`);
+    out.add('onto do: job exited 1 on studio after 5000ms\n', { err: true });
+    const r = { status: 1, ...out.result() };
+    expect(r.tail.length).toBeLessThanOrEqual(4000);
+    expect(r.stderr).toBe('onto: placing\nonto do: job exited 1 on studio after 5000ms\n');
+    expect(launchOf(r)).toMatchObject({ node: 'studio', noRoom: false, refused: false });
+  });
+
+  it('keeps only the end of stderr, cut at a line, so onto\'s last error still reads', () => {
+    const out = createOntoOutput();
+    for (let i = 0; i < 500; i++) out.add(`job noise ${i} onto do: fake refuses\n`, { err: true });
+    out.add('onto do: studio refuses kind:fix\n', { err: true });
+    const r = { status: 1, ...out.result() };
+    expect(r.stderr.length).toBeLessThanOrEqual(4000);
+    expect(r.stderr.startsWith('job noise')).toBe(true);
+    expect(launchOf(r)).toMatchObject({ refused: true });
   });
 });

@@ -18,15 +18,15 @@ export const ontoErrorOf = (stderr) => {
   return at < 0 || (at > 0 && stderr[at - 1] !== '\n') ? '' : stderr.slice(at);
 };
 
-/** What one `onto do`'s `{ status, stderr, tail }` says happened, as `run` answers it. */
+/** What one `onto do`'s `{ status, stderr, tail, launch? }` (`ontoOnce`'s answer) says happened, as `run` answers it. */
 export const launchOf = (r) => {
   const error = ontoErrorOf(r.stderr);
   return {
     status: r.status,
     busy: r.status !== 0 && BUSY.test(error),
     refused: r.status !== 0 && REFUSED.test(error) && !/job .* (failed|exited)/.test(error),
-    noRoom: r.status !== 0 && NO_ROOM.test(launchLinesOf(r.tail)),
-    node: nodeOfLaunch(r.tail),
+    noRoom: r.status !== 0 && NO_ROOM.test(launchLinesOf(r.launch ?? r.tail)),
+    node: nodeOfLaunch(r.launch ?? r.tail),
   };
 };
 
@@ -55,27 +55,60 @@ export const ontoArgs = (job) => [
   '--', 'bash', '-lc', job.shell,
 ];
 
-/** Runs onto once with `args` from `cwd`, its output appended to `log`. Answers `{ status, stderr, tail }`, `tail` the
- *  last 4000 characters of both streams. */
+/** How much of the end of onto's output, and of its stderr, is kept: enough for its closing lines. */
+const TAIL = 4000;
+/** The most launch text kept while no job line has come. */
+const LAUNCH_MAX = 64_000;
+
+/** `text` cut to its last `n` characters, starting at a line, so a cut line never reads as one of onto's. */
+const lastOf = (text, n) => {
+  if (text.length <= n) return text;
+  const cut = text.slice(-n);
+  return cut.slice(cut.indexOf('\n') + 1);
+};
+
+/**
+ * onto's output as it streams, kept bounded: `launch`, everything up to and including the first `job <id> on <node>`
+ * line, so where the job went outlives any amount of its output; `tail`, the last characters of both streams; and
+ * `stderr`, the last characters of stderr, enough for `ontoErrorOf`.
+ */
+export const createOntoOutput = () => {
+  let launch = '';
+  let launched = false;
+  let tail = '';
+  let stderr = '';
+  return {
+    add: (chunk, { err = false } = {}) => {
+      const text = String(chunk);
+      tail = lastOf(tail + text, TAIL);
+      if (err) stderr = lastOf(stderr + text, TAIL);
+      if (launched) return;
+      launch = (launch + text).slice(0, LAUNCH_MAX);
+      const line = /^\s*job\s+\S+\s+on\s+\S+.*$/m.exec(launch);
+      if (line) {
+        launched = true;
+        launch = launch.slice(0, line.index + line[0].length);
+      }
+    },
+    result: () => ({ stderr, tail, launch }),
+  };
+};
+
+/** Runs onto once with `args` from `cwd`, its output appended to `log`. Answers `{ status, ...createOntoOutput's }`. */
 export const ontoOnce = (args, cwd, log) =>
   new Promise((done) => {
     const child = spawn('onto', args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
-    let stderr = '';
-    let tail = '';
-    const keep = (chunk) => {
-      tail = (tail + chunk).slice(-4000);
-    };
+    const out = createOntoOutput();
     child.stdout.on('data', (chunk) => {
-      keep(chunk);
+      out.add(chunk);
       log.write(chunk);
     });
     child.stderr.on('data', (chunk) => {
-      stderr += chunk;
-      keep(chunk);
+      out.add(chunk, { err: true });
       log.write(chunk);
     });
     child.on('error', (error) => done({ status: 1, stderr: String(error), tail: String(error) }));
-    child.on('close', (status) => done({ status: status ?? 1, stderr, tail }));
+    child.on('close', (status) => done({ status: status ?? 1, ...out.result() }));
   });
 
 /** Each task's first progress counter anywhere in `onto top --json`'s answer, by task. */
