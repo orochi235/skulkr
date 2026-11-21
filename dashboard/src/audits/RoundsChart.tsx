@@ -6,7 +6,7 @@ import { Button, DialogTrigger } from 'react-aria-components';
 import { Icon } from '@weasel-js/ui/components/Icon';
 import { Popover, PopoverDialog } from '@weasel-js/ui/components/Popover';
 import { icon } from '@dash/icons.gen';
-import type { AuditArea, AuditRound } from './skulkrMap.types';
+import type { AuditArea, AuditPass, AuditRound } from './skulkrMap.types';
 import s from './RoundsChart.module.css';
 
 /** The chart's drawing size before its box is measured; it then draws at its box's width, so the bars take the room. */
@@ -28,9 +28,30 @@ const perArea = (n: number, r: AuditRound) => (r.areas > 0 ? n / r.areas : 0);
  *  an estimate, only what it found. */
 export const isPartial = (r: AuditRound) => (r.incomplete ?? 0) > r.areas;
 
+const r1 = (n: number) => Math.round(n * 10) / 10;
+
+/** An area's passes with each round's as one, as the map's `drawnRoundOf` joins them for calibration: counts summed,
+ *  `distinct` by share, `est` and `left` (already scaled by share) summed. An area whose files came from two areas of
+ *  one round inherits a pass from each. */
+export function passRoundsOf(passes: readonly AuditPass[]): AuditPass[] {
+  const byRound = new Map<number, AuditPass[]>();
+  for (const p of passes) byRound.set(p.round, [...(byRound.get(p.round) ?? []), p]);
+  return [...byRound.values()].map((group) => {
+    if (group.length === 1) return group[0]!;
+    const sum = (f: (p: AuditPass) => number) => group.reduce((n, p) => n + f(p), 0);
+    const corrected = group.some((p) => p.leftCorrected !== undefined);
+    return {
+      round: group[0]!.round, date: group[0]!.date, a: sum((p) => p.a), b: sum((p) => p.b), shared: sum((p) => p.shared),
+      distinct: r1(sum((p) => p.distinct * (p.share ?? 1))), est: r1(sum((p) => p.est)), left: r1(sum((p) => p.left)),
+      ...(corrected ? { leftCorrected: r1(sum((p) => p.leftCorrected ?? p.left)) } : {}),
+      ...(group.some((p) => p.provisional) ? { provisional: true } : {}),
+    };
+  });
+}
+
 /** An area's passes as rounds of one area each, so the chart draws them on the same terms: a pass pending as its round
  *  in `rounds` is, and a provisional one, which no round lists yet, live. */
-export const areaRoundsOf = (area: AuditArea, rounds: readonly AuditRound[]): AuditRound[] => area.passes.map((p) => {
+export const areaRoundsOf = (area: AuditArea, rounds: readonly AuditRound[]): AuditRound[] => passRoundsOf(area.passes).map((p) => {
   const pending = rounds.find((r) => r.round === p.round)?.pending ?? (p.provisional ? 'live' : undefined);
   return { round: p.round, date: p.date, areas: 1, files: area.files, distinct: p.distinct, est: p.est, ...(pending ? { pending } : {}) };
 });
@@ -41,7 +62,7 @@ export const AREA_CHART_PASSES = 2;
 /** What an area's nth pass (index `n`) found on average across every area that has one: `{ mean, of }` for each n. */
 export function nthPassAverages(areas: readonly AuditArea[]): { mean: number; of: number }[] {
   const out: { sum: number; of: number }[] = [];
-  for (const a of areas) a.passes.forEach((p, n) => { out[n] ??= { sum: 0, of: 0 }; out[n]!.sum += p.distinct; out[n]!.of += 1; });
+  for (const a of areas) passRoundsOf(a.passes).forEach((p, n) => { out[n] ??= { sum: 0, of: 0 }; out[n]!.sum += p.distinct; out[n]!.of += 1; });
   return out.map(({ sum, of }) => ({ mean: of ? sum / of : 0, of }));
 }
 
@@ -59,7 +80,8 @@ export function RoundsChart({ rounds: all, area: picked, areas = [], heatOf }: {
   const measured = useElementSize(box);
   const W = measured.width > 0 ? measured.width : FALLBACK_W;
   const H = measured.height > 0 ? measured.height : FALLBACK_H;
-  const area = picked && picked.passes.length >= AREA_CHART_PASSES ? picked : null;
+  const pickedPasses = picked ? passRoundsOf(picked.passes) : [];
+  const area = picked && pickedPasses.length >= AREA_CHART_PASSES ? picked : null;
   const rounds = area ? areaRoundsOf(area, all) : all;
   const averages = area ? nthPassAverages(areas) : [];
   const unit = area ? 'defects' : 'defects per area';
@@ -94,7 +116,7 @@ export function RoundsChart({ rounds: all, area: picked, areas = [], heatOf }: {
             <g key={r.round}>
               {!isPartial(r) && <rect className={s.est} x={x(i)} width={bar} y={y(perArea(r.est, r))} height={y(0) - y(perArea(r.est, r))} />}
               <rect className={r.pending || isPartial(r) ? s.pending : area && heatOf ? s.heat : s.found} x={x(i)} width={bar} y={y(perArea(r.distinct, r))} height={y(0) - y(perArea(r.distinct, r))}
-                fill={r.pending || isPartial(r) ? `url(#${hatch})` : area && heatOf ? heatOf(area.passes[i]!.left) : undefined}>
+                fill={r.pending || isPartial(r) ? `url(#${hatch})` : area && heatOf ? heatOf(pickedPasses[i]!.left) : undefined}>
                 <title>{area
                   ? `round ${r.round}${r.pending ? ` (${PENDING_LABEL[r.pending]})` : ''}: ${r.distinct} found and ${r.est.toFixed(1)} estimated in ${area.id}`
                   : `round ${r.round}${r.pending ? ` (${PENDING_LABEL[r.pending]})` : ''}: ${perArea(r.distinct, r).toFixed(1)} found and ${perArea(r.est, r).toFixed(1)} estimated per area; ${r.distinct} and ${r.est} over ${r.areas} areas`}{r.incomplete ? `; ${r.incomplete} more came back incomplete and are not counted${isPartial(r) ? ', too many to estimate from' : ''}` : ''}</title>
@@ -115,7 +137,7 @@ export function RoundsChart({ rounds: all, area: picked, areas = [], heatOf }: {
       <div className={s.foot}>
         <span className={s.scope}>
           {area ? <><strong>{area.id}</strong>, each round that read it</>
-            : picked ? <><strong>{picked.id}</strong> {passesText(picked.passes.length)}</> : 'per area the round read'}
+            : picked ? <><strong>{picked.id}</strong> {passesText(pickedPasses.length)}</> : 'per area the round read'}
         </span>
         <DialogTrigger>
           <Button className={s.about} aria-label="What the rounds chart shows"><Icon name={icon('ui:info')} size={14} /></Button>

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-import { RoundsChart, areaRoundsOf, nthPassAverages } from './RoundsChart';
+import { describe, expect, it, vi } from 'vitest';
+import { RoundsChart, areaRoundsOf, nthPassAverages, passRoundsOf } from './RoundsChart';
 import type { AuditArea, AuditRound } from './skulkrMap.types';
 
 const rounds: AuditRound[] = [
@@ -75,6 +75,31 @@ describe('RoundsChart', () => {
     expect(areaRoundsOf(area, rounds).map((r) => [r.round, r.areas, r.distinct, r.est, r.pending])).toEqual([
       [1, 1, 7, 10, undefined], [2, 1, 2, 2, 'live'],
     ]);
+  });
+
+  it('draws one bar for a round whose passes the area inherited from two areas, joined as the map joins them', () => {
+    const halves = {
+      ...area,
+      passes: [
+        { round: 1, date: '2026-11-01', a: 4, b: 4, shared: 2, distinct: 6, est: 4, left: 1, leftCorrected: 2, share: 0.5 },
+        { round: 1, date: '2026-11-01', a: 2, b: 2, shared: 1, distinct: 4, est: 1, left: 0.5, share: 0.25 },
+        area.passes[1]!,
+      ],
+    } as unknown as AuditArea;
+    const passes = passRoundsOf(halves.passes);
+    expect(passes.map((p) => [p.round, p.a, p.distinct, p.est, p.left, p.leftCorrected])).toEqual([[1, 6, 4, 5, 1.5, 2.5], [2, 2, 2, 2, 0, undefined]]);
+    expect(areaRoundsOf(halves, rounds).map((r) => r.round)).toEqual([1, 2]);
+    expect(nthPassAverages([halves])).toEqual([{ mean: 4, of: 1 }, { mean: 2, of: 1 }]);
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const heat: number[] = [];
+    render(<RoundsChart rounds={rounds} area={halves} heatOf={(left) => { heat.push(left); return 'red'; }} />);
+    expect(errors).not.toHaveBeenCalled();
+    errors.mockRestore();
+    expect([...document.querySelectorAll('title')].map((t) => t.textContent)).toEqual([
+      'round 1: 4 found and 5.0 estimated in geom.part1',
+      'round 2 (live): 2 found and 2.0 estimated in geom.part1',
+    ]);
+    expect(heat).toEqual([1.5]);
   });
 
   it("marks an area's pass pending as its round is, so an unmerged round hatches in the area's chart too", () => {
