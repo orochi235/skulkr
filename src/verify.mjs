@@ -4,13 +4,11 @@
  * exits, and in a job of its own where it needs a GUI node (`gui`) or where a model job left no verdict. The
  * verdict is the command's exit status and the runner's file-level counts.
  */
-import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { JOB_OUT } from './config.mjs';
 import { stripAnsi } from './ansi.mjs';
+import { q, readIf } from './text.mjs';
 
-const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
-const readIf = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : '');
 
 /** What a timed-out command exits with: perl's alarm is SIGALRM. */
 export const TIMED_OUT = 142;

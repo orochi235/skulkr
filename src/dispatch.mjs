@@ -2,14 +2,14 @@
  * Launching one job of an area: on whichever slot frees first, moving to another node when one turns it away, waiting
  * while no node has room, and reusing a resumed round's result that already came home.
  */
-import { cpSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, rmSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { sleep } from './after.mjs';
 import { isFinished, reviewText } from './findings.mjs';
 import { STARTED, runJob } from './jobs.mjs';
+import { readIf } from './text.mjs';
 import { parseEnvelope } from './usage.mjs';
 
-const readIf = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : '');
 const minutesSince = (t0) => (Date.now() - t0) / 60_000;
 /** How many times a job that never reached its node is launched before its area is recorded incomplete. */
 const LAUNCHES = 3;

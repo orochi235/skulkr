@@ -14,7 +14,7 @@ import { mainCheckout } from './batch.mjs';
 import { loadConfig, nextClock } from './config.mjs';
 import { inModelSteps } from './continuous.mjs';
 import { continuousOf } from './continuousOf.mjs';
-import { createHost } from './host.mjs';
+import { createHost, readOnlyError } from './host.mjs';
 import { requestOf } from './serviceCore.mjs';
 import { clearIdle, lastFinished, lastStartedAt, liveRuns, requestStop, writeContinuous, writeIdle } from './runs.mjs';
 import { readTenants, tenantsPath } from './tenants.mjs';
@@ -161,7 +161,7 @@ export const createTenant = (name, cfg, { readOnly = false, runtime = { children
         }),
       start,
       stop: (rounds) => {
-        if (readOnly) throw new Error(`${name} is read-only here: its rounds run under another service`);
+        if (readOnly) throw readOnlyError(name);
         for (const round of rounds) requestStop(round, state);
         say(`stop requested for round ${rounds.join(', ')}`);
       },

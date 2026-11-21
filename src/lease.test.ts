@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync 
 import { tmpdir, uptime } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { PLACED, createSlots } from './jobs.mjs';
+import { PLACED, createSlots } from './slots.mjs';
 import { heldAlive, leaseAt, pidAlive, takeLease, waitForLease } from './lease.mjs';
 import { mergeLock } from './runs.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';

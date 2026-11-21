@@ -16,6 +16,9 @@ import { buildOf, handle, msUntil, requestOf, shouldAutoStart } from './serviceC
  * Which tenant a request means: the one its `tenant` names, or the only one. Throws when it names none there is, or
  * names none while there are several.
  */
+/** What refuses a start or stop for tenant `name`, which is read-only on this host. */
+export const readOnlyError = (name) => new Error(`${name} is read-only here: its rounds run under another service`);
+
 export const tenantFor = (req, tenants) => {
   if (req.tenant !== undefined) {
     const found = tenants.find((t) => t.name === req.tenant);
@@ -54,6 +57,8 @@ export const createHost = ({ tenants, now = () => new Date(), log = () => {}, bu
 
   /** Another tenant whose round is in its model steps now, by name, or undefined. */
   const busyBeside = (name, list) => list.find((t) => t.name !== name && (t.modelBusy ? t.modelBusy() : t.running()))?.name;
+  /** What tenant `name`'s start waits on: another tenant's round in its model steps, else one queued ahead of it. */
+  const behindOf = (name, list) => busyBeside(name, list) ?? queue.find((q) => q.tenant !== name)?.tenant ?? null;
   /** Whether `entry` may start: no other tenant runs, and no other tenant's start has waited longer. */
   const free = (entry, list) => !busyBeside(entry.tenant, list) && !queue.slice(0, queue.indexOf(entry)).some((q) => q.tenant !== entry.tenant);
 
@@ -123,24 +128,24 @@ export const createHost = ({ tenants, now = () => new Date(), log = () => {}, bu
 
   /** A start for tenant `t`: now when the fleet is free, else queued. Answers what `handle` replies with. */
   const startFor = (t, list) => (args) => {
-    if (t.readOnly) throw new Error(`${t.name} is read-only here: its rounds run under another service`);
+    if (t.readOnly) throw readOnlyError(t.name);
     const entry = { tenant: t.name, args, auto: false, since: now().toISOString() };
     queue.push(entry);
     drain(list);
     if (entry.error) return { started: false, error: entry.error, args };
     if (!queue.includes(entry)) return { started: true, args };
-    return { started: false, waiting: true, behind: busyBeside(t.name, list) ?? queue.find((q) => q.tenant !== t.name)?.tenant, args };
+    return { started: false, waiting: true, behind: behindOf(t.name, list), args };
   };
 
   /** What tenant `t` is waiting on: each of its queued starts and what holds it. */
   const waitingOf = (t, list) => queue.filter((q) => q.tenant === t.name).map((q) => ({
     since: q.since, scheduled: q.auto, ...(q.continuous ? { continuous: true } : {}), args: q.args,
-    behind: busyBeside(t.name, list) ?? queue.find((o) => o.tenant !== t.name)?.tenant ?? null,
+    behind: behindOf(t.name, list),
   }));
 
   /** Turns tenant `t`'s continuous mode on (`on`) until the night's stop time, or off, and says what follows. */
   const continuousFor = (t, list) => (on) => {
-    if (t.readOnly) throw new Error(`${t.name} is read-only here: its rounds run under another service`);
+    if (t.readOnly) throw readOnlyError(t.name);
     if (!t.setContinuous) throw new Error(`${t.name} has no continuous mode`);
     const at = now();
     const was = t.continuous(at).mode;
@@ -158,7 +163,7 @@ export const createHost = ({ tenants, now = () => new Date(), log = () => {}, bu
     if (entry && !queue.includes(entry)) return { continuous: true, until: state.mode.until, started: true };
     return {
       continuous: true, until: state.mode.until, started: false,
-      ...(entry ? { waiting: true, behind: busyBeside(t.name, list) ?? null } : { why: state.next.why }),
+      ...(entry ? { waiting: true, behind: behindOf(t.name, list) } : { why: state.next.why }),
     };
   };
 
