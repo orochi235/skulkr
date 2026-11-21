@@ -35,6 +35,9 @@ const MIN = 60_000;
 /** The phase's color, as the stylesheet defines it. */
 export const phaseColor = (phase: AuditPhase): string => `var(--audit-phase-${phase})`;
 
+/** The span fills light enough that a label's pulse rests dark on them: lightness 0.65 and up in `palette.module.css`. */
+export const BRIGHT_FILLS: ReadonlySet<string> = new Set([phaseColor('match'), phaseColor('fix'), 'var(--audit-checks)']);
+
 /** A lane label's ink where its span is filled in `phase`'s color: white on the patch's black, else the lanes' own. */
 export const phaseInkOf = (phase: AuditPhase, fill: number | undefined): string | undefined =>
   (phase === 'patch' && (fill === undefined || fill > 0) ? 'var(--audit-phase-patch-ink)' : undefined);

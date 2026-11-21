@@ -5,7 +5,7 @@ import { SegmentedBar } from '@weasel-js/ui/components/Segmented';
 import { SpanStrips, type SpanStripSpan, type SpanStripsRow } from '@weasel-js/ui/components/SpanStrip';
 import { clockRuler } from './clock';
 import { GateFailures } from './GateFailures';
-import { GATE_RUNS, STEP_COLUMN_COUNT, leadsWithNode, inSharedSteps, laneStepsOf, laneViewOf, passDone, runClockOf, sharedSpansOf, type LaneView, PHASE_LABEL, phaseClass, stageCountsOf } from './phases';
+import { GATE_RUNS, STEP_COLUMN_COUNT, leadsWithNode, inSharedSteps, laneStepsOf, laneViewOf, passDone, runClockOf, sharedSpansOf, type LaneView, PHASE_LABEL, phaseClass, stageCountsOf, BRIGHT_FILLS } from './phases';
 import { NODE_SEP, headlineOf, lastLineOf, spendOf, startedText } from './runData';
 import { useViewerPref } from './viewerPref';
 import type { AuditLane, AuditRun } from './skulkrMap.types';
@@ -26,7 +26,8 @@ function withNode(span: SpanStripSpan): SpanStripSpan {
   const at = span.label.indexOf(NODE_SEP);
   if (at === 0) return span;
   const end = at === -1 ? span.label.length : at;
-  return { ...span, content: <><span className={s.node}>{span.label.slice(0, end)}</span>{span.label.slice(end)}</> };
+  const node = span.color && BRIGHT_FILLS.has(span.color) ? `${s.node} ${s.onBright}` : s.node;
+  return { ...span, content: <><span className={node}>{span.label.slice(0, end)}</span>{span.label.slice(end)}</> };
 }
 
 /** The capstone's runs that have failed, each with what it failed, in the shared lane's order. */

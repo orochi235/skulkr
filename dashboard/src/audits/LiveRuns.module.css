@@ -145,6 +145,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .lanes [data-state='active'] .node { animation: node-pulse 1.34s infinite; }
+  .lanes [data-state='active'] .node.onBright { animation-name: node-pulse-dark; }
 }
 
 /* It holds at its lightest and only passes through its darkest: it eases into light, rests there, then drops back
@@ -153,4 +154,11 @@
   0%, 100% { color: color-mix(in srgb, #fff 20%, #000); animation-timing-function: cubic-bezier(0.35, 0.2, 0.3, 1); }
   30% { color: color-mix(in srgb, #fff 80%, #000); animation-timing-function: linear; }
   75% { color: color-mix(in srgb, #fff 80%, #000); animation-timing-function: cubic-bezier(0.6, 0, 0.65, 0.8); }
+}
+
+/* On a bright fill the same pulse, inverted: it holds at its darkest and only passes through its lightest. */
+@keyframes node-pulse-dark {
+  0%, 100% { color: color-mix(in srgb, #fff 80%, #000); animation-timing-function: cubic-bezier(0.35, 0.2, 0.3, 1); }
+  30% { color: color-mix(in srgb, #fff 20%, #000); animation-timing-function: linear; }
+  75% { color: color-mix(in srgb, #fff 20%, #000); animation-timing-function: cubic-bezier(0.6, 0, 0.65, 0.8); }
 }
