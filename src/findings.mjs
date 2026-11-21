@@ -75,7 +75,7 @@ export const matchPrompt = (brief, a, b) => {
 const DUPLICATE = /^\(?duplicate\b/i;
 
 const TALLY = /^tally: (\d+) of (\d+) fixed, (\d+) extra fixed\s*$/im;
-const VERDICT = /\bfixed (?:in )?`?[0-9a-f]{7,}|\bnot a defect\b|\bquestion\b|\bduplicate of\b|\bnot fixed\b|\bdeclined\b/i;
+const VERDICT = new RegExp(`${FIXED_MARK.source}|\\bnot a defect\\b|\\bquestion\\b|\\bduplicate of\\b|\\bnot fixed\\b|\\bdeclined\\b`, 'i');
 const EXTRAS = /^\W*(?:any )?extra\b/i;
 const CHECKS = /^\W*checks\b/i;
 const SOURCE = /\((A\+B|A|B|sweep|carried)\)|,\s*(A\+B|A|B|sweep|carried)\s*:/;

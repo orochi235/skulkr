@@ -36,6 +36,7 @@ weasel cutover.
     `leftCorrected` and `calibration` (README "Calibration"), from 2026-11-20.
   - the map's `gateRuns`, each gate run's id and its `gate.labels` label, for the dashboard (2026-11-21).
   - the map's run `leftOut` and a left-out lane's patch `why`, read from `land.mjs`'s `left out:` lines (2026-11-21).
+  - reports the parsers used to misread (2026-11-21): a capitalized `Fixed <sha>` verdict counts as fixed.
   - a branch the batch leaves out: its outcome names the conflicting paths or git's message, a merge that meets a
     lock is retried, and later rounds' batches try it again (README "batch" step, 2026-11-21).
   Everything else stays at parity.

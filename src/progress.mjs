@@ -152,7 +152,7 @@ export const createCheckTally = (tally) => {
 };
 
 /** A fixer's verdict that it fixed a finding, `fixed <sha>`, which `findings.mjs` counts too. */
-export const FIXED_MARK = /\bfixed (?:in )?`?[0-9a-f]{7,}/;
+export const FIXED_MARK = /\bfixed (?:in )?`?[0-9a-f]{7,}/i;
 /** Text that reads as a fixer's report: its closing tally line, or a verdict. */
 const isReport = (text) => /^tally: /m.test(text) || FIXED_MARK.test(text);
 
