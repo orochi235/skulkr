@@ -3,3 +3,4 @@ dist/
 .DS_Store
 .onto-fetch-cache.json
 .alpo.local.json
+.playwright-mcp/

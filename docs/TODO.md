@@ -6,14 +6,11 @@ Open work on skulkr. Each entry says when it closes.
   weasel's rounds from `examples/weasel.config.mjs` (2026-11-21); left are moving the config and its briefs into
   weasel and deleting `scripts/skulk/`. Closes when weasel's own `skulkr.config.mjs` drives its rounds and
   `scripts/skulk/` is gone. Waiting on the user's go.
-- [ ] (P2) The dashboard installs only on this machine: `vite-plugin-wake` is `file:../../wake`, and it needs weasel's
-  `SpanStrip`, which no published `@weasel-js/ui` has yet (1.19.1 on 2026-11-21), through alpo. Closes when
-  `npm install && npm run dev` works in a fresh clone with no sibling checkouts: a weasel release carrying `SpanStrip`,
-  and wake either published or loaded only when present.
+- [ ] (P3) The dashboard installs weasel from tarballs on this repository's `weasel-70a055a` release, since no published
+  `@weasel-js/ui` has `SpanStrip` yet (1.19.1 on 2026-11-21; `dashboard/README.md` "weasel"). Closes when a weasel
+  release carries everything the dashboard imports, `package.json` pins it from npm, and the release is deleted.
 - [ ] (P3) Enlist skulkr on the fleet (`onto-enlist`), so `onto test` can run its suite. Closes when `.onto/tests`
   exists and one fleet run of the suite is green.
-- [ ] (P3) Typecheck `dashboard/` once (`ALPO_WEASEL=<built checkout> npm run typecheck` there). It has never run:
-  the controller refuses it locally, and a fleet node lacks the built weasel and `../../wake`. Closes on one clean run.
 - [ ] (P3) The dashboard's two gate stripes are fixed as weasel's (`GATE_RUNS` in `phases.ts`: "fleet tests" and
   "postbuild"), while the pipeline reads a project's gate runs from `gate.progress`. Closes when the map names the
   gate runs and their labels and the dashboard draws whichever it is given.

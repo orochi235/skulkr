@@ -6,18 +6,18 @@ export type AreaDefectsState =
   | { readonly status: 'ready'; readonly rounds: readonly AuditAreaRound[] }
   | { readonly status: 'failed'; readonly error: string };
 
-/** Every round's defects in area `id` from the dashboard's dev server at `url` (a tenant's area route), asked for
- *  again whenever `version` changes. */
-export function useAreaDefects(url: string, id: string, version: string): AreaDefectsState {
+/** Every round's defects in area `id`, read from `urlOf(id)`, asked for again whenever `version` changes. */
+export function useAreaDefects(urlOf: (id: string) => string, id: string, version: string): AreaDefectsState {
+  const url = urlOf(id);
   const [state, setState] = useState<{ key: string; value: AreaDefectsState }>({ key: '', value: { status: 'loading' } });
   const key = `${url}\n${id}\n${version}`;
   useEffect(() => {
     let live = true;
-    fetch(`${url}?id=${encodeURIComponent(id)}`, { cache: 'no-store' })
+    fetch(url, { cache: 'no-store' })
       .then(async (res) => {
         if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
         const rounds: unknown = await res.json();
-        if (!Array.isArray(rounds)) throw new Error('the dev server answered something other than a list of rounds');
+        if (!Array.isArray(rounds)) throw new Error('the server answered something other than a list of rounds');
         return rounds as AuditAreaRound[];
       })
       .then((rounds) => live && setState({ key, value: { status: 'ready', rounds } }),

@@ -375,8 +375,8 @@ map at `api/t/<name>/map` and an area's defects at `api/t/<name>/area?id=<area>`
 `skulkr defects` with `--tenant`. The page's title is a menu of the tenants; the one shown is in the URL hash
 (`#weasel`), and each viewer's last choice is remembered. `dashboard/README.md` says how to start it.
 
-For now it installs only beside local checkouts of weasel and wake (`dashboard/README.md`); everything else here
-works without it. `skulkr map [--out <file>]` writes the same JSON for anything else that draws it.
+A frozen copy of it, over weasel's audits, is at [michaelbaker.tech/skulkr](https://michaelbaker.tech/skulkr/).
+`skulkr map [--out <file>]` writes the same JSON for anything else that draws it.
 
 ### Area icons
 

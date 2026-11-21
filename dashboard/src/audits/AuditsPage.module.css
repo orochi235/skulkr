@@ -94,3 +94,5 @@
 
 .note code,
 .foot code { font-family: var(--wzl-font-mono); }
+
+.note a { color: inherit; }

@@ -16,7 +16,7 @@ import { liveEstimatesOf, phasesOf, withLivePasses } from './phases';
 import { continuousText } from './runData';
 import { useAuditPalette } from './useAuditPalette';
 import { useSkulkrMap } from './useSkulkrMap';
-import { TENANTS_PATH, tenantAreaPath, tenantMapPath } from '@shared/routes';
+import { SNAPSHOT, areaUrlFor, mapUrl, tenantsUrl } from '@dash/dataSource';
 import { TenantTitle } from '@dash/tenants/TenantTitle';
 import { useTenantChoice, useTenants } from '@dash/tenants/useTenants';
 import { readSize, useViewerPref } from './viewerPref';
@@ -47,7 +47,7 @@ function AreaNote({ map }: { map: SkulkrMap | null }) {
   return <>Each area is a directory of at most {partition.maxFiles} source files (<code>{partition.path}</code>).</>;
 }
 
-function Chart({ map, areaUrl, view }: { map: SkulkrMap; areaUrl: string; view: LaneSettings }) {
+function Chart({ map, areaUrl, view }: { map: SkulkrMap; areaUrl: (id: string) => string; view: LaneSettings }) {
   const [scene] = useState(createAuditScene);
   const selection = useSelection({ scene, mode: 'single' });
   const [hovered, setHovered] = useState<string | null>(null);
@@ -98,7 +98,7 @@ function Chart({ map, areaUrl, view }: { map: SkulkrMap; areaUrl: string; view: 
         <ResizeHandle value={asideWidth} min={ASIDE.min} max={ASIDE.max} invert onInput={setAsideWidth} onChange={keepAside} aria-label="Resize the side panel" />
         <aside className={s.aside} aria-label="Area">
           <AreaDetail area={area} holder={area && runHolding(map.runs, area.id)} />
-          {picked && <AreaDefects url={areaUrl} id={picked} version={map.generated} />}
+          {picked && <AreaDefects urlOf={areaUrl} id={picked} version={map.generated} />}
         </aside>
       </div>
       <ResizeHandle
@@ -123,10 +123,10 @@ export interface AuditsSource {
  *  server: `api/tenants`, then `api/t/<tenant>/map`. */
 export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
   const { base = import.meta.env.BASE_URL, everyMs, dev = true } = source;
-  const tenants = useTenants({ url: `${base}${TENANTS_PATH}`, dev });
+  const tenants = useTenants({ url: tenantsUrl(base), dev });
   const names = tenants.status === 'ready' ? tenants.names : [];
   const [tenant, choose] = useTenantChoice(names);
-  const state = useSkulkrMap({ url: tenant === null ? null : `${base}${tenantMapPath(tenant)}`, everyMs, dev });
+  const state = useSkulkrMap({ url: tenant === null ? null : mapUrl(base, tenant), everyMs: SNAPSHOT ? Infinity : everyMs, dev });
   const map = state.status === 'ready' ? state.map : null;
   const view = useLaneView();
   const continuous = continuousText(map?.continuous);
@@ -153,10 +153,17 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
           </p>
         )}
         {!noServer && failed && <p className={s.note}>{failed}</p>}
+        {SNAPSHOT && map && (
+          <p className={s.note}>
+            A snapshot of <a href="https://github.com/orochi235/skulkr">skulkr</a> auditing {tenant ?? 'a project'}, frozen
+            at {new Date(map.generated).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}{map.runs.length ? ', mid-round' : ''}. Hover or click an
+            area for its passes and the defects they found.
+          </p>
+        )}
         {state.status === 'ready' && tenant !== null && (
           <>
             {state.error && <p className={s.note}>The last refresh failed ({state.error}); showing the map before it.</p>}
-            <Chart key={tenant} map={state.map} areaUrl={`${base}${tenantAreaPath(tenant)}`} view={view} />
+            <Chart key={tenant} map={state.map} areaUrl={areaUrlFor(base, tenant)} view={view} />
           </>
         )}
         <p className={s.foot}>

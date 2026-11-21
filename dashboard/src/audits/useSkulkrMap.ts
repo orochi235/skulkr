@@ -86,7 +86,7 @@ export function useSkulkrMap(options: UseSkulkrMapOptions): SkulkrMapState {
       asking = true;
       void ask().finally(() => {
         asking = false;
-        if (live) stop = after(everyMs, loop);
+        if (live && Number.isFinite(everyMs)) stop = after(everyMs, loop);
       });
     };
     const onVisible = () => {

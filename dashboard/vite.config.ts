@@ -2,15 +2,17 @@ import { fileURLToPath } from 'node:url';
 import { alpo } from '@msb235/alpo/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
-import { wake } from 'vite-plugin-wake';
 import { skulkrMapPlugin } from './server/plugin.ts';
 
 const at = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 
 export const DEV_PORT = 5214;
 
+// wake lives in a sibling checkout on the machine this was written on; anywhere else the page simply goes without.
+const wake = await import('vite-plugin-wake').then((m) => m.wake({ fullReload: true }), () => null);
+
 export default defineConfig({
-  plugins: [react(), alpo({ from: at('.') }), skulkrMapPlugin(), wake({ fullReload: true })],
+  plugins: [react(), alpo({ from: at('.') }), skulkrMapPlugin(), ...(wake ? [wake] : [])],
   resolve: {
     alias: { '@dash': at('./src'), '@shared': at('./shared') },
     // Linked from a weasel checkout, its own React would otherwise load twice, and its own React Aria too: a trigger
