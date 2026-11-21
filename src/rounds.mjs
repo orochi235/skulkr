@@ -102,8 +102,8 @@ export const COVERED = 0.5;
  * Each area's history from the passes whose files overlap its own, so a history follows its files across a recut of
  * the partition: a pass is inherited by every area holding any of its files, with `share`, the part of the pass's
  * files that area holds, by which its estimates are scaled (`scaledOf`). A renamed area keeps its whole history; a
- * split one passes each part its share. A pass with no file list goes to the area of its own id, whole. `raw` is
- * `readPasses`'. Answers `{ history, covered }`: Maps by area id of its passes oldest first, and the share of its files
+ * split one passes each part its share. A pass with no file list goes to the area of its own id, whole. Each pass also
+ * carries `covers`, the part of the area's files its round's passes read together. `raw` is `readPasses`'. Answers `{ history, covered }`: Maps by area id of its passes oldest first, and the share of its files
  * any of them read.
  */
 /** @param {{ id: string, files: string[] }[]} areas @param {Map<string, any[]>} raw @returns {{ history: Map<string, any[]>, covered: Map<string, number> }} */
@@ -121,15 +121,18 @@ export const inheritPasses = (areas, raw) => {
   const covered = new Map();
   for (const area of areas) {
     const overlap = new Map();
+    const roundRead = new Map();
     let read = 0;
     for (const f of area.files) {
       const passes = byFile.get(f);
       if (!passes) continue;
       read += 1;
       for (const p of passes) overlap.set(p, (overlap.get(p) ?? 0) + 1);
+      for (const round of new Set(passes.map((p) => p.round))) roundRead.set(round, (roundRead.get(round) ?? 0) + 1);
     }
-    const own = (unlisted.get(area.id) ?? []).map((p) => ({ ...p, share: 1 }));
-    const inherited = [...overlap].map(([p, n]) => ({ ...p, share: n / p.files.length }));
+    const coversOf = (round) => (area.files.length ? (roundRead.get(round) ?? 0) / area.files.length : 0);
+    const own = (unlisted.get(area.id) ?? []).map((p) => ({ ...p, share: 1, covers: 1 }));
+    const inherited = [...overlap].map(([p, n]) => ({ ...p, share: n / p.files.length, covers: coversOf(p.round) }));
     const list = [...own, ...inherited].sort((x, y) => x.round - y.round || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
     history.set(area.id, list);
     covered.set(area.id, own.length ? 1 : area.files.length ? read / area.files.length : 0);
@@ -153,8 +156,64 @@ export const passOf = (round, date, a, b, shared, distinct, share = 1) => {
 /** A recorded pass (an `area.json` with its `round` and `share`) as the map draws it. */
 export const drawnPassOf = (p) => passOf(p.round, p.date, p.a ?? 0, p.b ?? 0, p.m ?? 0, p.distinct ?? 0, p.share);
 
-/** Each area's history (`inheritPasses`') as the map draws its passes. */
-export const drawnHistories = (history) => new Map([...history].map(([id, list]) => [id, list.map(drawnPassOf)]));
+/** An area's history (`inheritPasses`') by round, oldest first: `{ round, passes, covers }`, `covers` 1 where unknown. */
+export const roundsIn = (list = []) => {
+  const rounds = [];
+  for (const p of list) {
+    if (rounds.at(-1)?.round === p.round) rounds.at(-1).passes.push(p);
+    else rounds.push({ round: p.round, passes: [p], covers: p.covers ?? 1 });
+  }
+  return rounds;
+};
+
+/**
+ * The rounds an area's estimate and calibration go by: those whose passes read at least COVERED of its files, so a
+ * later pass that held one boundary file of it neither stands for it nor tests it.
+ */
+export const coveringRounds = (list) => roundsIn(list).filter((r) => r.covers >= COVERED);
+
+/** The round an area's estimate goes by: its last covering round, else the last of those that read the most of it. */
+export const lastRoundIn = (list) => {
+  const covering = coveringRounds(list);
+  if (covering.length) return covering.at(-1);
+  return roundsIn(list).reduce((best, r) => (!best || r.covers >= best.covers ? r : best), null);
+};
+
+const r1 = (n) => Math.round(n * 10) / 10;
+
+/**
+ * A round's passes of one area as one recorded pass: the pass itself when alone; else counts summed, Chapman's estimate
+ * and what it left summed by share (so `share` is 1), and fix commits and files joined.
+ */
+export const combinedOf = (passes) => {
+  if (passes.length <= 1) return passes[0];
+  const sum = (f) => passes.reduce((n, p) => n + f(p), 0);
+  return {
+    ...passes[0], a: sum((p) => p.a ?? 0), b: sum((p) => p.b ?? 0), m: sum((p) => p.m ?? 0), distinct: sum((p) => p.distinct ?? 0),
+    chapman: sum((p) => (p.chapman ?? 0) * (p.share ?? 1)), unfound: sum((p) => (p.unfound ?? 0) * (p.share ?? 1)), share: 1,
+    fixCommits: [...new Set(passes.flatMap((p) => p.fixCommits ?? []))], files: [...new Set(passes.flatMap((p) => p.files ?? []))].sort(),
+  };
+};
+
+/** A round's passes of one area as the map draws one pass: counts summed, `distinct`, `est` and `left` by share. */
+export const drawnRoundOf = (passes) => {
+  if (passes.length <= 1) return drawnPassOf(passes[0]);
+  const drawn = passes.map(drawnPassOf);
+  const sum = (f) => drawn.reduce((n, p) => n + f(p), 0);
+  return {
+    round: drawn[0].round, date: drawn[0].date, a: sum((p) => p.a), b: sum((p) => p.b), shared: sum((p) => p.shared),
+    distinct: r1(sum((p) => p.distinct * (p.share ?? 1))), est: r1(sum((p) => p.est)), left: r1(sum((p) => p.left)),
+  };
+};
+
+/** The pass an area's estimate goes by (`lastRoundIn`'s, `combinedOf`), or undefined for an area with no history. */
+export const lastPassIn = (list) => {
+  const r = lastRoundIn(list);
+  return r && combinedOf(r.passes);
+};
+
+/** Each area's history (`inheritPasses`') as calibration reads it: its covering rounds, each drawn as one pass. */
+export const drawnHistories = (history) => new Map([...history].map(([id, list]) => [id, coveringRounds(list).map((r) => drawnRoundOf(r.passes))]));
 
 /** `calibrationOf` over each area's history (`inheritPasses`'), with `pairLines` (`areaStats`') where known. */
 export const calibrationFor = (history, pairLines) => calibrationOf(drawnHistories(history), pairLines);
@@ -182,17 +241,22 @@ export const nextRound = ({ roundDirs = [], hardening = '', branches = [], claim
   return Math.max(...used) + 1;
 };
 
-const sameFiles = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((f, i) => f === b[i]);
+const sameFiles = (a, b) => {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  const set = new Set(b);
+  return a.every((f) => set.has(f));
+};
 
 /**
- * Whether an area's two latest passes settle it: each found at most QUIET_PASS distinct defects, both
- * read the same file list as the area has now, and nothing but the passes' own fixes changed those
- * files since the first of them. `touched(files, from, exclude)` answers whether a commit after
+ * Whether an area's two latest covering rounds (`coveringRounds`, each `combinedOf` its passes) settle it: each found at
+ * most QUIET_PASS distinct defects, both read the same file list as the area has now, and nothing but the passes' own
+ * fixes changed those files since the first of them. `touched(files, from, exclude)` answers whether a commit after
  * `from` and not in `exclude` changed any of `files`.
  */
 export const isSettled = (area, passes, touched) => {
-  if (passes.length < 2) return false;
-  const [first, last] = passes.slice(-2);
+  const rounds = coveringRounds(passes);
+  if (rounds.length < 2) return false;
+  const [first, last] = rounds.slice(-2).map((r) => combinedOf(r.passes));
   if (first.distinct > QUIET_PASS || last.distinct > QUIET_PASS) return false;
   if (!sameFiles(first.files, area.files) || !sameFiles(last.files, area.files)) return false;
   return !touched(area.files, first.commit, [...(first.fixCommits ?? []), ...(last.fixCommits ?? [])]);
@@ -234,10 +298,10 @@ export const pickAreas = ({ areas, passes, touched, count, inFlight = new Set(),
       settled.push(area.id);
       continue;
     }
-    const p = history.at(-1);
+    const last = lastRoundIn(history);
     const stale = staleLines.get(area.id) ?? 0;
-    const left = correctedLeftOf(drawnPassOf(p), calibration);
-    seen.push({ id: area.id, last: p.round, stale, rank: rankOf(left, stale) });
+    const left = correctedLeftOf(drawnRoundOf(last.passes), calibration);
+    seen.push({ id: area.id, last: last.round, stale, rank: rankOf(left, stale) });
   }
   seen.sort((x, y) => y.rank - x.rank || y.stale - x.stale || x.last - y.last || (x.id < y.id ? -1 : 1));
   return { picked: [...fresh, ...seen.map((s) => s.id)].slice(0, count), settled };
@@ -258,9 +322,9 @@ export const gitTouched = (git) => (files, from, exclude) => {
 
 /**
  * What the plan and the map read of each area's past for `cfg`'s project: its inherited `history` and `covered`
- * share (`inheritPasses`), `staleLines`, the lines of its files changed since its last pass, its fixes aside, and
- * `pairLines`, keyed `<area>\n<round>`, the lines of its files changed from each pass to the next, that pass's fixes
- * aside: what changed since the first less what changed since the second.
+ * share (`inheritPasses`), `staleLines`, the lines of its files changed since its last pass (`lastPassIn`), its fixes
+ * aside, and `pairLines`, keyed `<area>\n<round>`, the lines of its files changed from each covering round to the next,
+ * that round's fixes aside: what changed since the first less what changed since the second.
  */
 export const areaStats = (cfg, git, areas, raw, root) => {
   const { history, covered } = inheritPasses(areas, raw);
@@ -268,10 +332,11 @@ export const areaStats = (cfg, git, areas, raw, root) => {
   const pairs = [];
   for (const area of areas) {
     const list = history.get(area.id) ?? [];
-    const last = list.at(-1);
+    const last = lastPassIn(list);
     if (last?.commit) entries.push({ id: area.id, files: area.files, commit: last.commit, exclude: last.fixCommits ?? [] });
-    list.forEach((k, i) => {
-      const next = list[i + 1];
+    const rounds = coveringRounds(list).map((r) => combinedOf(r.passes));
+    rounds.forEach((k, i) => {
+      const next = rounds[i + 1];
       if (!next || !k.commit || !next.commit) return;
       const key = `${area.id}\n${k.round}`;
       pairs.push(key);

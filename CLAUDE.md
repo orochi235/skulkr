@@ -34,6 +34,8 @@ weasel cutover.
     recorded file count.
   - the queue's order among due areas by corrected defects left first (README "Which areas"), and the map's
     `leftCorrected` and `calibration` (README "Calibration"), from 2026-11-20.
+  - an area's history taken by round, and only its covering rounds (README "History follows files"): the queue's
+    order, `staleLines`, settling, calibration's pairs and factors, and the record's "last left" (2026-11-21).
   - the map's `gateRuns`, each gate run's id and its `gate.labels` label, for the dashboard (2026-11-21).
   - the map's run `leftOut` and a left-out lane's patch `why`, read from `land.mjs`'s `left out:` lines (2026-11-21).
   - reports the parsers used to misread (2026-11-21): a capitalized `Fixed <sha>` verdict counts as fixed;

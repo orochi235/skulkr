@@ -19,7 +19,7 @@ import { createSlots, runUntilFree } from './jobs.mjs';
 import { batchAndTest, patchAreas, patchSweep } from './land.mjs';
 import { waitForLease } from './lease.mjs';
 import { partitionAt } from './partition.mjs';
-import { areaStats, areasInFlight, gitTouched, inheritPasses, nextRound, passesIn, pickAreas, scaledOf } from './rounds.mjs';
+import { areaStats, areasInFlight, gitTouched, inheritPasses, lastPassIn, nextRound, passesIn, pickAreas, scaledOf } from './rounds.mjs';
 import { claimRound, claimedRounds, clearStatus, clearStop, liveRuns, nightsAt, planLock, pruneRuns, readJson, runDir, stopRequested, writeStatus, writeSummary } from './runs.mjs';
 import { fixSweep, runSweep, sweepLine } from './sweep.mjs';
 import { mayStartArea } from './usage.mjs';
@@ -137,7 +137,7 @@ const printPlan = (cfg, p, args, say) => {
     return;
   }
   for (const area of p.picked) {
-    const last = p.passes.get(area.id)?.at(-1);
+    const last = lastPassIn(p.passes.get(area.id));
     const stale = p.staleLines?.get(area.id) ?? 0;
     const left = last && Math.round(scaledOf(last).unfound * 10) / 10;
     say(`  ${area.id}: ${area.files.length} files${last ? `, last pass round ${last.round} (${last.distinct} distinct, ~${left} left${stale ? `; ${stale} lines changed since` : ''})` : ', never audited'}`);
@@ -192,7 +192,7 @@ const reviewAreas = async ({ ctx, git, picked, passes, open, args, status, deadl
       ctx.say(`not starting ${area.id}: ${why}`);
       continue;
     }
-    const last = passes.get(area.id)?.at(-1);
+    const last = lastPassIn(passes.get(area.id));
     const previous = last && { ...last, ...scaledOf(last) };
     const carried = open?.get(area.id) ?? [];
     const job = runArea(ctx, area, { previous, carried, changedSince: changedSince(git, area.files, previous?.commit, previous?.fixCommits ?? []) })

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { gitIn } from './batch.mjs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { areaStats, areasInFlight, chapman, inheritPasses, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf, withBatchPasses } from './rounds.mjs';
+import { areaStats, areasInFlight, calibrationFor, chapman, drawnRoundOf, inheritPasses, lastPassIn, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf, withBatchPasses } from './rounds.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -181,6 +181,37 @@ describe('pickAreas by corrected defects left', () => {
     const calibration = { minPairs: 5, pairs: [], series: [], factors: { overall: bucket(1), byShared: { '0': bucket(1), '1–2': bucket(10), '3+': bucket(1) } } };
     expect(pickAreas({ areas: [area('r'), area('q')], passes, calibration, touched: () => true, count: 2 }).picked).toEqual(['q', 'r']);
     expect(pickAreas({ areas: [area('r'), area('q')], passes, touched: () => true, count: 2 }).picked).toEqual(['r', 'q']);
+  });
+});
+
+describe('history by round', () => {
+  const pass = (round: number, id: string, files: string[], a: number, b: number, m: number, distinct: number, extra = {}) =>
+    ({ round, id, files, a, b, m, distinct, commit: `c${round}`, fixCommits: [], ...extra });
+
+  it("neither ranks nor calibrates an area by a later pass that read only a boundary file of it", () => {
+    const raw = new Map([
+      ['x', [pass(10, 'x', ['x/1.ts', 'x/2.ts', 'x/3.ts'], 12, 12, 1, 23)]], // left 60.5
+      ['y', [pass(11, 'y', ['y/1.ts', 'y/2.ts', 'y/3.ts', 'y/4.ts'], 0, 0, 0, 0)]],
+      ['z', [pass(9, 'z', ['z/1.ts'], 3, 3, 1, 5)]], // left 2
+    ]);
+    const areas = [{ id: 'x', files: ['x/1.ts', 'x/2.ts', 'x/3.ts', 'y/4.ts'] }, { id: 'z', files: ['z/1.ts'] }];
+    const { history, covered } = inheritPasses(areas, raw);
+    expect(history.get('x')!.map((p) => p.round)).toEqual([10, 11]);
+    expect(pickAreas({ areas, passes: history, covered, touched: () => true, count: 2 }).picked).toEqual(['x', 'z']);
+    expect(calibrationFor(history).pairs).toEqual([]);
+    expect(lastPassIn(history.get('x'))!.round).toBe(10);
+  });
+
+  it('takes two passes of one round in a merged area as one: left summed, fixes joined, no pair between them', () => {
+    const raw = new Map([
+      ['p', [pass(5, 'p', ['p/1.ts'], 3, 3, 1, 5, { chapman: 7, unfound: 2, fixCommits: ['f1'] })]],
+      ['q', [pass(5, 'q', ['q/1.ts'], 3, 3, 1, 5, { chapman: 7, unfound: 2, fixCommits: ['f2'] })]],
+    ]);
+    const { history } = inheritPasses([{ id: 'pq', files: ['p/1.ts', 'q/1.ts'] }], raw);
+    const last = lastPassIn(history.get('pq'))!;
+    expect([last.unfound, last.fixCommits]).toEqual([4, ['f1', 'f2']]);
+    expect(drawnRoundOf(history.get('pq')!)).toMatchObject({ round: 5, distinct: 10, est: 14, left: 4 });
+    expect(calibrationFor(history).pairs).toEqual([]);
   });
 });
 

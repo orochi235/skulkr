@@ -176,7 +176,10 @@ its files now, with a *share*: the part of that pass's files the area holds. The
 "left" are scaled by that share, so a pass split across two areas is counted once between them, and a renamed area,
 holding all of its pass's files, keeps its whole history. An area counts as audited only once passes have read at
 least half its files now (`COVERED` in `src/rounds.mjs`); below that it queues as never audited, its inherited
-passes still shown.
+passes still shown. An area's passes of one round count as one pass, its left the sum of theirs by share and its fixes
+all of theirs; and only a round whose passes read at least half the area's files (a *covering* round) stands for it:
+its last covering round is its "last pass" for the queue, staleness and settling, so a later pass that held one
+boundary file of it neither replaces its estimate nor tests it.
 
 **Stale estimates.** An area whose files changed since its last pass carries `staleLines` in the map: lines added
 plus deleted in those files (`git log --numstat`, merges left out) by every commit since the pass's commit but that
@@ -186,7 +189,7 @@ rebuild asks git only about commits it has not seen.
 
 **Calibration.** Chapman's estimate assumes the two reviewers find defects independently; two runs of one model
 are positively correlated, so "left" runs low. `src/calibration.mjs` checks it against what happened: for each pair
-of consecutive passes on one area (provisional ones skipped), what pass k left against the distinct defects pass
+of consecutive covering rounds on one area (provisional ones skipped; see "History follows files"), what pass k left against the distinct defects pass
 k+1 found, scaled by pass k+1's share as "left" is by pass k's. The pooled factor, found over predicted, is taken
 overall and by pass k's shared count (0, 1–2, 3 or more); a pass's corrected left is its left times its bucket's
 factor, or the overall one while the bucket has fewer than 5 pairs, never under 1. What pass k+1 found is a lower
