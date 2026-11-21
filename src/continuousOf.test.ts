@@ -47,4 +47,15 @@ describe('continuousOf', () => {
     write(state, 43, 'status.json', { started: at('23:00').toISOString(), step: 'review', costUsd: 25, pid: dead });
     expect(continuousOf(cfg, { now: at('23:50'), fleet }).budget).toMatchObject({ spentUsd: 25 });
   });
+
+  it('keeps the chain ended for the night across a restart, from the state on disk', () => {
+    const state = mkdtempSync(join(tmpdir(), 'skulkr-cont-'));
+    dirs.push(state);
+    const cfg = resolveConfig({ name: 'p', state, areasPerRound: 4, budget: { nightUsd: 100, areaGuessUsd: 1 } });
+    writeContinuous(state, { on: true, until: at('07:00', 17).toISOString() });
+    expect(continuousOf(cfg, { now: at('23:50'), fleet }).next).toMatchObject({ start: true });
+    writeFileSync(join(state, 'continuous-idle.json'), JSON.stringify({ until: at('23:55').toISOString(), why: 'failed' }));
+    expect(continuousOf(cfg, { now: at('23:50'), fleet }).next).toMatchObject({ start: false, why: expect.stringContaining('found nothing to do or failed') });
+    expect(continuousOf(cfg, { now: at('23:56'), fleet }).next).toMatchObject({ start: true });
+  });
 });

@@ -116,6 +116,15 @@ const continuousFile = (state) => join(state, 'continuous.json');
 export const readContinuous = (state) => readJson(continuousFile(state));
 export const writeContinuous = (state, value) => writeJson(continuousFile(state), value);
 
+/**
+ * Set when a continuous round the service started claimed nothing, failed, or could not start: `{ until, why, at }`, so
+ * the chain stays ended for the night across a restart. Cleared when a request turns continuous mode on.
+ */
+const idleFile = (state) => join(state, 'continuous-idle.json');
+export const readIdle = (state) => readJson(idleFile(state));
+export const writeIdle = (state, value) => writeJson(idleFile(state), value);
+export const clearIdle = (state) => rmSync(idleFile(state), { force: true });
+
 /** The night directories of every other run at `commit`, newest first, from each run's status or summary. */
 export const nightsAt = (commit, state, except) => rounds(state).filter((r) => r !== except).reverse().flatMap((r) => {
   const run = readJson(join(runDir(r, state), 'status.json')) ?? readJson(join(runDir(r, state), 'summary.json'));

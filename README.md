@@ -314,7 +314,8 @@ Every request but a bare `ping` may carry `tenant`, the project it is about, and
 
 Starting or restarting the service never starts a run, nor stops one: each run is a process group of its own and
 keeps going when the service that started it exits, and a restarted service finds it on disk and reads its latest line
-from its night log. Anything that keeps a process alive and owns its stdin can host it (launchd, systemd, tmux); under
+from its night log. Its first tick only arms each schedule; continuous mode, if on, starts its next round from the
+tick after. Anything that keeps a process alive and owns its stdin can host it (launchd, systemd, tmux); under
 onto, as the service `skulkr` hosting every registered tenant, on the machine holding their checkouts:
 
     onto sync --in skulkr orochi                     # from ~/src/skulkr
@@ -359,7 +360,8 @@ the coming night. Its spend is every round started in it, from `status.json` whi
 the last `status.json` of one that died without a summary (run directories from the last day are never pruned). The estimate is `areasPerRound` times the mean cost per
 finished area of the last five rounds, or `areasPerRound × budget.areaGuessUsd` before any. Each continuous round
 runs with `--cap-usd` set to the night's budget left or `budget.capUsd`, whichever is less. A continuous round that
-claims nothing or fails ends the chain for the night. `stopAt` still stops every run dispatching, as before.
+claims nothing, fails, or cannot start ends the chain for the night, noted in `<state>/continuous-idle.json` so a
+restart does not resume it; a request turning continuous mode on clears it. `stopAt` still stops every run dispatching, as before.
 
 ## Tenants
 
@@ -450,6 +452,7 @@ LaunchAgent, so install from a shell where `node` and `onto` resolve, and set ei
 | Locks | `<state>/plan.lock`, `<state>/merge.lock` | one file each, deleted on release |
 | The fleet queue | `~/.local/state/skulkr/fleet/`: `gate.lease` and a ticket per waiting run in `waiting/` | the lease deleted on release, a ticket when its run takes the gate; a dead pid's of either is cleared |
 | Continuous mode asked for | `<state>/continuous.json` | one file, rewritten by each request |
+| Continuous chain ended for the night | `<state>/continuous-idle.json` | one file, rewritten when a continuous round claims nothing, fails or cannot start, removed when a request turns the mode on |
 | Worktrees | `.worktrees/audit<N>-frozen-night`, `audit<N>-am-<area>`, `batch-<date>-audit<N>` in the project checkout | removed when the run ends, except a red batch's, which the report names |
 | Node trees | `<name>-skulkr-r<k>`, `<name>-skulkr-f<k>` on each node | a fixed set; each job clears its own output |
 

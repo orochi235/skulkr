@@ -1,17 +1,18 @@
 /** A tenant's continuous mode as its state on disk says now: what the service decides from, and what status shows. */
 import { budgetNight, modeOf, nextContinuous, queuesOf, roundEstimate, spentSince } from './continuous.mjs';
 import { readFleet } from './fleet.mjs';
-import { finishedRuns, lastWords, liveRuns, readContinuous } from './runs.mjs';
+import { finishedRuns, lastWords, liveRuns, readContinuous, readIdle } from './runs.mjs';
 
 const cents = (n) => Math.round(n * 100) / 100;
 
 /**
  * `cfg`'s continuous mode at `now`: `mode` (`modeOf`), `next` (`nextContinuous`: whether its next round starts, with
  * what cap, or why not), the night's budget and spend, and `queues` (`queuesOf`). `pending` counts rounds the service
- * started that have not claimed one; `idleUntil` is set when the last one it started found nothing to do or failed.
+ * started that have not claimed one. Whether the last one it started found nothing to do or failed is read from
+ * `readIdle`, so it outlives a restart.
  */
-/** @param {any} cfg @param {{ now?: Date, pending?: number, idleUntil?: string, readOnly?: boolean, fleet?: any }} [opts] */
-export const continuousOf = (cfg, { now = new Date(), pending = 0, idleUntil, readOnly = false, fleet } = {}) => {
+/** @param {any} cfg @param {{ now?: Date, pending?: number, readOnly?: boolean, fleet?: any }} [opts] */
+export const continuousOf = (cfg, { now = new Date(), pending = 0, readOnly = false, fleet } = {}) => {
   const live = liveRuns(cfg.state);
   const finished = finishedRuns(cfg.state);
   const night = budgetNight(now, cfg.schedule.stopAt);
@@ -20,7 +21,7 @@ export const continuousOf = (cfg, { now = new Date(), pending = 0, idleUntil, re
   const nightUsd = cfg.budget.nightUsd ?? null;
   const mode = modeOf({ now, schedule: cfg.schedule, nightUsd, override: readContinuous(cfg.state) });
   const next = nextContinuous({
-    now, mode, readOnly, runs: live, pending, spentUsd, estimateUsd: estimate.usd, nightUsd, capUsd: cfg.budget.capUsd, idleUntil,
+    now, mode, readOnly, runs: live, pending, spentUsd, estimateUsd: estimate.usd, nightUsd, capUsd: cfg.budget.capUsd, idleUntil: readIdle(cfg.state)?.until,
   });
   return {
     mode, next,

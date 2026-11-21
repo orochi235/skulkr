@@ -15,7 +15,7 @@ import { loadConfig, nextClock } from './config.mjs';
 import { inModelSteps } from './continuous.mjs';
 import { continuousOf } from './continuousOf.mjs';
 import { createHost } from './host.mjs';
-import { lastFinished, lastStartedAt, liveRuns, requestStop, writeContinuous } from './runs.mjs';
+import { clearIdle, lastFinished, lastStartedAt, liveRuns, requestStop, writeContinuous, writeIdle } from './runs.mjs';
 import { readTenants, tenantsPath } from './tenants.mjs';
 
 /**
@@ -52,9 +52,8 @@ export const lastLineOf = (path) => {
 };
 
 /**
- * One tenant as the host drives it: `cfg`'s project, each run `skulkr night` from its main checkout. `runtime` is what the tenant knows that is not on disk: the runs it started, when it last started one, and how long
- * continuous mode idles. A tenant reloaded from an edited config takes its predecessor's, so neither its runs nor its
- * idling are forgotten.
+ * One tenant as the host drives it: `cfg`'s project, each run `skulkr night` from its main checkout. `runtime` is what the tenant knows that is not on disk: the runs it started and when it last started one. A tenant
+ * reloaded from an edited config takes its predecessor's, so its runs are not forgotten.
  */
 export const createTenant = (name, cfg, { readOnly = false, runtime = { children: new Map() } } = {}) => {
   const root = mainCheckout(cfg);
@@ -74,8 +73,10 @@ export const createTenant = (name, cfg, { readOnly = false, runtime = { children
 
   /** Starts no continuous round until the night's stop time, after one that `why`. */
   const idle = (why) => {
-    runtime.idleUntil = nextClock(new Date(), cfg.schedule.stopAt).toISOString();
-    say(`continuous: that round ${why}; no more start until ${runtime.idleUntil}`);
+    const now = new Date();
+    const until = nextClock(now, cfg.schedule.stopAt).toISOString();
+    writeIdle(state, { until, why, at: now.toISOString() });
+    say(`continuous: that round ${why}; no more start until ${until}`);
   };
 
   const start = (args, { continuous = false } = {}) => {
@@ -127,11 +128,11 @@ export const createTenant = (name, cfg, { readOnly = false, runtime = { children
     running: () => children.size > 0 || liveRuns(state).length > 0,
     modelBusy: () => pending() > 0 || liveRuns(state).some(inModelSteps),
     scheduledContinuous: Boolean(cfg.schedule.continuous && cfg.budget.nightUsd > 0),
-    continuous: (now) => continuousOf(cfg, { now, pending: pending(), idleUntil: runtime.idleUntil, readOnly }),
+    continuous: (now) => continuousOf(cfg, { now, pending: pending(), readOnly }),
     setContinuous: (on, now) => {
       const until = nextClock(now, cfg.schedule.stopAt).toISOString();
       writeContinuous(state, { on, until, at: now.toISOString() });
-      if (on) runtime.idleUntil = undefined;
+      if (on) clearIdle(state);
       say(`continuous mode ${on ? 'on' : 'off'} until ${until}`);
     },
     lastStarted: () => {

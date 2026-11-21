@@ -195,6 +195,16 @@ describe('continuous rounds', () => {
     expect(await h.request('{"id":3,"status":true}')).toMatchObject({ continuous: { next: expect.stringContaining('the night\'s budget') } });
   });
 
+  it('starts no continuous round on its first tick, so a restart starts nothing by itself', () => {
+    const a = continuous('a');
+    a.setContinuous(true);
+    const h = host([a]);
+    h.tick();
+    expect(a.starts).toEqual([]);
+    h.tick();
+    expect(a.starts).toEqual([['--cap-usd', '160']]);
+  });
+
   it('ends with a bare stop, and refuses a read-only tenant or one with no nightly budget', async () => {
     const a = continuous('a');
     const h = host([a]);

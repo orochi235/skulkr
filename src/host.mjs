@@ -49,6 +49,8 @@ export const createHost = ({ tenants, now = () => new Date(), log = () => {}, bu
   const queue = [];
   /** Each tenant's next scheduled start, armed when it is first seen, so a restart never starts a round by itself. */
   const fireAt = new Map();
+  /** Set after the first tick, which only arms: a restart never starts a continuous round by itself either. */
+  let ticked = false;
 
   /** Another tenant whose round is in its model steps now, by name, or undefined. */
   const busyBeside = (name, list) => list.find((t) => t.name !== name && (t.modelBusy ? t.modelBusy() : t.running()))?.name;
@@ -109,7 +111,8 @@ export const createHost = ({ tenants, now = () => new Date(), log = () => {}, bu
       const due = shouldAutoStart({ now: at, running: t.running(), lastStarted: t.lastStarted(), startAt: t.startAt });
       if (due && !queue.some((q) => q.tenant === t.name && q.auto)) queue.push({ tenant: t.name, args: [], auto: true, since: at.toISOString() });
     }
-    for (const t of list) offerContinuous(t, at);
+    if (ticked) for (const t of list) offerContinuous(t, at);
+    ticked = true;
     drain(list);
   };
 
