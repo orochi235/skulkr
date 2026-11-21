@@ -41,7 +41,7 @@ export const plan = (cfg, root, args) => {
   const taken = (args.only ?? []).filter((id) => held.has(id));
   if (taken.length > 0) throw new Error(`${taken.join(', ')} ${taken.length === 1 ? 'is' : 'are'} held by a live run; see its status`);
   const inFlight = areasInFlightFor(cfg, git);
-  const open = openFindingsIn(cfg, git, root, records);
+  const open = openFindingsIn(cfg, git, root, records, areas);
   if (args.fixOnly) {
     const { picked, skipped } = planFixOnly({ areas, open, want: args.fixOnly, held, inFlight });
     const missing = skipped.filter((s) => s.why === 'no such area').map((s) => s.id);

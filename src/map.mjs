@@ -161,7 +161,7 @@ export const buildMap = (cfg, root, runner) => {
   // A live run's areas are being audited, not waiting, so the queue counts from 1 past them.
   const queue = new Map(picked.filter((id) => !holder.has(id)).map((id, i) => [id, i + 1]));
   const icons = areaIcons(iconsFor(cfg, root), areas);
-  const open = openFindingsIn(cfg, git, root, records);
+  const open = openFindingsIn(cfg, git, root, records, areas);
 
   const out = areas.map((area) => {
     const own = passes.get(area.id) ?? [];

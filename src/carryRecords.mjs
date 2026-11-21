@@ -38,5 +38,5 @@ const withSubjects = (git, rec) => {
 export const recordsIn = (cfg, git, root, records = recordsFor(cfg, git, root)) =>
   records.map((r) => withSubjects(git, recordOf(r.round, r.id, r.read)));
 
-/** The project's open findings by area id (`openFindings`'); `records` as `recordsIn`'s. */
-export const openFindingsIn = (cfg, git, root, records) => openFindings(recordsIn(cfg, git, root, records), { cited: cfg.citedRe });
+/** The project's open findings by area id (`openFindings`'), under `areas`, the partition now, where given; `records` as `recordsIn`'s. */
+export const openFindingsIn = (cfg, git, root, records, areas) => openFindings(recordsIn(cfg, git, root, records), { cited: cfg.citedRe, areas });

@@ -61,6 +61,24 @@ describe('openFindings', () => {
   });
 });
 
+describe('openFindings after a recut', () => {
+  const areas = [{ id: 'clamp', files: ['src/clamp.ts'] }, { id: 'ticker', files: ['src/ticker.ts'] }];
+
+  it('lists each open finding under the area holding its cited paths, and one citing none it holds under its old id', () => {
+    const elsewhere: [string, string] = ['the docs page names a removed option', 'docs/options.md:3'];
+    const open = openFindings([reported(56, [ROUNDING, LEAK, elsewhere])], { areas });
+    expect([...open].map(([id, list]) => [id, list.map((o: any) => o.id)])).toEqual([['clamp', ['r56-1']], ['ticker', ['r56-2']], ['x', ['r56-3']]]);
+  });
+
+  it("closes a finding carried into its new area's round once that fixer acts on it", () => {
+    const old = reported(56, [ROUNDING, LEAK]);
+    const carried = [{ id: 'r56-2', claim: LEAK[0], where: LEAK[1], from: 'A', round: 56, rounds: [56] }];
+    const fix = `- [r56-2] ${LEAK[0]} (A): fixed 1a2b3c4d.\n\ntally: 1 of 1 fixed, 0 extra fixed`;
+    const after = { ...reported(57, []), id: 'ticker', carried, fix };
+    expect([...openFindings([old, after], { areas })].map(([id, list]) => [id, list.map((o: any) => o.id)])).toEqual([['clamp', ['r56-1']]]);
+  });
+});
+
 describe('givenIn and fixOf', () => {
   it('orders matched findings first and drops a heading with no where line', () => {
     const rec = {

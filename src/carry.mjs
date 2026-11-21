@@ -78,9 +78,11 @@ const sameDefect = (open, finding, cited) => {
  * Every area's open findings from its records (`{ round, id, match, A, B, fix, area, carried, subjects }`, any order),
  * as a Map of area id to `{ id, claim, where, from, round, rounds }`, oldest first: `round` is the first round that
  * reported it and `rounds` every round that did. A fixer whose report gives as many verdicts as it was handed findings
- * acted on all of them; otherwise each finding is matched to its verdicts one by one (`actsOn`).
+ * acted on all of them; otherwise each finding is matched to its verdicts one by one (`actsOn`). Records keep the
+ * area ids of their round; with `areas`, the partition now, each finding is listed under the area holding its cited
+ * paths (`createHolderLookup`), so a recut hands it to the area that holds its code.
  */
-export const openFindings = (records, { cited } = {}) => {
+export const openFindings = (records, { cited, areas } = {}) => {
   const byArea = new Map();
   for (const rec of [...records].sort((x, y) => x.round - y.round)) {
     const list = byArea.get(rec.id) ?? [];
@@ -100,7 +102,9 @@ export const openFindings = (records, { cited } = {}) => {
       }
     }
     for (const c of carried) {
-      const known = list.find((o) => o.id === c.id) ?? list.find((o) => sameDefect(o, c, cited));
+      // A finding carried in after a recut was found under the area's old id, so it is looked for there too.
+      const known = list.find((o) => o.id === c.id) ?? list.find((o) => sameDefect(o, c, cited))
+        ?? [...byArea.values()].flat().find((o) => o.id === c.id && o.claim === c.claim);
       if (known) given.push({ ...known, id: c.id, known });
     }
     const fix = fixOf(rec);
@@ -109,5 +113,31 @@ export const openFindings = (records, { cited } = {}) => {
     for (const g of given) if (all || actsOn(fix, g)) g.known.acted = true;
     for (const o of list) if (!o.acted && actsOn(fix, o)) o.acted = true;
   }
-  return new Map([...byArea].map(([id, list]) => [id, list.filter((o) => !o.acted).map(({ acted, paths, ...o }) => o)]).filter(([, l]) => l.length));
+  const holder = areas && createHolderLookup(areas);
+  const open = new Map();
+  for (const [id, list] of byArea) {
+    for (const { acted, paths, ...o } of list) {
+      if (acted) continue;
+      const to = holder?.(paths) ?? id;
+      if (!open.has(to)) open.set(to, []);
+      open.get(to).push(o);
+    }
+  }
+  for (const list of open.values()) list.sort((x, y) => x.round - y.round);
+  return open;
+};
+
+/**
+ * For `areas` (`{ id, files }`), the id of the area holding the most of `paths`, the first such path's on a tie, or
+ * undefined when none holds any.
+ */
+export const createHolderLookup = (areas) => {
+  const byFile = new Map(areas.flatMap((a) => a.files.map((f) => [f, a.id])));
+  return (paths) => {
+    const counts = new Map();
+    for (const p of paths) if (byFile.has(p)) counts.set(byFile.get(p), (counts.get(byFile.get(p)) ?? 0) + 1);
+    let best;
+    for (const [id, n] of counts) if (best === undefined || n > counts.get(best)) best = id;
+    return best;
+  };
 };

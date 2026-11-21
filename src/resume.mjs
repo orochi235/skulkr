@@ -58,7 +58,7 @@ export const resume = async (cfg, root, args, say) => {
     const records = recordsFor(cfg, git, root);
     const p = {
       commit, round, picked: ids.flatMap((id) => (byId.has(id) ? [byId.get(id)] : [])), passes: inheritPasses([...byId.values()], passesIn(cfg, git, root, records)).history,
-      running, open: openFindingsIn(cfg, git, root, records),
+      running, open: openFindingsIn(cfg, git, root, records, [...byId.values()]),
     };
     const status = {
       round, commit, started: prior.started, resumed: new Date().toISOString(), step: 'freeze', areas: ids, nightDir: prior.nightDir,

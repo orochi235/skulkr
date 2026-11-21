@@ -52,6 +52,9 @@ weasel cutover.
     deleted then (2026-11-21).
   - the map's gate progress, outcomes and failures, read from the night's newest gate log rather than the first listed
     (2026-11-21).
+  - an open finding listed under the area now holding its cited paths, not the id of the round that found it, and one
+    carried into its new area closed once that area's fixer acts on it: the map's `openFindings` and `open`, the plan's
+    "carries N open findings" line, and what a fixer is handed (2026-11-21).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.
