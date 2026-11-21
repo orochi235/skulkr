@@ -1,0 +1,66 @@
+# The skulkr menu bar item, an optional install: `npm run menubar:install` links `skulkr` onto your PATH and has
+# perch build this into an app and hand it to launchd; `npm run menubar:uninstall` removes it. Every line it shows is
+# worded by `skulkr menu` (src/menu.mjs), which asks the service what `onto call` would.
+
+app:
+  name: skulkr
+  id: dev.skulkr.menubar
+  icon: mail.and.text.magnifyingglass.rtl
+  interval: 10s
+  gutter: false
+  # .hued's background.
+  tint: { color: "#35395f", style: chip, wrap: all, menu: true, opacity: 0.85 }
+
+watch:
+  m:
+    run: [skulkr, menu]
+    json: true
+    timeout: 45s
+    shape:
+      title: string
+      live: int
+      rows: [{ text: string, detail: string, started: string }]
+      last: [{ text: string, report: string }]
+      problems: [string]
+      dashboard: string
+      at: string
+
+state:
+  - broken: "!m.ok"
+  - up:
+
+status:
+  - when: broken
+    icon: exclamationmark.triangle
+  - when: "up && m.data.live == 0"
+    dim: true
+  - badge: "up && m.data.live > 0 ? string(m.data.live) : ''"
+
+menu:
+  - text: "{{m.data.title}}"
+    when: up
+  - text: "⚠ skulkr menu failed; is skulkr on the PATH it was installed with?"
+    when: broken
+  - each: m.data.problems
+    text: "⚠ {{it}}"
+    when: up
+  - separator
+  # One row per live round; its submenu has the round's latest log line.
+  - each: m.data.rows
+    when: up
+    text: "{{it.text}}"
+    menu:
+      - text: "{{it.started}}"
+      - text: "{{it.detail}}"
+        when: "it.detail != ''"
+  - separator
+  - each: m.data.last
+    when: up
+    text: "{{it.text}}"
+    menu:
+      - text: "{{it.report}}"
+  - separator
+  - text: Open the dashboard
+    when: up
+    open: "{{m.data.dashboard}}"
+  - { text: Quit skulkr, quit: true }

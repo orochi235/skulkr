@@ -28,7 +28,7 @@ import { loadRunner } from '../src/runner/index.mjs';
 import { serve } from '../src/service.mjs';
 import { addTenant, readTenants, removeTenant, requireTenant, tenantsPath } from '../src/tenants.mjs';
 
-const USAGE = 'usage: skulkr <init|night|partition|map|defects|service|config|tenants> [--config <file> | --tenant <name>] [--root <dir>] …';
+const USAGE = 'usage: skulkr <init|night|partition|map|defects|service|config|tenants|menu> [--config <file> | --tenant <name>] [--root <dir>] …';
 
 /** `argv` less `--config`, `--tenant` and `--root` and their values, and those values. */
 const takeOptions = (argv) => {
@@ -88,6 +88,11 @@ const main = async () => {
     return 0;
   }
   if (command === 'tenants') return tenantsCommand(rest);
+  if (command === 'menu') {
+    const { menuCommand } = await import('../src/menu.mjs');
+    console.log(JSON.stringify(menuCommand()));
+    return 0;
+  }
   if (command === 'init') {
     const path = initCommand();
     console.log(`wrote ${path}; check its guesses, then run \`skulkr partition\` and \`skulkr night --dry\``);

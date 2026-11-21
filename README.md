@@ -398,6 +398,21 @@ area spanning two takes none. The map carries each named icon's glyph once, in `
 weasel's (`examples/weasel/icons.mjs`) reads `PACKAGE_ICONS` from `apps/site/releaseIcons.ts` and the glyphs from
 the `icons.table.json` files its icon generator writes, as text, so nothing of weasel is imported or built.
 
+## The menu bar item
+
+An optional macOS menu bar item shows the rounds running across every tenant: a badge counting them, a line each with
+its step and spend against its cap, its latest log line under it, each tenant's last finished round with its report,
+and a link to the dashboard. It needs [perch](https://github.com/orochi235/perch) (`brew install orochi235/tap/perch`).
+
+```sh
+npm run menubar:install      # links `skulkr` into ~/.local/bin, then perch builds the item and hands it to launchd
+npm run menubar:uninstall
+```
+
+Its wording comes from `skulkr menu` (`src/menu.mjs`), which asks the service for each tenant's status the way
+`onto call` does, so it reads like the dashboard; `menubar/menubar.yaml` only lays the lines out. perch writes the
+`PATH` you install from into the item's LaunchAgent, so install from a shell where `node` and `onto` resolve.
+
 ## Where things go
 
 | What | Where | Bound |
