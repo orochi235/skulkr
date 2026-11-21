@@ -89,11 +89,19 @@ export const DEFAULTS = {
       lintOf: null,
       final: String.raw`\bnpm run(?: -s)? typecheck\b`,
     },
+    /**
+     * The check skulkr runs itself over the files a fixer's commits changed, never trusting the fixer's report, or
+     * null for none (README "Verify and repair"). `command` runs at the end of the fixer's own job; `{files}` in it
+     * is the changed files, `{related}` the same as `--related=<file>` each. `gui`, where some tests need a GUI
+     * node, is `{ command, probe }`: `probe` runs beside `command` and lists the test files the GUI part would
+     * run, one a line; `command` then runs in a job of its own on a GUI node. `timeoutMin` bounds each run.
+     */
+    verify: null,
   },
   /** Project rules added to the default briefs (a string of Markdown), per brief. */
   rules: { reviewer: '', fixer: '' },
   /** Brief templates, paths relative to the config file; unset uses the shipped default. */
-  briefs: { reviewer: undefined, matcher: undefined, fixer: undefined },
+  briefs: { reviewer: undefined, matcher: undefined, fixer: undefined, repair: undefined },
 
   /**
    * How a batch is tested. `{ref}` in the command is the batch branch; `cwd` is `root` or `batch` (its worktree).

@@ -5,6 +5,9 @@
  */
 import { sweep } from './weasel/sweep.mjs';
 
+/** The root vitest config's projects that run in Chromium: `browser`, `browser (webgpu)`, and `forge-stories`. */
+const BROWSER_PROJECTS = ['browser*', 'forge-stories'];
+
 const NVM = 'export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"; . "$NVM_DIR/nvm.sh" >/dev/null; nvm use >/dev/null';
 
 export default {
@@ -70,6 +73,16 @@ export default {
       lint: String.raw`\bnpm run(?: -s)? lint -w (?:@weasel-js\/)?([\w.-]+)`,
       lintOf: String.raw`^packages\/([^/]+)\/`,
       final: String.raw`\bnpm run(?: -s)? checks:gate\b`,
+    },
+    // Every test file whose imports reach what the fixer changed, under the root config's projects: all but the
+    // checks (`gate`) and the projects that need a browser, which run on a GUI node.
+    verify: {
+      command: `npx vitest related --run --maxWorkers=4 ${['!gate', ...BROWSER_PROJECTS.map((p) => `!${p}`)].map((p) => `--project='${p}'`).join(' ')} {files}`,
+      gui: {
+        probe: `npx vitest list --filesOnly ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {related}`,
+        command: `npx vitest related --run --maxWorkers=2 ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {files}`,
+      },
+      timeoutMin: 30,
     },
   },
 

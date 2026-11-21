@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JOB_IN, JOB_OUT, noFixers, nodesAt } from './config.mjs';
 import { leaseAt, pidAlive, takeLease } from './lease.mjs';
+import { verifyLines, verifyOf } from './verify.mjs';
 
 export const BUSY_WAIT_MS = 30_000;
 
@@ -63,25 +64,72 @@ const installLines = (cfg) => {
 };
 
 /**
- * The fixer commits the synced tree as it stands (it must hash to the frozen commit's tree), installs
- * when the lockfile changed since the tree's last install, lets the model fix and commit, and hands
- * back its commits as one mbox.
+ * Readies a node tree for a job that commits: the synced tree committed as it stands (it must hash to the frozen
+ * commit's tree), `BASE` set to that commit, and an install when the lockfile changed since the tree's last one.
+ */
+const treeLines = (cfg) => [
+  'grep -qx ".skulkr/" .git/info/exclude 2>/dev/null || echo ".skulkr/" >> .git/info/exclude',
+  'git add -A',
+  'git -c user.name=skulkr -c user.email=skulkr@localhost commit -q --no-verify --allow-empty -m "skulkr: frozen tree"',
+  `if [ "$(git rev-parse 'HEAD^{tree}')" != "$FROZEN_TREE" ]; then echo "synced tree $(git rev-parse 'HEAD^{tree}') is not the frozen tree $FROZEN_TREE" > ${JOB_OUT}/tree-mismatch; exit 0; fi`,
+  'BASE=$(git rev-parse HEAD)',
+  ...installLines(cfg),
+];
+
+/** The area's commits so far, `.skulkr/in/<area>/area.mbox`, applied on the frozen tree; a job whose patches do not
+ *  apply stops there with a failing verdict. */
+export const AREA_MBOX = 'area.mbox';
+const applyLines = (area) => [
+  `if ! git am -q --3way --keep-cr ${q(`${JOB_IN}/${area}/${AREA_MBOX}`)} > ${JOB_OUT}/am.log 2>&1; then git am --abort; `
+    + `echo "the area's patches did not apply" > ${JOB_OUT}/verify.log; echo 1 > ${JOB_OUT}/verify.exit; exit 0; fi`,
+];
+
+/** A model job's hand-back: its commits since `BASE` as one mbox and what it left uncommitted, then the verify step. */
+const handBackLines = (cfg) => {
+  const verify = verifyOf(cfg);
+  return [
+    `git format-patch --stdout "$BASE..HEAD" > ${JOB_OUT}/fix.mbox`,
+    `git status --porcelain > ${JOB_OUT}/uncommitted.txt`,
+    ...(verify ? verifyLines(verify) : []),
+    'exit 0',
+  ];
+};
+
+const fixFlags = (cfg) => ['--dangerously-skip-permissions', ...model(cfg.claude.models.fix), ...effort(cfg.claude.effort?.fix)];
+
+/**
+ * The fixer readies the tree, lets the model fix and commit, hands back its commits as one mbox, and runs the
+ * config's verify step over the files they changed.
  */
 export const fixShell = (cfg, area, budgetUsd, findings) =>
   [
-    'set -e', ...prelude(cfg), fresh,
-    'grep -qx ".skulkr/" .git/info/exclude 2>/dev/null || echo ".skulkr/" >> .git/info/exclude',
-    'git add -A',
-    'git -c user.name=skulkr -c user.email=skulkr@localhost commit -q --no-verify --allow-empty -m "skulkr: frozen tree"',
-    `if [ "$(git rev-parse 'HEAD^{tree}')" != "$FROZEN_TREE" ]; then echo "synced tree $(git rev-parse 'HEAD^{tree}') is not the frozen tree $FROZEN_TREE" > ${JOB_OUT}/tree-mismatch; exit 0; fi`,
-    'BASE=$(git rev-parse HEAD)',
-    ...installLines(cfg),
-    'set +e',
-    claudeLine(cfg, `${JOB_IN}/${area}/fix.md`, budgetUsd, ['--dangerously-skip-permissions', ...model(cfg.claude.models.fix), ...effort(cfg.claude.effort?.fix)], `--commits ${findings} --checks ${CHECKS_IN}`),
-    `git format-patch --stdout "$BASE..HEAD" > ${JOB_OUT}/fix.mbox`,
-    `git status --porcelain > ${JOB_OUT}/uncommitted.txt`,
+    'set -e', ...prelude(cfg), fresh, ...treeLines(cfg), 'set +e',
+    claudeLine(cfg, `${JOB_IN}/${area}/fix.md`, budgetUsd, fixFlags(cfg), `--commits ${findings} --checks ${CHECKS_IN}`),
+    ...handBackLines(cfg),
+  ].join('\n');
+
+/** A repair: the area's commits applied, the model given `repair.md`, and every commit since the frozen tree handed
+ *  back and verified, as a fixer's are. */
+export const repairShell = (cfg, area, budgetUsd) =>
+  [
+    'set -e', ...prelude(cfg), fresh, ...treeLines(cfg), ...applyLines(area), 'set +e',
+    claudeLine(cfg, `${JOB_IN}/${area}/repair.md`, budgetUsd, fixFlags(cfg)),
+    ...handBackLines(cfg),
+  ].join('\n');
+
+/** The verify step alone on the area's commits: its GUI part with `gui`, else the part a model job runs itself. */
+export const verifyShell = (cfg, area, { gui = false } = {}) => {
+  const verify = verifyOf(cfg);
+  return [
+    'set -e', ...prelude(cfg), fresh, ...treeLines(cfg), ...applyLines(area), 'set +e',
+    ...verifyLines(verify, gui ? { command: verify.gui.command, probe: null } : {}),
     'exit 0',
   ].join('\n');
+};
+
+/** A job's runner timeout in minutes: its model's, plus the verify step's where the job runs one. */
+export const timeoutOf = (cfg, { model = true, verify = Boolean(verifyOf(cfg)) } = {}) =>
+  (model ? cfg.claude.timeoutMin : 0) + (verify ? (verifyOf(cfg).timeoutMin ?? 20) + 5 : 0) + 10;
 
 /**
  * Slots per node for `role`, read again at every lease from `<state>/limits.json` (`{ "review": n, "fix": n }`)
@@ -155,19 +203,23 @@ export const runUntilFree = async (runner, job, { cwd, logPath, waitMs = BUSY_WA
       return { status: run.status, refused: Boolean(run.refused) };
     }
   } finally {
-    log.end();
+    // Flushed before the caller reads the log back for why a launch failed.
+    await new Promise((resolve) => {
+      log.once('error', resolve);
+      log.end(resolve);
+    });
   }
 };
 
 /**
- * One model job in `slot`; `expect` is the runner's `--expect`, a duration or `none`. Answers
+ * One job in `slot`; `expect` is the runner's `--expect`, a duration or `none`; `gui` asks for a node's GUI session. Answers
  * `{ status, refused }`: `refused` when the node turned the job away as quiet or unavailable before
  * anything ran, so the caller tries another node.
  */
-export const runJob = ({ cfg, runner, frozen, base, slot, kind, task, about, expect, env = {}, shell, to, logPath }) =>
+export const runJob = ({ cfg, runner, frozen, base, slot, kind, task, about, expect, env = {}, shell, to, logPath, gui, timeoutMin = cfg.claude.timeoutMin + 10 }) =>
   runUntilFree(runner, {
-    kind, node: slot.node, ref: base, timeout: `${cfg.claude.timeoutMin + 10}m`, expect, task, about,
-    out: JOB_OUT, to, env, shell,
+    kind, node: slot.node, ref: base, timeout: `${timeoutMin}m`, expect, task, about,
+    out: JOB_OUT, to, env, shell, ...(gui ? { gui: true } : {}),
   }, { cwd: frozen, logPath });
 
 export const jobDir = (nightDir, area, role) => join(nightDir, 'jobs', area, role);

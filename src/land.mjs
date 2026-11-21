@@ -13,6 +13,11 @@ import { mergeLock } from './runs.mjs';
 /** How many times a green batch merges a moved main in and tests again before leaving the fast-forward to fail. */
 const MAIN_CATCH_UPS = 2;
 
+/** Whether a fixer's verify step failed for good: a run that timed out lands, for the capstone to check. */
+export const failedVerify = (verify) => verify?.ok === false && !verify.timedOut;
+/** An area's outcome when its verify step still fails after its repairs. */
+const leftOutText = (verify) => `left out: verify still failing after ${verify.repairs ?? 0} repairs (${verify.why})`;
+
 /** Each fixer's mbox onto its own `audit<N>-<area>` branch. Answers the branches that took their patches. */
 export const patchAreas = ({ cfg, root, round, commit, nightDir, results, outcomes, say }) => {
   const branches = [];
@@ -20,6 +25,11 @@ export const patchAreas = ({ cfg, root, round, commit, nightDir, results, outcom
     const mbox = join(nightDir, 'areas', summary.id, 'fix.mbox');
     if (!existsSync(mbox)) {
       outcomes[summary.id] = summary.distinct > 0 ? 'no commits' : 'nothing to fix';
+      continue;
+    }
+    if (failedVerify(summary.verify)) {
+      outcomes[summary.id] = leftOutText(summary.verify);
+      say(`patch ${summary.id}: ${outcomes[summary.id]}`);
       continue;
     }
     const applied = applyFix(cfg, root, { round, area: summary.id, commit, mbox });
@@ -41,6 +51,11 @@ export const patchSweep = ({ cfg, root, round, commit, fixed, branches, outcomes
   if (!fixed.mbox) {
     outcomes[SWEEP_ID] = 'no commits';
     return { patches: 0, commits: [], report: fixed.report };
+  }
+  if (failedVerify(fixed.verify)) {
+    outcomes[SWEEP_ID] = leftOutText(fixed.verify);
+    say(`patch ${SWEEP_ID}: ${outcomes[SWEEP_ID]}`);
+    return { patches: fixed.patches, commits: [], report: fixed.report, verify: fixed.verify };
   }
   const applied = applyFix(cfg, root, { round, area: SWEEP_ID, commit, mbox: fixed.mbox });
   if (applied.error) {
