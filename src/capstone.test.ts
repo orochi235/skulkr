@@ -136,6 +136,21 @@ describe('a red capstone', () => {
     expect(leftOutIn(state)).toEqual([]);
   });
 
+  it("keeps an earlier round's blamed branch for a retry when the batch lands only over failures main already has", async () => {
+    const r = round({ docs: { 'docs/d.md': 'e' } });
+    r.git('checkout', '-q', '-b', 'audit4-src', r.commit);
+    writeFileSync(join(r.root, 'src/a.ts'), 'changed');
+    r.git('commit', '-qam', 'fix src in round 4');
+    r.git('checkout', '-q', 'main');
+    const state = scratch();
+    writeFileSync(join(state, 'left-out.json'), JSON.stringify({ branches: [{ branch: 'audit4-src', round: 4, why: 'merge conflict in x' }] }));
+    const alwaysRed = 'echo "fleet-fail: core src/a.test.ts :: a > works"; echo " FAIL  src/a.test.ts > a > works"; exit 1';
+    const { report } = await land(r, async () => ({ ok: false }), { command: ['bash', '-c', alwaysRed] }, async (files) => files, state);
+    expect(report).toMatch(/^main fast-forwarded to \w+; .*landed over 1 failures main already has/);
+    expect(r.git('branch', '--list', 'audit4-src')).not.toBe('');
+    expect(leftOutIn(state).map((e: { branch: string }) => e.branch)).toEqual(['audit4-src']);
+  });
+
   it('starts a repair only while the dollar cap and stop requests allow, leaving out the branches it does not repair', async () => {
     const r = round({ src: { 'src/a.ts': 'broken' }, docs: { 'docs/d.md': 'e' } });
     const asked: string[] = [];
