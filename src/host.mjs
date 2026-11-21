@@ -82,7 +82,12 @@ export const createHost = ({ tenants, now = () => new Date(), log = () => {}, bu
         args = continuousArgs(next);
       }
       log(`${t.name}: starting${entry.auto ? ' its scheduled round' : entry.continuous ? ' its next continuous round' : ''}${args.length ? ` (${args.join(' ')})` : ''}`);
-      t.deps.start(args, { continuous: Boolean(entry.continuous) });
+      try {
+        t.deps.start(args, { continuous: Boolean(entry.continuous) });
+      } catch (error) {
+        entry.error = error.message;
+        log(`${t.name}: ${error.message}`);
+      }
     }
   };
 
@@ -122,6 +127,7 @@ export const createHost = ({ tenants, now = () => new Date(), log = () => {}, bu
     const entry = { tenant: t.name, args, auto: false, since: now().toISOString() };
     queue.push(entry);
     drain(list);
+    if (entry.error) return { started: false, error: entry.error, args };
     if (!queue.includes(entry)) return { started: true, args };
     return { started: false, waiting: true, behind: busyBeside(t.name, list) ?? queue.find((q) => q.tenant !== t.name)?.tenant, args };
   };
@@ -148,6 +154,7 @@ export const createHost = ({ tenants, now = () => new Date(), log = () => {}, bu
     const entry = queue.find((q) => q.tenant === t.name && q.continuous);
     drain(list);
     const state = t.continuous(at);
+    if (entry?.error) return { continuous: true, until: state.mode.until, started: false, error: entry.error };
     if (entry && !queue.includes(entry)) return { continuous: true, until: state.mode.until, started: true };
     return {
       continuous: true, until: state.mode.until, started: false,

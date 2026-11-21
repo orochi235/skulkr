@@ -58,6 +58,13 @@ describe('handle', () => {
     expect(d.calls).toEqual([['stop', 42], ['stop', 41, 42]]);
   });
 
+  it('takes resume only as a round number', async () => {
+    expect(startArgs({ resume: 12 })).toEqual(['--resume', '12']);
+    expect(startArgs({ resume: '12' })).toEqual(['--resume', '12']);
+    for (const resume of ['x', 0, -1, 1.5, true, '', null]) expect(() => startArgs({ resume })).toThrow('resume takes a round number');
+    expect(await handle('{"id":1,"resume":"x"}', deps())).toMatchObject({ id: 1, error: expect.stringContaining('resume takes a round number') });
+  });
+
   it('rejects start fields it does not know', () => {
     expect(() => startArgs({ start: true, area: 3 })).toThrow('start does not take area');
   });

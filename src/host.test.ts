@@ -67,6 +67,14 @@ describe('createHost', () => {
     expect(await h.request('{"id":2,"ping":true}')).toMatchObject({ build: 'two' });
   });
 
+  it('answers a start whose run could not be spawned as not started, and keeps ticking', async () => {
+    const a = tenant('a');
+    a.deps.start = () => { throw new Error('run could not start: no process'); };
+    const h = host([a], { now: at('12:00') });
+    expect(await h.request('{"id":1,"start":true}')).toEqual({ tenant: 'a', id: 1, started: false, error: 'run could not start: no process', args: [] });
+    expect(() => h.tick()).not.toThrow();
+  });
+
   it('means the only tenant when a request names none', async () => {
     const a = tenant('a');
     const h = host([a], { now: at('12:00') });

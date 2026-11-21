@@ -307,7 +307,7 @@ requests, one JSON object a line on stdin, each echoing its `id`:
 | `{"ping":true}` | `pong`, skulkr's commit (`build`), and the tenants hosted; with `tenant`, that project checkout's commit |
 | `{"status":true}` | `runs`: every live run's round, step, areas, flags, dollars used against its cap, and `behind`, what a waiting one waits for; `last`: the summary of the run that ended last; `continuous`: the mode, what the next round waits on (`next`), and `nightUsd`, `spentUsd`, `leftUsd`, and `estimateUsd`; `queues`: the round in its model steps (`model`) and the fleet queue's holder and waiters (`fleet`) |
 | `{"plan":true}` | what a run started now would pick |
-| `{"start":true}` | starts a run now, beside any already running; takes `areas`, `only`, `nodes`, `capUsd`, `budget` (`{review, match, fix}`), `merge: false`, `sweep: true`, `fixOnly` (`true` or a list of areas), and `resume` |
+| `{"start":true}` | starts a run now, beside any already running; takes `areas`, `only`, `nodes`, `capUsd`, `budget` (`{review, match, fix}`), `merge: false`, `sweep: true`, `fixOnly` (`true` or a list of areas), and `resume` (a round number); answers `started: false` and `error` when its run could not be spawned |
 | `{"start":true,"continuous":true}` | turns continuous mode on until the night's `stopAt`, and starts its first round if the queues and budget allow; takes no other field. `"continuous":false` turns it off |
 | `{"stop":true}` | with `round`, that run; without, every live run and continuous mode until the night's `stopAt`: no new jobs start, running ones finish, then each run patches, batches, and records what completed |
 

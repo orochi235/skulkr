@@ -33,7 +33,7 @@ describe('a tenant starting a run', () => {
     const cfg = resolveConfig({ name: 'p', state: join(dir, 'state'), root: join(dir, 'gone'), budget: { nightUsd: 100 } });
     const t = createTenant('p', cfg);
     t.setContinuous(true, new Date());
-    t.deps.start([], { continuous: true });
+    expect(() => t.deps.start([], { continuous: true })).toThrow('run could not start');
     await new Promise((done) => setTimeout(done, 200));
     expect(t.running()).toBe(false);
     expect(t.lastStarted()).toBeUndefined();

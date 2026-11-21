@@ -29,7 +29,13 @@ export const startArgs = (req) => {
   const unknown = Object.keys(req).filter((k) => !known.has(k));
   if (unknown.length > 0) throw new Error(`start does not take ${unknown.join(', ')}`);
   const args = [];
-  if (req.resume !== undefined) args.push('--resume', String(Number(req.resume)));
+  if (req.resume !== undefined) {
+    const round = Number(req.resume);
+    if (!Number.isInteger(round) || round < 1 || (typeof req.resume !== 'number' && typeof req.resume !== 'string')) {
+      throw new Error(`resume takes a round number, not ${JSON.stringify(req.resume)}`);
+    }
+    args.push('--resume', String(round));
+  }
   if (req.areas !== undefined) args.push('--areas', String(req.areas));
   if (req.only !== undefined) args.push('--only', list(req.only));
   if (req.nodes !== undefined) args.push('--nodes', list(req.nodes));

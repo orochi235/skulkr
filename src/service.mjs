@@ -82,21 +82,24 @@ export const createTenant = (name, cfg, { readOnly = false, runtime = { children
 
   const start = (args, { continuous = false } = {}) => {
     const at = new Date();
-    const failed = (error) => {
-      say(`run could not start: skulkr night ${args.join(' ')}: ${error.message ?? error}`);
+    /** Logs why, idles continuous mode, and throws, so the start is answered as not started. */
+    const failed = (why) => {
+      const message = `run could not start: skulkr night ${args.join(' ')}: ${why}`;
+      say(message);
       if (continuous) idle('could not start');
+      throw new Error(message);
     };
     let child;
     try {
       // A process group of its own, so a restarting service (every `onto sync`) never takes its runs down with it.
       child = spawn(process.execPath, [BIN, 'night', ...base, ...args], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     } catch (error) {
-      failed(error);
-      return args;
+      failed(error.message ?? error);
     }
     if (child.pid === undefined) {
-      child.on('error', failed);
-      return args;
+      // Node says why only on the next turn, in an 'error' event that must have a listener.
+      child.on('error', (error) => say(`run could not start: ${error.message}`));
+      failed(`no process (is ${root} there?)`);
     }
     child.on('error', (error) => say(`run ${child.pid}: ${error.message}`));
     runtime.startedHere = at;
