@@ -34,7 +34,7 @@ export const nightStages = (log, names = NAMES) => {
     } else if ((m = /^match \d+\/\d+ (\S+):/.exec(line))) set(m[1], 'matched');
     else if ((m = /^fix \d+\/\d+ (\S+) on /.exec(line))) set(m[1], 'fixed');
     else if ((m = /^patch (\S+): /.exec(line))) set(m[1], 'patched');
-    else if ((m = names.conflict.exec(line))) set(m[1], 'conflict');
+    else if ((m = names.leftOut(line)) && !m.earlier) set(m.area, 'conflict');
   }
   return stages;
 };
@@ -94,8 +94,8 @@ export const nightLanes = (log, areas, jobs = [], reports = new Map(), names = N
       Object.assign(at(m[1], 'patch') ?? {}, { state: 'failed', why: m[2] });
     } else if ((m = /^(?:verify|repair) ([^\s:]+)/.exec(line)) && lanes.has(m[1])) {
       repairStep(lanes.get(m[1]), line);
-    } else if ((m = names.conflict.exec(line))) {
-      Object.assign(at(m[1], 'patch') ?? {}, { state: 'failed', why: 'conflicts; left out of the batch' });
+    } else if ((m = names.leftOut(line)) && !m.earlier) {
+      Object.assign(at(m.area, 'patch') ?? {}, { state: 'failed', why: `${m.why}; left out of the batch` });
     }
   }
   // A reviewer who found nothing leaves nothing to pair, so no matcher runs and no match line is written.
@@ -133,6 +133,15 @@ export const nightLanes = (log, areas, jobs = [], reports = new Map(), names = N
   }
   return [...lanes].map(([id, steps]) => ({ id, steps }));
 };
+
+/**
+ * Every branch a night's log says its batch left out: `{ area, round, why }`, `round` the branch's own, earlier than
+ * `round` for a branch an earlier round left out and this one retried.
+ */
+export const nightLeftOut = (log, round, names = NAMES) => log.split('\n').flatMap((line) => {
+  const m = names.leftOut(line);
+  return m ? [{ area: m.area, round: m.earlier ?? round, why: m.why }] : [];
+});
 
 /** A run's night directory: the one its record names, or else the one `night.mjs` named for its round. */
 const nightDirOf = (run, state) => {
@@ -185,6 +194,7 @@ export const readRun = (found, running, jobs = [], state, { names = NAMES, sweep
     report: run.report ?? null,
     areas: areaIds,
     stages: Object.fromEntries(nightStages(log, names)),
+    leftOut: nightLeftOut(log, run.round, names),
     lanes: withPasses(nightLanes(log, areaIds, running ? own : own.filter((j) => j.finished), fixReports(run.nightDir, areaIds), names), run),
     sweepRunning: Boolean(running && sweepId && jobs.some((j) => !j.finished && (j.task ?? '').endsWith(sweepId))),
     nightDir: run.nightDir ?? null,

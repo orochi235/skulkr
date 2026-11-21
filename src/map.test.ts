@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { fleetOf, fleetProgressOf, gateFailuresOf, gateNodesOf, gateOutcomesOf, gateRunsOf, nightLanes, nightRoundOf, nightStages, nightsOf, readRuns, rerunOf, withPasses } from './map.mjs';
+import { fleetOf, fleetProgressOf, gateFailuresOf, gateNodesOf, gateOutcomesOf, gateRunsOf, nightLanes, nightLeftOut, nightRoundOf, nightStages, nightsOf, readRuns, rerunOf, withPasses } from './map.mjs';
 import { progressOfTop } from './runner/onto.mjs';
 import { resolveConfig } from './config.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';
@@ -26,13 +26,34 @@ describe('nightStages', () => {
       'review 4/16 core.canvas.part1 A on studio: 3 findings, 47/47 files read, 5.5 min, 5.79M tokens',
       'review 5/16 core.canvas.part1 B on studio: 3 findings, 47/47 files read, 13.7 min, 9.96M tokens',
       'patch core.canvas.part1: 6 commits on audit40-core.canvas.part1',
-      'batch: audit40-core.canvas.part1 conflicts; left out',
+      'batch: audit40-core.canvas.part1 left out: merge conflict in a.ts',
+      'batch: audit38-apps.chart (round 38) left out: merge conflict in b.ts',
     ].join('\n');
     expect(Object.fromEntries(nightStages(log))).toEqual({
       'apps.chart': 'patched',
       'core.core': 'reviewing',
       'core.canvas.part1': 'conflict',
     });
+  });
+
+  it("reads an old night log's conflict line", () => {
+    expect(Object.fromEntries(nightStages('batch: audit40-core.canvas.part1 conflicts; left out'))).toEqual({ 'core.canvas.part1': 'conflict' });
+  });
+});
+
+describe('nightLeftOut', () => {
+  it('lists each branch the batch left out, with its round and why, old lines too', () => {
+    const log = [
+      'batch: audit40-a left out: merge conflict in a.ts, b.ts',
+      'batch: audit38-b (round 38) left out: merge failed: fatal: bad',
+      'batch: audit38-c, left out of round 38, merged',
+      'batch: audit40-d conflicts; left out',
+    ].join('\n');
+    expect(nightLeftOut(log, 40)).toEqual([
+      { area: 'a', round: 40, why: 'merge conflict in a.ts, b.ts' },
+      { area: 'b', round: 38, why: 'merge failed: fatal: bad' },
+      { area: 'd', round: 40, why: 'merge conflict' },
+    ]);
   });
 });
 
@@ -74,6 +95,13 @@ describe('nightLanes', () => {
     const [ops] = nightLanes(log, ['core.core.ops'], jobs);
     expect(ops.steps.A).toMatchObject({ state: 'done', minutes: 3, started: '2026-11-19T20:50:10.000Z', ended: '2026-11-19T20:53:10.000Z' });
     expect(ops.steps.B).toEqual({ state: 'waiting' });
+  });
+
+  it("fails the patch of a branch the batch left out, saying why, but not for an earlier round's retried branch", () => {
+    const log = 'batch: audit40-a left out: merge conflict in a.ts\nbatch: audit38-b (round 38) left out: merge conflict in b.ts';
+    const [a, b] = nightLanes(log, ['a', 'b']);
+    expect(a!.steps.patch).toEqual({ state: 'failed', why: 'merge conflict in a.ts; left out of the batch' });
+    expect(b!.steps.patch).toEqual({ state: 'waiting' });
   });
 
   it("fails a patch that did not apply", () => {
