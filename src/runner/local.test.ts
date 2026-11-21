@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -102,6 +102,19 @@ describe('the local runner', () => {
     const r = await run({ ...s, runner }, "trap '' TERM; sleep 30", { timeout: '1s' });
     expect(r.status).not.toBe(0);
     expect(Date.now() - t0).toBeLessThan(10_000);
+  });
+
+  it('deletes job records past a week as it runs a job', async () => {
+    const s = setup();
+    const jobs = join(s.dir, 'state', 'local-jobs');
+    mkdirSync(jobs, { recursive: true });
+    const old = join(jobs, 'old.json');
+    writeFileSync(old, '{}');
+    const week = new Date(Date.now() - 8 * 24 * 3_600_000);
+    utimesSync(old, week, week);
+    await run(s, 'true');
+    expect(existsSync(old)).toBe(false);
+    expect(readdirSync(jobs)).toHaveLength(1);
   });
 
   it('reads runner durations', () => {

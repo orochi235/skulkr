@@ -5,9 +5,10 @@
  * once, so their count is bounded by the config's slots.
  */
 import { spawn, execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync, readFileSync } from 'node:fs';
+import { cpSync, existsSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { JOB_IN } from '../config.mjs';
+import { readJson, writeJson } from '../json.mjs';
 import { heldAlive, takeLease } from '../lease.mjs';
 
 /** How long a finished job's record is kept for `jobs()`. */
@@ -86,16 +87,27 @@ const runShell = (shell, { cwd, env, log, timeoutMs, graceMs = KILL_GRACE_MS }) 
     });
   });
 
+/** Deletes the job records in `dir` older than {@link KEEP_JOBS_MS}, and answers the names of the rest. */
+const pruneJobs = (dir) => {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).filter((name) => {
+    const path = join(dir, name);
+    try {
+      if (Date.now() - statSync(path).mtimeMs <= KEEP_JOBS_MS) return true;
+      rmSync(path, { force: true });
+    } catch { /* gone already */ }
+    return false;
+  });
+};
+
 /** The runner interface (documented in `onto.mjs`), with every job on this machine as node `local`. */
 /** `graceMs`: how long a timed-out job has between SIGTERM and SIGKILL. */
 export const createLocalRunner = (cfg, { graceMs } = {}) => {
   const jobsDir = join(cfg.state, 'local-jobs');
-  const record = (file, job) => {
-    mkdirSync(jobsDir, { recursive: true });
-    writeFileSync(join(jobsDir, file), JSON.stringify(job));
-  };
+  const record = (file, job) => writeJson(join(jobsDir, file), job);
   return {
     run: async (job, { cwd, log }) => {
+      pruneJobs(jobsDir);
       const file = `${Date.now()}-${process.pid}-${job.task.replace(/[^\w.-]+/g, '_')}.json`;
       const entry = { task: job.task, node: 'local', state: 'running', started: new Date().toISOString(), pid: process.pid };
       record(file, entry);
@@ -117,21 +129,11 @@ export const createLocalRunner = (cfg, { graceMs } = {}) => {
     },
     unavailableNodes: () => new Set(),
     jobs: (since) => {
-      if (!existsSync(jobsDir)) return [];
       const after = Date.parse(since);
       const out = [];
-      for (const name of readdirSync(jobsDir)) {
-        const path = join(jobsDir, name);
-        if (Date.now() - statSync(path).mtimeMs > KEEP_JOBS_MS) {
-          rmSync(path, { force: true });
-          continue;
-        }
-        let j;
-        try {
-          j = JSON.parse(readFileSync(path, 'utf8'));
-        } catch {
-          continue;
-        }
+      for (const name of pruneJobs(jobsDir)) {
+        let j = readJson(join(jobsDir, name));
+        if (!j) continue;
         if (j.state === 'running' && !heldAlive(j)) j = { ...j, state: 'failed', finished: j.started };
         if (j.state === 'running' || Date.parse(j.finished) >= after || !Number.isFinite(after)) out.push(j);
       }

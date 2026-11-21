@@ -434,7 +434,7 @@ Its wording comes from `skulkr menu` (`src/menu.mjs`), which asks the service fo
 | Each commit's lines changed, for `staleLines` and calibration's `lines` | `~/.cache/skulkr/<name>/churn.json` | only the commits after the oldest pass asked about: any area's last pass, or the first of a pair of passes; rewritten without the rest on each build that adds one |
 | Node tree leases | `<state>/slots/<node>/<tree>` | deleted as each job ends; one whose pid is dead is taken back |
 | The local runner's clones | `<state>/trees/t<k>` and a lease beside each | one per job running at once; reused, never more than the most jobs ever run at once |
-| The local runner's job records, for the dashboard | `<state>/local-jobs/`, a file per job | deleted after 7 days, as `jobs()` reads them |
+| The local runner's job records, for the dashboard | `<state>/local-jobs/`, a file per job | deleted after 7 days, as each job starts and as `jobs()` reads them |
 | Locks | `<state>/plan.lock`, `<state>/merge.lock` | one file each, deleted on release |
 | The fleet queue | `~/.local/state/skulkr/fleet/`: `gate.lease` and a ticket per waiting run in `waiting/` | the lease deleted on release, a ticket when its run takes the gate; a dead pid's of either is cleared |
 | Continuous mode asked for | `<state>/continuous.json` | one file, rewritten by each request |
