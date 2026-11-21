@@ -154,6 +154,12 @@ describe('jobs', () => {
     expect(recentJobsOf([{ ...live, lines }])[0]!.job.what).toBe('left out: conflicts in a.ts');
   });
 
+  it('gives a branch an earlier round left out its own round, from the map', () => {
+    const lines = ['batch: audit39-ui.badge (round 39) left out: merge failed: lock'];
+    const run = { ...live, lines, leftOut: [{ area: 'ui.badge', round: 39, why: 'merge failed: lock' }] };
+    expect(recentJobsOf([run]).map((j) => [j.round, j.job.area])).toEqual([[39, 'ui.badge']]);
+  });
+
   it('keys two identical lines of one log apart', () => {
     const run = { ...map.runs[0]!, lines: ['fleet: test:batch passed', 'fleet: test:batch passed'] };
     const keys = recentJobsOf([run]).map((j) => j.key);

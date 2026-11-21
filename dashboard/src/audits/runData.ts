@@ -184,7 +184,9 @@ export function recentJobsOf(runs: readonly AuditRun[], perRun = 14, tails: Read
     return run.lines
       .map((line, i) => {
         const job = parseJob(line);
-        return { key: `${run.round}:${base + i}:${line}`, line, round: run.round, job: job && withLaneReason(job, run) };
+        // A branch an earlier round left out is that round's, as the map's list of what the batch left out says.
+        const round = job?.kind === 'batch' ? run.leftOut?.find((e) => e.area === job.area)?.round ?? run.round : run.round;
+        return { key: `${run.round}:${base + i}:${line}`, line, round, job: job && withLaneReason(job, run) };
       })
       .filter((r): r is RunJob => r.job !== null)
       .reverse()
