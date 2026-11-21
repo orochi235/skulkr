@@ -106,6 +106,13 @@ export interface FleetProgress {
   readonly total: number;
 }
 
+/** A branch a batch left out: its area, the round whose branch it is, and why. */
+export interface AuditLeftOut {
+  readonly area: string;
+  readonly round: number;
+  readonly why: string;
+}
+
 export interface AuditRun {
   readonly running: boolean;
   readonly round: number;
@@ -119,6 +126,9 @@ export interface AuditRun {
   readonly report: string | null;
   readonly areas: readonly string[];
   readonly stages: Readonly<Record<string, string>>;
+  /** Every branch the run's batch left out, a branch an earlier round left out and this one retried among them. Absent
+   *  from maps built before 2026-11-21. */
+  readonly leftOut?: readonly AuditLeftOut[];
   readonly lanes: readonly AuditLane[];
   readonly nightDir?: string | null;
   readonly sweepRunning: boolean;

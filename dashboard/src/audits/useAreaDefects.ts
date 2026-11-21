@@ -3,14 +3,17 @@ import type { AuditAreaRound } from './skulkrMap.types';
 
 export type AreaDefectsState =
   | { readonly status: 'loading' }
-  | { readonly status: 'ready'; readonly rounds: readonly AuditAreaRound[] }
+  /** `error`: why the last ask failed, the list the one before it read still shown. */
+  | { readonly status: 'ready'; readonly rounds: readonly AuditAreaRound[]; readonly error?: string }
   | { readonly status: 'failed'; readonly error: string };
 
-/** Every round's defects in area `id`, read from `urlOf(id)`, asked for again whenever `version` changes. */
+/** Every round's defects in area `id`, read from `urlOf(id)`, asked for again whenever `version` changes. A failed ask
+ *  keeps the area's last list and says why, as the map's does. */
 export function useAreaDefects(urlOf: (id: string) => string, id: string, version: string): AreaDefectsState {
   const url = urlOf(id);
   const [state, setState] = useState<{ key: string; value: AreaDefectsState }>({ key: '', value: { status: 'loading' } });
   const key = `${url}\n${id}\n${version}`;
+  const sameArea = (k: string) => k.startsWith(`${url}\n${id}\n`);
   useEffect(() => {
     let live = true;
     fetch(url, { cache: 'no-store' })
@@ -21,9 +24,14 @@ export function useAreaDefects(urlOf: (id: string) => string, id: string, versio
         return rounds as AuditAreaRound[];
       })
       .then((rounds) => live && setState({ key, value: { status: 'ready', rounds } }),
-        (e: Error) => live && setState({ key, value: { status: 'failed', error: e.message } }));
+        (e: Error) => live && setState((was) => ({
+          key,
+          value: was.value.status === 'ready' && sameArea(was.key)
+            ? { status: 'ready', rounds: was.value.rounds, error: e.message }
+            : { status: 'failed', error: e.message },
+        })));
     return () => { live = false; };
   }, [url, id, key]);
   // A new area shows as loading rather than the last one's list.
-  return state.key === key || state.value.status === 'ready' && state.key.startsWith(`${url}\n${id}\n`) ? state.value : { status: 'loading' };
+  return state.key === key || state.value.status === 'ready' && sameArea(state.key) ? state.value : { status: 'loading' };
 }

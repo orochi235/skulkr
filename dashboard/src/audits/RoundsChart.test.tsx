@@ -72,8 +72,17 @@ describe('RoundsChart', () => {
   });
 
   it('turns an area\'s passes into rounds of one area, a live pass pending', () => {
-    expect(areaRoundsOf(area).map((r) => [r.round, r.areas, r.distinct, r.est, r.pending])).toEqual([
+    expect(areaRoundsOf(area, rounds).map((r) => [r.round, r.areas, r.distinct, r.est, r.pending])).toEqual([
       [1, 1, 7, 10, undefined], [2, 1, 2, 2, 'live'],
     ]);
+  });
+
+  it("marks an area's pass pending as its round is, so an unmerged round hatches in the area's chart too", () => {
+    const unmerged = [rounds[0]!, { ...rounds[1]!, pending: 'unmerged' as const }];
+    const { a, b, shared, est, left } = area.passes[1]!;
+    const recorded = { ...area, passes: [area.passes[0]!, { round: 2, date: '2026-11-02', a, b, shared, distinct: 2, est, left }] } as AuditArea;
+    expect(areaRoundsOf(recorded, unmerged).map((r) => r.pending)).toEqual([undefined, 'unmerged']);
+    render(<RoundsChart rounds={unmerged} area={recorded} />);
+    expect([...document.querySelectorAll('title')].map((t) => t.textContent)).toContain('round 2 (unmerged): 2 found and 2.0 estimated in geom.part1');
   });
 });

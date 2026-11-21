@@ -5,6 +5,7 @@ import { SegmentedBar } from '@weasel-js/ui/components/Segmented';
 import { SpanStrips, type SpanStripSpan, type SpanStripsRow } from '@weasel-js/ui/components/SpanStrip';
 import { clockRuler } from './clock';
 import { GateFailures } from './GateFailures';
+import { LeftOut } from './LeftOut';
 import { laneViewOf, runClockOf, type LaneView } from './clockLane';
 import { passDone, PHASE_LABEL, phaseClass, stageCountsOf, BRIGHT_FILLS } from './phases';
 import { STEP_COLUMN_COUNT, laneStepsOf } from './stepsLane';
@@ -147,7 +148,8 @@ function StageCounts({ run }: { run: AuditRun }) {
   );
 }
 
-/** One run's strip: what it is doing and what it has spent, its last line, and a lane per area in flight. */
+/** One run's strip: what it is doing and what it has spent, its last line, what its batch left out, and a lane per
+ *  area in flight. */
 function RunStrip({ run, now, mode, hideComplete, on }: {
   run: AuditRun; now: number; mode: LaneMode; hideComplete: boolean; on: AreaHandlers;
 }) {
@@ -161,6 +163,7 @@ function RunStrip({ run, now, mode, hideComplete, on }: {
       <div className={s.line} title={lastLineOf(run)}><InlineMarkdown text={lastLineOf(run)} /></div>
       <div className={s.spend}>{spendOf(run)}</div>
       {run.lanes.length > 0 && <StageCounts run={run} />}
+      <LeftOut run={run} on={on} />
       {run.lanes.length > 0 && (
         <div className={s.lanes} data-mode={mode}>
           <Lanes run={run} now={now} mode={mode} hideComplete={hideComplete} on={on} />

@@ -107,9 +107,13 @@ export function stageCountsOf(lanes: readonly AuditLane[]): { done: number; tota
 export const passDone = (lane: AuditLane): boolean =>
   isFinished(lane) || (lane.steps.fix.state === 'done' && lane.steps.repair?.state !== 'running');
 
-/** Every area a live run holds, by id, and its phase on the map: `done` once its pass is. */
+/** Every area a live run holds, by id, and its phase on the map: a conflict once a step fails, as its lane says, else
+ *  `done` once its pass is. */
 export function phasesOf(runs: readonly AuditRun[]): ReadonlyMap<string, AuditPhase> {
-  return new Map(runs.filter((r) => r.running).flatMap((r) => r.lanes.map((lane) => [lane.id, passDone(lane) ? 'done' : phaseOf(lane)] as const)));
+  return new Map(runs.filter((r) => r.running).flatMap((r) => r.lanes.map((lane) => {
+    const phase = phaseOf(lane);
+    return [lane.id, phase !== 'conflict' && passDone(lane) ? 'done' : phase] as const;
+  })));
 }
 
 /** What a live run estimates each of its areas still holds once both reviews are matched, before the pass is done. */

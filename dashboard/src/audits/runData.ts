@@ -1,5 +1,5 @@
 /** What the audit page says about runs: each one's headline, its lanes, and the jobs its log reports. */
-import type { AuditContinuous, AuditRun, LaneStep, LaneStepKey } from './skulkrMap.types';
+import type { AuditContinuous, AuditLeftOut, AuditRun, LaneStep, LaneStepKey } from './skulkrMap.types';
 
 /**
  * `m` minutes as a lane says them, `<1 min`, `8.2 min` or `12 min`, a tenth shown under ten. Spelled out: the lanes
@@ -82,8 +82,6 @@ export interface Job {
   readonly of?: string;
   /** Whether it went wrong: a review that skipped files or did not finish, a patch that did not apply, a conflict, a failed fleet run. */
   readonly bad: boolean;
-  /** A batch job about a branch an earlier round left out, rather than one of this round's. */
-  readonly earlier?: boolean;
 }
 
 /** A match's result: how many findings both reviews made, then how many only one did. */
@@ -121,13 +119,6 @@ export function parseJob(line: string): Job | null {
   if ((m = /^repair (\S+) (\S+) on (\S+): (\d+) commits, ([\d.]+) min; verify (.*)$/.exec(line))) {
     return { kind: 'fix', label: `repair ${m[2]}`, area: m[1]!, what: `${plural(Number(m[4]), 'commit')}; verify ${m[6]}`, node: m[3], minutes: Number(m[5]), bad: m[6] !== 'passed' };
   }
-  // A branch is `<prefix><round>-<area>`, the prefix the project's own. Logs before 2026-11-21 said `<branch> conflicts`.
-  if ((m = /^batch: \S*?\d+-(\S+?)( \(round \d+\))? left out: (.*)$/.exec(line))) {
-    return { kind: 'batch', label: 'batch', area: m[1]!, what: `left out: ${m[3]}`, bad: true, ...(m[2] ? { earlier: true } : {}) };
-  }
-  if ((m = /^batch: \S*?\d+-(\S+) conflicts/.exec(line))) {
-    return { kind: 'batch', label: 'batch', area: m[1]!, what: 'conflicts; left out of the batch', bad: true };
-  }
   // The plan's own `control sweep:` line, printed at start-up, reports no job; only a count or a failure does.
   if ((m = /^control sweep: (\d+ dead.*|did not run.*)$/.exec(line))) {
     return { kind: 'sweep', label: 'sweep', area: '', what: m[1]!.replace(/; see \S+/, ''), bad: m[1]!.startsWith('did not run') };
@@ -146,12 +137,20 @@ export interface RunJob {
   readonly job: Job;
 }
 
-/** A batch job leaving out one of the run's own areas, saying why as that area's lane does where the map gives a reason. */
-function withLaneReason(job: Job, run: AuditRun): Job {
-  if (job.kind !== 'batch' || !job.bad || job.earlier) return job;
-  const patch = run.lanes.find((l) => l.id === job.area)?.steps.patch;
-  return patch?.state === 'failed' && patch.why ? { ...job, what: patch.why } : job;
+/**
+ * The entry of the map's `leftOut` a `batch:` line reports, found by matching the line against the list rather than
+ * parsing it: the branch, whatever the project's prefix, ends `<round>-<area>`. Logs before 2026-11-21 said
+ * `<branch> conflicts`. A map without `leftOut` matches nothing, and the line reads as any other batch line.
+ */
+function leftOutAt(line: string, run: AuditRun): AuditLeftOut | undefined {
+  if (!line.startsWith('batch: ')) return undefined;
+  return run.leftOut?.find((e) => {
+    const branch = `${e.round}-${e.area}`;
+    return line.endsWith(`${branch} left out: ${e.why}`) || line.endsWith(`${branch} (round ${e.round}) left out: ${e.why}`) || line.includes(`${branch} conflicts`);
+  });
 }
+
+const leftOutJob = (e: AuditLeftOut): Job => ({ kind: 'batch', label: 'batch', area: e.area, what: `left out: ${e.why}`, bad: true });
 
 /** A run's log tail as last seen, and how many lines of the log came before its first. */
 export interface LogTail {
@@ -183,8 +182,8 @@ export function recentJobsOf(runs: readonly AuditRun[], perRun = 14, tails: Read
     const base = tails.get(run.round)?.base ?? 0;
     return run.lines
       .map((line, i) => {
-        const job = parseJob(line);
-        return { key: `${run.round}:${base + i}:${line}`, line, round: run.round, job: job && withLaneReason(job, run) };
+        const out = leftOutAt(line, run);
+        return { key: `${run.round}:${base + i}:${line}`, line, round: out?.round ?? run.round, job: out ? leftOutJob(out) : parseJob(line) };
       })
       .filter((r): r is RunJob => r.job !== null)
       .reverse()

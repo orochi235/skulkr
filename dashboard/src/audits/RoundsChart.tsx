@@ -28,11 +28,12 @@ const perArea = (n: number, r: AuditRound) => (r.areas > 0 ? n / r.areas : 0);
  *  an estimate, only what it found. */
 export const isPartial = (r: AuditRound) => (r.incomplete ?? 0) > r.areas;
 
-/** An area's passes as rounds of one area each, so the chart draws them on the same terms. */
-export const areaRoundsOf = (area: AuditArea): AuditRound[] => area.passes.map((p) => ({
-  round: p.round, date: p.date, areas: 1, files: area.files, distinct: p.distinct, est: p.est,
-  ...(p.provisional ? { pending: 'live' as const } : {}),
-}));
+/** An area's passes as rounds of one area each, so the chart draws them on the same terms: a pass pending as its round
+ *  in `rounds` is, and a provisional one, which no round lists yet, live. */
+export const areaRoundsOf = (area: AuditArea, rounds: readonly AuditRound[]): AuditRound[] => area.passes.map((p) => {
+  const pending = rounds.find((r) => r.round === p.round)?.pending ?? (p.provisional ? 'live' : undefined);
+  return { round: p.round, date: p.date, areas: 1, files: area.files, distinct: p.distinct, est: p.est, ...(pending ? { pending } : {}) };
+});
 
 /** The fewest passes an area needs before the chart draws it alone rather than every round. */
 export const AREA_CHART_PASSES = 2;
@@ -59,7 +60,7 @@ export function RoundsChart({ rounds: all, area: picked, areas = [], heatOf }: {
   const W = measured.width > 0 ? measured.width : FALLBACK_W;
   const H = measured.height > 0 ? measured.height : FALLBACK_H;
   const area = picked && picked.passes.length >= AREA_CHART_PASSES ? picked : null;
-  const rounds = area ? areaRoundsOf(area) : all;
+  const rounds = area ? areaRoundsOf(area, all) : all;
   const averages = area ? nthPassAverages(areas) : [];
   const unit = area ? 'defects' : 'defects per area';
   const ticks = ticksFor(Math.max(0, ...rounds.filter((r) => !isPartial(r)).map((r) => perArea(Math.max(r.est, r.distinct), r)), ...rounds.map((_, i) => averages[i]?.mean ?? 0)));
