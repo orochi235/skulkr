@@ -140,6 +140,21 @@ describe('verifyAndRepair', () => {
     }
   });
 
+  it('keeps every later area whose file the frozen-tree check could not launch for, as failing rather than dropped', async () => {
+    const h = harness({ command: 'run {files}' }, { repair: [{ ...PASSING, 'fix.mbox': mbox(3) }, { ...PASSING, 'fix.mbox': mbox(2) }] });
+    const run = h.ctx.runner.run;
+    h.ctx.runner.run = async (job: Job) => {
+      if (job.task.endsWith('-verify')) throw new Error('runner gone');
+      return run(job);
+    };
+    for (const id of ['a', 'b']) {
+      const dir = join(h.ctx.nightDir, 'jobs', id, 'fix');
+      write(dir, { ...FAILING, 'fix.mbox': mbox(2) });
+      const got = await verifyAndRepair(h.ctx, { id }, { mbox: join(dir, 'fix.mbox') }, dir);
+      expect(got).toMatchObject({ ok: true, repairs: [{ ok: true }] });
+    }
+  });
+
   it('keeps a failure the area owns when the frozen-tree run gives no file-level answer', async () => {
     const h = harness({ command: 'run {files}' }, {
       verify: [{ 'verify.exit': '1', 'verify.log': 'Error: no install' }],

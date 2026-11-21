@@ -56,8 +56,11 @@ export const baselineFailures = async (ctx, area, verdict) => {
       env: nodeEnv(ctx, unknown), task: ctx.cfg.names.task(ctx.round, area.id, 'verify'), logPath: `${to}.log`,
       timeoutMin: timeoutOf(ctx.cfg, { model: false }),
       about: `Checks whether the tests that failed on audit round ${ctx.round}'s fixes to ${area.id} fail on the frozen tree without them.`,
-    }).then(() => verdictIn(to));
-    // A baseline run that gave no file-level answer clears nothing: those files stay the area's.
+    }).then(() => verdictIn(to), (error) => {
+      ctx.say(`verify ${area.id}: the frozen-tree check failed (${error.message ?? error}); its files stay the area's`);
+      return { unrun: true };
+    });
+    // A baseline run that gave no file-level answer, or none at all, clears nothing: those files stay the area's.
     for (const file of unknown) known.set(key(file), ran.then((v) => !v.unrun && v.counts !== undefined && v.failedFiles.includes(file)));
   }
   const fails = await Promise.all(files.map((file) => known.get(key(file))));
