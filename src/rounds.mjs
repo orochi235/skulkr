@@ -270,6 +270,10 @@ export const isSettled = (area, passes, touched) => {
 export const areasInFlight = (unmergedBranches, areaOf = /^audit\d+-(.+)$/) =>
   new Set(unmergedBranches.flatMap((b) => areaOf.exec(b)?.[1] ?? []));
 
+/** `areasInFlight` over the branches `cfg`'s `main` has not merged, asked of `git`: the one answer night and the map use. */
+export const areasInFlightFor = (cfg, git) =>
+  areasInFlight(git('for-each-ref', `--no-merged=${cfg.git.main}`, '--format=%(refname:short)', 'refs/heads').split('\n'), cfg.names.areaOf);
+
 /**
  * Where a due area ranks: what its last pass left, corrected (`correctedLeftOf`), in whole defects, and at least 1
  * once any of its lines changed since, so a changed area with nothing left competes with one holding about one.

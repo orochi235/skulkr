@@ -19,7 +19,7 @@ import { createSlots, runUntilFree } from './jobs.mjs';
 import { batchAndTest, patchAreas, patchSweep } from './land.mjs';
 import { waitForLease } from './lease.mjs';
 import { partitionAt } from './partition.mjs';
-import { areaStats, areasInFlight, gitTouched, inheritPasses, lastPassIn, nextRound, passesIn, pickAreas, scaledOf } from './rounds.mjs';
+import { areaStats, areasInFlightFor, gitTouched, inheritPasses, lastPassIn, nextRound, passesIn, pickAreas, scaledOf } from './rounds.mjs';
 import { claimRound, claimedRounds, clearStatus, clearStop, liveRuns, nightsAt, planLock, pruneRuns, readJson, runDir, stopRequested, writeStatus, writeSummary } from './runs.mjs';
 import { fixSweep, runSweep, sweepLine } from './sweep.mjs';
 import { mayStartArea } from './usage.mjs';
@@ -105,7 +105,7 @@ const plan = (cfg, root, args) => {
   if (unknown.length > 0) throw new Error(`no area named ${unknown.join(', ')}; see ${cfg.partition.path}`);
   const taken = (args.only ?? []).filter((id) => held.has(id));
   if (taken.length > 0) throw new Error(`${taken.join(', ')} ${taken.length === 1 ? 'is' : 'are'} held by a live run; see its status`);
-  const inFlight = areasInFlight(git('for-each-ref', `--no-merged=${main}`, '--format=%(refname:short)', 'refs/heads').split('\n'), cfg.names.areaOf);
+  const inFlight = areasInFlightFor(cfg, git);
   const open = openFindingsIn(cfg, git, root);
   if (args.fixOnly) {
     const { picked, skipped } = planFixOnly({ areas, open, want: args.fixOnly, held, inFlight });

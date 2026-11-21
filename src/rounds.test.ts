@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { gitIn } from './batch.mjs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { areaStats, areasInFlight, calibrationFor, chapman, drawnRoundOf, inheritPasses, lastPassIn, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf, withBatchPasses } from './rounds.mjs';
+import { weaselConfig } from '../test/weaselConfig.ts';
+import { areaStats, areasInFlight, areasInFlightFor, calibrationFor, chapman, drawnRoundOf, inheritPasses, lastPassIn, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf, withBatchPasses } from './rounds.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -59,6 +60,14 @@ describe('pickAreas', () => {
     expect([...inFlight].sort()).toEqual(['b', 'core.animation']);
     const picked = pickAreas({ areas: ['a', 'b', 'c'].map((id) => area(id)), passes: new Map(), touched: never, count: 3, inFlight }).picked;
     expect(picked).toEqual(['a', 'c']);
+  });
+
+  it("asks git for the branches main has not merged, under the config's names", () => {
+    const cfg = weaselConfig();
+    const asked: string[][] = [];
+    const git = (...args: string[]) => (asked.push(args), 'audit37-b\nbatch/2026-11-18-audit37\n');
+    expect([...areasInFlightFor(cfg, git)]).toEqual(['b']);
+    expect(asked[0]).toContain(`--no-merged=${cfg.git.main}`);
   });
 
   it('picks an area again as never audited when its only pass had a reviewer that never ran', () => {

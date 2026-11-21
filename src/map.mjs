@@ -12,7 +12,7 @@ import { fleetOf } from './gate.mjs';
 import { areaIcons, iconsFor } from './icons.mjs';
 import { partitionAt } from './partition.mjs';
 import { correctedLeftOf } from './calibration.mjs';
-import { COVERED, areaStats, calibrationFor, chapman, drawnPassOf, gitTouched, incompleteByRound, passOf, passesIn, pickAreas } from './rounds.mjs';
+import { COVERED, areaStats, areasInFlightFor, calibrationFor, chapman, drawnPassOf, gitTouched, incompleteByRound, passOf, passesIn, pickAreas } from './rounds.mjs';
 import { openFindingsIn } from './carryRecords.mjs';
 import { continuousOf } from './continuousOf.mjs';
 import { lastFinished, liveRuns, readJson } from './runs.mjs';
@@ -284,7 +284,7 @@ export const buildMap = (cfg, root, runner) => {
   const { history: passes, covered, staleLines, pairLines } = areaStats(cfg, git, areas, passesIn(cfg, git, root), root);
   const calibration = calibrationFor(passes, pairLines);
   const corrected = (p) => ({ ...p, leftCorrected: correctedLeftOf(p, calibration) });
-  const { picked, settled } = pickAreas({ areas, passes, covered, staleLines, calibration, touched: gitTouched(git), count: Infinity });
+  const { picked, settled } = pickAreas({ areas, passes, covered, staleLines, calibration, touched: gitTouched(git), count: Infinity, inFlight: areasInFlightFor(cfg, git) });
   const settledSet = new Set(settled);
   const runs = readRuns(cfg.state, null, { listJobs: (since) => runner.jobs(since), listProgress: () => runner.progress?.() ?? new Map(), names: cfg.names, sweepId: cfg.sweep?.id, gate: cfg.gate })
     .map((r) => ({ ...r, lanes: r.lanes.map((l) => (l.pass ? { ...l, pass: corrected(l.pass) } : l)) }));

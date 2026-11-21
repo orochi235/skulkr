@@ -168,7 +168,8 @@ code changed under a zero estimate still competes. Ties go to the most lines cha
 longest since that pass (`rankOf` and `pickAreas` in `src/rounds.mjs`). An area is *settled*, and skipped, after
 two consecutive passes that each found at most one distinct defect, on the same file list, with nothing but those
 passes' own fixes changing its files since. What is due comes only from the `area.json` files of earlier rounds and
-git.
+git. An area a live run holds, or an unmerged `audit<N>-<area>` branch, is skipped, and the map's queue numbers skip it
+too.
 
 **History follows files.** A pass belongs to the files it read (its `files.txt`, also `files` in its `area.json`),
 not to its area's name, so a recut partition keeps what was learned. An area inherits every pass that read any of
