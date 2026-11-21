@@ -122,6 +122,7 @@ export const createTenant = (name, cfg, { readOnly = false, runtime = { children
     readOnly,
     runtime,
     startAt: cfg.schedule.startAt,
+    stopAt: cfg.schedule.stopAt,
     /** A run this service started counts before it has claimed its round, so no second one starts beside it. */
     running: () => children.size > 0 || liveRuns(state).length > 0,
     modelBusy: () => pending() > 0 || liveRuns(state).some(inModelSteps),

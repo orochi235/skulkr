@@ -373,7 +373,7 @@ reloaded, keeping the runs it started (a module the config imports keeps its fir
 Rounds of different tenants never do their model work at once, since they share the fleet's slots: a tenant due, or
 asked to start, while another's round is in its model steps waits until that round reaches its patch step, and its
 `status` reply lists that under `waiting` (`behind` names the tenant it waits on), beside `nextStart`, its next
-scheduled start. Their gates take turns in the fleet queue. A tenant's own rounds may still run beside each other
+scheduled start. A scheduled start still waiting at its own `stopAt` is skipped until the next `startAt`. Their gates take turns in the fleet queue. A tenant's own rounds may still run beside each other
 when started by hand. A tenant added `--read-only` is shown and its live rounds hold the fleet like any other's, but
 the service never starts or stops one: its rounds run under another service.
 

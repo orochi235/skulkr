@@ -4,11 +4,12 @@
  * slots, so a start (scheduled, continuous, or asked for) while another tenant's round is in its model steps waits in
  * a queue until that round reaches its patch step. Their gates take turns through the fleet queue (`fleet.mjs`).
  *
- * A tenant here is `{ name, readOnly, startAt, running(), modelBusy?(), lastStarted(), deps }`, and for continuous
+ * A tenant here is `{ name, readOnly, startAt, stopAt?, running(), modelBusy?(), lastStarted(), deps }`, and for continuous
  * mode `continuous?(now)` (`continuousOf`), `setContinuous?(on, now)` and `scheduledContinuous`: `deps` is `handle`'s
  * for that tenant, its `start(args, { continuous })` the raw start. A read-only tenant's runs count as busy, but
  * nothing starts it.
  */
+import { inWindow } from './config.mjs';
 import { handle, msUntil, shouldAutoStart } from './serviceCore.mjs';
 
 /**
@@ -59,6 +60,12 @@ export const createHost = ({ tenants, now = () => new Date(), log = () => {}, bu
       const t = list.find((x) => x.name === entry.tenant);
       if (!t || t.readOnly) {
         queue.splice(queue.indexOf(entry), 1);
+        continue;
+      }
+      // A scheduled start held past its night's stopAt would audit all day.
+      if (entry.auto && t.stopAt && t.stopAt !== t.startAt && !inWindow(now(), t.startAt, t.stopAt)) {
+        queue.splice(queue.indexOf(entry), 1);
+        log(`${t.name}: its scheduled round waited past ${t.stopAt}; skipped until the next ${t.startAt}`);
         continue;
       }
       if (!free(entry, list)) continue;
