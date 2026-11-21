@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fixOnlyArg, planFixOnly } from './fixOnly.mjs';
 import { parseArgs } from './night.mjs';
 import { startArgs } from './serviceCore.mjs';
-import { weaselConfig } from '../test/weaselConfig';
+import { weaselConfig } from '../test/weaselConfig.ts';
 
 const areas = ['a', 'b', 'c', 'd'].map((id) => ({ id, files: [`${id}.ts`] }));
 const open = new Map([['b', [{ id: 'r1-1' }]], ['c', [{ id: 'r1-2' }]], ['d', [{ id: 'r2-1' }]]]);

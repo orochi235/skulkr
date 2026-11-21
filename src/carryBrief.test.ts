@@ -16,7 +16,7 @@ const OPEN = [
 
 describe('carried findings in the fixer brief', () => {
   it('leaves out what this round\'s reviewers reported again', () => {
-    expect(toCarry(OPEN, [{ claim: '`useTicker` keeps its interval running after unmount' }]).map((o) => o.id)).toEqual(['r56-1']);
+    expect(toCarry(OPEN, [{ claim: '`useTicker` keeps its interval running after unmount' }]).map((o: any) => o.id)).toEqual(['r56-1']);
     expect(toCarry(OPEN)).toHaveLength(2);
   });
 

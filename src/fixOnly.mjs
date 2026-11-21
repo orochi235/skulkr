@@ -21,6 +21,7 @@ export const fixOnlyArg = (value) => (value === undefined ? undefined : value ==
  * findings), limited to `want` when it is a list, less those `held` by a live run or `inFlight` on an unlanded branch.
  * Answers `{ picked, skipped }`: the picked area ids, and why each wanted one was not picked.
  */
+/** @param {{ areas: { id: string }[], open: Map<string, any[]>, want?: true | string[], held?: Set<string>, inFlight?: Set<string> }} p */
 export const planFixOnly = ({ areas, open, want = true, held = new Set(), inFlight = new Set() }) => {
   const known = new Set(areas.map((a) => a.id));
   const wanted = want === true ? null : new Set(want);
