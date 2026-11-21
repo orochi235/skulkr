@@ -60,6 +60,6 @@ describe('TenantTitle', () => {
     rerender(<h1><TenantTitle names={['weasel', 'demo']} current="weasel" onChoose={onChoose} /></h1>);
     fireEvent.change(screen.getByRole('combobox', { name: 'Project' }), { target: { value: 'demo' } });
     expect(onChoose).toHaveBeenCalledWith('demo');
-    expect(screen.getByRole('heading')).toHaveTextContent('audits');
+    expect(screen.getByRole('heading')).toHaveTextContent(/^skulkr⨯/);
   });
 });

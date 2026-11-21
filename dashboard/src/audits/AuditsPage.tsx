@@ -17,7 +17,9 @@ import { continuousText } from './runData';
 import { useAuditPalette } from './useAuditPalette';
 import { useSkulkrMap } from './useSkulkrMap';
 import { SNAPSHOT, areaUrlFor, mapUrl, tenantsUrl } from '@dash/dataSource';
+import { AppTitle } from '@dash/AppTitle';
 import { TenantTitle } from '@dash/tenants/TenantTitle';
+import { titleFor } from '@dash/title';
 import { useTenantChoice, useTenants } from '@dash/tenants/useTenants';
 import { readSize, useViewerPref } from './viewerPref';
 import type { SkulkrMap } from './skulkrMap.types';
@@ -37,8 +39,6 @@ function stampOf(map: SkulkrMap): string {
   return `${map.branch ? `${map.branch} ` : ''}${map.head} · updated ${when}`;
 }
 
-/** The page's title: the project's name where the map gives one. */
-const titleOf = (map: SkulkrMap | null): string => (map?.project ? `${map.project} audits` : 'Audits');
 
 /** What an area is, from the map's partition where it says. */
 function AreaNote({ map }: { map: SkulkrMap | null }) {
@@ -143,7 +143,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
     : tenants.status === 'ready' && !names.length ? 'The dev server reads no tenant: register one with skulkr tenants add.'
     : state.status === 'failed' ? `Couldn't read the audit map: ${state.error}` : null;
   return (
-    <Shell title={tenant !== null ? `${tenant} audits` : titleOf(map)} heading={heading} header={header}>
+    <Shell title={titleFor(tenant ?? map?.project ?? null)} heading={heading ?? <AppTitle />} header={header}>
       <div className={`${palette.palette} ${s.root}`}>
         {!noServer && !failed && state.status === 'loading' && <p className={s.note}>Reading the audit map…</p>}
         {noServer && (
