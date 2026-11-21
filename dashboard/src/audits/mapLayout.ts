@@ -143,3 +143,13 @@ export function layoutMap(
   place(areaTree(areas), inset({ x: 0, y: 0, width, height }, MAP_PADDING.outer), 0, null);
   return { frames, cells };
 }
+
+/** The side of an area's icon, the same in every cell, and the room it keeps from the cell's edges. */
+export const ICON = { size: 24, margin: 4 } as const;
+
+/** The square an icon of `size` takes centered in `cell`, or null when the cell cannot hold it with `margin` to
+ *  spare on every side. */
+export function iconBoxIn(cell: Box, size: number = ICON.size, margin: number = ICON.margin): Box | null {
+  if (cell.width < size + 2 * margin || cell.height < size + 2 * margin) return null;
+  return { x: cell.x + (cell.width - size) / 2, y: cell.y + (cell.height - size) / 2, width: size, height: size };
+}

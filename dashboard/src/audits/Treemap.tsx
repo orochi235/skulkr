@@ -30,19 +30,22 @@ export interface TreemapProps {
   readonly lit?: string | null;
   /** How many areas a round takes, whose halves the queue numbers are counted in. */
   readonly areasPerRound?: number;
+  /** Each icon's glyph, by the name an area's `icon` gives. */
+  readonly glyphs?: Readonly<Record<string, string>>;
 }
 
 /** Every audit area as a cell of a treemap drawn on the scene graph: hover and click pick through the canvas's
  *  own hit testing and selection. */
 /** The most the map numbers: eight rounds of the queue, in half rounds. */
 const MAX_HALVES = 16;
+const NO_GLYPHS: Readonly<Record<string, string>> = {};
 const HALF_STOPS = Array.from({ length: MAX_HALVES + 1 }, (_, i) => i);
 const readHalves = (v: string): number | undefined => {
   const n = Number(v);
   return Number.isInteger(n) && n >= 0 && n <= MAX_HALVES ? n : undefined;
 };
 
-export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16 }: TreemapProps) {
+export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS }: TreemapProps) {
   // How many half-rounds of the queue's head to number on the map, each in its area's corner.
   const [halves, setHalves, keepHalves] = useViewerPref('upcomingHalves', 6, readHalves);
   const places = halves * (areasPerRound / 2);
@@ -62,8 +65,8 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
   const heat = useMemo(() => heatScaleOf(areas), [areas]);
   const layout = useMemo(() => layoutMap(areas, size.width, size.height), [areas, size]);
   useLayoutEffect(() => {
-    syncAuditScene(scene, auditNodeSpecs(areas, layout, palette, phases, lit, places, estimates));
-  }, [scene, areas, layout, palette, phases, lit, places, estimates]);
+    syncAuditScene(scene, auditNodeSpecs(areas, layout, palette, phases, lit, places, estimates, glyphs));
+  }, [scene, areas, layout, palette, phases, lit, places, estimates, glyphs]);
 
   // The map's text is set in the theme's faces, which the canvas draws from the document's fonts once each loads.
   useEffect(() => {

@@ -2,6 +2,7 @@
 import { asNodeId, contrastRatio, createScene, nodeShapesOf, type NodeId, type RectPose, type Scene } from '@weasel-js/core';
 import { deepEqual } from '@weasel-js/registry';
 import { AUDIT_PAINTER, type AuditCellData, type AuditFrameData, type AuditNodeData } from './auditPainter';
+import { glyphPathsOf } from './glyph';
 import { changedSincePass, heatScaleOf, labelIn, toneOf, wrapAtDots, type HeatScale } from './areaData';
 import { rampAt } from './heat';
 import type { MapCell, MapFrame } from './mapLayout';
@@ -110,7 +111,7 @@ function labelLines(area: AuditArea, cell: MapCell, font: string): string[] {
 
 function cellData(
   area: AuditArea, cell: MapCell, palette: AuditPalette, heat: HeatScale, phase: AuditPhase | undefined, lit: boolean, upcoming: number,
-  estimate: number | undefined,
+  estimate: number | undefined, glyph: string | undefined,
 ): AuditCellData {
   const tone = toneOf(area);
   // An estimate older than its files' last changes wears a cut corner; its color stays the heat its estimate gives,
@@ -131,6 +132,7 @@ function cellData(
     edge: palette.panel,
     ink,
     ...(labeled ? { label: labelLines(area, cell, palette.font.ui) } : {}),
+    ...(glyph ? { icon: glyphPathsOf(glyph) } : {}),
     ...(live ? { live: phase ? palette.phase[phase] : palette.live } : {}),
     ...(tone === 'unaudited' && labeled ? { backing: palette.uncharted } : {}),
     font: palette.font.ui,
@@ -155,6 +157,8 @@ export function auditNodeSpecs(
   upcoming = Infinity,
   /** What a live run already estimates its areas hold: a never-audited one's hatching takes that heat. */
   estimates: ReadonlyMap<string, number> = new Map(),
+  /** Each icon's glyph, by the name an area's `icon` gives. */
+  glyphs: Readonly<Record<string, string>> = {},
 ): AuditNodeSpec[] {
   const byId = new Map(areas.map((a) => [a.id, a]));
   const heat = heatScaleOf(areas);
@@ -176,7 +180,8 @@ export function auditNodeSpecs(
     const parent = c.parent === null ? undefined : frameBox.get(c.parent);
     out.push({
       id: asNodeId(c.id), parent: c.parent === null ? null : frameIdOf(c.parent), pickable: true,
-      pose: poseIn(c, parent), data: cellData(area, c, palette, heat, phases.get(area.id), area.id === lit, upcoming, estimates.get(area.id)),
+      pose: poseIn(c, parent), data: cellData(area, c, palette, heat, phases.get(area.id), area.id === lit, upcoming, estimates.get(area.id),
+        area.icon !== undefined && Object.hasOwn(glyphs, area.icon) ? glyphs[area.icon] : undefined),
     });
   }
   return out;

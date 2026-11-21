@@ -28,6 +28,8 @@ export interface AuditArea {
   readonly stage: string | null;
   /** Lines of its files changed since its last pass, that pass's own fixes aside; absent when none. */
   readonly staleLines?: number;
+  /** Its icon's name, a key of the map's `icons`; absent when the config gives it none. */
+  readonly icon?: string;
 }
 
 export type LaneStepName = 'A' | 'B' | 'match' | 'fix' | 'patch';
@@ -151,6 +153,8 @@ export interface SkulkrMap {
   readonly continuous?: AuditContinuous;
   readonly runs: readonly AuditRun[];
   readonly areas: readonly AuditArea[];
+  /** Each icon an area names, as its glyph: an SVG body on a 20×20 viewBox. */
+  readonly icons?: Readonly<Record<string, string>>;
   readonly rounds: readonly AuditRound[];
 }
 
