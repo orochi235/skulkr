@@ -29,6 +29,15 @@ export const stageLabelOf = (stage: string): string => getOwn(STAGE_LABEL, stage
 
 export const lastPassOf = (area: AuditArea): AuditPass | null => area.passes.at(-1) ?? null;
 
+/** A pass's left, calibrated, or its own where the map has no calibration. */
+export const correctedLeftOf = (p: AuditPass): number => p.leftCorrected ?? p.left;
+
+/** A pass's estimate with its left calibrated: what it found plus the corrected left. */
+export const correctedEstOf = (p: AuditPass): number => p.est + correctedLeftOf(p) - p.left;
+
+/** The corrected figure as it reads beside a raw one: whole defects, approximate. */
+export const correctedText = (n: number): string => `≈${formatCount(Math.round(n))}`;
+
 export function toneOf(area: AuditArea): AreaTone {
   if (area.status === 'settled') return 'settled';
   if (area.status === 'unaudited') return 'unaudited';
@@ -91,6 +100,8 @@ export function statsFor(areas: readonly AuditArea[]): Stat[] {
   const auditedFiles = audited.reduce((n, a) => n + a.files, 0);
   const left = audited.reduce((n, a) => n + (lastPassOf(a)?.left ?? 0), 0);
   const staleLeft = audited.reduce((n, a) => n + (a.staleLines ? lastPassOf(a)?.left ?? 0 : 0), 0);
+  const leftCorrected = audited.reduce((n, a) => { const p = lastPassOf(a); return n + (p ? correctedLeftOf(p) : 0); }, 0);
+  const calibrated = audited.some((a) => lastPassOf(a)?.leftCorrected !== undefined);
   // A pass several areas inherited counts once over them, by each one's share.
   const found = Math.round(areas.reduce((n, a) => n + a.passes.reduce((m, p) => m + p.distinct * (p.share ?? 1), 0), 0));
   const settled = areas.filter((a) => a.status === 'settled').length;
@@ -100,7 +111,7 @@ export function statsFor(areas: readonly AuditArea[]): Stat[] {
     { value: formatCount(found), label: 'defects found and fixed, all rounds' },
     {
       value: `≈${formatCount(Math.round(left))}`,
-      label: staleLeft >= 0.5 ? `estimated still in audited areas, ≈${formatCount(Math.round(staleLeft))} of it in areas changed since` : 'estimated still in audited areas',
+      label: `estimated still in audited areas${calibrated ? ` (${correctedText(leftCorrected)} corrected)` : ''}${staleLeft >= 0.5 ? `, ≈${formatCount(Math.round(staleLeft))} of it in areas changed since` : ''}`,
     },
     { value: formatCount(settled), label: 'areas settled' },
   ];

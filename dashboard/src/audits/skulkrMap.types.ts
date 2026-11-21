@@ -12,6 +12,8 @@ export interface AuditPass {
   readonly distinct: number;
   readonly est: number;
   readonly left: number;
+  /** `left` times the calibration factor for the pass's shared bucket (the map's `calibration`). */
+  readonly leftCorrected?: number;
   /** The part of the pass's files this area holds, when it holds only some: `est` and `left` are scaled by it. */
   readonly share?: number;
   /** A live run's pass, its area's pass done and its round's record not yet landed. */
@@ -156,6 +158,48 @@ export interface SkulkrMap {
   /** Each icon an area names, as its glyph: an SVG body on a 20×20 viewBox. */
   readonly icons?: Readonly<Record<string, string>>;
   readonly rounds: readonly AuditRound[];
+  readonly calibration?: AuditCalibration;
+}
+
+/** One pass checked against the area's next: what it left, and what the next pass found. */
+export interface CalibrationPair {
+  readonly area: string;
+  readonly round: number;
+  readonly next: number;
+  readonly a: number;
+  readonly b: number;
+  readonly shared: number;
+  readonly est: number;
+  readonly left: number;
+  readonly found: number;
+  /** Lines of the area's files changed between the two passes, the first's fixes aside. */
+  readonly lines?: number;
+}
+
+/** Found over predicted, pooled over `pairs`; null while nothing was predicted. */
+export interface CalibrationFactor {
+  readonly pairs: number;
+  readonly predicted: number;
+  readonly found: number;
+  readonly factor: number | null;
+}
+
+/** One round's passes against their areas' next passes, and the factor pooled over it and every earlier round. */
+export interface CalibrationPoint {
+  readonly round: number;
+  readonly pairs: number;
+  readonly predicted: number;
+  readonly found: number;
+  readonly factor: number | null;
+}
+
+/** How Chapman's "left" compared with what later passes found, recomputed on each map build. */
+export interface AuditCalibration {
+  /** The pairs a shared bucket needs before its own factor is used. */
+  readonly minPairs: number;
+  readonly pairs: readonly CalibrationPair[];
+  readonly factors: { readonly overall: CalibrationFactor; readonly byShared: Readonly<Record<string, CalibrationFactor>> };
+  readonly series: readonly CalibrationPoint[];
 }
 
 /** One defect as a round tells it: what was broken, who listed it, what became of it, and what the fix changed. */

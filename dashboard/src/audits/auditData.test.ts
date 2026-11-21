@@ -163,6 +163,11 @@ describe('areas', () => {
     ]);
   });
 
+  it('gives the corrected total beside the raw one once the map carries corrected figures', () => {
+    const corrected = map.areas.map((a) => ({ ...a, passes: a.passes.map((p) => ({ ...p, leftCorrected: p.left * 4 })) }));
+    expect(statsFor(corrected)[3]).toEqual({ value: '≈13', label: 'estimated still in audited areas (≈51 corrected)' });
+  });
+
   it('says how much of what is left rests on areas changed since their pass, and counts a shared pass once', () => {
     const due = map.areas.find((a) => a.status === 'due' && a.passes.length)!;
     const stale = map.areas.map((a) => (a.id === due.id ? { ...a, staleLines: 120 } : a));

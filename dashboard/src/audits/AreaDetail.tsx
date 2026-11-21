@@ -3,8 +3,8 @@ import { Badge } from '@weasel-js/ui/components/Badge';
 import { DetailList, DetailRow } from '@weasel-js/ui/components/DetailList';
 import { SidebarPanel } from '@weasel-js/ui/components/SidebarPanel';
 import type { Grade } from '@weasel-js/theme';
-import { STATUS_LABEL, lastPassOf, stageLabelOf } from './areaData';
-import type { AreaStatus, AuditArea, AuditRun } from './skulkrMap.types';
+import { STATUS_LABEL, correctedEstOf, correctedLeftOf, correctedText, lastPassOf, stageLabelOf } from './areaData';
+import type { AreaStatus, AuditArea, AuditPass, AuditRun } from './skulkrMap.types';
 import s from './AreaDetail.module.css';
 
 const GRADE: Readonly<Record<AreaStatus, Grade | undefined>> = { unaudited: undefined, due: 'info', settled: 'success', tonight: 'danger' };
@@ -20,12 +20,18 @@ function Passes({ area }: { area: AuditArea }) {
         {area.passes.map((p, i) => (
           <tr key={`${p.round}-${i}`}>
             <td>{p.round}{p.share !== undefined && <abbr className={s.share} title="the part of that pass's files this area holds; est. and left are scaled by it"> {Math.round(p.share * 100)}%</abbr>}</td><td className={s.vennCell}><Venn a={p.a - p.shared} both={p.shared} b={p.b - p.shared} /></td><td>{p.distinct}</td>
-            <td>{p.est.toFixed(1)}</td><td>{p.left.toFixed(1)}</td>
+            <td>{p.est.toFixed(1)}<Corrected pass={p} value={correctedEstOf(p)} /></td><td>{p.left.toFixed(1)}<Corrected pass={p} value={correctedLeftOf(p)} /></td>
           </tr>
         ))}
       </tbody>
     </table>
   );
+}
+
+/** A calibrated figure after its raw one, where the map gives the pass one. */
+function Corrected({ pass, value }: { pass: AuditPass; value: number }) {
+  if (pass.leftCorrected === undefined) return null;
+  return <span className={s.corrected} title="corrected by how much later passes found"> {correctedText(value)}</span>;
 }
 
 /** Reviewer A's findings and B's as two pills overlapping in the middle: only A's, the ones both found, only B's. */
@@ -55,7 +61,7 @@ export function AreaDetail({ area, holder }: { area: AuditArea | undefined; hold
             <DetailRow label="passes">{area.passes.length}</DetailRow>
             {area.queue !== null && <DetailRow label="queue position">{area.queue}</DetailRow>}
             {area.stage && <DetailRow label="this run">{stageLabelOf(area.stage)}</DetailRow>}
-            {last && <DetailRow label={`left after round ${last.round}`}>{last.left.toFixed(1)}</DetailRow>}
+            {last && <DetailRow label={`left after round ${last.round}`}>{last.left.toFixed(1)}{last.leftCorrected !== undefined && ` (${correctedText(last.leftCorrected)} corrected)`}</DetailRow>}
             {area.staleLines ? <DetailRow label="lines changed since">{area.staleLines.toLocaleString()}</DetailRow> : null}
           </DetailList>
           <Passes area={area} />
