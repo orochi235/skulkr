@@ -83,8 +83,8 @@ export interface Job {
   readonly bad: boolean;
 }
 
-/** A match's result: the distinct findings of the two reviews, then how many both found. */
-export const matchText = (shared: number, a: number, b: number) => `${a + b - shared} total, ${shared} shared`;
+/** A match's result: how many findings both reviews made, then how many only one did. */
+export const matchText = (shared: number, a: number, b: number) => `${shared} shared, ${a + b - 2 * shared} unique`;
 
 /** The job a `night.log` line reports, or null for a line that reports none. */
 export function parseJob(line: string): Job | null {
