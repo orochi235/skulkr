@@ -65,8 +65,9 @@ export const capstoneRepairer = (ctx, { root, results, mboxOf = () => undefined 
 
 /**
  * One repair cycle for a red capstone whose log is at `logPath`, on the batch `batch` built from the frozen commit
- * `commit`. `repair(id, files, log)` repairs one area's branch. Answers what was tried: `repaired` and `dropped`
- * branches, `byBranch`, the failing files laid at each, and `unattributed`, the failures no branch reaches.
+ * `commit`. `repair(id, files, log)` repairs one of this round's area branches. Answers what was tried: `repaired`
+ * and `dropped` branches, `unrepairable`, earlier rounds' branches failures were laid at, `byBranch`, the failing
+ * files laid at each, and `unattributed`, the failures no branch reaches.
  */
 export const repairCapstone = async ({ cfg, root, round, commit, batch, logPath, repair, say }) => {
   const text = readFileSync(logPath, 'utf8');
@@ -90,10 +91,16 @@ export const repairCapstone = async ({ cfg, root, round, commit, batch, logPath,
     if (!owners.length) unblamed.push(step);
     for (const b of owners) byBranch.set(b, [...(byBranch.get(b) ?? []), step]);
   }
-  const idOf = (branch) => branch.replace(cfg.names.area(round, ''), '');
+  const idOf = cfg.names.idOf;
   const laid = [...byBranch].map(([b, files]) => `${idOf(b)} ${files.length}`).join(', ');
   say(`capstone: ${where.length} failures; ${laid || 'none laid at a branch'}${unattributed.length + unblamed.length ? `; ${unattributed.length + unblamed.length} unattributed` : ''}`);
+  // A branch an earlier round left out has its commits in that round's night, not this one's: none to repair here.
+  const earlier = (branch) => cfg.names.branchOf(branch)?.round !== round;
   const tried = await Promise.all([...byBranch].map(async ([branch, files]) => {
+    if (earlier(branch)) {
+      say(`repair ${branch} capstone: left out, not repairable this round`);
+      return { branch, ok: false, earlier: true };
+    }
     try {
       return { branch, ...(await repair(idOf(branch), files, excerptFor(text, files))) };
     } catch (error) {
@@ -103,8 +110,9 @@ export const repairCapstone = async ({ cfg, root, round, commit, batch, logPath,
   }));
   return {
     repaired: tried.filter((t) => t.ok).map((t) => t.branch),
-    dropped: tried.filter((t) => !t.ok).map((t) => t.branch),
-    byBranch: Object.fromEntries([...byBranch].map(([b, files]) => [idOf(b), files])),
+    dropped: tried.filter((t) => !t.ok && !t.earlier).map((t) => t.branch),
+    unrepairable: tried.filter((t) => t.earlier).map((t) => t.branch),
+    byBranch: Object.fromEntries([...byBranch].map(([b, files]) => [earlier(b) ? b : idOf(b), files])),
     unattributed: [...unattributed, ...unblamed],
   };
 };
@@ -116,6 +124,7 @@ export const capstoneText = (cycle, idOf, again) => {
     'capstone repair:',
     cycle.repaired.length ? ` repaired ${ids(cycle.repaired)};` : '',
     cycle.dropped.length ? ` left out ${ids(cycle.dropped)}, whose repair still failed;` : '',
+    cycle.unrepairable?.length ? ` left out ${cycle.unrepairable.join(', ')}, not repairable this round;` : '',
     cycle.unattributed.length ? ` unattributed: ${cycle.unattributed.slice(0, 5).join(', ')}${cycle.unattributed.length > 5 ? ', …' : ''};` : '',
     again === undefined ? ' nothing to retest' : ` the capstone ran again ${again ? 'green' : 'red'}`,
   ].join('');

@@ -56,9 +56,9 @@ const summary = (id: string) => ({
   jobs: { minutes: {}, weightedTokens: 0, costUsd: 0 },
 });
 
-const land = async (r: ReturnType<typeof round>, repair?: (id: string, files: string[], log: string) => Promise<{ ok: boolean }>, gate: object = {}, baseline?: (files: string[]) => Promise<string[]>) => {
+const land = async (r: ReturnType<typeof round>, repair?: (id: string, files: string[], log: string) => Promise<{ ok: boolean }>, gate: object = {}, baseline?: (files: string[]) => Promise<string[]>, state = scratch()) => {
   const said: string[] = [];
-  const cfg = resolveConfig({ name: 't', state: scratch(), gate: { name: 'test', command: ['bash', '-c', GATE], cwd: 'batch', failPrefix: 'fleet-fail:', ...gate } });
+  const cfg = resolveConfig({ name: 't', state, gate: { name: 'test', command: ['bash', '-c', GATE], cwd: 'batch', failPrefix: 'fleet-fail:', ...gate } });
   const results = r.branches.map((b) => summary(b.replace('audit5-', '')));
   const report = await batchAndTest({
     cfg, root: r.root, git: r.git, round: 5, commit: r.commit, date: '2026-11-20', nightDir: scratch(), branches: r.branches, results,
@@ -108,6 +108,25 @@ describe('a red capstone', () => {
     expect(old.report).toMatch(/^main fast-forwarded to \w+; landed over 1 failures main already has \(src\/a\.test\.ts\)$/);
     const fresh = await land(round({ src: { 'src/a.ts': 'broken' } }), undefined, {}, async () => []);
     expect(fresh.report).toMatch(/^red: /);
+  });
+
+  it("leaves out an earlier round's branch the failures are laid at, without a repair, and lands the rest", async () => {
+    const r = round({ docs: { 'docs/d.md': 'e' } });
+    r.git('checkout', '-q', '-b', 'audit4-src', r.commit);
+    writeFileSync(join(r.root, 'src/a.ts'), 'broken');
+    r.git('commit', '-qam', 'fix src in round 4');
+    r.git('checkout', '-q', 'main');
+    const state = scratch();
+    writeFileSync(join(state, 'left-out.json'), JSON.stringify({ branches: [{ branch: 'audit4-src', round: 4, why: 'merge conflict in x' }] }));
+    const asked: string[] = [];
+    const { report, said } = await land(r, async (id) => {
+      asked.push(id);
+      return { ok: false };
+    }, {}, undefined, state);
+    expect(asked).toEqual([]);
+    expect(said).toContain('repair audit4-src capstone: left out, not repairable this round');
+    expect(report).toMatch(/^main fast-forwarded to \w+; .*capstone repair: left out audit4-src, not repairable this round; the capstone ran again green$/);
+    expect(report).not.toContain('still failed');
   });
 
   it('stays red with no repair given, as before', async () => {

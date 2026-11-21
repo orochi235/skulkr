@@ -256,6 +256,7 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
   const tops = topDirs(p.roots);
   const { prefix, batchPrefix } = c.naming;
   const pre = escape(prefix);
+  const areaBranch = new RegExp(`^${pre}(\\d+)-(.+)$`);
   const briefPath = (role) => (c.briefs[role] ? resolve(base, c.briefs[role]) : new URL(`${role}.md`, DEFAULT_BRIEFS).pathname);
   return {
     ...c,
@@ -285,6 +286,13 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
       batchTree: (date, round) => `${batchPrefix}-${date}-${prefix}${round}`,
       /** `<prefix><N>-<area>` → the area. */
       areaOf: new RegExp(`^${pre}\\d+-(.+)$`),
+      /** An area branch `<prefix><N>-<area>` → `{ round, id }`, or undefined for any other branch. */
+      branchOf: (branch) => {
+        const m = areaBranch.exec(branch);
+        return m ? { round: Number(m[1]), id: m[2] } : undefined;
+      },
+      /** An area branch → its area, of whichever round; any other branch as it is. */
+      idOf: (branch) => areaBranch.exec(branch)?.[2] ?? branch,
       /** A round number in any branch named for one: `audit30-ui`, `batch/…-audit31`. */
       roundIn: new RegExp(`(?:^|[/-])${pre}(\\d+)(?:-|$)`),
       /** A job of round `round` (any round when omitted), by its task name. */

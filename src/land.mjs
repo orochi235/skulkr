@@ -114,7 +114,7 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
  * that `main` fast-forwarded to `tip` with the round's `areas` in it.
  */
 export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, baseline, onLanded }) => {
-  const idOf = (branch) => branch.replace(cfg.names.area(round, ''), '');
+  const idOf = cfg.names.idOf;
   const fixCommits = new Map(results.map((a) => [a.id, a.fixCommits]));
   const main = cfg.git.main;
   const earlier = new Map(retryable(git, leftOutIn(cfg.state), main).filter((e) => !branches.includes(e.branch)).map((e) => [e.branch, e]));
@@ -179,12 +179,13 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
         if (area) area.fixCommits = [];
         outcomes[idOf(branch)] = `\`${branch}\`, left out: its capstone failures still failed after a repair`;
       }
-      if (!cycle.repaired.length && !cycle.dropped.length) break;
-      landing = landing.filter((b) => !cycle.dropped.includes(b));
+      const out = [...cycle.dropped, ...cycle.unrepairable];
+      if (!cycle.repaired.length && !out.length) break;
+      landing = landing.filter((b) => !out.includes(b));
       ({ batch, tip: recorded } = build());
-      say(`capstone: rebuilt ${batch.name} with ${cycle.repaired.length} repaired and ${cycle.dropped.length} left out; testing again`);
+      say(`capstone: rebuilt ${batch.name} with ${cycle.repaired.length} repaired and ${out.length} left out; testing again`);
     }
-    const retested = cycle && (cycle.repaired.length || cycle.dropped.length) ? !tested.report : undefined;
+    const retested = cycle && (cycle.repaired.length || cycle.dropped.length || cycle.unrepairable.length) ? !tested.report : undefined;
     let tried = earlier.size ? `; retried ${earlier.size} branches left out of earlier rounds, ${retried.merged} merged and ${retried.out} still left out` : '';
     if (cycle) tried += `; ${capstoneText(cycle, idOf, retested)}`;
     const over = tested.report && baseline ? await alreadyFailing(cfg, tested.log, baseline) : null;
