@@ -28,9 +28,14 @@ const leaseTree = (state, source) => {
     const dir = join(pool, `t${k}`);
     const release = takeLease(join(pool, `t${k}.lease`), {});
     if (!release) continue;
-    if (!existsSync(join(dir, '.git'))) {
-      rmSync(dir, { recursive: true, force: true });
-      execFileSync('git', ['clone', '-q', '--shared', '--no-checkout', source, dir], { stdio: 'ignore' });
+    try {
+      if (!existsSync(join(dir, '.git'))) {
+        rmSync(dir, { recursive: true, force: true });
+        execFileSync('git', ['clone', '-q', '--shared', '--no-checkout', source, dir], { stdio: 'ignore' });
+      }
+    } catch (error) {
+      release();
+      throw error;
     }
     return { dir, release };
   }
@@ -77,13 +82,13 @@ export const createLocalRunner = (cfg) => {
   };
   return {
     run: async (job, { cwd, log }) => {
-      const source = git(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
-      const tree = leaseTree(cfg.state, source);
       const file = `${Date.now()}-${process.pid}-${job.task.replace(/[^\w.-]+/g, '_')}.json`;
       const entry = { task: job.task, node: 'local', state: 'running', started: new Date().toISOString(), pid: process.pid };
       record(file, entry);
       let status = 1;
+      let tree;
       try {
+        tree = leaseTree(cfg.state, git(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']));
         syncTree(tree.dir, cwd, job.ref ?? git(cwd, ['rev-parse', 'HEAD']));
         status = await runShell(job.shell, { cwd: tree.dir, env: job.env, log, timeoutMs: durationMs(job.timeout) });
         const out = join(tree.dir, job.out);
@@ -91,7 +96,7 @@ export const createLocalRunner = (cfg) => {
       } catch (error) {
         log.write(`skulkr local runner: ${error.message ?? error}\n`);
       } finally {
-        tree.release();
+        tree?.release();
         record(file, { ...entry, state: status === 0 ? 'done' : 'failed', exit: status, finished: new Date().toISOString() });
       }
       return { status, busy: false, refused: false };

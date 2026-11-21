@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -84,6 +84,15 @@ describe('the local runner', () => {
     expect(r.status).not.toBe(0);
     expect(Date.now() - t0).toBeLessThan(10_000);
     expect(existsSync(join(r.to, 'got'))).toBe(false);
+  });
+
+  it('answers a failed job, and keeps no lease, when its clone cannot be made', async () => {
+    const s = setup();
+    rmSync(join(s.dir, 'repo', '.git', 'objects'), { recursive: true, force: true });
+    const r = await run(s, 'true');
+    expect(r.status).not.toBe(0);
+    const pool = join(s.dir, 'state', 'trees');
+    expect(existsSync(pool) ? readdirSync(pool).filter((n) => n.endsWith('.lease')) : []).toEqual([]);
   });
 
   it('reads runner durations', () => {
