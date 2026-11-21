@@ -13,9 +13,6 @@
   together, a function rather than a whole file, and a check's verdict rather than its log (`… | tail -5`, or
   `grep -E "Tests |×|error"`).
 - Leave `.skulkr/` alone and out of every commit.
-- Every call rereads everything before it, so read in few, targeted calls: the findings and the files they cite
-  together, a function rather than a whole file, and a check's verdict rather than its log (`… | tail -5`, or
-  `grep -E "Tests |×|error"`).
 
 ## Writing
 
