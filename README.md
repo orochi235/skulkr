@@ -120,7 +120,7 @@ the config, unless the config's `root` or `--root` says otherwise. `skulkr confi
 
 **Briefs.** The shipped briefs in `briefs/` are generic and fill `{{project}}`, `{{rules}}`, `{{test}}`,
 `{{typecheck}}`, and `{{lint}}` from the config, beside their own variables (`{{round}}`, `{{area}}`,
-`{{commit}}`, `{{files}}`, `{{out}}` for a reviewer; `{{source}}` for a fixer; `{{attempt}}`, `{{command}}`,
+`{{commit}}`, `{{files}}` (each with its line count), `{{out}}` for a reviewer; `{{source}}` for a fixer; `{{attempt}}`, `{{command}}`,
 `{{failures}}`, and `{{log}}` for a repair). A project's own brief may use the
 same ones. The reviewer brief's closing `<!-- done: … -->` line, its `## Files read` section, and the fixer
 brief's `tally:` line are read back by the pipeline, so a replacement must keep them.
@@ -135,7 +135,7 @@ Each step prints one line as it completes (`review 3/16 …`).
 | plan | Areas come from the partition, less every area a live run holds. The round number is one past the highest used by a `<record.dir>/round-<N>/` directory, the ledger's text, a branch named `audit<N>-…`, or a run's claim. The run claims it by creating `runs/<N>/`; if another run got there first it takes the next. Planning holds `plan.lock`, so two runs starting at once never pick the same area. |
 | freeze | A detached worktree at `main`'s tip, `.worktrees/audit<N>-frozen-night`. That sha is the round's commit. |
 | sweep | Only with `--sweep` and a configured sweep: one job at the frozen commit beside the reviews; its findings go to one fixer. |
-| review | Per area, two reviewer jobs from the frozen tree with the reviewer brief and the area's file list. Reviewers may read, search, and run `git log/show/diff/blame`, and write only `.skulkr/out/`. Each lists the files it read; its stream goes through `src/progress.mjs`, so the runner shows how many of the area's files it has opened. |
+| review | Per area, two reviewer jobs from the frozen tree with the reviewer brief and the area's file list. Reviewers may read, search, and run `git log/show/diff/blame`, and write only `.skulkr/out/`; their shell stays in the tree's root (`CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR`), since that write rule is relative to the working directory. Each lists the files it read; its stream goes through `src/progress.mjs`, so the runner shows how many of the area's files it has opened. |
 | match | One job per area pairs the two lists (the matcher brief); the pipeline keeps only one-to-one pairs and computes the estimate. |
 | fix | Per area with findings, one fixer job, permissions bypassed, in the node's synced tree. It first commits the synced tree and checks it hashes to the frozen commit's tree, installs if the lockfile changed (an install that fails stops the job before the model runs, leaving `install.log`), then hands back its commits as an mbox. |
 | verify | Per fixer with commits, the config's `checks.verify` over the files they changed, run by skulkr, never read from the fixer's report; see "Verify and repair". |

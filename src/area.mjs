@@ -18,6 +18,22 @@ import { totals } from './usage.mjs';
 import { verifyOf } from './verify.mjs';
 
 const round1 = (n) => Number(n.toFixed(1));
+
+/** Lines in the file at `path`, or undefined when it cannot be read. */
+const linesIn = (path) => {
+  try {
+    const text = readFileSync(path, 'utf8');
+    return text === '' ? 0 : text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
+  } catch {
+    return undefined;
+  }
+};
+
+/** The reviewer brief's `{{files}}`: one `- path (N lines)` per file of `files`, counted in the tree at `root`. */
+export const reviewFileList = (root, files) => files.map((f) => {
+  const n = linesIn(join(root, f));
+  return n === undefined ? `- ${f}` : `- ${f} (${n} ${n === 1 ? 'line' : 'lines'})`;
+}).join('\n');
 const cents = (n) => Number(n.toFixed(2));
 
 const review = async (ctx, area, side) => {
@@ -138,7 +154,7 @@ export const jobsPart = (minutes, nodes, fixed, records) => {
  */
 export const runArea = async (ctx, area, { previous, changedSince, carried = [] }) => {
   const inDir = stageIn(ctx, area);
-  const vars = { ...projectVars(ctx.cfg, 'reviewer'), round: ctx.round, area: area.id, commit: ctx.commit, out: `${JOB_OUT}/findings.md`, files: area.files.map((f) => `- ${f}`).join('\n') };
+  const vars = { ...projectVars(ctx.cfg, 'reviewer'), round: ctx.round, area: area.id, commit: ctx.commit, out: `${JOB_OUT}/findings.md`, files: reviewFileList(ctx.frozen, area.files) };
   writeFileSync(join(inDir, 'review.md'), fill(brief(ctx.cfg, 'reviewer'), vars));
   writeFileSync(join(inDir, 'files.txt'), `${area.files.join('\n')}\n`);
   const [a, b] = await Promise.all([review(ctx, area, 'A'), review(ctx, area, 'B')]);

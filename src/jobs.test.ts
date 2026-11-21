@@ -43,6 +43,12 @@ describe('job command lines', () => {
     expect(verifyShell(cfg, 'core')).not.toContain(STARTED);
   });
 
+  it("keep a reviewer's shell in the tree's root, where its write rule is anchored", () => {
+    const cfg = resolveConfig({});
+    expect(claudeOf(reviewShell(cfg, 'core', 8))).toContain('CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1');
+    expect(claudeOf(fixShell(cfg, 'core', 15, 3))).not.toContain('MAINTAIN_PROJECT_WORKING_DIR');
+  });
+
   it('leave the model, effort, and setting sources to the node where the config leaves them unset', () => {
     const cfg = resolveConfig({ claude: { settingSources: null } });
     const review = claudeOf(reviewShell(cfg, 'core', 8));

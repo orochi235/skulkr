@@ -39,6 +39,10 @@ describe('parseFindings', () => {
     expect(parseFindings('## A leak\n- **where:** a.ts:1\n')[0]).toMatchObject({ claim: 'A leak', where: 'a.ts:1' });
   });
 
+  it("reads a files-read path that kept the brief's line count", () => {
+    expect(parseFilesRead('## Files read\n- a.ts (120 lines)\n- `b.ts` (1 line)\n')).toEqual(['a.ts', 'b.ts']);
+  });
+
   it('answers nothing for an empty report', () => {
     expect(parseFindings('')).toEqual([]);
     expect(parseFilesRead('')).toEqual([]);

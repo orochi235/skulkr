@@ -8,8 +8,12 @@ defects the area still holds. That estimate only works if both reviewers search 
   subagents or split the list. You may open other files to understand a call or a type, but a finding must be
   about code in a listed file.
 - **Do not edit anything** but your findings file. No fixes, no commits, no branches, no stash. Report only.
-- **The tree you are in is the frozen commit {{commit}}.** Cite paths relative to its root. It may have no
-  node_modules; reason from the code. You may read history with `git log`, `git show`, `git diff`, `git blame`.
+- **The tree you are in is the frozen commit {{commit}}, and your working directory is its root.** Cite paths
+  relative to it. It may have no node_modules; reason from the code.
+- **Read with the tools, not the shell.** Read opens files (several in one turn), Grep searches, Glob lists. The
+  only shell commands you may run are `git log`, `git show`, `git diff` and `git blame`, from where you are: never
+  `cd`, never `git -C`, one command per call, never chained with `;`, `&&`, `|` or a loop. Anything else is
+  refused, and a refused call still costs a turn. Each file's line count is in the list below; never count them.
 - Root `CLAUDE.md` (terminology, module rules, traps table) is already in your context, so never open it;
   read the `docs/traps/*.md` file for your area if its table names one. `docs/unruled.md` lists calls already made — a behavior ruled
   there is not a defect (search it; it is large).
@@ -30,7 +34,8 @@ Earlier rounds fixed a lot; look for what is still there, especially in code cha
 
 ## Output
 
-Write your findings to `{{out}}` as Markdown, one `##` section per finding:
+Write your findings with the Write tool to `{{out}}` under the tree's root, then add to it with Edit; that file is
+the only one you may write, and the shell cannot write it. Markdown, one `##` section per finding:
 
     ## <one-line claim>
     - where: path/to/file.ts:LINE (function name)
@@ -39,7 +44,7 @@ Write your findings to `{{out}}` as Markdown, one `##` section per finding:
     - severity: high | medium | low
 
 Write the file as you go, appending what each batch of files turned up, not only at the end. When done, add a section
-`## Files read` listing every listed file you actually read, one path per line, and finish with a final line
+`## Files read` listing every listed file you actually read, one path per line without its count, and finish with a final line
 `<!-- done: N findings, files read: M -->`. Your reply is just that line. If you cannot write the file, put
 the whole document in your reply instead.
 

@@ -32,6 +32,8 @@ const claudeLine = (cfg, role, promptFile, budgetUsd, flags, progress) =>
     `date -u +%FT%TZ > ${JOB_OUT}/${STARTED} &&`,
     ...(cfg.claude.configDir ? [`CLAUDE_CONFIG_DIR=${cfg.claude.configDir}`] : []),
     ...(cfg.claude.cacheTtl?.[role] ? [`CLAUDE_CODE_PROMPT_CACHE_TTL=${cfg.claude.cacheTtl[role]}`] : []),
+    // A reviewer's write rule is relative to the working directory, which a `cd` would otherwise move.
+    ...(role === 'review' ? ['CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1'] : []),
     `perl -e 'alarm shift; exec @ARGV' ${cfg.claude.timeoutMin * 60}`,
     'claude -p "$(cat', `${q(promptFile)})"`,
     `--output-format ${progress ? 'stream-json --verbose' : 'json'} --strict-mcp-config`,
