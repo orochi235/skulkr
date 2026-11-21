@@ -9,6 +9,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSyn
 import { join } from 'node:path';
 import { runArea } from './area.mjs';
 import { capstoneRepairer } from './capstone.mjs';
+import { gateBaseline } from './repair.mjs';
 import { openFindingsIn } from './carryRecords.mjs';
 import { addWorktree, gitIn, mainCheckout, removeWorktree } from './batch.mjs';
 import { JOB_IN, nextClock, nodesAt } from './config.mjs';
@@ -365,7 +366,8 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     setStep('batch');
     const mboxOf = (id) => (id === cfg.sweep?.id ? sweepFixed?.mbox : undefined);
     const repair = verifyOf(cfg) ? capstoneRepairer(ctx, { root, results, mboxOf }) : undefined;
-    report = await batchAndTest({ ...landing, git, date: ctx.date, nightDir: status.nightDir, branches, results, sweep, merge: args.merge, setStep, repair });
+    const baseline = verifyOf(cfg) ? gateBaseline(ctx) : undefined;
+    report = await batchAndTest({ ...landing, git, date: ctx.date, nightDir: status.nightDir, branches, results, sweep, merge: args.merge, setStep, repair, baseline });
     const checked = verifyLine(results);
     if (checked) report += `; ${checked}`;
     const unrun = results.filter((s) => s.incomplete?.length).map((s) => `${s.id} (${s.incomplete.join(', ')})`);

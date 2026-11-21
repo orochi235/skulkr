@@ -154,3 +154,15 @@ export const summaryOf = (v) => ({
   ...(v.failedFiles?.length ? { failedFiles: v.failedFiles.slice(0, 20) } : {}), ...(v.guiRan ? { gui: true } : {}),
   ...(v.baseline?.length ? { baseline: v.baseline.slice(0, 20) } : {}),
 });
+
+/**
+ * Which of `files`, test files a red gate named, fail on the frozen tree too: the verify step's plain part first, then
+ * its GUI part for the rest, each in a job of the round's `gate` lane.
+ */
+export const gateBaseline = (ctx) => async (files) => {
+  const gate = { id: 'gate' };
+  const plain = await baselineFailures(ctx, gate, { failedFiles: files, gui: false });
+  const rest = files.filter((f) => !plain.includes(f));
+  const gui = rest.length && verifyOf(ctx.cfg)?.gui ? await baselineFailures(ctx, gate, { failedFiles: rest, gui: true }) : [];
+  return [...plain, ...gui];
+};

@@ -49,6 +49,7 @@ export default {
     progress: { tests: '' },          // its parallel runs, by the prefix of their `onto: progress` log lines (dashboard)
     outcome: {},                      // per run, the word of its closing `<word> passed|failed` log line; else the gate's own result
     jobs: {},                         // per run, a regex on its runner jobs' task names; a run without one takes the rest
+    blame: null,                      // or (logText, step) => paths: what a failed step's output blames; see "Verify and repair"
   },
 
   checks: {                           // what the default fixer brief tells the fixer to run
@@ -213,7 +214,8 @@ with `checks.verify` set, it runs the project's verify step itself on what each 
 | `gui` | `{ probe, command }` for tests that need a node's GUI session. `probe` runs beside `command` and prints the test files the GUI part would run, one a line; when it lists one, or fails, `command` runs in an `onto do --gui` job of its own on the area's commits. With no `probe`, the GUI part runs for any change. |
 | verdict | The command's exit status and vitest's `Test Files` counts: it passes only on exit 0 with no file failed, so a file whose setup or teardown throws fails even when every test in it passes. |
 | repair | A failing verdict goes, verbatim, to a repair job (`briefs/repair.md`, or the config's `briefs.repair`) on the area's commits, told to make it pass without weakening a test. Its commits are verified the same way. After two repairs that still fail, the area is left out of the batch, as a conflicting branch is. A run that timed out is not repaired: the area lands, and the capstone checks it. |
-| capstone | A red gate's `fleet-fail:` files are laid at the area branches whose commits changed each file, else changed a file it reaches by relative imports, else changed a workspace package it imports; a file none reaches is unattributed. Each such branch gets one repair job given the gate's lines about its files, which its verify step checks beside its own changes. Repaired branches are patched again, the rest are left out, the batch is rebuilt, and the gate runs once more. One cycle per round. |
+| capstone | A red gate's `fleet-fail:` files are laid at the area branches whose commits changed each file, else changed a file it reaches by relative imports, else changed a workspace package it imports; a file none reaches is unattributed. Each such branch gets one repair job given the gate's lines about its files, which its verify step checks beside its own changes. A failed step (a check, not a test file) goes to the branches that changed a path the config's `gate.blame(logText, step)` reads from its output (weasel's reads the packages `check:unnameable` names); without one it is unattributed. Repaired branches are patched again, the rest are left out, the batch is rebuilt, and the gate runs once more. One cycle per round. |
+| old failures | A gate still red after the capstone lands anyway when every failure left is a test file that fails on the frozen commit too, checked as the verify step's baseline is: `main` has those failures already, so landing leaves it no worse, and the report says it landed over them. A failed step is never discounted. |
 
 The night log prints a `verify` line per area and a `repair` line per repair; each area's `area.json` and the run's
 `summary.json` keep `verify` (`ok`, `why`, `repairs`, `testFiles`, `failedFiles`), and the closing `night:` line counts

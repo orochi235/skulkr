@@ -9,6 +9,21 @@ import { sweep } from './weasel/sweep.mjs';
 /** The root vitest config's projects that run in Chromium: `browser`, `browser (webgpu)`, and `forge-stories`. */
 const BROWSER_PROJECTS = ['browser*', 'forge-stories'];
 
+/**
+ * The packages a failed post-build step blames: its output, after its `fleet-fail:` line and up to the next step,
+ * names each as `@weasel-js/<name>: …` (`check:unnameable`'s report) or on a line saying it failed (the build's
+ * `[build] 31/65 FAIL … @weasel-js/<name>`), and a package's directory is its name.
+ */
+export const blameStep = (text, step) => {
+  const lines = text.split('\n');
+  const at = lines.findIndex((l) => l.startsWith('fleet-fail:') && l.endsWith(step));
+  if (at < 0) return [];
+  const end = lines.findIndex((l, i) => i > at && /\bci-run:|^fleet-fail:/.test(l));
+  const section = lines.slice(at + 1, end < 0 ? undefined : end);
+  const named = (l) => [...l.matchAll(/@weasel-js\/([\w.-]+):\s/g), ...(/\bFAIL\b|\bfailed\b/.test(l) ? l.matchAll(/@weasel-js\/([\w.-]+)/g) : [])];
+  return [...new Set(section.flatMap((l) => named(l).map((m) => `packages/${m[1]}`)))];
+};
+
 const NVM = 'export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"; . "$NVM_DIR/nvm.sh" >/dev/null; nvm use >/dev/null';
 
 export default {
@@ -97,6 +112,7 @@ export default {
     jobs: { build: '^postbuild-' },
     failPrefix: 'fleet-fail:',
     failRun: { build: 'postbuild' },
+    blame: blameStep,
   },
 
   setup: {

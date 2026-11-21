@@ -12,17 +12,20 @@ import { checkedIn, repairJob, summaryOf } from './repair.mjs';
 import { verdictText } from './verify.mjs';
 import { stripAnsi } from './ansi.mjs';
 
-const TEST_PATH = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
-/** How many lines of the log a failing file's excerpt keeps after each line naming it. */
+/** A failure the gate names by a test file, rather than a step. */
+export const TEST_PATH = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
+/** How many lines of the log a failing file's excerpt keeps after each line naming it; a failed step, whose output
+ *  is all there is to go on, keeps more. */
 const AFTER = 25;
+const STEP_AFTER = 150;
 
 /** The gate log's lines about `files`, verbatim: each line naming one, and the lines after it up to the next. */
-export const excerptFor = (text, files) => {
+export const excerptFor = (text, files, after = files.some((f) => !TEST_PATH.test(f)) ? STEP_AFTER : AFTER) => {
   const lines = stripAnsi(text).split('\n');
   const keep = new Set();
   lines.forEach((line, i) => {
     if (!files.some((f) => line.includes(f))) return;
-    for (let j = i; j < Math.min(lines.length, i + 1 + AFTER); j++) {
+    for (let j = i; j < Math.min(lines.length, i + 1 + after); j++) {
       if (j > i && /\bFAIL\b|^fleet-fail:/.test(lines[j]) && !files.some((f) => lines[j].includes(f))) break;
       keep.add(j);
     }
@@ -79,9 +82,17 @@ export const repairCapstone = async ({ cfg, root, round, commit, batch, logPath,
     }
   });
   const { byBranch, unattributed } = attribute(failing, changed, (file) => reachOf(batch.tree, file, workspaces));
+  // A failed step names no file of its own; the config's `gate.blame` reads which paths its output points at.
+  const unblamed = [];
+  for (const step of steps) {
+    const paths = cfg.gate.blame?.(text, step) ?? [];
+    const owners = [...changed].filter(([, files]) => [...files].some((f) => paths.some((p) => f === p || f.startsWith(p.endsWith('/') ? p : `${p}/`)))).map(([b]) => b);
+    if (!owners.length) unblamed.push(step);
+    for (const b of owners) byBranch.set(b, [...(byBranch.get(b) ?? []), step]);
+  }
   const idOf = (branch) => branch.replace(cfg.names.area(round, ''), '');
   const laid = [...byBranch].map(([b, files]) => `${idOf(b)} ${files.length}`).join(', ');
-  say(`capstone: ${where.length} failures; ${laid || 'none laid at a branch'}${unattributed.length + steps.length ? `; ${unattributed.length + steps.length} unattributed` : ''}`);
+  say(`capstone: ${where.length} failures; ${laid || 'none laid at a branch'}${unattributed.length + unblamed.length ? `; ${unattributed.length + unblamed.length} unattributed` : ''}`);
   const tried = await Promise.all([...byBranch].map(async ([branch, files]) => {
     try {
       return { branch, ...(await repair(idOf(branch), files, excerptFor(text, files))) };
@@ -94,7 +105,7 @@ export const repairCapstone = async ({ cfg, root, round, commit, batch, logPath,
     repaired: tried.filter((t) => t.ok).map((t) => t.branch),
     dropped: tried.filter((t) => !t.ok).map((t) => t.branch),
     byBranch: Object.fromEntries([...byBranch].map(([b, files]) => [idOf(b), files])),
-    unattributed: [...unattributed, ...steps],
+    unattributed: [...unattributed, ...unblamed],
   };
 };
 

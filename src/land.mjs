@@ -4,10 +4,11 @@
  * The gate run through the fast-forward holds the merge lock, so runs land one at a time, and the gate itself holds
  * the fleet queue's lease (`fleet.mjs`), so one gate runs at a time across every tenant.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { applyFix, catchUpWithMain, commitRecord, fastForwardMain, makeBatch, removeWorktree, runGate } from './batch.mjs';
-import { capstoneText, repairCapstone } from './capstone.mjs';
+import { TEST_PATH, capstoneText, repairCapstone } from './capstone.mjs';
+import { failedWhereIn } from './gate.mjs';
 import { fleetDir, waitForFleet } from './fleet.mjs';
 import { waitForLease } from './lease.mjs';
 import { mergeLock } from './runs.mjs';
@@ -96,7 +97,7 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
     const log = join(nightDir, `${logName}${suffix}${cfg.gate.logSuffix}`);
     const status = await runGate(cfg, { root, batch, logPath: log });
     say(`gate: ${gate} ${status === 0 ? 'passed' : `failed (${status}); its log is ${log}`}`);
-    if (status !== 0) return { batch, log, report: `red: ${batch.name} and its branches kept; worktree ${batch.tree}; logs in ${nightDir}` };
+    if (status !== 0) return { batch, tip, log, report: `red: ${batch.name} and its branches kept; worktree ${batch.tree}; logs in ${nightDir}` };
     if (!merge || pass === MAIN_CATCH_UPS + 1 || !catchUp()) return { batch, tip };
   }
 };
@@ -104,9 +105,11 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
 /**
  * Merges the branches into the batch, records the round there, runs the gate on its tip, and merges if green. A red
  * gate gets one capstone repair cycle where `repair` is given (`capstone.mjs`): its failures go to the branches that
- * caused them, the batch is rebuilt from the repaired ones, and the gate runs once more.
+ * caused them, the batch is rebuilt from the repaired ones, and the gate runs once more. Still red, it lands anyway
+ * where `baseline(files)` says every failure left is a test file that fails on the frozen commit too: `main` has
+ * those failures already, so landing leaves it no worse.
  */
-export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair }) => {
+export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, baseline }) => {
   const idOf = (branch) => branch.replace(cfg.names.area(round, ''), '');
   const fixCommits = new Map(results.map((a) => [a.id, a.fixCommits]));
   let landing = [...branches];
@@ -159,8 +162,12 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
       say(`capstone: rebuilt ${batch.name} with ${cycle.repaired.length} repaired and ${cycle.dropped.length} left out; testing again`);
     }
     const retested = cycle && (cycle.repaired.length || cycle.dropped.length) ? !tested.report : undefined;
-    const tried = cycle ? `; ${capstoneText(cycle, idOf, retested)}` : '';
-    if (tested.report) return `${tested.report}${tried}`;
+    let tried = cycle ? `; ${capstoneText(cycle, idOf, retested)}` : '';
+    const over = tested.report && baseline ? await alreadyFailing(cfg, tested.log, baseline) : null;
+    if (over) {
+      say(`gate: every failure left (${over.length}) fails on ${commit.slice(0, 10)} too; landing over them`);
+      tried += `; landed over ${over.length} failures ${cfg.git.main} already has (${over.slice(0, 3).join(', ')}${over.length > 3 ? ', …' : ''})`;
+    } else if (tested.report) return `${tested.report}${tried}`;
     removeWorktree(root, batch.tree);
     if (!merge) return `green; --no-merge, so ${cfg.git.main} is untouched and ${batch.name} and its branches are kept${tried}`;
     const result = fastForwardMain(root, tested.tip, cfg.git.main);
@@ -169,6 +176,17 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
   } finally {
     release();
   }
+};
+
+/**
+ * The failures a red gate's log at `logPath` names, when every one is a test file `baseline` finds failing on the
+ * frozen commit as well; else null. A failed step, or a log naming no failure, is never discounted.
+ */
+const alreadyFailing = async (cfg, logPath, baseline) => {
+  const where = failedWhereIn(readFileSync(logPath, 'utf8'), cfg.gate);
+  if (!where.length || where.some((w) => !TEST_PATH.test(w))) return null;
+  const old = await baseline(where);
+  return where.every((w) => old.includes(w)) ? where : null;
 };
 
 /** The gate on the batch, in its turn in the fleet queue, which it holds only while it runs. */

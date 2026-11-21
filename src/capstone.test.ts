@@ -56,13 +56,13 @@ const summary = (id: string) => ({
   jobs: { minutes: {}, weightedTokens: 0, costUsd: 0 },
 });
 
-const land = async (r: ReturnType<typeof round>, repair?: (id: string, files: string[], log: string) => Promise<{ ok: boolean }>) => {
+const land = async (r: ReturnType<typeof round>, repair?: (id: string, files: string[], log: string) => Promise<{ ok: boolean }>, gate: object = {}, baseline?: (files: string[]) => Promise<string[]>) => {
   const said: string[] = [];
-  const cfg = resolveConfig({ name: 't', state: scratch(), gate: { name: 'test', command: ['bash', '-c', GATE], cwd: 'batch', failPrefix: 'fleet-fail:' } });
+  const cfg = resolveConfig({ name: 't', state: scratch(), gate: { name: 'test', command: ['bash', '-c', GATE], cwd: 'batch', failPrefix: 'fleet-fail:', ...gate } });
   const results = r.branches.map((b) => summary(b.replace('audit5-', '')));
   const report = await batchAndTest({
     cfg, root: r.root, git: r.git, round: 5, commit: r.commit, date: '2026-11-20', nightDir: scratch(), branches: r.branches, results,
-    sweep: undefined, outcomes: {}, merge: true, say: (l: string) => said.push(l), setStep: () => {}, repair,
+    sweep: undefined, outcomes: {}, merge: true, say: (l: string) => said.push(l), setStep: () => {}, repair, baseline,
   });
   return { report, said, results };
 };
@@ -89,6 +89,25 @@ describe('a red capstone', () => {
     const { report, results } = await land(r, async () => ({ ok: false }));
     expect(report).toContain('capstone repair: left out src, whose repair still failed; the capstone ran again green');
     expect(results[0]!.fixCommits).toEqual([]);
+  });
+
+  it("lays a failed step at the branches that changed what the config's blame reads from its output", async () => {
+    const r = round({ src: { 'src/a.ts': 'broken' }, docs: { 'docs/d.md': 'e' } });
+    const step = 'if grep -q broken src/a.ts; then echo "fleet-fail: post npm run check:x"; echo "  [x] src: names a type it does not export"; exit 1; fi';
+    const asked: [string, string[], string][] = [];
+    const { said } = await land(r, async (id, files, log) => {
+      asked.push([id, files, log]);
+      return { ok: false };
+    }, { command: ['bash', '-c', step], blame: (text: string, s: string) => (s === 'npm run check:x' && text.includes('[x] src:') ? ['src'] : []) });
+    expect(asked).toEqual([['src', ['npm run check:x'], expect.stringContaining('[x] src: names a type')]]);
+    expect(said).toContain('capstone: 1 failures; src 1');
+  });
+
+  it('lands over failures the frozen commit has too, and stays red over one it does not', async () => {
+    const old = await land(round({ src: { 'src/a.ts': 'broken' } }), undefined, {}, async (files) => files);
+    expect(old.report).toMatch(/^main fast-forwarded to \w+; landed over 1 failures main already has \(src\/a\.test\.ts\)$/);
+    const fresh = await land(round({ src: { 'src/a.ts': 'broken' } }), undefined, {}, async () => []);
+    expect(fresh.report).toMatch(/^red: /);
   });
 
   it('stays red with no repair given, as before', async () => {

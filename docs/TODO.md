@@ -2,12 +2,6 @@
 
 Open work on skulkr. Each entry says when it closes.
 
-- [ ] (P1) Gates go red on checks the verify step never runs, so `main` stops moving and later rounds reuse a stale
-  base. From 2026-11-20 10:00 to 2026-11-21 10:00 only round 56 of 48–65 landed: 59 and 64 failed on
-  `npm run check:unnameable` (postbuild only), 60 in `npm run build`, and 62 and 63 on `Toast/containment.test.ts`, which the
-  capstone could not attribute. 148 gate and salvage jobs ran (59.5 CPU-h) against about 36 for one gate per round.
-  Closes when weasel's `checks.verify` covers what the gate fails on (the build of the changed packages and
-  `check:unnameable`), and a gate failure the base commit already has does not count against the round.
 - [ ] (P2) Continuous rounds pile up behind each other: rounds 62–64 overlapped overnight and took 262–289 min each, 61–64%
   of job time waiting, against 42–74 min before; round 62's gate waited 103 min behind rounds 63 and 64's reviews.
   Closes when the next continuous round starts only when the fleet has room for its reviews, and a round's gate and
