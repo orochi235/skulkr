@@ -131,6 +131,32 @@ describe('dispatch of a refused job', () => {
   });
 });
 
+describe('dispatch on pinned nodes that all refuse', () => {
+  it('gives the job up after the two hours a placing runner would retry it', async () => {
+    const spec = { ...job({}), kind: 'review', shell: 'true', task: 't', timeoutMin: 5 };
+    vi.useFakeTimers({ toFake: ['Date'] });
+    let runs = 0;
+    const said: string[] = [];
+    try {
+      const ctx = {
+        cfg: {}, frozen: '/nowhere', base: 'b', say: (l: string) => said.push(l), usage: () => {}, refuse: () => {}, budget: { match: 1 },
+        acquire: async () => ({ node: 'studio', placed: false, release: () => {} }),
+        runner: { run: async () => {
+          runs += 1;
+          vi.setSystemTime(Date.now() + 30 * 60_000);
+          return { status: 1, refused: true };
+        } },
+      };
+      const got = await dispatch(ctx, { id: 'a' }, 'match', { ...spec, logPath: join(spec.to, 'j.log') });
+      expect(got).toMatchObject({ launched: false });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(runs).toBe(5);
+    expect(said.at(-1)).toBe('match a refused by studio; refused 5 times over 120 min, so not launched');
+  });
+});
+
 describe('earlierReview', () => {
   /** A night directory with area `x`'s file list and, when `done`, its finished reviewer A. */
   const night = (files: string, done: boolean) => {

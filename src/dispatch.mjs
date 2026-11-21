@@ -81,6 +81,7 @@ export const dispatch = async (ctx, area, role, spec) => {
   }
   let roomWaits = 0;
   let refusals = 0;
+  let firstRefused;
   for (let launches = 1; ; launches++) {
     const slot = await ctx.acquire(FIX_ROLES.has(role) ? 'fix' : 'review');
     const t0 = Date.now();
@@ -96,8 +97,11 @@ export const dispatch = async (ctx, area, role, spec) => {
     if (result.refused) {
       ctx.refuse(slot.node);
       refusals += 1;
+      firstRefused ??= Date.now();
       const stopped = Boolean(ctx.stopped?.());
-      gaveUp = stopped || (slot.placed && refusals >= REFUSALS);
+      // A placing runner relaunches each minute, up to REFUSALS times; a pinned run waits out each node's cooldown
+      // instead, so it gets the same span of time, after which every node it may use has gone on refusing.
+      gaveUp = stopped || (slot.placed ? refusals >= REFUSALS : Date.now() - firstRefused >= REFUSALS * RELAUNCH_WAIT_MS);
       if (!gaveUp) {
         ctx.say(`${role} ${area.id} refused by ${result.node ?? slot.node}, trying ${slot.placed ? 'again' : 'another node'}`);
         if (slot.placed) await sleep(RELAUNCH_WAIT_MS);
@@ -105,7 +109,7 @@ export const dispatch = async (ctx, area, role, spec) => {
         launches -= 1;
         continue;
       }
-      ctx.say(`${role} ${area.id} refused by ${result.node ?? slot.node}; ${stopped ? 'stop requested' : `refused ${refusals} times`}, so not launched`);
+      ctx.say(`${role} ${area.id} refused by ${result.node ?? slot.node}; ${stopped ? 'stop requested' : `refused ${refusals} times over ${Math.round((Date.now() - firstRefused) / 60_000)} min`}, so not launched`);
     }
     const node = result.node ?? slot.node;
     const exit = readIf(join(spec.to, model ? 'exit' : 'verify.exit')).trim();
