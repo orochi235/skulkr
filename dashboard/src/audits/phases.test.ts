@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { STEP_COLUMN_COUNT, CLOCK_AHEAD_MINUTES, TYPICAL_MINUTES, isFinished, laneStepsOf, laneViewOf, passDone, phaseColor, phaseOf, phasesOf, runClockOf, withLivePasses } from './phases';
+import { CLOCK_AHEAD_MINUTES, laneViewOf, runClockOf } from './clockLane';
+import { TYPICAL_MINUTES, isFinished, passDone, phaseColor, phaseOf, phasesOf, withLivePasses } from './phases';
+import { STEP_COLUMN_COUNT, laneStepsOf } from './stepsLane';
 import fixture from './fixture.map.json';
 import type { AuditLane, AuditRun, LaneStep, LaneStepName, SkulkrMap } from './skulkrMap.types';
 
