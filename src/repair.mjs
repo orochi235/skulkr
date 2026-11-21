@@ -13,7 +13,8 @@ import { failureExcerpt, needsGui, verdictIn, verdictText, verifyOf } from './ve
 
 export const MAX_REPAIRS = 2;
 
-const patchesIn = (mbox) => (mbox && existsSync(mbox) ? (readFileSync(mbox, 'utf8').match(/^From [0-9a-f]{40} /gm) ?? []).length : 0);
+/** How many commits the mbox at `mbox` holds: none when there is no mbox. */
+export const patchesIn = (mbox) => (mbox && existsSync(mbox) ? (readFileSync(mbox, 'utf8').match(/^From [0-9a-f]{40} /gm) ?? []).length : 0);
 
 /** Puts the area's commits so far where a node job applies them from: `.skulkr/in/<area>/area.mbox`. */
 const stage = (ctx, id, mbox) => {

@@ -11,7 +11,7 @@ import { brief, fill, projectVars } from './brief.mjs';
 import { toCarry, writeCarried } from './carryBrief.mjs';
 import { dispatch } from './dispatch.mjs';
 import { CHECKS_IN, PROGRESS_IN, fixShell, jobDir, matchShell, progressSource, reviewShell, stoppedBeforeModel, timeoutOf } from './jobs.mjs';
-import { verifyAndRepair } from './repair.mjs';
+import { patchesIn, verifyAndRepair } from './repair.mjs';
 import { chapman } from './rounds.mjs';
 import { readIf } from './text.mjs';
 import { totals } from './usage.mjs';
@@ -19,7 +19,6 @@ import { verifyOf } from './verify.mjs';
 
 const round1 = (n) => Number(n.toFixed(1));
 const cents = (n) => Number(n.toFixed(2));
-const patchesIn = (mbox) => (existsSync(mbox) ? (readFileSync(mbox, 'utf8').match(/^From [0-9a-f]{40} /gm) ?? []).length : 0);
 
 const review = async (ctx, area, side) => {
   const to = jobDir(ctx.nightDir, area.id, side);
