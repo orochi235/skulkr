@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { resolveConfig } from './config.mjs';
-import { verifyAndRepair } from './repair.mjs';
+import { baselineKey, verifyAndRepair } from './repair.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -112,12 +112,19 @@ describe('verifyAndRepair', () => {
     const got = await verifyAndRepair(h.ctx, h.area, { mbox: join(h.fixDir, 'fix.mbox') }, h.fixDir);
     expect(got).toMatchObject({ ok: true, repairs: [], verify: { ok: true, baseline: ['a/store.pbt.test.ts'] } });
     expect(h.jobs.map((j) => [j.task, j.env?.VERIFY_EXTRA])).toEqual([['audit7-a-verify', 'a/store.pbt.test.ts']]);
+    expect(h.jobs[0]!.to).toBe(join(h.ctx.nightDir, 'jobs', 'a', `verify-baseline-${baselineKey(['a/store.pbt.test.ts'], false)}`));
     expect(h.said).toEqual(['verify a: passed (3 test files); 1 failing on the frozen tree too, set aside (a/store.pbt.test.ts)']);
     const other = join(h.ctx.nightDir, 'jobs', 'b', 'fix');
     write(other, { ...FAILING, 'fix.mbox': mbox(1) });
     const again = await verifyAndRepair(h.ctx, { id: 'b' }, { mbox: join(other, 'fix.mbox') }, other);
     expect(again.ok).toBe(true);
     expect(h.jobs).toHaveLength(1);
+  });
+
+  it("names a frozen-tree check by its files and GUI flag, whatever the order or which area asks", () => {
+    expect(baselineKey(['b.test.ts', 'a.test.ts'], false)).toBe(baselineKey(['a.test.ts', 'b.test.ts'], false));
+    expect(baselineKey(['a.test.ts'], false)).not.toBe(baselineKey(['b.test.ts'], false));
+    expect(baselineKey(['a.test.ts'], false)).not.toBe(baselineKey(['a.test.ts'], true));
   });
 
   it("repairs only an area's own failures, and tells the repair which failing files are the tree's", async () => {

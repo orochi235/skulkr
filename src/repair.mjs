@@ -3,6 +3,7 @@
  * GUI part in a job of its own where the changes need it, and, while the verdict is failing, hands the failing output
  * to a repair job on the same area's commits, up to {@link MAX_REPAIRS} times. Nothing here reads the fixer's report.
  */
+import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { brief, fill, projectVars } from './brief.mjs';
@@ -39,6 +40,9 @@ const verifyJob = async (ctx, area, mbox, { gui, label, extra }) => {
   return { ...verdictIn(to), dir: to, gui };
 };
 
+/** A short name for a frozen-tree check of `files` (in any order), `gui` or not. */
+export const baselineKey = (files, gui) => createHash('sha256').update(`${gui ? 'gui' : 'plain'}\n${[...files].sort().join('\n')}`).digest('hex').slice(0, 10);
+
 /**
  * Which of `verdict`'s failing test files fail on the frozen tree without any area's commits. Each file is checked
  * once a round, in a job of `area`'s that runs the same part of the verify step, and the answer kept on `ctx` for
@@ -51,7 +55,8 @@ export const baselineFailures = async (ctx, area, verdict) => {
   const key = (file) => `${verdict.gui ? 'gui' : 'plain'}\n${file}`;
   const unknown = files.filter((file) => !known.has(key(file)));
   if (unknown.length) {
-    const to = jobDir(ctx.nightDir, area.id, `verify-baseline-${known.size}${verdict.gui ? '-gui' : ''}`);
+    // Named by what it checks, so a resume reuses only a run over the same files.
+    const to = jobDir(ctx.nightDir, area.id, `verify-baseline-${baselineKey(unknown, verdict.gui)}${verdict.gui ? '-gui' : ''}`);
     const ran = dispatch(ctx, area, 'verify', {
       kind: 'test', expect: 'none', gui: Boolean(verdict.gui), shell: baselineShell(ctx.cfg, { gui: verdict.gui }), to,
       env: nodeEnv(ctx, unknown), task: ctx.cfg.names.task(ctx.round, area.id, 'verify'), logPath: `${to}.log`,
