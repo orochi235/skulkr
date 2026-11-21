@@ -45,6 +45,8 @@ export const verifyLines = (verify, { command = verify.command, probe = verify.g
 
 /** A test file's path in a line of runner output. */
 const TEST_PATH = /([\w@./-]+\.(?:test|spec)\.[cm]?[jt]sx?)\b/;
+/** Whether `path` is a test file's path, rather than a step's name or another file. */
+export const isTestPath = (path) => TEST_PATH.exec(path)?.[1] === path;
 
 /** vitest's file-level counts in `text`: its last `Test Files  1 failed | 2 passed (3)` line, or undefined. */
 export const fileCountsOf = (text) => {
@@ -59,6 +61,9 @@ export const fileCountsOf = (text) => {
 export const failedFilesIn = (text) =>
   [...new Set(stripAnsi(text).split('\n').filter((l) => /\bFAIL\b/.test(l)).flatMap((l) => TEST_PATH.exec(l)?.[1] ?? []))];
 
+/** Whether `text` holds vitest's report of errors outside any test file (`Unhandled Errors`, ` Errors  2 errors`). */
+export const unhandledIn = (text) => /Unhandled Errors?\b|^\s*Errors\s+\d+ errors?\b/m.test(stripAnsi(text));
+
 /**
  * The verdict of one verify run from its exit status and log: `{ ok, exit, counts, failedFiles, why, timedOut? }`. It
  * passes only on exit 0 with no failed file counted; a run that left no exit status is `{ ok: false, unrun: true }`.
@@ -72,7 +77,7 @@ export const verdictOf = (exitText, log) => {
   const why = ok ? '' : exit === TIMED_OUT ? 'timed out'
     : counts?.failed ? `${counts.failed} of ${counts.total} test files failed`
       : `exited ${exit}`;
-  return { ok, exit, counts, failedFiles, why, ...(exit === TIMED_OUT ? { timedOut: true } : {}) };
+  return { ok, exit, counts, failedFiles, why, ...(exit === TIMED_OUT ? { timedOut: true } : {}), ...(unhandledIn(log) ? { unhandled: true } : {}) };
 };
 
 /** The verdict a job left in `dir`, with its log and the files it checked. */

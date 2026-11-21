@@ -1,8 +1,8 @@
 /** The round's written record: `<record.dir>/round-<N>/README.md` and its row in the config's ledger, if it has one. */
+import { usd } from './usage.mjs';
 
 const num = (n, width = 5) => (n === undefined ? '-' : n.toFixed(1)).padStart(width);
 const mtok = (n) => `${(n / 1e6).toFixed(2)}M`;
-const usd = (n) => `$${n.toFixed(2)}`;
 const ceiling = (s) => (s.budgetHit?.length ? `; ${s.budgetHit.join(', ')} stopped at its dollar ceiling` : '');
 const unrun = (s) => (s.incomplete?.length ? `; reviewer ${s.incomplete.join(' and ')} never ran or never finished its report, so no estimate` : '');
 

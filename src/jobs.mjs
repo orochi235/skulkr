@@ -11,6 +11,7 @@ import { verifyLines, verifyOf } from './verify.mjs';
 
 export const BUSY_WAIT_MS = 30_000;
 
+const readIf = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : '');
 const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 
 /** The progress filter, copied into each frozen tree's `.skulkr/in` so a node runs the one this run ships. */
@@ -52,15 +53,31 @@ export const reviewShell = (cfg, area, budgetUsd) =>
 export const matchShell = (cfg, area, budgetUsd) =>
   [fresh, claudeLine(cfg, 'match', `${JOB_IN}/${area}/match.md`, budgetUsd, ['--disallowedTools', q('Bash,Edit,Write,Task,Agent'), ...model(cfg.claude.models.match), ...effort(cfg.claude.effort?.match)])].join(' && ');
 
-/** Installs when the lockfile changed since the tree's last install, or nothing when the config names no install. */
-const installLines = (cfg) => {
+/**
+ * Files a job writes under its output when it stops before the model runs, each holding why: the synced tree is not
+ * the frozen one, or the install failed.
+ */
+export const STOPPED_BEFORE_MODEL = ['tree-mismatch', 'install-failed'];
+
+/** Why the job in `dir` stopped before its model ran, or '' when it did not. */
+export const stoppedBeforeModel = (dir) => STOPPED_BEFORE_MODEL.map((f) => readIf(join(dir, f)).trim()).filter(Boolean).join('; ');
+
+/**
+ * Installs when the lockfile changed since the tree's last install, or nothing when the config names no install. A
+ * failed install stops the job before the model runs.
+ */
+export const installLines = (cfg) => {
   const install = cfg.setup.install;
   if (!install?.command) return [];
-  if (!install.lockfile) return [`${install.command} > ${JOB_OUT}/install.log 2>&1`];
+  const run = `if ! ${install.command} > ${JOB_OUT}/install.log 2>&1; then echo ${q(`install failed: ${install.command}; see install.log`)} > ${JOB_OUT}/install-failed; exit 0; fi`;
+  if (!install.lockfile) return [run];
   const marker = install.marker ?? 'node_modules/.skulkr-lock';
   return [
     `LOCK=$(shasum ${q(install.lockfile)} | cut -d" " -f1)`,
-    `if [ "$(cat ${marker} 2>/dev/null)" != "$LOCK" ]; then ${install.command} > ${JOB_OUT}/npm-ci.log 2>&1 && echo "$LOCK" > ${marker}; fi`,
+    `if [ "$(cat ${marker} 2>/dev/null)" != "$LOCK" ]; then`,
+    `  ${run}`,
+    `  echo "$LOCK" > ${marker}`,
+    'fi',
   ];
 };
 

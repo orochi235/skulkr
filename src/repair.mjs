@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { brief, fill, projectVars } from './brief.mjs';
 import { JOB_IN } from './config.mjs';
 import { dispatch } from './dispatch.mjs';
-import { AREA_MBOX, baselineShell, jobDir, repairShell, timeoutOf, verifyShell } from './jobs.mjs';
+import { AREA_MBOX, baselineShell, jobDir, repairShell, stoppedBeforeModel, timeoutOf, verifyShell } from './jobs.mjs';
 import { failureExcerpt, needsGui, verdictIn, verdictText, verifyOf } from './verify.mjs';
 
 export const MAX_REPAIRS = 2;
@@ -56,8 +56,11 @@ export const baselineFailures = async (ctx, area, verdict) => {
       env: nodeEnv(ctx, unknown), task: ctx.cfg.names.task(ctx.round, area.id, 'verify'), logPath: `${to}.log`,
       timeoutMin: timeoutOf(ctx.cfg, { model: false }),
       about: `Checks whether the tests that failed on audit round ${ctx.round}'s fixes to ${area.id} fail on the frozen tree without them.`,
-    }).then(() => verdictIn(to));
-    // A baseline run that gave no file-level answer clears nothing: those files stay the area's.
+    }).then(() => verdictIn(to), (error) => {
+      ctx.say(`verify ${area.id}: the frozen-tree check failed (${error.message ?? error}); its files stay the area's`);
+      return { unrun: true };
+    });
+    // A baseline run that gave no file-level answer, or none at all, clears nothing: those files stay the area's.
     for (const file of unknown) known.set(key(file), ran.then((v) => !v.unrun && v.counts !== undefined && v.failedFiles.includes(file)));
   }
   const fails = await Promise.all(files.map((file) => known.get(key(file))));
@@ -65,15 +68,19 @@ export const baselineFailures = async (ctx, area, verdict) => {
 };
 
 /**
- * `verdict` with the failures the frozen tree already has set aside: passing when every failing file is one of
- * them, and naming them in `baseline` either way.
+ * `verdict` with the failures the frozen tree already has set aside, naming them in `baseline`: passing only when
+ * every failing file is one of them and the failing files account for the whole failure, so a non-zero exit from
+ * an unhandled error or a command after the tests still fails.
  */
 export const judged = async (ctx, area, verdict) => {
   if (verdict.ok || verdict.timedOut || verdict.unrun) return verdict;
   const baseline = await baselineFailures(ctx, area, verdict);
   if (!baseline.length) return verdict;
   const own = verdict.failedFiles.filter((file) => !baseline.includes(file));
-  return own.length ? { ...verdict, failedFiles: own, baseline } : { ...verdict, ok: true, failedFiles: [], baseline };
+  if (own.length) return { ...verdict, failedFiles: own, baseline };
+  const accounted = verdict.counts?.failed === verdict.failedFiles.length && !verdict.unhandled;
+  if (accounted) return { ...verdict, ok: true, failedFiles: [], baseline };
+  return { ...verdict, failedFiles: [], baseline, why: verdict.unhandled ? 'unhandled errors outside the test files' : `exited ${verdict.exit} beyond the failing test files` };
 };
 
 /**
@@ -116,6 +123,8 @@ export const repairJob = async (ctx, area, { mbox, log, label, attempt, extra = 
     task: ctx.cfg.names.task(ctx.round, area.id, 'repair'), logPath: join(to, '..', `repair-${label}.log`), timeoutMin: timeoutOf(ctx.cfg),
     about: `Repairs audit round ${ctx.round}'s fixes to area ${area.id}, whose tests fail, without weakening the tests.`,
   });
+  const stopped = stoppedBeforeModel(to);
+  if (stopped) ctx.say(`repair ${area.id}: ${stopped}`);
   const next = join(to, 'fix.mbox');
   const total = patchesIn(next);
   const had = patchesIn(mbox);

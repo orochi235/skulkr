@@ -275,6 +275,9 @@ describe('gate outcomes and reruns', () => {
     expect(rerunOf(49, jobs, cfg.gate, cfg.names)).toEqual({ tests: { done: 4, total: 20 }, build: null });
     expect(gateNodesOf(49, jobs, cfg.gate, cfg.names)).toEqual({ tests: 'studio + teitou', build: 'studio' });
     expect(rerunOf(47, jobs, cfg.gate, cfg.names)).toBeNull();
+    // Another tenant's names would match no job; a caller that leaves them out fails rather than getting the defaults.
+    expect(() => rerunOf(49, jobs, cfg.gate, undefined)).toThrow();
+    expect(() => gateNodesOf(49, jobs, cfg.gate, undefined)).toThrow();
   });
 
   it('finds each task\'s first counter in onto top\'s answer', () => {

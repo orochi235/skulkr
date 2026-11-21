@@ -7,12 +7,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { applyFix, catchUpWithMain, commitRecord, fastForwardMain, makeBatch, removeWorktree, runGate } from './batch.mjs';
-import { TEST_PATH, capstoneText, repairCapstone } from './capstone.mjs';
+import { capstoneText, repairCapstone } from './capstone.mjs';
 import { failedWhereIn } from './gate.mjs';
 import { fleetDir, waitForFleet } from './fleet.mjs';
 import { leftOutIn, leftOutWhy, recordLeftOut, retryable } from './leftOut.mjs';
 import { waitForLease } from './lease.mjs';
 import { mergeLock } from './runs.mjs';
+import { isTestPath } from './verify.mjs';
 /** How many times a green batch merges a moved main in and tests again before leaving the fast-forward to fail. */
 const MAIN_CATCH_UPS = 2;
 
@@ -110,10 +111,11 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
  * caused them, the batch is rebuilt from the repaired ones, and the gate runs once more. Still red, it lands anyway
  * where `baseline(files)` says every failure left is a test file that fails on the frozen commit too: `main` has
  * those failures already, so landing leaves it no worse. A branch left out because it would not merge is recorded
- * (`leftOut.mjs`), and the next round's batch tries it again after its own branches.
+ * (`leftOut.mjs`), and the next round's batch tries it again after its own branches. `onLanded({ tip, areas })` hears
+ * that `main` fast-forwarded to `tip` with the round's `areas` in it.
  */
-export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, baseline }) => {
-  const idOf = (branch) => branch.replace(cfg.names.area(round, ''), '');
+export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, baseline, onLanded = /** @type {(landed: { tip: string, areas: string[] }) => void} */ (() => {}) }) => {
+  const idOf = cfg.names.idOf;
   const fixCommits = new Map(results.map((a) => [a.id, a.fixCommits]));
   const main = cfg.git.main;
   const earlier = new Map(retryable(git, leftOutIn(cfg.state), main).filter((e) => !branches.includes(e.branch)).map((e) => [e.branch, e]));
@@ -178,12 +180,13 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
         if (area) area.fixCommits = [];
         outcomes[idOf(branch)] = `\`${branch}\`, left out: its capstone failures still failed after a repair`;
       }
-      if (!cycle.repaired.length && !cycle.dropped.length) break;
-      landing = landing.filter((b) => !cycle.dropped.includes(b));
+      const out = [...cycle.dropped, ...cycle.unrepairable];
+      if (!cycle.repaired.length && !out.length) break;
+      landing = landing.filter((b) => !out.includes(b));
       ({ batch, tip: recorded } = build());
-      say(`capstone: rebuilt ${batch.name} with ${cycle.repaired.length} repaired and ${cycle.dropped.length} left out; testing again`);
+      say(`capstone: rebuilt ${batch.name} with ${cycle.repaired.length} repaired and ${out.length} left out; testing again`);
     }
-    const retested = cycle && (cycle.repaired.length || cycle.dropped.length) ? !tested.report : undefined;
+    const retested = cycle && (cycle.repaired.length || cycle.dropped.length || cycle.unrepairable.length) ? !tested.report : undefined;
     let tried = earlier.size ? `; retried ${earlier.size} branches left out of earlier rounds, ${retried.merged} merged and ${retried.out} still left out` : '';
     if (cycle) tried += `; ${capstoneText(cycle, idOf, retested)}`;
     const over = tested.report && baseline ? await alreadyFailing(cfg, tested.log, baseline) : null;
@@ -195,6 +198,7 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     if (!merge) return `green; --no-merge, so ${cfg.git.main} is untouched and ${batch.name} and its branches are kept${tried}`;
     const result = fastForwardMain(root, tested.tip, cfg.git.main);
     if (result.startsWith(`${cfg.git.main} fast-forwarded`)) {
+      onLanded({ tip: tested.tip, areas: batch.merged.filter((b) => !earlier.has(b)).map(idOf) });
       // Another round may have landed and deleted a branch both took from the left-out record.
       for (const b of [...batch.merged, batch.name]) tryDelete(git, b);
     }
@@ -217,7 +221,7 @@ const tryDelete = (git, branch) => {
  */
 const alreadyFailing = async (cfg, logPath, baseline) => {
   const where = failedWhereIn(readFileSync(logPath, 'utf8'), cfg.gate);
-  if (!where.length || where.some((w) => !TEST_PATH.test(w))) return null;
+  if (!where.length || where.some((w) => !isTestPath(w))) return null;
   const old = await baseline(where);
   return where.every((w) => old.includes(w)) ? where : null;
 };

@@ -137,7 +137,7 @@ Each step prints one line as it completes (`review 3/16 …`).
 | sweep | Only with `--sweep` and a configured sweep: one job at the frozen commit beside the reviews; its findings go to one fixer. |
 | review | Per area, two reviewer jobs from the frozen tree with the reviewer brief and the area's file list. Reviewers may read, search, and run `git log/show/diff/blame`, and write only `.skulkr/out/`. Each lists the files it read; its stream goes through `src/progress.mjs`, so the runner shows how many of the area's files it has opened. |
 | match | One job per area pairs the two lists (the matcher brief); the pipeline keeps only one-to-one pairs and computes the estimate. |
-| fix | Per area with findings, one fixer job, permissions bypassed, in the node's synced tree. It first commits the synced tree and checks it hashes to the frozen commit's tree, installs if the lockfile changed, then hands back its commits as an mbox. |
+| fix | Per area with findings, one fixer job, permissions bypassed, in the node's synced tree. It first commits the synced tree and checks it hashes to the frozen commit's tree, installs if the lockfile changed (an install that fails stops the job before the model runs, leaving `install.log`), then hands back its commits as an mbox. |
 | verify | Per fixer with commits, the config's `checks.verify` over the files they changed, run by skulkr, never read from the fixer's report; see "Verify and repair". |
 | repair | Per area whose verify fails, up to two repair jobs on its commits, each verified again; an area still failing is left out of the batch. |
 | patch | Each mbox is applied with `git am` onto `audit<N>-<area>` at the frozen commit. One that does not apply is reported and left out. |
@@ -158,7 +158,7 @@ file is regenerated, and the ledger, when the config names one, gets a row.
 | `--no-merge` | | leave `main` alone even when the batch is green |
 | `--sweep` | | run the configured sweep too |
 | `--fix-only [a,b]` | | a fix-only round for these areas, or every area with open findings; see "Carried findings" |
-| `--resume N` | | pick round N back up, reusing every job whose result came home |
+| `--resume N` | | pick round N back up, reusing every job whose result came home; it stops starting areas at the first `schedule.stopAt` after the resume. Under the plan lock, it leaves out the areas a live run holds and those the round already landed, which its status and `summary.json` name in `landed` (`main`'s tip and the areas) once `main` fast-forwards |
 | `--cap-usd N` | `budget.capUsd` | list-price dollars the run may spend |
 | `--budget-review`, `--budget-match`, `--budget-fix` | `budget.*` | each job's `--max-budget-usd` |
 
@@ -209,9 +209,9 @@ reviews already running, fixers, and verify steps go on.
 **Limits.** Each job's model is stopped at `claude.timeoutMin` and the runner stops the job ten minutes later, so
 what it wrote still comes home. A run starts no new area after `schedule.stopAt`, nor when the areas running plus
 one more, each expected to cost the mean of this run's finished areas (`budget.areaGuessUsd` before any has),
-would pass the dollar cap. An area whose reviewers ran always gets its matcher and fixer. Where skulkr picks
+would pass the dollar cap, nor once a stop is requested; a fix-only round's fixers start under the same checks. An area whose reviewers ran always gets its matcher and fixer. Where skulkr picks
 nodes (a pinned run, or a runner that does not place jobs), a node the runner reports unavailable is skipped, and a
-dispatch a node refuses moves to another node and keeps that one out for `nodes.refusedCooldownMin`.
+dispatch a node refuses moves to another node and keeps that one out for `nodes.refusedCooldownMin`. Under a placing runner a refused job is launched again each minute, up to 120 times; a refusal after a stop request is not retried.
 `<state>/limits.json` (`{ "review": n, "fix": n }`) changes the slots per node, or under a placing runner the jobs at
 once, for runs already going.
 
@@ -224,9 +224,9 @@ with `checks.verify` set, it runs the project's verify step itself on what each 
 |---|---|
 | `command` | Runs at the end of the fixer's own job, after the model exits, on the committed tree (uncommitted edits are dropped first). `{files}` is the files the fixer's commits changed; `{related}` is the same as one `--related=<file>` each. Bounded by `timeoutMin` (default 20). |
 | `gui` | `{ probe, command }` for tests that need a node's GUI session. `probe` runs beside `command` and prints the test files the GUI part would run, one a line; when it lists one, or fails, `command` runs in an `onto do --gui` job of its own on the area's commits. With no `probe`, the GUI part runs for any change. |
-| verdict | The command's exit status and vitest's `Test Files` counts: it passes only on exit 0 with no file failed, so a file whose setup or teardown throws fails even when every test in it passes. |
+| verdict | The command's exit status and vitest's `Test Files` counts: it passes only on exit 0 with no file failed, so a file whose setup or teardown throws fails even when every test in it passes. A failing file that fails on the frozen commit too is set aside as `baseline`; the verdict passes only when such files are all that failed and they account for the whole failure, so an unhandled error or a non-zero exit beyond the counted files still fails. |
 | repair | A failing verdict goes, verbatim, to a repair job (`briefs/repair.md`, or the config's `briefs.repair`) on the area's commits, told to make it pass without weakening a test. Its commits are verified the same way. After two repairs that still fail, the area is left out of the batch, as a conflicting branch is. A run that timed out is not repaired: the area lands, and the capstone checks it. |
-| capstone | A red gate's `fleet-fail:` files are laid at the area branches whose commits changed each file, else changed a file it reaches by relative imports, else changed a workspace package it imports; a file none reaches is unattributed. Each such branch gets one repair job given the gate's lines about its files, which its verify step checks beside its own changes. A failed step (a check, not a test file) goes to the branches that changed a path the config's `gate.blame(logText, step)` reads from its output (weasel's reads the packages `check:unnameable` names); without one it is unattributed. Repaired branches are patched again, the rest are left out, the batch is rebuilt, and the gate runs once more. One cycle per round. |
+| capstone | A red gate's `fleet-fail:` files are laid at the area branches whose commits changed each file, else changed a file it reaches by relative imports, else changed a workspace package it imports; a file none reaches is unattributed. Each such branch gets one repair job given the gate's lines about its files, which its verify step checks beside its own changes. A failed step (a check, not a test file) goes to the branches that changed a path the config's `gate.blame(logText, step)` reads from its output (weasel's reads the packages `check:unnameable` names); without one it is unattributed. Repaired branches are patched again, the rest are left out, the batch is rebuilt, and the gate runs once more. A branch an earlier round left out that this batch retried gets no repair, its commits being that round's: it is left out again, as not repairable this round. One cycle per round. |
 | old failures | A gate still red after the capstone lands anyway when every failure left is a test file that fails on the frozen commit too, checked as the verify step's baseline is: `main` has those failures already, so landing leaves it no worse, and the report says it landed over them. A failed step is never discounted. |
 
 The night log prints a `verify` line per area and a `repair` line per repair; each area's `area.json` and the run's
@@ -441,7 +441,7 @@ LaunchAgent, so install from a shell where `node` and `onto` resolve, and set ei
 
 | What | Where | Bound |
 |---|---|---|
-| A run's log, job outputs, and runner logs | `<state>/nights/<start>-round<N>/` | the newest `keepNights`; older ones are deleted when a run starts |
+| A run's log, job outputs, and runner logs | `<state>/nights/<start>-round<N>/` | the newest `keepNights`, and any a run's status or summary still names; older ones are deleted when a run starts |
 | A run's claim, status, stop request, and summary | `<state>/runs/<N>/`: the directory is the claim; `status.json` (with its pid) while it runs, `stop` when asked, `summary.json` when it ends | the newest `keepNights`, never a live one nor one started in the last day; pruned when a run starts |
 | Each commit's lines changed, for `staleLines` and calibration's `lines` | `~/.cache/skulkr/<name>/churn.json` | only the commits after the oldest pass asked about: any area's last pass, or the first of a pair of passes; rewritten without the rest on each build that adds one, and dropped when the partition's `roots`, `extensions` or `exclude` change |
 | Node tree leases | `<state>/slots/<node>/<tree>` | deleted as each job ends; one whose pid is dead is taken back |

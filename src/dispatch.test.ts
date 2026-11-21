@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { cameHome, earlierReview } from './dispatch.mjs';
+import { cameHome, dispatch, earlierReview } from './dispatch.mjs';
 
 const dirs: string[] = [];
 const job = (files: Record<string, string>) => {
@@ -34,6 +34,26 @@ describe('cameHome', () => {
   });
   it('runs again a review that never reached its done line', () => {
     expect(cameHome(job({ exit: '0', 'claude.json': ok, 'findings.md': '1. a finding\n' }), 'review-A')).toBeUndefined();
+  });
+});
+
+describe('dispatch', () => {
+  it("stops relaunching a job a placing runner keeps refusing once the run's stop is requested", async () => {
+    const said: string[] = [];
+    let stopped = false;
+    const ctx = {
+      cfg: {}, frozen: '/nowhere', base: 'b', say: (l: string) => said.push(l), usage: () => {}, refuse: () => {},
+      stopped: () => stopped,
+      acquire: async () => ({ node: 'placed', placed: true, release: () => {} }),
+      runner: { run: async () => {
+        stopped = true;
+        return { status: 1, refused: true };
+      } },
+    };
+    const spec = { ...job({}), logPath: join(job({}).to, 'v.log'), kind: 'test', shell: 'true', task: 't', timeoutMin: 5 };
+    const got = await dispatch(ctx, { id: 'a' }, 'verify', spec);
+    expect(got).toMatchObject({ launched: false });
+    expect(said).toEqual(['verify a refused by placed; stop requested, so not launched']);
   });
 });
 
