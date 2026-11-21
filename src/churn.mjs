@@ -1,12 +1,14 @@
 /**
- * How many lines of an area's files changed since its last pass: the changes of every commit after the pass's commit
- * that is not one of the pass's own fixes, counted as `git log --numstat` counts them (added plus deleted). Merges are
- * left out, so a change counts once, in the commit that made it.
+ * What changed in an area's files since its last pass: which of them, and how many lines, over every commit after the
+ * pass's commit that is not one of the pass's own fixes, counted as `git log --numstat` counts them (added plus
+ * deleted; a mode-only change touches a file with 0 lines). Merges are left out, so a change counts once, in the commit
+ * that made it.
  *
  * A commit's counts never change, so they are kept in `~/.cache/skulkr/<name>/churn.json` (outside the project's state,
  * which another service may own) and git is asked only for commits not there yet; the file holds only commits after
- * the oldest pass asked about, rewritten on each build that adds one. The counts hold only the paths `keep` accepted,
- * so the file carries the caller's `cacheKey` for that filter and is dropped when it differs.
+ * the oldest pass asked about, rewritten on each build that adds one, unless the caller asks it not to `prune`. The
+ * counts hold only the paths `keep` accepted, so the file carries the caller's `cacheKey` for that filter and is
+ * dropped when it differs.
  */
 import { execFileSync } from 'node:child_process';
 import { homedir } from 'node:os';
@@ -78,16 +80,19 @@ const readCache = (path, key) => {
 const CHUNK = 400;
 
 /**
- * Lines changed since each entry's pass: `entries` are `{ id, files, commit, exclude }` (the area's files now, its
+ * What changed since each entry's pass: `entries` are `{ id, files, commit, exclude }` (the area's files now, its
  * last pass's commit, and that pass's fix commits). `git` runs git in the project; `keep(path)` says which paths are
- * worth counting, and `cacheKey` names that filter; `cacheFile` holds the counts between builds, or null for none. Answers a Map id → lines; an entry
- * whose commit git does not know counts 0.
+ * worth counting, and `cacheKey` names that filter; `cacheFile` holds the counts between builds, or null for none, and
+ * `prune: false` keeps every commit already there. Answers `{ lines, touched }`, Maps by id: the lines changed, and the
+ * files changed, in the order of `files`. An entry whose commit git does not know counts 0 lines and touched null.
  */
-/** @param {(...args: string[]) => string} git @param {{ id: string, files: string[], commit: string, exclude?: string[] }[]} entries @param {{ keep?: (path: string) => boolean, cacheKey?: string, cacheFile?: string | null, root?: string | null }} [opts] */
-export const churnSince = (git, entries, { keep = () => true, cacheKey = '', cacheFile = null, root = null } = {}) => {
+/** @param {(...args: string[]) => string} git @param {{ id: string, files: string[], commit?: string, exclude?: string[] }[]} entries @param {{ keep?: (path: string) => boolean, cacheKey?: string, cacheFile?: string | null, root?: string | null, prune?: boolean }} [opts] @returns {{ lines: Map<string, number>, touched: Map<string, string[] | null> }} */
+export const churnSince = (git, entries, { keep = () => true, cacheKey = '', cacheFile = null, root = null, prune = true } = {}) => {
   const out = new Map(entries.map((e) => [e.id, 0]));
+  const touchedOut = new Map(entries.map((e) => [e.id, null]));
+  const result = { lines: out, touched: touchedOut };
   const asked = [...new Set(entries.map((e) => e.commit).filter(Boolean))];
-  if (!asked.length) return out;
+  if (!asked.length) return result;
   // Every commit after any of them, with its parents, is one walk from their common ancestor. Only when git cannot
   // find that, because a pass names a commit it lacks, is each one checked.
   let known = asked;
@@ -96,7 +101,7 @@ export const churnSince = (git, entries, { keep = () => true, cacheKey = '', cac
     base = asked.length === 1 ? git('rev-parse', '--verify', `${asked[0]}^{commit}`) : git('merge-base', '--octopus', ...asked);
   } catch {
     known = root ? commitsKnown(root, asked) : [];
-    if (!known.length) return out;
+    if (!known.length) return result;
     base = known.length === 1 ? known[0] : git('merge-base', '--octopus', ...known);
   }
   const graph = parentsOf(git('log', '--topo-order', '--format=%H %P', `${base}..HEAD`));
@@ -109,7 +114,9 @@ export const churnSince = (git, entries, { keep = () => true, cacheKey = '', cac
   for (let i = 0; i < missing.length; i += CHUNK) {
     Object.assign(cache, parseNumstat(git('show', '--numstat', '--no-renames', '--format=@%H', ...missing.slice(i, i + CHUNK)), keep));
   }
-  if (cacheFile && (missing.length || Object.keys(cache).length > wanted.length)) {
+  if (cacheFile && !prune && missing.length) {
+    writeJson(cacheFile, { key: cacheKey, commits: cache });
+  } else if (cacheFile && prune && (missing.length || Object.keys(cache).length > wanted.length)) {
     const kept = Object.fromEntries(wanted.map((sha) => [sha, cache[sha] ?? {}]));
     writeJson(cacheFile, { key: cacheKey, commits: kept });
   }
@@ -129,15 +136,26 @@ export const churnSince = (git, entries, { keep = () => true, cacheKey = '', cac
   for (const e of entries) {
     const k = index.get(e.commit);
     if (k === undefined) continue;
+    const skip = new Set(e.exclude ?? []);
     let lines = 0;
-    for (const f of e.files) for (const [sha, n] of touches.get(f) ?? []) if (later(sha, k)) lines += n;
-    for (const sha of new Set(e.exclude ?? [])) {
+    const changed = [];
+    for (const f of e.files) {
+      let hit = false;
+      for (const [sha, n] of touches.get(f) ?? []) {
+        if (!later(sha, k)) continue;
+        lines += n;
+        if (!skip.has(sha)) hit = true;
+      }
+      if (hit) changed.push(f);
+    }
+    for (const sha of skip) {
       if (!graph.has(sha) || merges.has(sha) || !later(sha, k)) continue;
       for (const f of e.files) lines -= cache[sha]?.[f] ?? 0;
     }
     out.set(e.id, lines);
+    touchedOut.set(e.id, changed);
   }
-  return out;
+  return result;
 };
 
 /** Which of `shas` the repository at `root` holds as commits, asked in one `git cat-file --batch-check`. */

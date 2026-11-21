@@ -11,7 +11,7 @@ import { planFixOnly } from './fixOnly.mjs';
 import { waitForLease } from './lease.mjs';
 import { partitionAt } from './partition.mjs';
 import { recordsFor } from './recordFiles.mjs';
-import { areaStats, areasInFlightFor, gitTouched, lastPassIn, nextRound, passesIn, pickAreas, scaledOf } from './rounds.mjs';
+import { areaStats, areasInFlightFor, lastPassIn, nextRound, passesIn, pickAreas, scaledOf } from './rounds.mjs';
 import { claimRound, claimedRounds, liveRuns, planLock, writeStatus } from './runs.mjs';
 import { usd } from './usage.mjs';
 
@@ -32,7 +32,7 @@ export const plan = (cfg, root, args) => {
   const round = nextRound({ roundDirs, hardening, branches, claimed: claimedRounds(cfg.state), roundIn: cfg.names.roundIn });
   const areas = partitionAt(cfg, root, commit);
   const records = recordsFor(cfg, git, root);
-  const { history: passes, covered, staleLines } = areaStats(cfg, git, areas, passesIn(cfg, git, root, records), root);
+  const { history: passes, covered, staleLines, touched } = areaStats(cfg, git, areas, passesIn(cfg, git, root, records), root);
   const running = liveRuns(cfg.state);
   const held = new Set(running.flatMap((r) => r.areas ?? []));
   const byId = new Map(areas.map((a) => [a.id, a]));
@@ -51,7 +51,7 @@ export const plan = (cfg, root, args) => {
   const picked = args.only
     ? args.only.slice(0, args.areas)
     : pickAreas({
-      areas, passes, covered, staleLines, touched: gitTouched(git), count: args.areas,
+      areas, passes, covered, staleLines, touched, count: args.areas,
       inFlight: new Set([...inFlight, ...held]),
     }).picked;
   return { commit, round, picked: picked.map((id) => byId.get(id)), passes, staleLines, running, open };

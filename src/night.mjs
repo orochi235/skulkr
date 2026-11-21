@@ -21,7 +21,7 @@ import { createSlots } from './slots.mjs';
 import { batchAndTest, patchAreas, patchSweep } from './land.mjs';
 import { begin, localDate, plan, printPlan } from './plan.mjs';
 import { resume } from './resume.mjs';
-import { lastPassIn, scaledOf } from './rounds.mjs';
+import { changedSince, lastPassIn, scaledOf } from './rounds.mjs';
 import { sleep } from './after.mjs';
 import { readJson } from './json.mjs';
 import { claimedRounds, clearStatus, nightsAt, pruneRuns, runDir, stopRequested, writeStatus, writeSummary } from './runs.mjs';
@@ -49,20 +49,6 @@ export const pruneNights = (cfg) => {
   }
 };
 
-/** The files of `files` some commit after `from`, other than `exclude`, changed. */
-const changedSince = (git, files, from, exclude) => {
-  if (!from || files.length === 0) return [];
-  const skip = new Set(exclude);
-  const out = git('log', '--no-merges', '--format=@%H', '--name-only', `${from}..HEAD`, '--', ...files);
-  const changed = new Set();
-  let keep = false;
-  for (const line of out.split('\n')) {
-    if (line.startsWith('@')) keep = !skip.has(line.slice(1));
-    else if (line && keep) changed.add(line);
-  }
-  return [...changed];
-};
-
 /** Each picked area's reviews, matcher and fixer, started as `startAreas` admits them; resolves when all finish. */
 const reviewAreas = ({ ctx, git, picked, passes, open, args, status, deadline, results }) => startAreas({
   ctx, picked, args, status, deadline, results, maxAreas: () => areasAtOnce(ctx.cfg, args, 'review', 2),
@@ -70,7 +56,7 @@ const reviewAreas = ({ ctx, git, picked, passes, open, args, status, deadline, r
     const last = lastPassIn(passes.get(area.id));
     const previous = last && { ...last, ...scaledOf(last) };
     const carried = open?.get(area.id) ?? [];
-    return runArea(ctx, area, { previous, carried, changedSince: changedSince(git, area.files, previous?.commit, previous?.fixCommits ?? []) });
+    return runArea(ctx, area, { previous, carried, changedSince: changedSince(ctx.cfg, git, ctx.root, area.files, previous?.commit, previous?.fixCommits ?? []) });
   },
 });
 

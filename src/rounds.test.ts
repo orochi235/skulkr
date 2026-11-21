@@ -249,10 +249,14 @@ describe('areaStats', () => {
         { round: 2, id: 'a', a: 1, b: 1, m: 1, distinct: 1, files: ['a.ts'], commit: second, fixCommits: [] },
       ]]]);
       const cfg = { name: 'stats-test', partition: { isSource: () => true } };
-      const { staleLines, pairLines } = areaStats(cfg, gitIn(root), [{ id: 'a', files: ['a.ts'] }], raw, root);
+      const { staleLines, pairLines, touched } = areaStats(cfg, gitIn(root), [{ id: 'a', files: ['a.ts'] }], raw, root);
       // From the first pass: 2 deleted and 4 added by the second's commit; the fix's 5 lines are left out.
       expect(Object.fromEntries(pairLines)).toEqual({ 'a\n1': 6 });
       expect(Object.fromEntries(staleLines)).toEqual({ a: 5 });
+      // isSettled asks whether anything but the two passes' fixes touched its files since the first: the second's
+      // commit did. It is answered from the same walk, so a range the walk did not take is refused.
+      expect(touched(['a.ts'], first, [fix])).toBe(true);
+      expect(() => touched(['a.ts'], second, [])).toThrow(/did not walk/);
     } finally {
       process.env.HOME = home;
     }

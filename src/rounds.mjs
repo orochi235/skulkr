@@ -217,12 +217,23 @@ const sameFiles = (a, b) => {
  * `from` and not in `exclude` changed any of `files`.
  */
 export const isSettled = (area, passes, touched) => {
-  const rounds = coveringRounds(passes);
-  if (rounds.length < 2) return false;
-  const [first, last] = rounds.slice(-2).map((r) => combinedOf(r.passes));
+  const quiet = settlingOf(passes);
+  if (!quiet) return false;
+  const { first, last, from, exclude } = quiet;
   if (first.distinct > QUIET_PASS || last.distinct > QUIET_PASS) return false;
   if (!sameFiles(first.files, area.files) || !sameFiles(last.files, area.files)) return false;
-  return !touched(area.files, first.commit, [...(first.fixCommits ?? []), ...(last.fixCommits ?? [])]);
+  return !touched(area.files, from, exclude);
+};
+
+/**
+ * The two latest covering rounds `isSettled` weighs, each `combinedOf` its passes, with the range it asks `touched`
+ * about: from the first's commit, both rounds' fixes aside. Undefined for an area with fewer than two.
+ */
+export const settlingOf = (passes) => {
+  const rounds = coveringRounds(passes);
+  if (rounds.length < 2) return undefined;
+  const [first, last] = rounds.slice(-2).map((r) => combinedOf(r.passes));
+  return { first, last, from: first.commit, exclude: [...(first.fixCommits ?? []), ...(last.fixCommits ?? [])] };
 };
 
 /**
@@ -274,33 +285,45 @@ export const pickAreas = ({ areas, passes, touched, count, inFlight = new Set(),
   return { picked: [...fresh, ...seen.map((s) => s.id)].slice(0, count), settled };
 };
 
-/** A `touched` for `isSettled` that asks git. */
-export const gitTouched = (git) => (files, from, exclude) => {
-  if (files.length === 0) return false;
-  let out;
-  try {
-    out = git('log', '--no-merges', '--format=%H', `${from}..HEAD`, '--', ...files);
-  } catch {
-    return true;
-  }
-  const skip = new Set(exclude);
-  return out.split('\n').some((sha) => sha && !skip.has(sha));
+/** What `churnSince` takes for `cfg`'s project at `root`: its source filter, and the cache kept under it. */
+export const churnOptionsFor = (cfg, root) => ({ keep: cfg.partition.isSource, cacheKey: cfg.partition.sourceKey, cacheFile: churnCacheOf(cfg.name), root });
+
+/**
+ * The files of `files` some commit after `from`, other than `exclude`, changed (`churnSince`'s `touched`), asked of
+ * `cfg`'s project at `root` now. Leaves the churn cache's older commits in place. Throws when git does not know `from`.
+ */
+export const changedSince = (cfg, git, root, files, from, exclude) => {
+  if (!from || files.length === 0) return [];
+  const { touched } = churnSince(git, [{ id: 'asked', files, commit: from, exclude }], { ...churnOptionsFor(cfg, root), prune: false });
+  const changed = touched.get('asked');
+  if (!changed) throw new Error(`git does not know ${from}, the commit of the last pass of ${files[0]}'s area`);
+  return changed;
 };
+
+const touchedKey = (files, from, exclude) => JSON.stringify([from ?? null, exclude, files]);
 
 /**
  * What the plan and the map read of each area's past for `cfg`'s project: its inherited `history` and `covered`
  * share (`inheritPasses`), `staleLines`, the lines of its files changed since its last pass (`lastPassIn`), its fixes
- * aside, and `pairLines`, keyed `<area>\n<round>`, the lines of its files changed from each covering round to the next,
- * that round's fixes aside: what changed since the first less what changed since the second.
+ * aside, `pairLines`, keyed `<area>\n<round>`, the lines of its files changed from each covering round to the next,
+ * that round's fixes aside: what changed since the first less what changed since the second, and `touched`, the
+ * answer `isSettled` asks of each area (`settlingOf`), true where git does not know the commit.
  */
 export const areaStats = (cfg, git, areas, raw, root) => {
   const { history, covered } = inheritPasses(areas, raw);
   const entries = [];
   const pairs = [];
+  const settling = new Map();
   for (const area of areas) {
     const list = history.get(area.id) ?? [];
     const last = lastPassIn(list);
     if (last?.commit) entries.push({ id: area.id, files: area.files, commit: last.commit, exclude: last.fixCommits ?? [] });
+    const quiet = settlingOf(list);
+    if (quiet) {
+      const id = `${area.id}\nsettle`;
+      settling.set(touchedKey(area.files, quiet.from, quiet.exclude), id);
+      entries.push({ id, files: area.files, commit: quiet.from, exclude: quiet.exclude });
+    }
     const rounds = coveringRounds(list).map((r) => combinedOf(r.passes));
     rounds.forEach((k, i) => {
       const next = rounds[i + 1];
@@ -311,8 +334,16 @@ export const areaStats = (cfg, git, areas, raw, root) => {
       entries.push({ id: `${key}\nto`, files: area.files, commit: next.commit, exclude: [] });
     });
   }
-  const lines = churnSince(git, entries, { keep: cfg.partition.isSource, cacheKey: cfg.partition.sourceKey, cacheFile: churnCacheOf(cfg.name), root });
+  const { lines, touched: changed } = churnSince(git, entries, churnOptionsFor(cfg, root));
   const staleLines = new Map(areas.flatMap((a) => (lines.has(a.id) ? [[a.id, lines.get(a.id)]] : [])));
   const pairLines = new Map(pairs.map((key) => [key, Math.max(0, lines.get(`${key}\nfrom`) - lines.get(`${key}\nto`))]));
-  return { history, covered, staleLines, pairLines };
+  /** @type {(files: string[], from: string, exclude: string[]) => boolean} */
+  const touched = (files, from, exclude) => {
+    if (files.length === 0) return false;
+    const id = settling.get(touchedKey(files, from, exclude));
+    if (id === undefined) throw new Error(`areaStats: touched asked of a range it did not walk (from ${from})`);
+    const paths = changed.get(id);
+    return !paths || paths.length > 0;
+  };
+  return { history, covered, staleLines, pairLines, touched };
 };

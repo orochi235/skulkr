@@ -44,9 +44,10 @@ describe('churnSince', () => {
       { id: 'lost', files: ['src/a.ts'], commit: 'f'.repeat(40), exclude: [] },
     ];
     const keep = (p: string) => p.startsWith('src/');
-    const lines = churnSince(gitIn(root), entries, { keep, cacheKey: 'src', cacheFile, root });
+    const { lines, touched } = churnSince(gitIn(root), entries, { keep, cacheKey: 'src', cacheFile, root });
     // a: the third commit rewrote 2 lines into 4 (2 deleted, 4 added); the fix is not counted.
     expect(Object.fromEntries(lines)).toEqual({ a: 6, b: 4, late: 6, lost: 0 });
+    expect(Object.fromEntries(touched)).toEqual({ a: ['src/a.ts'], b: ['src/b.ts'], late: ['src/a.ts'], lost: null });
     expect(existsSync(cacheFile)).toBe(true);
     const cached = JSON.parse(readFileSync(cacheFile, 'utf8'));
     expect(cached.key).toBe('src');
@@ -57,11 +58,30 @@ describe('churnSince', () => {
       if (args[0] === 'show') throw new Error('asked git for counts the cache holds');
       return gitIn(root)(...args);
     };
-    expect(Object.fromEntries(churnSince(noShow, entries.slice(0, 2), { keep, cacheKey: 'src', cacheFile, root }))).toEqual({ a: 6, b: 4 });
+    expect(Object.fromEntries(churnSince(noShow, entries.slice(0, 2), { keep, cacheKey: 'src', cacheFile, root }).lines)).toEqual({ a: 6, b: 4 });
     // Counts kept under another filter are dropped, not read back: docs/ is counted once the filter takes it.
     const all = churnSince(gitIn(root), [{ id: 'docs', files: ['docs/x.md'], commit: pass, exclude: [] }], { cacheKey: 'all', cacheFile, root });
-    expect(all.get('docs')).toBe(50);
+    expect(all.lines.get('docs')).toBe(50);
     expect(JSON.parse(readFileSync(cacheFile, 'utf8')).key).toBe('all');
+  });
+
+  it('names the files a later commit touched, a mode-only change included and fixes aside, and keeps the cache unpruned when asked', () => {
+    const { root, run, commit } = repo();
+    commit({ 'src/old.ts': 1 });
+    const pass = commit({ 'src/a.ts': 1, 'src/b.ts': 1, 'src/c.ts': 1 });
+    const fix = commit({ 'src/c.ts': 2 });
+    run('update-index', '--chmod=+x', 'src/b.ts');
+    run('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'mode');
+    const cacheFile = join(root, '..', `${root.split('/').at(-1)}-cache`, 'churn.json');
+    dirs.push(dirname(cacheFile));
+    const files = ['src/c.ts', 'src/b.ts', 'src/a.ts'];
+    const first = churnSince(gitIn(root), [{ id: 'x', files, commit: run('rev-parse', 'HEAD~3'), exclude: [] }], { cacheFile, root });
+    expect(first.touched.get('x')).toEqual(['src/c.ts', 'src/b.ts', 'src/a.ts']);
+    const kept = Object.keys(JSON.parse(readFileSync(cacheFile, 'utf8')).commits).length;
+    const { lines, touched } = churnSince(gitIn(root), [{ id: 'x', files, commit: pass, exclude: [fix] }], { cacheFile, root, prune: false });
+    expect(touched.get('x')).toEqual(['src/b.ts']);
+    expect(lines.get('x')).toBe(0);
+    expect(Object.keys(JSON.parse(readFileSync(cacheFile, 'utf8')).commits)).toHaveLength(kept);
   });
 
   it('reads numstat output and walks a commit graph', () => {
