@@ -27,7 +27,7 @@ export const readPasses = (root, recordDir) => {
       const listed = join(roundDir, area.name, 'files.txt');
       if (!Array.isArray(pass.files) && existsSync(listed)) pass.files = readFileSync(listed, 'utf8').split('\n').filter(Boolean);
       // A pass a reviewer never ran or never finished is no pass: the area comes back as if it had not been audited.
-      if (pass.incomplete?.length) continue;
+      if (pass.incomplete?.length || pass.fixOnly) continue;
       if (!passes.has(pass.id)) passes.set(pass.id, []);
       passes.get(pass.id).push(pass);
     }
@@ -57,7 +57,7 @@ export const withBatchPasses = (passes, git, recordDir, refs) => {
           pass.files = git('show', `${ref}:${path.replace(/area\.json$/, 'files.txt')}`).split('\n').filter(Boolean);
         } catch {}
       }
-      if (pass.incomplete?.length) continue;
+      if (pass.incomplete?.length || pass.fixOnly) continue;
       if (!passes.has(pass.id)) passes.set(pass.id, []);
       passes.get(pass.id).push(pass);
     }

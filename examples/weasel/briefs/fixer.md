@@ -36,6 +36,14 @@ What you write ships under the repo owner's name.
 5. A finding that needs a behavior call nobody has made: make the strict call (misuse throws or warns, with an
    opt-in override), record it in `docs/unruled.md` in that file's format, and say so in your report.
 
+## Carried findings
+
+When the source above says findings are carried from earlier rounds, they are in `carried.md` beside the
+reviewers' reports, each headed by its id and the round that reported it. No fixer acted on them then, and the
+code may have changed since: check each still applies before anything else, and give it a verdict like any other
+(`not a defect (no longer applies)` when it is gone). Lead its line in your report with its id in brackets,
+`[r56-3]`, and give `carried` as where it came from. Carried findings count in N.
+
 ## Before reporting
 
 - Each test file you touched, one at a time: `npx vitest run --maxWorkers=1 <file>` from the tree root (a

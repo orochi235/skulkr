@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { JOB_IN, JOB_OUT } from './config.mjs';
 import { citedPaths, firstJson, isFinished, matchPrompt, parseFilesRead, parseFindings, reviewText, validPairs } from './findings.mjs';
 import { brief, fill, projectVars } from './brief.mjs';
+import { toCarry, writeCarried } from './carryBrief.mjs';
 import { dispatch } from './dispatch.mjs';
 import { CHECKS_IN, PROGRESS_IN, fixShell, jobDir, matchShell, progressSource, reviewShell, timeoutOf } from './jobs.mjs';
 import { verifyAndRepair } from './repair.mjs';
@@ -55,7 +56,7 @@ const match = async (ctx, area, a, b) => {
 };
 
 /** What the fixer is told its findings are: two blind reviews of an area, unless `source` says otherwise. */
-const reviewedSource = (ctx, id) => fill(
+export const reviewedSource = (ctx, id) => fill(
   'Two blind reviewers read this area at the frozen commit {{commit}} and reported without fixing. Their\n'
   + 'reports are `{{reportA}}` and `{{reportB}}`. Some findings appear in both under different words; treat\n'
   + 'those as one.',
@@ -88,10 +89,10 @@ export const fix = async (ctx, area, findings, source = reviewedSource(ctx, area
 };
 
 /**
- * The whole area. `previous` is its last pass, if any, and `changedSince` the files of the area that
- * changed after it. Answers the area's summary, which becomes its `area.json`.
+ * The whole area. `previous` is its last pass, if any, `changedSince` the files of the area that changed after it,
+ * and `carried` its open findings from earlier rounds. Answers the area's summary, which becomes its `area.json`.
  */
-export const runArea = async (ctx, area, { previous, changedSince }) => {
+export const runArea = async (ctx, area, { previous, changedSince, carried = [] }) => {
   const inDir = join(ctx.frozen, JOB_IN, area.id);
   mkdirSync(inDir, { recursive: true });
   const vars = { ...projectVars(ctx.cfg, 'reviewer'), round: ctx.round, area: area.id, commit: ctx.commit, out: `${JOB_OUT}/findings.md`, files: area.files.map((f) => `- ${f}`).join('\n') };
@@ -115,7 +116,11 @@ export const runArea = async (ctx, area, { previous, changedSince }) => {
   // A side that never ran, or stopped before its report's done line, looked at too little for an estimate.
   const incomplete = [a, b].flatMap((r, i) => (r.launched && isFinished(r.text) ? [] : [i === 0 ? 'A' : 'B']));
   const estimate = incomplete.length ? undefined : chapman(na, nb, m);
-  const fixed = distinct > 0 ? await fix(ctx, area, distinct) : undefined;
+  const carry = toCarry(carried, [...a.findings, ...b.findings]);
+  const carriedText = writeCarried(ctx, area.id, carry, dir);
+  const fixed = distinct + carry.length > 0
+    ? await fix(ctx, area, distinct + carry.length, [reviewedSource(ctx, area.id), carriedText].filter(Boolean).join('\n\n'))
+    : undefined;
   if (fixed?.report) writeFileSync(join(dir, 'fix.md'), fixed.report);
   if (fixed?.mbox) copyFileSync(fixed.mbox, join(dir, 'fix.mbox'));
   const changed = new Set(changedSince);
@@ -129,6 +134,7 @@ export const runArea = async (ctx, area, { previous, changedSince }) => {
     newCode: previous ? { since: previous.round, changedFiles: changed.size, findings: [...a.findings, ...b.findings].filter((f) => citedPaths(f, ctx.cfg.citedRe).some((p) => changed.has(p))).length } : undefined,
     previous: previous ? { round: previous.round, chapman: previous.chapman, unfound: previous.unfound } : undefined,
     patches: fixed?.patches ?? 0,
+    ...(carry.length ? { carried: carry.length } : {}),
     ...(fixed?.verify ? { verify: fixed.verify } : {}),
     questions: (fixed?.report.match(/\bquestion\b/gi) ?? []).length,
     budgetHit: records.filter((r) => r.budgetHit).map((r) => r.role),

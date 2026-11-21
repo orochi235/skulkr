@@ -97,7 +97,7 @@ export const commitRecord = (cfg, tree, { round, commit, date, nightDir, areas, 
   for (const area of areas) {
     const to = join(dir, area.id);
     mkdirSync(to, { recursive: true });
-    for (const file of ['files.txt', 'A.md', 'B.md', 'match.json', 'fix.md']) {
+    for (const file of ['files.txt', 'A.md', 'B.md', 'match.json', 'fix.md', 'carried.json']) {
       const from = join(nightDir, 'areas', area.id, file);
       if (existsSync(from)) cpSync(from, join(to, file));
     }
