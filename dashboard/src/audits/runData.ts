@@ -82,6 +82,8 @@ export interface Job {
   readonly of?: string;
   /** Whether it went wrong: a review that skipped files or did not finish, a patch that did not apply, a conflict, a failed fleet run. */
   readonly bad: boolean;
+  /** A batch job about a branch an earlier round left out, rather than one of this round's. */
+  readonly earlier?: boolean;
 }
 
 /** A match's result: how many findings both reviews made, then how many only one did. */
@@ -119,7 +121,11 @@ export function parseJob(line: string): Job | null {
   if ((m = /^repair (\S+) (\S+) on (\S+): (\d+) commits, ([\d.]+) min; verify (.*)$/.exec(line))) {
     return { kind: 'fix', label: `repair ${m[2]}`, area: m[1]!, what: `${plural(Number(m[4]), 'commit')}; verify ${m[6]}`, node: m[3], minutes: Number(m[5]), bad: m[6] !== 'passed' };
   }
-  if ((m = /^batch: audit\d+-(\S+) conflicts/.exec(line))) {
+  // A branch is `<prefix><round>-<area>`, the prefix the project's own. Logs before 2026-11-21 said `<branch> conflicts`.
+  if ((m = /^batch: \S*?\d+-(\S+?)( \(round \d+\))? left out: (.*)$/.exec(line))) {
+    return { kind: 'batch', label: 'batch', area: m[1]!, what: `left out: ${m[3]}`, bad: true, ...(m[2] ? { earlier: true } : {}) };
+  }
+  if ((m = /^batch: \S*?\d+-(\S+) conflicts/.exec(line))) {
     return { kind: 'batch', label: 'batch', area: m[1]!, what: 'conflicts; left out of the batch', bad: true };
   }
   // The plan's own `control sweep:` line, printed at start-up, reports no job; only a count or a failure does.
@@ -139,6 +145,13 @@ export interface RunJob {
   readonly job: Job;
 }
 
+/** A batch job leaving out one of the run's own areas, saying why as that area's lane does where the map gives a reason. */
+function withLaneReason(job: Job, run: AuditRun): Job {
+  if (job.kind !== 'batch' || !job.bad || job.earlier) return job;
+  const patch = run.lanes.find((l) => l.id === job.area)?.steps.patch;
+  return patch?.state === 'failed' && patch.why ? { ...job, what: patch.why } : job;
+}
+
 /** Each run's jobs, newest first, live runs before the finished one, at most `perRun` from each. */
 export function recentJobsOf(runs: readonly AuditRun[], perRun = 14): RunJob[] {
   return runs.flatMap((run) => {
@@ -148,7 +161,8 @@ export function recentJobsOf(runs: readonly AuditRun[], perRun = 14): RunJob[] {
       .map((line) => {
         const copy = seen.get(line) ?? 0;
         seen.set(line, copy + 1);
-        return { key: `${run.round}:${copy}:${line}`, line, round: run.round, job: parseJob(line) };
+        const job = parseJob(line);
+        return { key: `${run.round}:${copy}:${line}`, line, round: run.round, job: job && withLaneReason(job, run) };
       })
       .filter((r): r is RunJob => r.job !== null)
       .reverse()

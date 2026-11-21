@@ -90,7 +90,7 @@ describe('jobs', () => {
     });
     expect(parseJob('fix 2/4 core.ops on studio: 3 commits, 12.0 min, 0.81M weighted tokens')).toMatchObject({ kind: 'fix', tokens: 0.81 });
     expect(parseJob('match 1/4 core.ops: 2 shared of 5 + 4')).toMatchObject({ kind: 'match', what: '2 shared, 5 unique' });
-    expect(parseJob('batch: audit41-core.ops conflicts; left out')?.bad).toBe(true);
+    expect(parseJob('batch: audit41-core.ops conflicts; left out')).toMatchObject({ kind: 'batch', area: 'core.ops', bad: true });
     expect(parseJob('fleet: 2 failed')).toMatchObject({ kind: 'fleet', bad: true });
     expect(parseJob('something else')).toBeNull();
   });
@@ -127,6 +127,19 @@ describe('jobs', () => {
       what: '2 findings, read 12 of 12 files, hit its ceiling, unfinished: not counted as a pass', bad: true,
     });
     expect(parseJob(`${line}, hit its ceiling`)).toMatchObject({ what: '2 findings, read 12 of 12 files, hit its ceiling', bad: false });
+  });
+
+  it("reads a branch the batch left out, whatever the project names its branches, and the lane's reason where the map gives one", () => {
+    expect(parseJob('batch: audit41-core.ops left out: conflicts in a.ts, b.ts')).toEqual({
+      kind: 'batch', label: 'batch', area: 'core.ops', what: 'left out: conflicts in a.ts, b.ts', bad: true,
+    });
+    expect(parseJob('batch: sk7-ui.p-touch (round 6) left out: merge failed: lock')).toMatchObject({ area: 'ui.p-touch', earlier: true, bad: true });
+    expect(parseJob('batch: audit40-core.ops, left out of round 40, merged')).toMatchObject({ kind: 'night', bad: false });
+    const ops = live.lanes[0]!;
+    const lines = ['batch: audit41-core.ops left out: conflicts in a.ts'];
+    const withReason = { ...live, lines, lanes: [{ ...ops, steps: { ...ops.steps, patch: { state: 'failed' as const, why: 'conflicts in a.ts, b.ts' } } }] };
+    expect(recentJobsOf([withReason])[0]!.job.what).toBe('conflicts in a.ts, b.ts');
+    expect(recentJobsOf([{ ...live, lines }])[0]!.job.what).toBe('left out: conflicts in a.ts');
   });
 
   it('keys two identical lines of one log apart', () => {
