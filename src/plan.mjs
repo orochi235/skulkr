@@ -10,6 +10,7 @@ import { nodesAt } from './config.mjs';
 import { planFixOnly } from './fixOnly.mjs';
 import { waitForLease } from './lease.mjs';
 import { partitionAt } from './partition.mjs';
+import { recordsFor } from './recordFiles.mjs';
 import { areaStats, areasInFlightFor, gitTouched, lastPassIn, nextRound, passesIn, pickAreas, scaledOf } from './rounds.mjs';
 import { claimRound, claimedRounds, liveRuns, planLock, writeStatus } from './runs.mjs';
 import { usd } from './usage.mjs';
@@ -30,7 +31,8 @@ export const plan = (cfg, root, args) => {
   const hardening = ledger && existsSync(ledger) ? readFileSync(ledger, 'utf8') : '';
   const round = nextRound({ roundDirs, hardening, branches, claimed: claimedRounds(cfg.state), roundIn: cfg.names.roundIn });
   const areas = partitionAt(cfg, root, commit);
-  const { history: passes, covered, staleLines } = areaStats(cfg, git, areas, passesIn(cfg, git, root), root);
+  const records = recordsFor(cfg, git, root);
+  const { history: passes, covered, staleLines } = areaStats(cfg, git, areas, passesIn(cfg, git, root, records), root);
   const running = liveRuns(cfg.state);
   const held = new Set(running.flatMap((r) => r.areas ?? []));
   const byId = new Map(areas.map((a) => [a.id, a]));
@@ -39,7 +41,7 @@ export const plan = (cfg, root, args) => {
   const taken = (args.only ?? []).filter((id) => held.has(id));
   if (taken.length > 0) throw new Error(`${taken.join(', ')} ${taken.length === 1 ? 'is' : 'are'} held by a live run; see its status`);
   const inFlight = areasInFlightFor(cfg, git);
-  const open = openFindingsIn(cfg, git, root);
+  const open = openFindingsIn(cfg, git, root, records);
   if (args.fixOnly) {
     const { picked, skipped } = planFixOnly({ areas, open, want: args.fixOnly, held, inFlight });
     const missing = skipped.filter((s) => s.why === 'no such area').map((s) => s.id);

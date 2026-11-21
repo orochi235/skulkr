@@ -5,6 +5,7 @@ import { gitIn } from './batch.mjs';
 import { openFindingsIn } from './carryRecords.mjs';
 import { waitForLease } from './lease.mjs';
 import { partitionAt } from './partition.mjs';
+import { recordsFor } from './recordFiles.mjs';
 import { inheritPasses, passesIn } from './rounds.mjs';
 import { readJson } from './json.mjs';
 import { clearStop, liveRuns, planLock, runDir, writeStatus } from './runs.mjs';
@@ -54,9 +55,10 @@ export const resume = async (cfg, root, args, say) => {
     if (held.length) say(`resume: ${held.join(', ')} ${held.length === 1 ? 'is' : 'are'} held by a live run; left out`);
     clearStop(round, state);
     if (prior.args?.fixOnly) args.fixOnly = prior.args.fixOnly;
+    const records = recordsFor(cfg, git, root);
     const p = {
-      commit, round, picked: ids.flatMap((id) => (byId.has(id) ? [byId.get(id)] : [])), passes: inheritPasses([...byId.values()], passesIn(cfg, git, root)).history,
-      running, open: openFindingsIn(cfg, git, root),
+      commit, round, picked: ids.flatMap((id) => (byId.has(id) ? [byId.get(id)] : [])), passes: inheritPasses([...byId.values()], passesIn(cfg, git, root, records)).history,
+      running, open: openFindingsIn(cfg, git, root, records),
     };
     const status = {
       round, commit, started: prior.started, resumed: new Date().toISOString(), step: 'freeze', areas: ids, nightDir: prior.nightDir,
