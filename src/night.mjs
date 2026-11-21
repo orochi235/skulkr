@@ -21,14 +21,14 @@ import { batchAndTest, patchAreas, patchSweep } from './land.mjs';
 import { begin, localDate, plan, printPlan } from './plan.mjs';
 import { resume } from './resume.mjs';
 import { lastPassIn, scaledOf } from './rounds.mjs';
-import { claimedRounds, clearStatus, nightsAt, pruneRuns, readJson, runDir, stopRequested, writeStatus, writeSummary } from './runs.mjs';
+import { sleep } from './after.mjs';
+import { readJson } from './json.mjs';
+import { claimedRounds, clearStatus, nightsAt, pruneRuns, runDir, stopRequested, writeStatus, writeSummary } from './runs.mjs';
 import { fixSweep, runSweep, sweepLine } from './sweep.mjs';
 import { verifyLine, verifyOf } from './verify.mjs';
 
 const POLL_MS = 15_000;
 const UNAVAILABLE_TTL_MS = 5 * 60_000;
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** When a run stops starting areas: the first `schedule.stopAt` after it started, or after it was resumed. */
 export const deadlineOf = (cfg, status) => nextClock(new Date(status.resumed ?? status.started), cfg.schedule.stopAt);

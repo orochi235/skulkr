@@ -6,7 +6,8 @@ import { openFindingsIn } from './carryRecords.mjs';
 import { waitForLease } from './lease.mjs';
 import { partitionAt } from './partition.mjs';
 import { inheritPasses, passesIn } from './rounds.mjs';
-import { clearStop, liveRuns, planLock, readJson, runDir, writeStatus } from './runs.mjs';
+import { readJson } from './json.mjs';
+import { clearStop, liveRuns, planLock, runDir, writeStatus } from './runs.mjs';
 
 /**
  * The areas a resume of `prior` (the round's status or summary) runs again: every one it planned, less those its

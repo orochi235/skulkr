@@ -17,7 +17,7 @@ describe('resolveConfig', () => {
     const cfg = resolveConfig({ naming: { prefix: 'sweep', batchPrefix: 'land' } });
     expect(cfg.names.area(7, 'ui')).toBe('sweep7-ui');
     expect(cfg.names.batch('2026-11-20', 7)).toBe('land/2026-11-20-sweep7');
-    expect(cfg.names.areaOf.exec('sweep7-core.x')?.[1]).toBe('core.x');
+    expect(cfg.names.branchOf('sweep7-core.x')).toEqual({ round: 7, id: 'core.x' });
     expect(cfg.names.roundIn.exec('land/2026-11-20-sweep12')?.[1]).toBe('12');
     expect(cfg.names.step.exec('sweep7-ui-match')?.slice(1)).toEqual(['ui', 'match']);
   });

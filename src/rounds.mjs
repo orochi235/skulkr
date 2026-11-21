@@ -227,15 +227,15 @@ export const isSettled = (area, passes, touched) => {
 
 /**
  * The areas an earlier round is still holding: each `audit<N>-<area>` branch not yet merged into `main`
- * (`areaOf`, the config's `names.areaOf`). Their passes are recorded only on that round's batch branch, so
+ * (`branchOf`, the config's `names.branchOf`). Their passes are recorded only on that round's batch branch, so
  * `readPasses` cannot see them.
  */
-export const areasInFlight = (unmergedBranches, areaOf) =>
-  new Set(unmergedBranches.flatMap((b) => areaOf.exec(b)?.[1] ?? []));
+export const areasInFlight = (unmergedBranches, branchOf) =>
+  new Set(unmergedBranches.flatMap((b) => branchOf(b)?.id ?? []));
 
 /** `areasInFlight` over the branches `cfg`'s `main` has not merged, asked of `git`: the one answer night and the map use. */
 export const areasInFlightFor = (cfg, git) =>
-  areasInFlight(git('for-each-ref', `--no-merged=${cfg.git.main}`, '--format=%(refname:short)', 'refs/heads').split('\n'), cfg.names.areaOf);
+  areasInFlight(git('for-each-ref', `--no-merged=${cfg.git.main}`, '--format=%(refname:short)', 'refs/heads').split('\n'), cfg.names.branchOf);
 
 /**
  * Where a due area ranks: what its last pass left, corrected (`correctedLeftOf`), in whole defects, and at least 1

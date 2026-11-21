@@ -4,13 +4,13 @@
  */
 import { cpSync, existsSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { sleep } from './after.mjs';
 import { isFinished, reviewText } from './findings.mjs';
 import { runJob } from './jobs.mjs';
 import { parseEnvelope } from './usage.mjs';
 
 const readIf = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : '');
 const minutesSince = (t0) => (Date.now() - t0) / 60_000;
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 /** How many times a job that never reached its node is launched before its area is recorded incomplete. */
 const LAUNCHES = 3;
 const RELAUNCH_WAIT_MS = 60_000;

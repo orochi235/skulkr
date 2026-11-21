@@ -6,7 +6,8 @@ import { createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync } f
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JOB_IN, JOB_OUT, noFixers, nodesAt } from './config.mjs';
-import { leaseAt, pidAlive, takeLease } from './lease.mjs';
+import { sleep } from './after.mjs';
+import { heldAlive, leaseAt, takeLease } from './lease.mjs';
 import { verifyLines, verifyOf } from './verify.mjs';
 
 export const BUSY_WAIT_MS = 30_000;
@@ -197,7 +198,7 @@ export const createSlots = (cfg, pinned, { about = {}, places = false } = {}) =>
     // Fewest live leases of this role first, so jobs spread across nodes instead of filling the first.
     const busy = (node) => {
       const dir = join(state, 'slots', node);
-      return existsSync(dir) ? readdirSync(dir).filter((t) => t.startsWith(prefix) && pidAlive(leaseAt(join(dir, t))?.pid)).length : 0;
+      return existsSync(dir) ? readdirSync(dir).filter((t) => t.startsWith(prefix) && heldAlive(leaseAt(join(dir, t)))).length : 0;
     };
     const nodes = (placed ? [PLACED] : pinned ?? nodesAt(cfg, now)).map((node, i) => ({ node, i, n: busy(node) })).sort((a, b) => a.n - b.n || a.i - b.i).map((e) => e.node);
     for (const node of nodes) {
@@ -224,8 +225,6 @@ export const createSlots = (cfg, pinned, { about = {}, places = false } = {}) =>
   };
   return { take, refuse, inUse: () => held.size };
 };
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** One runner job from `cwd`, tried again while its tree is busy; its output goes to `logPath`. Answers `{ status, refused, noRoom, node? }`. */
 export const runUntilFree = async (runner, job, { cwd, logPath, waitMs = BUSY_WAIT_MS }) => {

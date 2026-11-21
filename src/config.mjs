@@ -288,8 +288,6 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
       frozen: (round) => `${prefix}${round}-frozen-night`,
       am: (round, area) => `${prefix}${round}-am-${area}`,
       batchTree: (date, round) => `${batchPrefix}-${date}-${prefix}${round}`,
-      /** `<prefix><N>-<area>` → the area. */
-      areaOf: new RegExp(`^${pre}\\d+-(.+)$`),
       /** An area branch `<prefix><N>-<area>` → `{ round, id }`, or undefined for any other branch. */
       branchOf: (branch) => {
         const m = areaBranch.exec(branch);

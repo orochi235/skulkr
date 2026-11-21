@@ -57,7 +57,7 @@ describe('pickAreas', () => {
   });
 
   it('skips an area an unlanded round still holds on an audit branch', () => {
-    const inFlight = areasInFlight(['audit37-b', 'audit37-core.animation', 'batch/2026-11-18-audit37', 'feature-x'], weaselConfig().names.areaOf);
+    const inFlight = areasInFlight(['audit37-b', 'audit37-core.animation', 'batch/2026-11-18-audit37', 'feature-x'], weaselConfig().names.branchOf);
     expect([...inFlight].sort()).toEqual(['b', 'core.animation']);
     const picked = pickAreas({ areas: ['a', 'b', 'c'].map((id) => area(id)), passes: new Map(), touched: never, count: 3, inFlight }).picked;
     expect(picked).toEqual(['a', 'c']);

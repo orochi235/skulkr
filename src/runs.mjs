@@ -8,9 +8,6 @@ import { join } from 'node:path';
 import { readJson, writeJson as writeJsonAt } from './json.mjs';
 import { heldAlive } from './lease.mjs';
 
-// night.mjs still imports readJson from here.
-export { readJson };
-
 export const runsDir = (state) => join(state, 'runs');
 export const runDir = (round, state) => join(runsDir(state), String(round));
 /** Held from the batch's gate run through `main`'s fast-forward, so two runs never land at once. */
