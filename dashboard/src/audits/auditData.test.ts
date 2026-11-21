@@ -102,7 +102,6 @@ describe('jobs', () => {
     });
     expect(parseJob('fix 2/4 core.ops on studio: 3 commits, 12.0 min, 0.81M weighted tokens')).toMatchObject({ kind: 'fix', tokens: 0.81 });
     expect(parseJob('match 1/4 core.ops: 2 shared of 5 + 4')).toMatchObject({ kind: 'match', what: '2 shared, 5 unique' });
-    expect(parseJob('batch: audit41-core.ops conflicts; left out')).toMatchObject({ kind: 'batch', area: 'core.ops', bad: true });
     expect(parseJob('fleet: 2 failed')).toMatchObject({ kind: 'fleet', bad: true });
     expect(parseJob('something else')).toBeNull();
   });
@@ -141,17 +140,27 @@ describe('jobs', () => {
     expect(parseJob(`${line}, hit its ceiling`)).toMatchObject({ what: '2 findings, read 12 of 12 files, hit its ceiling', bad: false });
   });
 
-  it("reads a branch the batch left out, whatever the project names its branches, and the lane's reason where the map gives one", () => {
-    expect(parseJob('batch: audit41-core.ops left out: conflicts in a.ts, b.ts')).toEqual({
-      kind: 'batch', label: 'batch', area: 'core.ops', what: 'left out: conflicts in a.ts, b.ts', bad: true,
-    });
-    expect(parseJob('batch: sk7-ui.p-touch (round 6) left out: merge failed: lock')).toMatchObject({ area: 'ui.p-touch', earlier: true, bad: true });
-    expect(parseJob('batch: audit40-core.ops, left out of round 40, merged')).toMatchObject({ kind: 'night', bad: false });
-    const ops = live.lanes[0]!;
-    const lines = ['batch: audit41-core.ops left out: conflicts in a.ts'];
-    const withReason = { ...live, lines, lanes: [{ ...ops, steps: { ...ops.steps, patch: { state: 'failed' as const, why: 'conflicts in a.ts, b.ts' } } }] };
-    expect(recentJobsOf([withReason])[0]!.job.what).toBe('conflicts in a.ts, b.ts');
-    expect(recentJobsOf([{ ...live, lines }])[0]!.job.what).toBe('left out: conflicts in a.ts');
+  it("reads a branch the batch left out from the map's leftOut, whatever the project names its branches", () => {
+    const leftOut = [
+      { area: 'core.ops', round: 41, why: 'conflicts in a.ts, b.ts' },
+      { area: 'ui.p-touch', round: 6, why: 'merge failed: lock' },
+      { area: 'core.debug', round: 41, why: 'merge conflict' },
+    ];
+    const lines = [
+      'batch: a1141-core.ops left out: conflicts in a.ts, b.ts',
+      'batch: sk6-ui.p-touch (round 6) left out: merge failed: lock',
+      'batch: audit41-core.debug conflicts; left out',
+      'batch: audit40-core.ops, left out of round 40, merged',
+    ];
+    const rows = recentJobsOf([{ ...live, lines, leftOut }]).reverse();
+    expect(rows.map((r) => [r.round, r.job.kind, r.job.area, r.job.what, r.job.bad])).toEqual([
+      [41, 'batch', 'core.ops', 'left out: conflicts in a.ts, b.ts', true],
+      [6, 'batch', 'ui.p-touch', 'left out: merge failed: lock', true],
+      [41, 'batch', 'core.debug', 'left out: merge conflict', true],
+      [41, 'night', '', 'audit40-core.ops, left out of round 40, merged', false],
+    ]);
+    // A map from before leftOut reads the line as any other batch line.
+    expect(recentJobsOf([{ ...live, lines: lines.slice(0, 1) }])[0]!.job).toMatchObject({ kind: 'night', label: 'batch', bad: false });
   });
 
   it('gives a branch an earlier round left out its own round, from the map', () => {
