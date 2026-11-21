@@ -1,0 +1,57 @@
+/* The frame, axes, and caption are the rounds chart's, so the two tabs read as one panel. */
+.frame { composes: frame from './RoundsChart.module.css'; }
+.box { composes: box from './RoundsChart.module.css'; }
+.chart { composes: chart from './RoundsChart.module.css'; }
+.grid { composes: grid from './RoundsChart.module.css'; }
+.title { composes: title from './RoundsChart.module.css'; }
+.axis { composes: axis from './RoundsChart.module.css'; }
+.foot { composes: foot from './RoundsChart.module.css'; }
+.scope { composes: scope from './RoundsChart.module.css'; }
+.about { composes: about from './RoundsChart.module.css'; }
+.aboutText { composes: aboutText from './RoundsChart.module.css'; }
+
+.factorAxis {
+  composes: axis from './RoundsChart.module.css';
+  fill: var(--audit-ink);
+}
+
+.predicted {
+  fill: none;
+  stroke: var(--audit-depth-3);
+  stroke-dasharray: 2 2;
+}
+
+.found { fill: var(--audit-depth-2); }
+
+.factor {
+  fill: none;
+  stroke: var(--audit-ink);
+  stroke-width: 1.5;
+}
+
+.factorDot { fill: var(--audit-ink); }
+
+.hint {
+  margin: 0;
+  font-size: var(--wzl-font-size-sm);
+  color: var(--audit-muted);
+}
+
+.para { margin: 0 0 var(--wzl-space-2); }
+
+.table {
+  composes: numeric from '@weasel-js/theme/numeric.module.css';
+  width: 100%;
+  margin-block-end: var(--wzl-space-2);
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 2px var(--wzl-space-1);
+  text-align: end;
+}
+
+.table th { font-weight: var(--wzl-font-weight-medium); color: var(--audit-muted); }
+
+.table .label { text-align: start; }
