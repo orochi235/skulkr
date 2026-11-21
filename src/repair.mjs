@@ -65,15 +65,19 @@ export const baselineFailures = async (ctx, area, verdict) => {
 };
 
 /**
- * `verdict` with the failures the frozen tree already has set aside: passing when every failing file is one of
- * them, and naming them in `baseline` either way.
+ * `verdict` with the failures the frozen tree already has set aside, naming them in `baseline`: passing only when
+ * every failing file is one of them and the failing files account for the whole failure, so a non-zero exit from
+ * an unhandled error or a command after the tests still fails.
  */
 export const judged = async (ctx, area, verdict) => {
   if (verdict.ok || verdict.timedOut || verdict.unrun) return verdict;
   const baseline = await baselineFailures(ctx, area, verdict);
   if (!baseline.length) return verdict;
   const own = verdict.failedFiles.filter((file) => !baseline.includes(file));
-  return own.length ? { ...verdict, failedFiles: own, baseline } : { ...verdict, ok: true, failedFiles: [], baseline };
+  if (own.length) return { ...verdict, failedFiles: own, baseline };
+  const accounted = verdict.counts?.failed === verdict.failedFiles.length && !verdict.unhandled;
+  if (accounted) return { ...verdict, ok: true, failedFiles: [], baseline };
+  return { ...verdict, failedFiles: [], baseline, why: verdict.unhandled ? 'unhandled errors outside the test files' : `exited ${verdict.exit} beyond the failing test files` };
 };
 
 /**

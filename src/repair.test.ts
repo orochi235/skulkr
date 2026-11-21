@@ -128,6 +128,18 @@ describe('verifyAndRepair', () => {
     expect(brief).toContain("leave them: `a/store.pbt.test.ts`.");
   });
 
+  it('keeps failing when the frozen tree has every failing file but the failure goes beyond them', async () => {
+    const unhandled = { ...FAILING, 'verify.log': `${FAILING['verify.log']}\n Errors  1 error` };
+    const extra = { ...FAILING, 'verify.log': ' FAIL  a/store.pbt.test.ts > keeps order\n Test Files  2 failed | 1 passed (3)' };
+    for (const files of [unhandled, extra]) {
+      const h = harness({ command: 'run {files}' }, { verify: [BROKEN], repair: [{ ...PASSING, 'fix.mbox': mbox(3) }] });
+      write(h.fixDir, { ...files, 'fix.mbox': mbox(2) });
+      const got = await verifyAndRepair(h.ctx, h.area, { mbox: join(h.fixDir, 'fix.mbox') }, h.fixDir);
+      expect(got.repairs).toHaveLength(1);
+      expect(h.said[0]).toMatch(/^verify a: failed: .*set aside \(a\/store\.pbt\.test\.ts\)$/);
+    }
+  });
+
   it('keeps a failure the area owns when the frozen-tree run gives no file-level answer', async () => {
     const h = harness({ command: 'run {files}' }, {
       verify: [{ 'verify.exit': '1', 'verify.log': 'Error: no install' }],
