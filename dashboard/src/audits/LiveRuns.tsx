@@ -5,7 +5,7 @@ import { SegmentedBar } from '@weasel-js/ui/components/Segmented';
 import { SpanStrips, type SpanStripSpan, type SpanStripsRow } from '@weasel-js/ui/components/SpanStrip';
 import { clockRuler } from './clock';
 import { GateFailures } from './GateFailures';
-import { STEP_COLUMN_COUNT, laneStepsOf, laneViewOf, passDone, runClockOf, type LaneView, PHASE_LABEL, phaseClass, stageCountsOf, BRIGHT_FILLS } from './phases';
+import { stepColumnCountFor, repairsIn, laneStepsOf, laneViewOf, passDone, runClockOf, type LaneView, PHASE_LABEL, phaseClass, stageCountsOf, BRIGHT_FILLS } from './phases';
 import { GATE_RUNS, inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
 import { NODE_SEP, headlineOf, lastLineOf, spendOf, startedText } from './runData';
 import { useViewerPref } from './viewerPref';
@@ -95,7 +95,6 @@ export function LaneViewControls({ view }: { view: LaneSettings }) {
   );
 }
 
-const STEPS_WINDOW = { from: 0, to: STEP_COLUMN_COUNT };
 const SHARED_WINDOW = { from: 0, to: 2 };
 
 /** The run's areas, on the run's clock or as a grid of steps; a finished one stays, filled, until the run ends, unless
@@ -113,7 +112,8 @@ function Lanes({ run, now, mode, hideComplete, on }: { run: AuditRun; now: numbe
     }
   });
   if (lanes.length === 0) return null;
-  const rows = lanes.map(({ lane, view }) => laneRow(lane, view, on, mode === 'steps' ? laneStepsOf(lane, now) : view.spans));
+  const repairs = repairsIn(run.lanes);
+  const rows = lanes.map(({ lane, view }) => laneRow(lane, view, on, mode === 'steps' ? laneStepsOf(lane, now, repairs) : view.spans));
   // Anywhere on a lane picks and lights its area, as its name does; the name stays the keyboard's way in.
   const areaAt = (target: EventTarget) => {
     const row = target instanceof Element ? target.closest('[role="listitem"]') : null;
@@ -128,7 +128,7 @@ function Lanes({ run, now, mode, hideComplete, on }: { run: AuditRun; now: numbe
     >
       {mode === 'clock'
         ? <SpanStrips aria-label={`Round ${run.round} lanes`} window={clock} at={now} ruler={clockRuler(clock.from)} rows={rows} />
-        : <SpanStrips aria-label={`Round ${run.round} lanes`} window={STEPS_WINDOW} rows={rows} />}
+        : <SpanStrips aria-label={`Round ${run.round} lanes`} window={{ from: 0, to: stepColumnCountFor(repairs) }} rows={rows} />}
     </div>
   );
 }

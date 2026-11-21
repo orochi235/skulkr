@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STEP_COLUMN_COUNT, CLOCK_AHEAD_MINUTES, TYPICAL_MINUTES, isFinished, laneStepsOf, laneViewOf, passDone, phaseColor, phaseOf, phasesOf, runClockOf, withLivePasses } from './phases';
+import { STEP_COLUMN_COUNT, stepColumnCountFor, CLOCK_AHEAD_MINUTES, TYPICAL_MINUTES, isFinished, laneStepsOf, laneViewOf, passDone, phaseColor, phaseOf, phasesOf, runClockOf, withLivePasses } from './phases';
 import fixture from './fixture.map.json';
 import type { AuditLane, AuditRun, LaneStep, LaneStepName, SkulkrMap } from './skulkrMap.types';
 
@@ -136,6 +136,10 @@ describe('laneStepsOf', () => {
       ['A', 0, 0, 1], ['B', 0, 1, 1], ['match', 1, 0, 2], ['fix', 2, 0, 2], ['checks', 3, 0, 2], ['repair', 3.25, 0, 2], ['patch', 3.75, 0, 2],
     ]);
     expect(STEP_COLUMN_COUNT).toBe(4.35);
+    expect(stepColumnCountFor(false)).toBeCloseTo(3.85);
+    const closed = laneStepsOf(lane({}), NOW, false);
+    expect(closed.map((s) => s.id)).not.toContain('repair');
+    expect(closed.find((s) => s.id === 'patch')?.start).toBe(3.25);
   });
 
   it('stops a running step short of full until it finishes', () => {
