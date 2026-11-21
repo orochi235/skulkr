@@ -81,3 +81,17 @@
   color: var(--audit-muted);
   text-decoration: none;
 }
+
+.open {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--wzl-space-1);
+  font-size: var(--wzl-font-size-sm);
+}
+
+.openRound {
+  font-variant-numeric: tabular-nums;
+  color: var(--audit-muted);
+}

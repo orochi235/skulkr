@@ -78,7 +78,7 @@ const TALLY = /^tally: (\d+) of (\d+) fixed, (\d+) extra fixed\s*$/im;
 const VERDICT = /\bfixed (?:in )?`?[0-9a-f]{7,}|\bnot a defect\b|\bquestion\b|\bduplicate of\b|\bnot fixed\b|\bdeclined\b/i;
 const EXTRAS = /^\W*(?:any )?extra\b/i;
 const CHECKS = /^\W*checks\b/i;
-const SOURCE = /\((A\+B|A|B|sweep)\)|,\s*(A\+B|A|B|sweep)\s*:/;
+const SOURCE = /\((A\+B|A|B|sweep|carried)\)|,\s*(A\+B|A|B|sweep|carried)\s*:/;
 const SHAS = /^(?:fixed (?:in )?)?`?[0-9a-f]{7,}`?(?:(?:,| and) `?[0-9a-f]{7,}`?)*[-\w]*/i;
 
 /** A report's text with markdown emphasis and list marks off. */

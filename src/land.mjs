@@ -25,7 +25,7 @@ export const patchAreas = ({ cfg, root, round, commit, nightDir, results, outcom
   for (const summary of results) {
     const mbox = join(nightDir, 'areas', summary.id, 'fix.mbox');
     if (!existsSync(mbox)) {
-      outcomes[summary.id] = summary.distinct > 0 ? 'no commits' : 'nothing to fix';
+      outcomes[summary.id] = summary.distinct > 0 || summary.carried > 0 ? 'no commits' : 'nothing to fix';
       continue;
     }
     if (failedVerify(summary.verify)) {
