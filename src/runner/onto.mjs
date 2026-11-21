@@ -12,7 +12,7 @@ const ICONS = { fix: 'wrench.and.screwdriver', review: 'doc.text.magnifyingglass
 /** `onto do`'s arguments for `job`; see `createOntoRunner`'s `run`. */
 export const ontoArgs = (job) => [
   'do', ...(job.gui ? ['--gui'] : []), '--kind', job.kind,
-  ...(job.node ? ['--node', job.node] : []), '--in', job.tree, ...(job.ref ? ['--ref', job.ref] : []), '--force',
+  ...(job.node ? ['--node', job.node] : []), ...(job.tree ? ['--in', job.tree] : []), ...(job.ref ? ['--ref', job.ref] : []), '--force',
   '--timeout', job.timeout, '--expect', job.expect, '--task', job.task, '--about', job.about,
   '--icon', job.icon ?? ICONS[job.kind] ?? ICONS.review,
   '--out', job.out, '--to', job.to,

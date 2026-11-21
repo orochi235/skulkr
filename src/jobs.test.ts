@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ontoArgs } from './runner/onto.mjs';
 import { resolveConfig } from './config.mjs';
 import { fixShell, matchShell, reviewShell } from './jobs.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';
@@ -22,5 +23,14 @@ describe('job command lines', () => {
     const cfg = resolveConfig({ claude: { settingSources: null } });
     const review = claudeOf(reviewShell(cfg, 'core', 8));
     expect(review).not.toMatch(/--model|--effort|--setting-sources/);
+  });
+});
+
+describe('ontoArgs', () => {
+  const job = { kind: 'review', node: 'teitou', ref: 'abc', timeout: '40m', expect: 'none', task: 't', about: 'a', out: 'o', to: 'd', shell: 'true' };
+
+  it("names no tree, so onto runs the job in one of the repository's pooled trees", () => {
+    expect(ontoArgs(job)).not.toContain('--in');
+    expect(ontoArgs({ ...job, tree: 'weasel-dev' })).toEqual(expect.arrayContaining(['--in', 'weasel-dev']));
   });
 });

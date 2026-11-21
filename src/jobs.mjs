@@ -1,7 +1,6 @@
 /**
  * Model jobs on the fleet. Each job runs through the runner from the frozen tree, so the node's tree is the
- * frozen commit plus `.skulkr/in`, in a tree name of its own (a slot) so jobs on one node never
- * share a tree. What a job writes under `.skulkr/out` comes back to a local directory.
+ * frozen commit plus `.skulkr/in`, in one of onto's pooled trees, which no other running job holds. What a job writes under `.skulkr/out` comes back to a local directory.
  */
 import { createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -99,8 +98,8 @@ export const slotsPerNode = (cfg, role) => {
 };
 
 /**
- * Slots: one tree name per concurrent job on a node, leased on disk under `<state>/slots/<node>/<tree>`
- * so every run on this machine shares them. `pinned` replaces the time-of-day node list; `about` goes into
+ * Slots: how many jobs of a role run on a node at once, leased on disk under `<state>/slots/<node>/<name>` so
+ * every run on this machine shares them. A slot's name is only its lease's; onto picks the job's tree. `pinned` replaces the time-of-day node list; `about` goes into
  * each lease (the run's round).
  */
 export const createSlots = (cfg, pinned, { about = {} } = {}) => {
@@ -167,7 +166,7 @@ export const runUntilFree = async (runner, job, { cwd, logPath, waitMs = BUSY_WA
  */
 export const runJob = ({ cfg, runner, frozen, base, slot, kind, task, about, expect, env = {}, shell, to, logPath }) =>
   runUntilFree(runner, {
-    kind, node: slot.node, tree: slot.tree, ref: base, timeout: `${cfg.claude.timeoutMin + 10}m`, expect, task, about,
+    kind, node: slot.node, ref: base, timeout: `${cfg.claude.timeoutMin + 10}m`, expect, task, about,
     out: JOB_OUT, to, env, shell,
   }, { cwd: frozen, logPath });
 
