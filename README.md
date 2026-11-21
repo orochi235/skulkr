@@ -368,7 +368,8 @@ absolute path.
 Every command takes `--tenant <name>` beside `--config` to name a tenant's config (`skulkr map --tenant weasel`).
 
 `skulkr service` with no config named hosts every tenant in the registry, reread every 30 seconds and before each
-request, so one added while it runs is picked up without a restart. Each tenant keeps its own `schedule.startAt`.
+request, so one added while it runs is picked up without a restart, and a tenant's config edited while it runs is
+reloaded, keeping the runs it started (a module the config imports keeps its first version until a restart). Each tenant keeps its own `schedule.startAt`.
 Rounds of different tenants never do their model work at once, since they share the fleet's slots: a tenant due, or
 asked to start, while another's round is in its model steps waits until that round reaches its patch step, and its
 `status` reply lists that under `waiting` (`behind` names the tenant it waits on), beside `nextStart`, its next

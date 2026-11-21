@@ -3,7 +3,7 @@
  * derived from them (regular expressions, names, paths) that the rest of the pipeline reads. Nothing else
  * in `src/` holds a project-specific value. README.md "The config file" says what each setting does.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -340,11 +340,14 @@ export const configPath = ({ config, root } = {}, env = process.env) => {
   return join(resolve(expandHome(root ?? env.SKULKR_ROOT ?? process.cwd())), CONFIG_FILE);
 };
 
-/** Reads and resolves a project's config; `root` (or `SKULKR_ROOT`) overrides the root it names. */
-export const loadConfig = async ({ config, root } = {}, env = process.env) => {
+/**
+ * Reads and resolves a project's config; `root` (or `SKULKR_ROOT`) overrides the root it names. `fresh` reads the file
+ * as it is now rather than as this process first imported it (the modules it imports stay as first imported).
+ */
+export const loadConfig = async ({ config, root, fresh = false } = {}, env = process.env) => {
   const file = configPath({ config, root }, env);
   if (!existsSync(file)) throw new Error(`no config at ${file}; write a ${CONFIG_FILE} (README.md says how) or pass --config`);
-  const mod = await import(pathToFileURL(file).href);
+  const mod = await import(`${pathToFileURL(file).href}${fresh ? `?mtime=${statSync(file).mtimeMs}` : ''}`);
   const user = typeof mod.default === 'function' ? await mod.default() : mod.default;
   const rootAt = root ?? env.SKULKR_ROOT;
   return resolveConfig(user ?? {}, { file, root: rootAt ? resolve(expandHome(rootAt)) : undefined });

@@ -1,9 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { resolveConfig } from './config.mjs';
-import { createTenant, lastLineOf } from './service.mjs';
+import { createTenant, lastLineOf, registryTenants } from './service.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -36,5 +36,37 @@ describe('a tenant starting a run', () => {
     expect(t.running()).toBe(false);
     expect(t.lastStarted()).toBeUndefined();
     expect(t.continuous(new Date()).next).toMatchObject({ start: false, why: expect.stringContaining('found nothing to do or failed') });
+  });
+});
+
+describe('the registry\'s tenants', () => {
+  it('reload an edited config, keep what the tenant started, and forget a tenant no longer registered', async () => {
+    const dir = tmp();
+    const config = join(dir, 'skulkr.config.mjs');
+    const write = (startAt: string, at: number) => {
+      writeFileSync(config, `export default { name: 'p', root: ${JSON.stringify(dir)}, state: ${JSON.stringify(join(dir, 'state'))}, schedule: { startAt: '${startAt}' } };`);
+      utimesSync(config, at, at);
+    };
+    const registry = join(dir, 'tenants.json');
+    writeFileSync(registry, JSON.stringify([{ name: 'p', config }]));
+    write('21:00', 1_000_000);
+    const source = registryTenants(registry);
+    await source.refresh();
+    const first = source.current()[0];
+    expect(first.startAt).toBe('21:00');
+    first.runtime.children.set(4242, { lastLine: 'x' });
+    await source.refresh();
+    expect(source.current()[0]).toBe(first);
+    write('22:30', 2_000_000);
+    await source.refresh();
+    const second = source.current()[0];
+    expect(second.startAt).toBe('22:30');
+    expect(second.running()).toBe(true);
+    writeFileSync(registry, '[]');
+    await source.refresh();
+    expect(source.current()).toEqual([]);
+    writeFileSync(registry, JSON.stringify([{ name: 'p', config }]));
+    await source.refresh();
+    expect(source.current()[0].running()).toBe(false);
   });
 });
