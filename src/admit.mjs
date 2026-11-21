@@ -15,11 +15,12 @@ export const areasAtOnce = (cfg, args, role, jobsPerArea) => {
  * its summary pushed to `results`.
  */
 export const startAreas = async ({ ctx, picked, args, status, deadline, results, maxAreas, start }) => {
-  const inFlight = new Set();
+  const inFlight = new Map();
   const cfg = ctx.cfg;
   for (const area of picked) {
-    while (inFlight.size >= maxAreas) await Promise.race(inFlight);
-    const affordable = mayStartArea({ used: status.costUsd, finished: results.map((r) => r.jobs.costUsd), inFlight: inFlight.size, cap: args.capUsd, guess: cfg.budget.areaGuessUsd });
+    while (inFlight.size >= maxAreas) await Promise.race(inFlight.keys());
+    const running = [...inFlight.values()].map((id) => ctx.spentOn?.(id) ?? 0);
+    const affordable = mayStartArea({ used: status.costUsd, finished: results.map((r) => r.jobs.costUsd), running, cap: args.capUsd, guess: cfg.budget.areaGuessUsd });
     const why = ctx.stopped() ? 'stop requested'
       : new Date() >= deadline ? `past ${cfg.schedule.stopAt}`
         : !affordable ? `the next area would cross the ${usd(args.capUsd)} cap (${usd(status.costUsd)} used)` : '';
@@ -31,7 +32,7 @@ export const startAreas = async ({ ctx, picked, args, status, deadline, results,
       .then((summary) => results.push(summary))
       .catch((error) => ctx.say(`area ${area.id} failed: ${error.stack ?? error}`))
       .finally(() => inFlight.delete(job));
-    inFlight.add(job);
+    inFlight.set(job, area.id);
   }
-  await Promise.all(inFlight);
+  await Promise.all(inFlight.keys());
 };

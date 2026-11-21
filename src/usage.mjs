@@ -55,10 +55,12 @@ export const totals = (records) => ({
 });
 
 /**
- * Whether a night that has spent `used` dollars, with `inFlight` areas still running, may start another
- * area, expecting each to cost the mean of `finished` (dollar costs of its finished areas) or `guess`.
+ * Whether a night that has spent `used` dollars may start another area, expecting each to cost the mean of `finished`
+ * (dollar costs of its finished areas) or `guess`. `running` holds what each area still running has spent so far, which
+ * `used` already counts, so each is expected to cost only the rest of its share.
  */
-export const mayStartArea = ({ used, finished, inFlight, cap, guess }) => {
+export const mayStartArea = ({ used, finished, running, cap, guess }) => {
   const expected = finished.length > 0 ? finished.reduce((s, n) => s + n, 0) / finished.length : guess;
-  return used + (inFlight + 1) * expected <= cap;
+  const rest = running.reduce((s, spent) => s + Math.max(0, expected - spent), 0);
+  return used + rest + expected <= cap;
 };

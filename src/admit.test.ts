@@ -36,6 +36,17 @@ describe('startAreas', () => {
   });
 });
 
+describe('startAreas, against the cap', () => {
+  it("counts a running area's spend so far once, not again in what it is expected to cost", async () => {
+    const h = harness({ costUsd: 85 });
+    const results: { id: string }[] = [];
+    // Each running area has spent its whole expected $10, which the $85 used already holds.
+    await startAreas({ ...h, ctx: { ...h.ctx, spentOn: () => 10 }, picked, deadline: later, results, maxAreas: 3 });
+    expect(h.said).toEqual([]);
+    expect(results.map((r) => r.id).sort()).toEqual(['a', 'b', 'c']);
+  });
+});
+
 describe('fixOnlyAreas', () => {
   it('holds a fix-only round to the dollar cap', async () => {
     const h = harness({ costUsd: 95 });

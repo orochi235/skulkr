@@ -85,6 +85,7 @@ const runContext = ({ cfg, runner, root, p, args, status, frozen, say, setStep }
   const slots = createSlots(cfg, args.nodes, { about: { round: p.round }, places: args.places });
   let unavailable = { at: 0, nodes: new Set() };
   const counts = {};
+  const spent = new Map();
   return {
     cfg, runner, root,
     earlierNights: nightsAt(p.commit, cfg.state, p.round),
@@ -97,6 +98,8 @@ const runContext = ({ cfg, runner, root, p, args, status, frozen, say, setStep }
     })),
     total: args.fixOnly ? { review: 0, match: 0, fix: p.picked.length } : { review: p.picked.length * 2, match: p.picked.length, fix: p.picked.length },
     stopped: () => stopRequested(p.round, cfg.state),
+    /** What area `id`'s jobs have cost so far, a reused job's included as its area's mean counts it. */
+    spentOn: (id) => spent.get(id) ?? 0,
     /** One runner job from the frozen tree outside the slots (a sweep's), tried again while its tree is busy. */
     runFree: (job, logPath) => runUntilFree(runner, job, { cwd: frozen, logPath }),
     say,
@@ -104,6 +107,7 @@ const runContext = ({ cfg, runner, root, p, args, status, frozen, say, setStep }
     refuse: (node) => slots.refuse(node),
     usage: (record) => {
       appendFileSync(join(status.nightDir, 'usage.jsonl'), `${JSON.stringify({ round: p.round, ...record })}\n`);
+      spent.set(record.area, (spent.get(record.area) ?? 0) + record.costUsd);
       // A reused job's spend was counted where it ran: before a resume, or in the earlier run it came from.
       if (!record.reused) {
         status.weightedTokens += record.weightedTokens;

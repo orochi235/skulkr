@@ -207,9 +207,9 @@ queue, no run starts a new review, since a gate is a suite-sized fleet run and t
 reviews already running, fixers, and verify steps go on.
 
 **Limits.** Each job's model is stopped at `claude.timeoutMin` and the runner stops the job ten minutes later, so
-what it wrote still comes home. A run starts no new area after `schedule.stopAt`, nor when the areas running plus
-one more, each expected to cost the mean of this run's finished areas (`budget.areaGuessUsd` before any has),
-would pass the dollar cap, nor once a stop is requested; a fix-only round's fixers start under the same checks. An area whose reviewers ran always gets its matcher and fixer. Where skulkr picks
+what it wrote still comes home. A run starts no new area after `schedule.stopAt`, nor when what it has spent, plus
+what each running area has left of its expected cost, plus one more area would pass the dollar cap, an area being
+expected to cost the mean of this run's finished areas (`budget.areaGuessUsd` before any has), nor once a stop is requested; a fix-only round's fixers start under the same checks. An area whose reviewers ran always gets its matcher and fixer. Where skulkr picks
 nodes (a pinned run, or a runner that does not place jobs), a node the runner reports unavailable is skipped, and a
 dispatch a node refuses moves to another node and keeps that one out for `nodes.refusedCooldownMin`. Under a placing runner a refused job is launched again each minute, up to 120 times; a refusal after a stop request is not retried.
 A job that failed before its model started is launched up to three times; one whose model started (it writes

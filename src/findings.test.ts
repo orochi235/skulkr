@@ -137,11 +137,21 @@ describe('usage', () => {
 
   it('starts another area only while the running areas and it fit under the dollar cap', () => {
     const cap = 80;
-    expect(mayStartArea({ used: 0, finished: [], inFlight: 0, cap, guess: 10 })).toBe(true);
-    expect(mayStartArea({ used: 0, finished: [], inFlight: 7, cap, guess: 10 })).toBe(true);
-    expect(mayStartArea({ used: 0, finished: [], inFlight: 8, cap, guess: 10 })).toBe(false);
-    expect(mayStartArea({ used: 60, finished: [8.8, 11.2], inFlight: 1, cap, guess: 100 })).toBe(true);
-    expect(mayStartArea({ used: 71, finished: [8.8, 11.2], inFlight: 0, cap, guess: 0 })).toBe(false);
+    const idle = (n: number) => Array(n).fill(0);
+    expect(mayStartArea({ used: 0, finished: [], running: idle(0), cap, guess: 10 })).toBe(true);
+    expect(mayStartArea({ used: 0, finished: [], running: idle(7), cap, guess: 10 })).toBe(true);
+    expect(mayStartArea({ used: 0, finished: [], running: idle(8), cap, guess: 10 })).toBe(false);
+    expect(mayStartArea({ used: 60, finished: [8.8, 11.2], running: idle(1), cap, guess: 100 })).toBe(true);
+    expect(mayStartArea({ used: 71, finished: [8.8, 11.2], running: idle(0), cap, guess: 0 })).toBe(false);
+  });
+
+  it("counts only what each running area has left to spend, since what it spent is in `used` already", () => {
+    // Five running areas have spent $8 of their expected $10 each, and one finished area $10.
+    expect(mayStartArea({ used: 50, finished: [10], running: [8, 8, 8, 8, 8], cap: 70, guess: 0 })).toBe(true);
+    expect(mayStartArea({ used: 50, finished: [10], running: [8, 8, 8, 8, 8], cap: 69, guess: 0 })).toBe(false);
+    // One running past its expected cost is expected to cost nothing more, not less than nothing.
+    expect(mayStartArea({ used: 50, finished: [10], running: [30, 0], cap: 70, guess: 0 })).toBe(true);
+    expect(mayStartArea({ used: 50, finished: [10], running: [30, 0], cap: 69, guess: 0 })).toBe(false);
   });
 });
 
