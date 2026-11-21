@@ -6,6 +6,8 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process';
 
 const BUSY = /working tree .* is busy/;
 const REFUSED = /\bquiet\b|refuses|is offline|not reachable|unavailable/i;
+/** onto's answer when every node it tried is at its ceiling of working trees. */
+export const NO_ROOM = /at or over this node's [\d.]+ \w+ ceiling|will not take a new tree/;
 
 const ICONS = { fix: 'wrench.and.screwdriver', review: 'doc.text.magnifyingglass' };
 
@@ -20,18 +22,27 @@ export const ontoArgs = (job) => [
   '--', 'bash', '-lc', job.shell,
 ];
 
-/** Runs onto once with `args` from `cwd`, its output appended to `log`. Answers `{ status, stderr }`. */
+/** Runs onto once with `args` from `cwd`, its output appended to `log`. Answers `{ status, stderr, tail }`, `tail` the
+ *  last 4000 characters of both streams. */
 export const ontoOnce = (args, cwd, log) =>
   new Promise((done) => {
     const child = spawn('onto', args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
     let stderr = '';
-    child.stdout.pipe(log, { end: false });
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk;
+    let tail = '';
+    const keep = (chunk) => {
+      tail = (tail + chunk).slice(-4000);
+    };
+    child.stdout.on('data', (chunk) => {
+      keep(chunk);
       log.write(chunk);
     });
-    child.on('error', (error) => done({ status: 1, stderr: String(error) }));
-    child.on('close', (status) => done({ status: status ?? 1, stderr }));
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+      keep(chunk);
+      log.write(chunk);
+    });
+    child.on('error', (error) => done({ status: 1, stderr: String(error), tail: String(error) }));
+    child.on('close', (status) => done({ status: status ?? 1, stderr, tail }));
   });
 
 /** Each task's first progress counter anywhere in `onto top --json`'s answer, by task. */
@@ -53,9 +64,10 @@ export const progressOfTop = (top) => {
 /**
  * The runner interface, as onto answers it:
  *
- * - `run(job, { cwd, log })` launches one job and answers `{ status, busy, refused }`: `busy` when the node's tree is
- *   in use and nothing ran (the caller waits and tries again); `refused` when the node turned it away as quiet or
- *   unavailable before anything ran (the caller tries another node). `job` is `{ kind, node?, tree, ref?, task,
+ * - `run(job, { cwd, log })` launches one job and answers `{ status, busy, refused, noRoom }`: `busy` when the node's
+ *   tree is in use and nothing ran (the caller waits and tries again); `refused` when the node turned it away as quiet
+ *   or unavailable before anything ran (the caller tries another node); `noRoom` when no node had room for a tree and
+ *   nothing ran (the caller waits a minute, without counting it as a failed launch). `job` is `{ kind, node?, tree, ref?, task,
  *   about, expect, timeout, icon?, gui?, out, to, env?, shell }`: `kind` `review` | `fix` | `test`; `tree` the node
  *   tree's name; `ref` the commit the tree syncs against; `expect` a duration or `none`; `timeout` a duration;
  *   `out` the directory in the tree brought back into the local directory `to`; `shell` a bash script.
@@ -72,6 +84,7 @@ export const createOntoRunner = () => ({
       status: r.status,
       busy: BUSY.test(r.stderr),
       refused: r.status !== 0 && REFUSED.test(r.stderr) && !/job .* (failed|exited)/.test(r.stderr),
+      noRoom: r.status !== 0 && NO_ROOM.test(r.tail),
     };
   },
   unavailableNodes: () => {

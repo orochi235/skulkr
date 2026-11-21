@@ -53,6 +53,14 @@ describe('runners', () => {
       '--task', 't', '--about', 'a', '--icon', 'wrench.and.screwdriver', '--out', '.skulkr/out', '--to', '/to', '--env', 'K=v', '--', 'bash', '-lc', 'true']);
   });
 
+  it('defaults to the local runner, its one node, and slots for one machine; a fleet runner keeps 6 each', () => {
+    expect(resolveConfig({}).runner).toBe('local');
+    expect(resolveConfig({}).nodes).toMatchObject({ list: ['local'], reviewSlots: 3, fixSlots: 2 });
+    expect(resolveConfig({ nodes: { fixSlots: 1 } }).nodes).toMatchObject({ reviewSlots: 3, fixSlots: 1 });
+    expect(resolveConfig({ runner: 'onto' }).nodes).toMatchObject({ list: [], reviewSlots: 6, fixSlots: 6 });
+    expect(weaselConfig().nodes).toMatchObject({ list: ['studio', 'teitou', 'msb-uai'], reviewSlots: 6, fixSlots: 6 });
+  });
+
   it('takes a runner object from the config, and refuses one missing part of the interface', async () => {
     const runner = { run: async () => ({ status: 0 }), unavailableNodes: () => new Set(), jobs: () => [] };
     expect(await loadRunner(resolveConfig({ runner }))).toBe(runner);

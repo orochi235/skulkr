@@ -17,8 +17,6 @@ const RELAUNCH_WAIT_MS = 60_000;
 /** How many minutes a job waits, one launch a minute, for a node to make room for its tree: a refusal for room
  *  never counts toward {@link LAUNCHES}, since no node being free is not the job failing. */
 const ROOM_WAITS = 120;
-/** onto's answer when every node it tried is at its ceiling of working trees. */
-const NO_ROOM = /at or over this node's [\d.]+ \w+ ceiling|will not take a new tree/;
 
 /** Roles that run in fixer slots, never on a node that takes no fixers: each runs the project's code. */
 const FIX_ROLES = new Set(['fix', 'repair', 'verify']);
@@ -77,7 +75,7 @@ export const dispatch = async (ctx, area, role, spec) => {
     }
     const exit = readIf(join(spec.to, model ? 'exit' : 'verify.exit')).trim();
     // No exit file: the job never ran on the node, so there is no reply to read, only another launch to try.
-    if (result.status !== 0 && !exit && roomWaits < ROOM_WAITS && NO_ROOM.test(readIf(spec.logPath).slice(-4000))) {
+    if (result.status !== 0 && !exit && roomWaits < ROOM_WAITS && result.noRoom) {
       roomWaits += 1;
       launches -= 1;
       if (roomWaits === 1 || roomWaits % 10 === 0) ctx.say(`${role} ${area.id}: no node has room for its tree (${roomWaits} min waited); waiting`);

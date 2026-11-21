@@ -119,17 +119,22 @@ export const DEFAULTS = {
     install: { lockfile: 'package-lock.json', command: 'npm ci --no-audit --no-fund', marker: 'node_modules/.skulkr-lock' },
   },
 
-  /** The job runner: `'onto'`, a module path exporting `createRunner(cfg)`, or a runner object. */
-  runner: 'onto',
+  /**
+   * The job runner: `'local'` (every job on this machine, README "Runners"), `'onto'`, a module path exporting
+   * `createRunner(cfg)`, or a runner object.
+   */
+  runner: 'local',
   nodes: {
+    /** Unset under the local runner: its one node, `local`. */
     list: [],
     /** A node that takes model jobs only inside a daily window, e.g. `{ name, from: '00:00', until: '09:00' }`. */
     local: null,
     /** Nodes fixers never run on (they run with permissions bypassed). */
     noFixers: [],
     refusedCooldownMin: 30,
-    reviewSlots: 6,
-    fixSlots: 6,
+    /** Unset: 6 each, or under the local runner, which shares one machine, `LOCAL_SLOTS`. */
+    reviewSlots: undefined,
+    fixSlots: undefined,
   },
 
   claude: {
@@ -180,6 +185,22 @@ export const DEFAULTS = {
   icons: null,
 };
 
+/** The local runner's slots when the config names none: one machine runs every job and every fixer's checks. */
+export const LOCAL_SLOTS = { reviewSlots: 3, fixSlots: 2 };
+const FLEET_SLOTS = { reviewSlots: 6, fixSlots: 6 };
+
+/** The node list and slots, filled in for the runner when the config leaves them unset. */
+const nodesFor = (nodes, runner) => {
+  const local = runner === 'local';
+  const slots = local ? LOCAL_SLOTS : FLEET_SLOTS;
+  return {
+    ...nodes,
+    list: nodes.list.length || !local ? nodes.list : ['local'],
+    reviewSlots: nodes.reviewSlots ?? slots.reviewSlots,
+    fixSlots: nodes.fixSlots ?? slots.fixSlots,
+  };
+};
+
 const isPlain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) && !(v instanceof RegExp) && Object.getPrototypeOf(v) === Object.prototype;
 
 /** `over` laid on `base`: plain objects merge key by key; anything else, arrays included, replaces. */
@@ -222,6 +243,7 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
     ...c,
     name,
     file,
+    nodes: nodesFor(c.nodes, c.runner),
     root: root ?? (c.root ? resolve(base, expandHome(c.root)) : undefined),
     state: c.state ? resolve(base, expandHome(c.state)) : join(homedir(), '.local', 'state', 'skulkr', name),
     partition: {

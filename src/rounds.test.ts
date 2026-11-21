@@ -173,7 +173,7 @@ describe('pickAreas by corrected defects left', () => {
   it("scales each area's left by its shared bucket's factor", () => {
     const passes = new Map([['q', [pass(1, 'q', 2, 2, 1, 3)]], ['r', [pass(1, 'r', 6, 6, 3, 9)]]]); // left 0.5 and 2.3
     const bucket = (factor: number) => ({ pairs: 9, predicted: 1, found: factor, factor });
-    const calibration = { factors: { overall: bucket(1), byShared: { '0': bucket(1), '1–2': bucket(10), '3+': bucket(1) } } };
+    const calibration = { minPairs: 5, pairs: [], series: [], factors: { overall: bucket(1), byShared: { '0': bucket(1), '1–2': bucket(10), '3+': bucket(1) } } };
     expect(pickAreas({ areas: [area('r'), area('q')], passes, calibration, touched: () => true, count: 2 }).picked).toEqual(['q', 'r']);
     expect(pickAreas({ areas: [area('r'), area('q')], passes, touched: () => true, count: 2 }).picked).toEqual(['r', 'q']);
   });

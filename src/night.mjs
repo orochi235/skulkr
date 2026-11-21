@@ -306,6 +306,9 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
   const args = parseArgs(cfg, argv);
   if (args.sweep && !cfg.sweep) throw new Error('--sweep: the config names no sweep');
   if (args.sweep && args.fixOnly) throw new Error('--sweep and --fix-only: a fix-only round runs no checks to fix');
+  if (!args.dry && !args.nodes?.length && !cfg.nodes.list.length && !cfg.nodes.local) {
+    throw new Error(`the config names no nodes for the ${typeof cfg.runner === 'string' ? cfg.runner : 'configured'} runner; set nodes.list or pass --nodes`);
+  }
   const root = mainCheckout(cfg);
   const git = gitIn(root);
   if (args.dry) {

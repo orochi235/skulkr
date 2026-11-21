@@ -202,7 +202,7 @@ export const createSlots = (cfg, pinned, { about = {} } = {}) => {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** One runner job from `cwd`, tried again while its tree is busy; its output goes to `logPath`. Answers `{ status, refused }`. */
+/** One runner job from `cwd`, tried again while its tree is busy; its output goes to `logPath`. Answers `{ status, refused, noRoom }`. */
 export const runUntilFree = async (runner, job, { cwd, logPath, waitMs = BUSY_WAIT_MS }) => {
   mkdirSync(job.to, { recursive: true });
   const log = createWriteStream(logPath, { flags: 'a' });
@@ -213,7 +213,7 @@ export const runUntilFree = async (runner, job, { cwd, logPath, waitMs = BUSY_WA
         await sleep(waitMs);
         continue;
       }
-      return { status: run.status, refused: Boolean(run.refused) };
+      return { status: run.status, refused: Boolean(run.refused), noRoom: Boolean(run.noRoom) };
     }
   } finally {
     // Flushed before the caller reads the log back for why a launch failed.

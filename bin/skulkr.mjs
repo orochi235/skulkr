@@ -4,6 +4,7 @@
  * registered tenant's, else `SKULKR_CONFIG`, else `skulkr.config.mjs` in `--root`, `SKULKR_ROOT` or the working
  * directory). README.md says what each does.
  *
+ *   skulkr init                 writes a starter skulkr.config.mjs for the repository here
  *   skulkr night [flags]        one run (a round); `--dry` prints its plan
  *   skulkr partition [--ref R]  rewrites the partition file
  *   skulkr map [--out FILE]     the dashboard's JSON
@@ -19,6 +20,7 @@ import { mainCheckout } from '../src/batch.mjs';
 import { exitAfterFlush } from '../src/exit.mjs';
 import { loadConfig } from '../src/config.mjs';
 import { areaDefects } from '../src/defects.mjs';
+import { initCommand } from '../src/init.mjs';
 import { mapCommand } from '../src/map.mjs';
 import { runNight } from '../src/night.mjs';
 import { partitionCommand } from '../src/partition.mjs';
@@ -26,7 +28,7 @@ import { loadRunner } from '../src/runner/index.mjs';
 import { serve } from '../src/service.mjs';
 import { addTenant, readTenants, removeTenant, requireTenant, tenantsPath } from '../src/tenants.mjs';
 
-const USAGE = 'usage: skulkr <night|partition|map|defects|service|config|tenants> [--config <file> | --tenant <name>] [--root <dir>] …';
+const USAGE = 'usage: skulkr <init|night|partition|map|defects|service|config|tenants> [--config <file> | --tenant <name>] [--root <dir>] …';
 
 /** `argv` less `--config`, `--tenant` and `--root` and their values, and those values. */
 const takeOptions = (argv) => {
@@ -86,6 +88,11 @@ const main = async () => {
     return 0;
   }
   if (command === 'tenants') return tenantsCommand(rest);
+  if (command === 'init') {
+    const path = initCommand();
+    console.log(`wrote ${path}; check its guesses, then run \`skulkr partition\` and \`skulkr night --dry\``);
+    return 0;
+  }
   if (command === 'service' && hostsRegistry(opts)) {
     await serve(null);
     return undefined;
