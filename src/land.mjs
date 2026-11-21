@@ -114,7 +114,7 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
  * (`leftOut.mjs`), and the next round's batch tries it again after its own branches. `onLanded({ tip, areas })` hears
  * that `main` fast-forwarded to `tip` with the round's `areas` in it.
  */
-export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, baseline, onLanded }) => {
+export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, baseline, onLanded = /** @type {(landed: { tip: string, areas: string[] }) => void} */ (() => {}) }) => {
   const idOf = cfg.names.idOf;
   const fixCommits = new Map(results.map((a) => [a.id, a.fixCommits]));
   const main = cfg.git.main;
@@ -198,7 +198,7 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     if (!merge) return `green; --no-merge, so ${cfg.git.main} is untouched and ${batch.name} and its branches are kept${tried}`;
     const result = fastForwardMain(root, tested.tip, cfg.git.main);
     if (result.startsWith(`${cfg.git.main} fast-forwarded`)) {
-      onLanded?.({ tip: tested.tip, areas: batch.merged.filter((b) => !earlier.has(b)).map(idOf) });
+      onLanded({ tip: tested.tip, areas: batch.merged.filter((b) => !earlier.has(b)).map(idOf) });
       // Another round may have landed and deleted a branch both took from the left-out record.
       for (const b of [...batch.merged, batch.name]) tryDelete(git, b);
     }
