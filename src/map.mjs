@@ -11,7 +11,8 @@ import { fixTallyOf } from './findings.mjs';
 import { fleetOf } from './gate.mjs';
 import { areaIcons, iconsFor } from './icons.mjs';
 import { partitionAt } from './partition.mjs';
-import { COVERED, areaStats, chapman, gitTouched, incompleteByRound, passesIn, pickAreas } from './rounds.mjs';
+import { correctedLeftOf } from './calibration.mjs';
+import { COVERED, areaStats, calibrationFor, chapman, drawnPassOf, gitTouched, incompleteByRound, passOf, passesIn, pickAreas } from './rounds.mjs';
 import { continuousOf } from './continuousOf.mjs';
 import { lastFinished, liveRuns, readJson } from './runs.mjs';
 import { parseEnvelope } from './usage.mjs';
@@ -235,28 +236,18 @@ export const nightsOf = (runs, state) => {
   return [...latest.values()];
 };
 
-/**
- * A pass as the map draws it: the reviews' counts, Chapman's estimate of what the area held, and what is left, the
- * last two scaled by `share`, the part of the pass's files the area holds (marked when under 1).
- */
-const passOf = (round, date, a, b, shared, distinct, share = 1) => {
-  const est = chapman(a, b, shared);
-  const r = (n) => Math.round(n * 10) / 10;
-  return {
-    round, date, a, b, shared, distinct, est: r(est * share), left: Math.max(0, r((est - distinct) * share)),
-    ...(share < 1 ? { share: Math.round(share * 1000) / 1000 } : {}),
-  };
-};
-
 /** The whole map for the project at `root` under `cfg`, its runs' jobs asked of `runner`. */
 export const buildMap = (cfg, root, runner) => {
   const git = gitIn(root);
   const head = git('rev-parse', '--short', 'HEAD');
   const areas = partitionAt(cfg, root, 'HEAD');
-  const { history: passes, covered, staleLines } = areaStats(cfg, git, areas, passesIn(cfg, git, root), root);
-  const { picked, settled } = pickAreas({ areas, passes, covered, staleLines, touched: gitTouched(git), count: Infinity });
+  const { history: passes, covered, staleLines, pairLines } = areaStats(cfg, git, areas, passesIn(cfg, git, root), root);
+  const calibration = calibrationFor(passes, pairLines);
+  const corrected = (p) => ({ ...p, leftCorrected: correctedLeftOf(p, calibration) });
+  const { picked, settled } = pickAreas({ areas, passes, covered, staleLines, calibration, touched: gitTouched(git), count: Infinity });
   const settledSet = new Set(settled);
-  const runs = readRuns(cfg.state, null, { listJobs: (since) => runner.jobs(since), listProgress: () => runner.progress?.() ?? new Map(), names: cfg.names, sweepId: cfg.sweep?.id, gate: cfg.gate });
+  const runs = readRuns(cfg.state, null, { listJobs: (since) => runner.jobs(since), listProgress: () => runner.progress?.() ?? new Map(), names: cfg.names, sweepId: cfg.sweep?.id, gate: cfg.gate })
+    .map((r) => ({ ...r, lanes: r.lanes.map((l) => (l.pass ? { ...l, pass: corrected(l.pass) } : l)) }));
   /** The live run holding each area. */
   const holder = new Map(runs.filter((r) => r.running).flatMap((r) => r.areas.map((id) => [id, r])));
   // A live run's areas are being audited, not waiting, so the queue counts from 1 past them.
@@ -265,7 +256,7 @@ export const buildMap = (cfg, root, runner) => {
 
   const out = areas.map((area) => {
     const own = passes.get(area.id) ?? [];
-    const history = own.map((p) => passOf(p.round, p.date, p.a, p.b, p.m, p.distinct, p.share));
+    const history = own.map((p) => corrected(drawnPassOf(p)));
     const run = holder.get(area.id);
     const audited = history.length > 0 && (covered.get(area.id) ?? 1) >= COVERED;
     const status = run ? 'tonight' : settledSet.has(area.id) ? 'settled' : audited ? 'due' : 'unaudited';
@@ -328,6 +319,7 @@ export const buildMap = (cfg, root, runner) => {
     areas: out,
     ...(Object.keys(icons.glyphs).length ? { icons: icons.glyphs } : {}),
     rounds: [...rounds.values()].sort((x, y) => x.round - y.round).map((r) => ({ ...r, est: Math.round(r.est) })),
+    calibration,
   };
 };
 

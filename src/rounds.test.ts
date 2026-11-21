@@ -1,8 +1,10 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { gitIn } from './batch.mjs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { areasInFlight, chapman, inheritPasses, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf, withBatchPasses } from './rounds.mjs';
+import { areaStats, areasInFlight, chapman, inheritPasses, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf, withBatchPasses } from './rounds.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -139,6 +141,67 @@ describe('pickAreas with churn', () => {
     const staleLines = new Map([['a', 40], ['d', 400]]);
     const { picked } = pickAreas({ areas: ['a', 'b', 'c', 'd', 'e', 'f'].map(area), passes, covered, staleLines, touched: () => true, count: 9 });
     expect(picked).toEqual(['e', 'f', 'd', 'a', 'b', 'c']);
+  });
+});
+
+describe('pickAreas by corrected defects left', () => {
+  const area = (id: string) => ({ id, files: [`${id}/x.ts`] });
+  const pass = (round: number, id: string, a: number, b: number, m: number, distinct: number) =>
+    ({ round, id, a, b, m, distinct, files: [`${id}/x.ts`], commit: 'c', fixCommits: [] });
+
+  it('ranks due areas by what their last pass left, then lines changed, then the oldest pass; a changed area with nothing left still competes', () => {
+    const passes = new Map([
+      ['x', [pass(5, 'x', 4, 4, 1, 7)]], // left 4.5
+      ['y', [pass(6, 'y', 2, 2, 2, 2)]], // left 0, its files changed since
+      ['z', [pass(7, 'z', 2, 2, 1, 3)]], // left 0.5
+      ['w', [pass(2, 'w', 2, 2, 2, 2)]],
+      ['v', [pass(3, 'v', 2, 2, 2, 2)]],
+    ]);
+    const staleLines = new Map([['y', 300]]);
+    const { picked } = pickAreas({ areas: ['v', 'w', 'x', 'y', 'z', 'new'].map(area), passes, staleLines, touched: () => true, count: 9 });
+    expect(picked).toEqual(['new', 'x', 'y', 'z', 'w', 'v']);
+  });
+
+  it("scales each area's left by its shared bucket's factor", () => {
+    const passes = new Map([['q', [pass(1, 'q', 2, 2, 1, 3)]], ['r', [pass(1, 'r', 6, 6, 3, 9)]]]); // left 0.5 and 2.3
+    const bucket = (factor: number) => ({ pairs: 9, predicted: 1, found: factor, factor });
+    const calibration = { factors: { overall: bucket(1), byShared: { '0': bucket(1), '1–2': bucket(10), '3+': bucket(1) } } };
+    expect(pickAreas({ areas: [area('r'), area('q')], passes, calibration, touched: () => true, count: 2 }).picked).toEqual(['q', 'r']);
+    expect(pickAreas({ areas: [area('r'), area('q')], passes, touched: () => true, count: 2 }).picked).toEqual(['r', 'q']);
+  });
+});
+
+describe('areaStats', () => {
+  it("gives each pair of passes the lines changed from the first to the second, the first's fixes aside", () => {
+    const root = mkdtempSync(join(tmpdir(), 'skulkr-stats-'));
+    dirs.push(root);
+    const home = process.env.HOME;
+    process.env.HOME = root;
+    try {
+      const run = (...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+      run('init', '-q', '-b', 'main');
+      const commit = (lines: number) => {
+        writeFileSync(join(root, 'a.ts'), Array.from({ length: lines }, (_, i) => `line ${i} ${Math.random()}`).join('\n') + '\n');
+        run('add', '-A');
+        run('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'c');
+        return run('rev-parse', 'HEAD');
+      };
+      const first = commit(3);
+      const fix = commit(2);
+      const second = commit(4);
+      commit(1);
+      const raw = new Map([['a', [
+        { round: 1, id: 'a', a: 1, b: 1, m: 1, distinct: 1, files: ['a.ts'], commit: first, fixCommits: [fix] },
+        { round: 2, id: 'a', a: 1, b: 1, m: 1, distinct: 1, files: ['a.ts'], commit: second, fixCommits: [] },
+      ]]]);
+      const cfg = { name: 'stats-test', partition: { isSource: () => true } };
+      const { staleLines, pairLines } = areaStats(cfg, gitIn(root), [{ id: 'a', files: ['a.ts'] }], raw, root);
+      // From the first pass: 2 deleted and 4 added by the second's commit; the fix's 5 lines are left out.
+      expect(Object.fromEntries(pairLines)).toEqual({ 'a\n1': 6 });
+      expect(Object.fromEntries(staleLines)).toEqual({ a: 5 });
+    } finally {
+      process.env.HOME = home;
+    }
   });
 });
 

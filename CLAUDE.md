@@ -30,6 +30,8 @@ weasel cutover.
     record's "last left", and "never audited" for an area passes cover under half of;
   - the map's `staleLines` and pass `share`, and the rounds chart's sums, which count each pass once with its
     recorded file count.
+  - the queue's order among due areas by corrected defects left first (README "Which areas"), and the map's
+    `leftCorrected` and `calibration` (README "Calibration"), from 2026-11-20.
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.
