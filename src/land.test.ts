@@ -58,11 +58,13 @@ const project = () => {
     const said: string[] = [];
     const outcomes: Record<string, string> = {};
     const results = branches.map((b) => area(b.replace(cfg.names.area(round, ''), '')));
+    const landed: { tip: string; areas: string[] }[] = [];
     const report = await batchAndTest({
       cfg, root, git, round, commit: frozen, date: '2026-11-21', nightDir: temp('skulkr-night-'), branches, results,
       sweep: undefined, outcomes, merge: true, say: (l: string) => said.push(l), setStep: () => {}, repair: undefined, baseline: undefined,
+      onLanded: (l: { tip: string; areas: string[] }) => landed.push(l),
     });
-    return { report, outcomes, said };
+    return { report, outcomes, said, landed };
   };
   return { cfg, root, git, frozen, branch, night };
 };
@@ -97,6 +99,15 @@ describe('batchAndTest', () => {
     expect(five.report).toContain('1 merged and 0 still left out');
     expect(readFileSync(join(git('rev-parse', '--show-toplevel'), 'shared.txt'), 'utf8')).toBe('rebased');
     expect(leftOutIn(cfg.state)).toEqual([]);
+  });
+
+  it("tells the run which of its areas landed and at what tip, though landing deletes their branches", async () => {
+    const { git, branch, night } = project();
+    const a = branch(3, 'a', 'a.txt');
+    const clash = branch(3, 'b', 'shared.txt');
+    const three = await night(3, [a, clash]);
+    expect(three.landed).toEqual([{ tip: git('rev-parse', 'main'), areas: ['a'] }]);
+    expect(git('branch', '--list', a)).toBe('');
   });
 
   it('reports a merge that failed without conflicting as failed, with git\'s message', async () => {

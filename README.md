@@ -158,7 +158,7 @@ file is regenerated, and the ledger, when the config names one, gets a row.
 | `--no-merge` | | leave `main` alone even when the batch is green |
 | `--sweep` | | run the configured sweep too |
 | `--fix-only [a,b]` | | a fix-only round for these areas, or every area with open findings; see "Carried findings" |
-| `--resume N` | | pick round N back up, reusing every job whose result came home; it stops starting areas at the first `schedule.stopAt` after the resume |
+| `--resume N` | | pick round N back up, reusing every job whose result came home; it stops starting areas at the first `schedule.stopAt` after the resume. Under the plan lock, it leaves out the areas a live run holds and those the round already landed, which its status and `summary.json` name in `landed` (`main`'s tip and the areas) once `main` fast-forwards |
 | `--cap-usd N` | `budget.capUsd` | list-price dollars the run may spend |
 | `--budget-review`, `--budget-match`, `--budget-fix` | `budget.*` | each job's `--max-budget-usd` |
 

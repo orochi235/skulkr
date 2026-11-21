@@ -110,9 +110,10 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
  * caused them, the batch is rebuilt from the repaired ones, and the gate runs once more. Still red, it lands anyway
  * where `baseline(files)` says every failure left is a test file that fails on the frozen commit too: `main` has
  * those failures already, so landing leaves it no worse. A branch left out because it would not merge is recorded
- * (`leftOut.mjs`), and the next round's batch tries it again after its own branches.
+ * (`leftOut.mjs`), and the next round's batch tries it again after its own branches. `onLanded({ tip, areas })` hears
+ * that `main` fast-forwarded to `tip` with the round's `areas` in it.
  */
-export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, baseline }) => {
+export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, baseline, onLanded }) => {
   const idOf = (branch) => branch.replace(cfg.names.area(round, ''), '');
   const fixCommits = new Map(results.map((a) => [a.id, a.fixCommits]));
   const main = cfg.git.main;
@@ -195,6 +196,7 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     if (!merge) return `green; --no-merge, so ${cfg.git.main} is untouched and ${batch.name} and its branches are kept${tried}`;
     const result = fastForwardMain(root, tested.tip, cfg.git.main);
     if (result.startsWith(`${cfg.git.main} fast-forwarded`)) {
+      onLanded?.({ tip: tested.tip, areas: batch.merged.filter((b) => !earlier.has(b)).map(idOf) });
       // Another round may have landed and deleted a branch both took from the left-out record.
       for (const b of [...batch.merged, batch.name]) tryDelete(git, b);
     }

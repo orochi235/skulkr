@@ -173,7 +173,7 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     return { round: p.round, dry: true };
   }
   mkdirSync(cfg.state, { recursive: true });
-  const { p, status } = args.resume === undefined ? await begin(cfg, root, args, say) : resume(cfg, root, args, say);
+  const { p, status } = args.resume === undefined ? await begin(cfg, root, args, say) : await resume(cfg, root, args, say);
   if (!status) return { round: p.round, dry: true };
   pruneNights(cfg);
   pruneRuns(cfg.keepNights, cfg.state);
@@ -216,7 +216,12 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     const mboxOf = (id) => (id === cfg.sweep?.id ? sweepFixed?.mbox : undefined);
     const repair = verifyOf(cfg) ? capstoneRepairer(ctx, { root, results, mboxOf }) : undefined;
     const baseline = verifyOf(cfg) ? gateBaseline(ctx) : undefined;
-    report = await batchAndTest({ ...landing, git, date: ctx.date, nightDir: status.nightDir, branches, results, sweep, merge: args.merge, setStep, repair, baseline });
+    report = await batchAndTest({ ...landing, git, date: ctx.date, nightDir: status.nightDir, branches, results, sweep, merge: args.merge, setStep, repair, baseline,
+      onLanded: (landed) => {
+        status.landed = { tip: landed.tip, areas: [...new Set([...(status.landed?.areas ?? []), ...landed.areas])] };
+        writeStatus(p.round, status, cfg.state);
+      },
+    });
     const checked = verifyLine(results);
     if (checked) report += `; ${checked}`;
     const unrun = results.filter((s) => s.incomplete?.length).map((s) => `${s.id} (${s.incomplete.join(', ')})`);
@@ -226,7 +231,7 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     if (frozen) removeWorktree(root, frozen);
     writeSummary(p.round, {
       round: p.round, commit: p.commit, started: status.started, ended: new Date().toISOString(), nightDir: status.nightDir, report, planned: status.areas,
-      weightedTokens: status.weightedTokens, costUsd: status.costUsd, capUsd: args.capUsd, sweep: sweepSummary(cfg, sweep, outcomes),
+      weightedTokens: status.weightedTokens, costUsd: status.costUsd, capUsd: args.capUsd, sweep: sweepSummary(cfg, sweep, outcomes), ...(status.landed ? { landed: status.landed } : {}),
       areas: results.map((s) => ({ id: s.id, ...(s.fixOnly ? { fixOnly: true } : {}), ...(s.carried ? { carried: s.carried } : {}), a: s.a, b: s.b, m: s.m, distinct: s.distinct, chapman: s.chapman, patches: s.patches, outcome: outcomes[s.id], ...(s.incomplete?.length ? { incomplete: s.incomplete } : {}), ...(s.verify ? { verify: s.verify } : {}), minutes: s.jobs.minutes, weightedTokens: s.jobs.weightedTokens, costUsd: s.jobs.costUsd, budgetHit: s.budgetHit })),
     }, cfg.state);
     clearStatus(p.round, cfg.state);
