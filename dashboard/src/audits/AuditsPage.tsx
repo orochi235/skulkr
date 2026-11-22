@@ -103,7 +103,7 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
   const heatOf = useMemo(() => (left: number) => heatColorOf(colors.depth, heat.at, left), [heat, colors.depth]);
   const area = shown.find((a) => a.id === shownId);
   const pickedArea = picked ? areas.find((a) => a.id === picked) ?? null : null;
-  const stats = useMemo(() => statsFor(shown, past, areas), [shown, past, areas]);
+  const stats = useMemo(() => statsFor(shown, past, areas, map.runs), [shown, past, areas, map.runs]);
   const [onlyRound, setOnlyRound] = useDashPref('map.grayOut');
   const [query, setQuery] = useState('');
   const matches = useMemo(() => {

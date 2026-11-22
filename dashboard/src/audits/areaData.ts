@@ -148,9 +148,15 @@ export function fixedIn(area: AuditArea): { readonly fixed: number; readonly rep
   return { fixed: reported.reduce((n, p) => n + p.fixed! * (p.share ?? 1), 0), reported: reported.length };
 }
 
+/** The defects live runs' fixers have fixed that no batch has landed yet: each finished fix's tally, listed and extra,
+ *  less those whose patch failed and so will not merge. */
+export const queuedFixesIn = (runs: readonly AuditRun[]): number => runs.filter((r) => r.running).flatMap((r) => r.lanes)
+  .filter((l) => l.steps.fix.state === 'done' && l.steps.patch.state !== 'failed')
+  .reduce((n, l) => n + (l.steps.fix.fixed ?? 0) + (l.steps.fix.extra ?? 0), 0);
+
 /** The headline numbers over every area, or over the areas as of a past round (`areasAsOf`). Settling is not known
  *  of a past round, so it is counted over `now`, every area as it stands. */
-export function statsFor(areas: readonly AuditArea[], asOf: number | null = null, now: readonly AuditArea[] = areas): Stat[] {
+export function statsFor(areas: readonly AuditArea[], asOf: number | null = null, now: readonly AuditArea[] = areas, runs: readonly AuditRun[] = []): Stat[] {
   const files = areas.reduce((n, a) => n + a.files, 0);
   const audited = areas.filter((a) => a.passes.length > 0 && a.status !== 'unaudited');
   const auditedFiles = audited.reduce((n, a) => n + a.files, 0);
@@ -164,6 +170,7 @@ export function statsFor(areas: readonly AuditArea[], asOf: number | null = null
     { value: `${formatCount(audited.length)} / ${formatCount(areas.length)}`, label: asOf === null ? 'areas audited at least once' : `areas audited by round ${asOf}` },
     { value: `${files ? Math.round((100 * auditedFiles) / files) : 0}%`, label: `of ${formatCount(files)} source files charted` },
     { value: formatCount(found), label: asOf === null ? 'defects found and fixed, all rounds' : `defects found and fixed through round ${asOf}` },
+    ...(asOf === null ? [{ value: formatCount(queuedFixesIn(runs)), label: 'fixed, waiting to merge' }] : []),
     {
       value: `≈${formatCount(Math.round(left))}`,
       label: `estimated still in audited areas${calibrated ? ` (${correctedText(leftCorrected)} corrected)` : ''}${staleLeft >= 0.5 ? `, ≈${formatCount(Math.round(staleLeft))} of it in areas changed since` : ''}`,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changedSincePass, correctionShows, fixedIn, foundIn, heatScaleOverRounds, defectsVersionOf, heatScaleOf, labelIn, lastPassOf, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
+import { changedSincePass, correctionShows, fixedIn, foundIn, queuedFixesIn, heatScaleOverRounds, defectsVersionOf, heatScaleOf, labelIn, lastPassOf, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
 import { continuousText, headlineOf, logTailsOf, parseJob, recentJobsOf, scrolledOf, spendOf, stepText } from './runData';
 import { stageCountsOf } from './phases';
 import { inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
@@ -227,6 +227,7 @@ describe('areas', () => {
       { value: '4 / 6', label: 'areas audited at least once' },
       { value: '80%', label: 'of 150 source files charted' },
       { value: '23', label: 'defects found and fixed, all rounds' },
+      { value: '0', label: 'fixed, waiting to merge' },
       { value: '≈13', label: 'estimated still in audited areas' },
       { value: '1', label: 'areas settled' },
     ]);
@@ -234,13 +235,13 @@ describe('areas', () => {
 
   it('gives the corrected total beside the raw one once the map carries corrected figures', () => {
     const corrected = map.areas.map((a) => ({ ...a, passes: a.passes.map((p) => ({ ...p, leftCorrected: p.left * 4 })) }));
-    expect(statsFor(corrected)[3]).toEqual({ value: '≈13', label: 'estimated still in audited areas (≈51 corrected)' });
+    expect(statsFor(corrected)[4]).toEqual({ value: '≈13', label: 'estimated still in audited areas (≈51 corrected)' });
   });
 
   it('says how much of what is left rests on areas changed since their pass, and counts a shared pass once', () => {
     const due = map.areas.find((a) => a.status === 'due' && a.passes.length)!;
     const stale = map.areas.map((a) => (a.id === due.id ? { ...a, staleLines: 120 } : a));
-    expect(statsFor(stale)[3]!.label).toBe(`estimated still in audited areas, ≈${Math.round(due.passes.at(-1)!.left)} of it in areas changed since`);
+    expect(statsFor(stale)[4]!.label).toBe(`estimated still in audited areas, ≈${Math.round(due.passes.at(-1)!.left)} of it in areas changed since`);
     const half = { ...due, passes: [{ ...due.passes[0]!, distinct: 4, share: 0.5 }] };
     const split = [half, { ...half, id: 'other' }];
     expect(statsFor(split)[2]!.value).toBe('4');
@@ -255,7 +256,7 @@ describe('areas', () => {
     const area = { ...due, passes: [covering, boundary], last: covering };
     expect(lastPassOf(area)).toBe(covering);
     expect(toneOf(area)).toEqual({ left: 20 });
-    expect(statsFor([area])[3]).toEqual({ value: '≈20', label: 'estimated still in audited areas (≈40 corrected)' });
+    expect(statsFor([area])[4]).toEqual({ value: '≈20', label: 'estimated still in audited areas (≈40 corrected)' });
     expect(heatScaleOf([area]).top).toBe(20);
     expect(lastPassOf({ ...area, last: null })).toBeNull();
     const { last: _, ...kept } = area;
@@ -408,5 +409,22 @@ describe('foundIn and fixedIn', () => {
   it('sums the fixes passes reported, and says how many reported', () => {
     expect(fixedIn(area([pass(1, 6), pass(2, 4, { fixed: 4, share: 0.5 }), pass(3, 3, { fixed: 3 })]))).toEqual({ fixed: 5, reported: 2 });
     expect(fixedIn(area([pass(1, 6)]))).toBeNull();
+  });
+});
+
+describe('queuedFixesIn', () => {
+  const lane = (fix: object, patch: object = { state: 'waiting' }) => ({ id: 'x', steps: { A: { state: 'done' }, B: { state: 'done' }, match: { state: 'done' }, fix, patch } });
+  const run = (running: boolean, lanes: object[]) => ({ ...live, running, lanes }) as unknown as SkulkrMap['runs'][0];
+
+  it("sums live runs' finished fixes, listed and extra, less a patch that failed", () => {
+    const lanes = [
+      lane({ state: 'done', fixed: 3, extra: 1 }),
+      lane({ state: 'done', fixed: 2 }, { state: 'done' }),
+      lane({ state: 'done', fixed: 5 }, { state: 'failed' }),
+      lane({ state: 'running', fixed: 4 }),
+    ];
+    expect(queuedFixesIn([run(true, lanes), run(false, [lane({ state: 'done', fixed: 9 })])])).toBe(6);
+    expect(statsFor(map.areas, null, map.areas, [run(true, lanes)])[3]).toEqual({ value: '6', label: 'fixed, waiting to merge' });
+    expect(statsFor(map.areas, 3).map((t) => t.label)).not.toContain('fixed, waiting to merge');
   });
 });
