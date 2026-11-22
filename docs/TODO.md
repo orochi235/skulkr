@@ -6,8 +6,9 @@ Open work on skulkr. Each entry says when it closes.
   weasel's rounds from `examples/weasel.config.mjs` (2026-11-21); left are moving the config and its briefs into
   weasel and deleting `scripts/skulk/`. Closes when weasel's own `skulkr.config.mjs` drives its rounds and
   `scripts/skulk/` is gone. Waiting on the user's go.
-- [ ] (P3) Delete this repository's `weasel-70a055a` release: its tarballs stood in for a weasel release with
-  `SpanStrip`, and the dashboard pins `@weasel-js/*` 2.0.0 from npm since 2026-11-22. Closes when the release is gone.
+- [ ] (P3) Merge the parked `warm-programs` branch (worktree `../skulkr-warm-programs`): the dashboard calls weasel's
+  `warmPrograms()` before React renders so the map's shaders compile during boot. `@weasel-js/*` 2.0.0 lacks it.
+  Closes when the dashboard pins a weasel release that has `warmPrograms` and the branch merges.
 - [ ] (P2) Some jobs' `claude.json` ends up empty after skulkr has already read its usage from it: seven in blits
   nights 1–3 (2026-11-21), e.g. `nights/2026-11-21T17-02-12-742Z-round2/jobs/apps.playground/A/`, whose review-A
   usage record is complete while the file beside `.onto-fetch-cache.json` is 0 bytes. Something truncates it later,

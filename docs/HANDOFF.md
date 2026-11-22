@@ -21,16 +21,6 @@ On `main`. `git log --oneline @{u}..HEAD` lists what is committed but not pushed
   Baseline measured on round 70: reviews $1.49 each, 63% of the round's spend; cache writes 36%, cache reads 37%,
   output 27% of a review's cost.
 
-## Waiting on the user
-
-- Delete skulkr's `weasel-70a055a` GitHub release (`docs/TODO.md`); nothing uses its tarballs since the dashboard
-  moved to `@weasel-js/*` 2.0.0 from npm.
-- The `warm-programs` branch and worktree (`../skulkr-warm-programs`, one commit): proposed moving its TODO line to
-  `main` and marking it parked (`git config branch.warm-programs.parked …`); weasel 2.0.0 still lacks
-  `warmPrograms`, so it cannot merge yet.
-- This machine's alpo link (`dashboard/.alpo.local.json`, gitignored) serves `~/src/weasel` over npm; it existed for
-  `SpanStrip`, which 2.0.0 has. `alpo unlink weasel` would put the dev server on npm. Not done: it is the user's.
-
 ## Traps
 
 - **The dev server's file watcher went dead once** (2026-11-22): :5214 served morning modules all day and every
