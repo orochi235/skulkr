@@ -231,3 +231,9 @@ export const fastForwardMain = (root, tip, main = 'main') => {
   const run = tryGit(git, 'merge', '--ff-only', tip);
   return run.ok ? `${main} fast-forwarded to ${tip.slice(0, 10)}` : `not fast-forwarded: ${run.out.split('\n')[0]}`;
 };
+
+/** Pushes `main` to `remote`. Answers what happened, in a clause for the report; a failure leaves `main` as it is. */
+export const pushMain = (root, main = 'main', remote = 'origin') => {
+  const run = tryGit(gitIn(root), 'push', '-q', remote, `${main}:${main}`);
+  return run.ok ? `pushed to ${remote}` : `not pushed: ${run.out.split('\n').find(Boolean) ?? 'git push failed'}`;
+};

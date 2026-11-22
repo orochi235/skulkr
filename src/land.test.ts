@@ -36,6 +36,9 @@ const project = () => {
   git('init', '-q', '-b', 'main');
   git('config', 'user.email', 'skulkr@example.invalid');
   git('config', 'user.name', 'skulkr');
+  const remote = temp('skulkr-remote-');
+  gitIn(remote)('init', '-q', '--bare', '-b', 'main');
+  git('remote', 'add', 'origin', remote);
   const put = (file: string, text: string) => {
     writeFileSync(join(root, file), text);
     git('add', file);
@@ -66,15 +69,17 @@ const project = () => {
     });
     return { report, outcomes, said, landed };
   };
-  return { cfg, root, git, frozen, branch, night };
+  return { cfg, root, git, remote, frozen, branch, night };
 };
 
 describe('batchAndTest', () => {
   it('names a conflict\'s paths, records the branch, and merges it in a later round once it merges cleanly', async () => {
-    const { cfg, git, branch, night } = project();
+    const { cfg, git, remote, branch, night } = project();
     const clean = branch(3, 'a', 'a.txt');
     const clash = branch(3, 'b', 'shared.txt');
     const three = await night(3, [clean, clash]);
+    expect(three.report).toMatch(/^main fast-forwarded to \w+ and pushed to origin$/);
+    expect(gitIn(remote)('rev-parse', 'main')).toBe(git('rev-parse', 'main'));
     expect(three.outcomes.b).toBe(`\`${clash}\`, left out: merge conflict in shared.txt`);
     expect(three.said).toContain(`batch: ${clash} left out: merge conflict in shared.txt`);
     expect(three.report).toMatch(/^main fast-forwarded/);

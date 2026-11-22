@@ -37,7 +37,8 @@ export const DEFAULTS = {
     areaId: (dir) => dir.replace(/\//g, '.'),
   },
 
-  git: { main: 'main', remote: 'origin' },
+  /** `push` sends `main` to `remote` once a green round has fast-forwarded it. */
+  git: { main: 'main', remote: 'origin', push: true },
 
   naming: {
     /** `audit` makes `audit<N>-<area>` branches and `audit<N>-<area>-<step>` job names. */

@@ -80,6 +80,9 @@ export default {
     install: ${g.install ? js(g.install) : 'null'},
   },
 
+  // Whether a green round's main is pushed to origin once it lands; false leaves pushing to you.
+  git: { push: true },
+
   // Every job runs on this machine. Fixers run with permissions bypassed, in clones under skulkr's state directory.
   runner: 'local',
 

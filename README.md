@@ -23,7 +23,7 @@ call is a `claude -p` job. By default each job runs on the machine you start the
 
 A real round spends money and moves your local `main`. Reviewers and matchers only read, but each area's fixer
 runs with permissions bypassed (in a clone of its own, never your checkout), and a batch whose test gate passes
-fast-forwards local `main` (never pushed). `--no-merge` leaves `main` alone, and the batch branch for you to read.
+fast-forwards local `main` and pushes it (`git: { push: false }` keeps it local). `--no-merge` leaves `main` alone, and the batch branch for you to read.
 The config `init` writes caps a run at $40 list price, 4 areas a round.
 
 ## Adopting it
@@ -82,7 +82,7 @@ export default {
     trailer: '',                      // lines ending the record commit's message
   },
   naming: { prefix: 'audit', batchPrefix: 'batch' }, // audit<N>-<area>, batch/<date>-audit<N>
-  git: { main: 'main', remote: 'origin' },
+  git: { main: 'main', remote: 'origin', push: true }, // push: main goes to remote once a green round lands
 
   setup: {                            // readying a node tree for a fixer
     prelude: '',                      // a shell line before every job (weasel's selects its Node with nvm)
@@ -142,7 +142,7 @@ Each step prints one line as it completes (`review 3/16 …`).
 | repair | Per area whose verify fails, up to two repair jobs on its commits, each verified again; an area still failing is left out of the batch. |
 | patch | Each mbox is applied with `git am` onto `audit<N>-<area>` at the frozen commit. One that does not apply is reported and left out. |
 | batch | Every branch merges into `batch/<date>-audit<N>` (a worktree), then every branch an earlier round left out. A merge that meets another git's lock (`index.lock': File exists`) is retried after 0.5, 1 and 2 seconds. One that still fails is left out, its outcome reading `left out: merge conflict in <paths>` or `left out: merge failed: <git's message>`, and recorded in the state directory's `left-out.json` until `main` holds it or the branch is deleted; the map gives each run `leftOut`, an `{ area, round, why }` per branch its log says was left out, and fails that area's patch step with the why. The round's record is committed there. Then the run waits for `merge.lock`, held by one run at a time from its gate through `main`'s fast-forward; holding it, it merges `main` in if another run has landed meanwhile, waits its turn in the fleet queue (step `fleet-wait`; see "Continuous rounds"), and runs the gate on the tip. |
-| merge | Green: local `main` fast-forwards to the batch (never pushed), and the branches are deleted. If `main` moved during the gate, it is merged in and the gate runs again, up to twice. Red: one capstone repair cycle (see "Verify and repair"), and the gate once more; still red, the batch worktree and its branches stay, and the report names them and what was tried. |
+| merge | Green: local `main` fast-forwards to the batch and, with `git.push` (the default), is pushed to `git.remote`; a push that fails is reported and leaves `main` where it is. The branches are deleted. If `main` moved during the gate, it is merged in and the gate runs again, up to twice. Red: one capstone repair cycle (see "Verify and repair"), and the gate once more; still red, the batch worktree and its branches stay, and the report names them and what was tried. |
 
 The record, in `<record.dir>/round-<N>/`: per area `files.txt`, `A.md`, `B.md`, `match.json`, `fix.md` and
 `area.json` (counts, estimate, the previous pass's estimate this one tests, findings in files changed since, fix

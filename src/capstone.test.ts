@@ -59,7 +59,7 @@ const summary = (id: string) => ({
 
 const land = async (r: ReturnType<typeof round>, repair?: (id: string, files: string[], log: string) => Promise<{ ok: boolean }>, gate: object = {}, baseline?: (files: string[]) => Promise<string[]>, state = scratch(), mayRepair?: (started: number) => string) => {
   const said: string[] = [];
-  const cfg = resolveConfig({ name: 't', state, gate: { name: 'test', command: ['bash', '-c', GATE], cwd: 'batch', failPrefix: 'fleet-fail:', ...gate } });
+  const cfg = resolveConfig({ name: 't', state, git: { push: false }, gate: { name: 'test', command: ['bash', '-c', GATE], cwd: 'batch', failPrefix: 'fleet-fail:', ...gate } });
   const results = r.branches.map((b) => summary(b.replace('audit5-', '')));
   const outcomes: Record<string, string> = {};
   const report = await batchAndTest({

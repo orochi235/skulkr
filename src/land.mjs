@@ -6,7 +6,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { applyFix, catchUpWithMain, commitRecord, fastForwardMain, makeBatch, removeWorktree, runGate } from './batch.mjs';
+import { applyFix, catchUpWithMain, commitRecord, fastForwardMain, makeBatch, pushMain, removeWorktree, runGate } from './batch.mjs';
 import { capstoneText, repairCapstone } from './capstone.mjs';
 import { failedWhereIn } from './gate.mjs';
 import { fleetDir, waitForFleet } from './fleet.mjs';
@@ -196,8 +196,9 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     } else if (tested.report) return `${tested.report}${tried}`;
     removeWorktree(root, batch.tree);
     if (!merge) return `green; --no-merge, so ${cfg.git.main} is untouched and ${batch.name} and its branches are kept${tried}`;
-    const result = fastForwardMain(root, tested.tip, cfg.git.main);
+    let result = fastForwardMain(root, tested.tip, cfg.git.main);
     if (result.startsWith(`${cfg.git.main} fast-forwarded`)) {
+      if (cfg.git.push) result += ` and ${pushMain(root, cfg.git.main, cfg.git.remote)}`;
       onLanded({ tip: tested.tip, areas: batch.merged.filter((b) => !earlier.has(b)).map(idOf) });
       // Another round may have landed and deleted a branch both took from the left-out record. A branch the capstone
       // dropped goes too, as a verify failure leaves no branch: kept, it would hold its area out of every later plan.
