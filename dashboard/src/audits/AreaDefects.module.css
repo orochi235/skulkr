@@ -78,6 +78,9 @@
 }
 
 .from {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   font-family: var(--wzl-font-mono);
   font-size: var(--wzl-font-size-xs);
   color: var(--audit-muted);

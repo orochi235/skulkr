@@ -1,9 +1,11 @@
+import { Icon } from '@weasel-js/ui/components/Icon';
 import { InlineMarkdown } from '@weasel-js/ui/components/InlineMarkdown';
 import { Badge } from '@weasel-js/ui/components/Badge';
 import { Popover, PopoverDialog } from '@weasel-js/ui/components/Popover';
 import { SidebarPanel } from '@weasel-js/ui/components/SidebarPanel';
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { Grade } from '@weasel-js/theme';
+import { icon } from '@dash/icons.gen';
 import { useAreaDefects } from './useAreaDefects';
 import type { AuditDefect } from './skulkrMap.types';
 import s from './AreaDefects.module.css';
@@ -11,6 +13,16 @@ import s from './AreaDefects.module.css';
 const GRADE: Readonly<Record<AuditDefect['verdict'], Grade | undefined>> = {
   fixed: 'success', 'not a defect': undefined, duplicate: undefined, question: 'warn', 'not fixed': 'danger', open: 'info',
 };
+
+/** Who listed a defect; a carried one, an earlier round's that no fixer had acted on, with a clock turned back. */
+function Source({ from }: { from: string }) {
+  if (from !== 'carried') return <span className={s.from}>{from}</span>;
+  return (
+    <span className={s.from} title="an earlier round's finding no fixer had acted on, handed to this round's fixer">
+      <Icon name={icon('ui:commitHistory')} size={12} />carried
+    </span>
+  );
+}
 
 /** One defect as a square tile: its verdict and source, then as much of its claim as fits. Where the claim is cut off,
  *  or the fixer left a note, pressing the tile opens the whole of both. */
@@ -44,7 +56,7 @@ function Defect({ d }: { d: AuditDefect }) {
       >
         <div className={s.head}>
           {badge}
-          {d.from && <span className={s.from}>{d.from}</span>}
+          {d.from && <Source from={d.from} />}
         </div>
         <div ref={claim} className={s.claim}><InlineMarkdown text={d.claim} /></div>
       </div>
@@ -53,7 +65,7 @@ function Defect({ d }: { d: AuditDefect }) {
           <PopoverDialog aria-label="Defect details" className={s.details}>
             <div className={s.head}>
               {badge}
-              {d.from && <span className={s.from}>{d.from}</span>}
+              {d.from && <Source from={d.from} />}
             </div>
             <div className={s.full}><InlineMarkdown text={d.claim} /></div>
             {d.note && <div className={s.note}><InlineMarkdown text={d.note} /></div>}
