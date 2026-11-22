@@ -107,7 +107,7 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
     const x = p.x, y = p.y + p.height;
     out.push(...filled(pathFromD(`M ${x} ${y} L ${x} ${y - cut} L ${x + cut} ${y} Z`), { color: d.edge }));
   }
-  if (d.live) out.push({ kind: 'path', path: rect(p, 4), stroke: { paint: { color: d.live, opacity: d.pulse }, width: 7.5 } });
+  if (d.live) out.push({ kind: 'path', path: rect(p, 5), stroke: { paint: { color: d.live, opacity: d.pulse }, width: 9.5 } });
   // Drawn inward, since a neighbor paints over anything outside the cell.
   if (d.glow) for (const [by, opacity] of GLOW) out.push({ kind: 'path', path: rect(p, by), stroke: { paint: { color: d.glow, opacity }, width: 3 } });
   if (d.settled && p.width >= 16 && p.height >= 16) {
