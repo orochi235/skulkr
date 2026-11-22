@@ -76,6 +76,8 @@ weasel cutover.
   - a failed step that is a file of tests, laid at branches by `gate.blame` reading each failing test's name, and
     weasel's blame laying a failed package lint at what biome flags or the package (README "Verify and repair",
     2026-11-22).
+  - the record's `partition.json`, partitioned from the batch's tree rather than the round's frozen commit, so it no
+    longer lags one landing behind `main` (README "A run", 2026-11-22).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

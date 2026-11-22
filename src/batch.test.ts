@@ -228,6 +228,24 @@ describe('commitRecord', () => {
     expect(readFileSync(join(dir, 'LEDGER.md'), 'utf8')).toContain('|---|\n| 4 |');
     expect(git('log', '-1', '--format=%B')).toMatch(/\n\nT: x$/);
   });
+
+  it("partitions the batch's tree as it lands, with what main gained after the round's commit", () => {
+    const { dir, git } = repo('main.txt', 'batch.txt');
+    mkdirSync(join(dir, 'src/x'), { recursive: true });
+    writeFileSync(join(dir, 'src/x/a.ts'), 'x');
+    git('add', '.');
+    git('commit', '-q', '-m', 'src');
+    const frozen = git('rev-parse', 'HEAD');
+    mkdirSync(join(dir, 'src/y'), { recursive: true });
+    writeFileSync(join(dir, 'src/y/b.ts'), 'y');
+    git('add', '.');
+    git('commit', '-q', '-m', 'landed meanwhile');
+    const night = mkdtempSync(join(tmpdir(), 'skulkr-night-'));
+    dirs.push(night);
+    commitRecord(resolveConfig({ record: { dir: 'audit-log' } }), dir, { round: 3, commit: frozen, date: '2026-11-20', nightDir: night, areas: [area('x')], outcomes: {}, sweep: undefined });
+    const files = JSON.parse(readFileSync(join(dir, 'audit-log/partition.json'), 'utf8')).flatMap((a: { files: string[] }) => a.files);
+    expect(files).toContain('src/y/b.ts');
+  });
 });
 
 describe('runGate', () => {

@@ -146,7 +146,8 @@ export const commitRecord = (cfg, tree, { round, commit, date, nightDir, areas, 
     }
   }
   writeFileSync(join(dir, 'README.md'), roundReadme(cfg, { round, commit, date, areas, sweep, outcomes }));
-  writePartition(cfg, tree, partitionAt(cfg, tree, commit));
+  // The batch's own tree, not the round's commit: it holds whatever landed on main while the round ran.
+  writePartition(cfg, tree, partitionAt(cfg, tree, 'HEAD'));
   const paths = [recordDir];
   const ledger = cfg.record.ledger;
   if (ledger) {

@@ -149,7 +149,8 @@ Each step prints one line as it completes (`review 3/16 …`).
 The record, in `<record.dir>/round-<N>/`: per area `files.txt`, `A.md`, `B.md`, `match.json`, `fix.md` and
 `area.json` (counts, estimate, the previous pass's estimate this one tests, findings in files changed since, fix
 commits, tokens and cost); `usage.jsonl`, one record per job; and `README.md`, the round's table. The partition
-file is regenerated, and the ledger, when the config names one, gets a row.
+file is regenerated from the batch's tree, so it holds what landed on `main` while the round ran, and the ledger, when
+the config names one, gets a row.
 
 | Flag | Default | Does |
 |---|---|---|
