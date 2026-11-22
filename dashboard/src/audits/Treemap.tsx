@@ -66,6 +66,14 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
     return watchResize(host, measure);
   }, []);
 
+  // A click that leaves the one picked area picked was a click on it, and unpicks it; the canvas only ever replaces.
+  const pickedAtPress = useRef<string | null>(null);
+  const notePress = () => { pickedAtPress.current = selection.get().length === 1 ? selection.get()[0]! : null; };
+  const unpickRepeat = () => {
+    const was = pickedAtPress.current;
+    const now = selection.get();
+    if (was !== null && now.length === 1 && now[0] === was) selection.clear();
+  };
   const heat = useMemo(() => heatScaleOf(areas), [areas]);
   const layout = useMemo(() => layoutMap(areas, size.width, size.height), [areas, size]);
   useLayoutEffect(() => {
@@ -98,7 +106,10 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
   return (
     <div className={s.chart}>
       {header}
-      <div ref={hostRef} className={s.host} role="img" aria-label="Treemap of every audit area, sized by source files">
+      <div
+        ref={hostRef} className={s.host} role="img" aria-label="Treemap of every audit area, sized by source files"
+        onPointerDownCapture={notePress} onClick={unpickRepeat}
+      >
         <SceneCanvas
           className={s.canvas}
           scene={scene}

@@ -62,6 +62,8 @@ weasel cutover.
   - an open finding listed under the area now holding its cited paths, not the id of the round that found it, and one
     carried into its new area closed once that area's fixer acts on it: the map's `openFindings` and `open`, the plan's
     "carries N open findings" line, and what a fixer is handed (2026-11-21).
+  - each map pass's `fixed`, the defects its fixer's `fix.md` says it fixed, listed or extra, for the dashboard's area
+    ledger (2026-11-21).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

@@ -49,7 +49,7 @@ function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanS
     valueText: view.elapsed ? `${view.phase}, ${view.elapsed} in` : view.phase,
     lead: (
       <button
-        type="button" className={s.name} data-lane={lane.id} onClick={() => on.onPick(lane.id)}
+        type="button" className={s.name} data-lane={lane.id} onClick={(e) => { e.stopPropagation(); on.onPick(lane.id); }}
         onPointerEnter={() => on.onLight(lane.id)} onPointerLeave={() => on.onLight(null)} onFocus={() => on.onLight(lane.id)} onBlur={() => on.onLight(null)}
       >
         {lane.id}

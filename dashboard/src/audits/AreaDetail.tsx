@@ -18,6 +18,7 @@ function Passes({ area }: { area: AuditArea }) {
   if (area.passes.length === 0) return <p className={s.hint}>No round has read it yet.</p>;
   const shared = area.passes.some((p) => p.share !== undefined);
   const corrected = area.passes.some((p) => p.leftCorrected !== undefined);
+  const fixes = area.passes.some((p) => p.fixed !== undefined);
   const fix = (p: AuditPass, value: number) => (p.leftCorrected === undefined ? '' : correctedText(value));
   return (
     <table className={s.table}>
@@ -26,7 +27,7 @@ function Passes({ area }: { area: AuditArea }) {
           <th>round</th>
           {shared && <th className={s.side}><abbr className={s.muted} title={SHARE_TITLE}>share</abbr></th>}
           <th className={s.vennCell}><Venn a="A" both={<span className={s.cap} role="img" aria-label="found by both">∩</span>} b="B" /></th>
-          <th>found</th>
+          <th>found</th>{fixes && <th>fixed</th>}
           <th>est.</th>{corrected && <th className={s.side}><abbr className={s.muted} title={CORRECTED_TITLE}>≈</abbr></th>}
           <th>left</th>{corrected && <th className={s.side}><abbr className={s.muted} title={CORRECTED_TITLE}>≈</abbr></th>}
         </tr>
@@ -37,7 +38,7 @@ function Passes({ area }: { area: AuditArea }) {
             <td>{p.round}</td>
             {shared && <td className={`${s.side} ${s.muted}`}>{p.share === undefined ? '' : `${Math.round(p.share * 100)}%`}</td>}
             <td className={s.vennCell}><Venn a={p.a - p.shared} both={p.shared} b={p.b - p.shared} /></td>
-            <td>{p.distinct}</td>
+            <td>{p.distinct}</td>{fixes && <td>{p.fixed ?? ''}</td>}
             <td>{p.est.toFixed(1)}</td>{corrected && <td className={`${s.side} ${s.muted}`}>{fix(p, correctedEstOf(p))}</td>}
             <td>{p.left.toFixed(1)}</td>{corrected && <td className={`${s.side} ${s.muted}`}>{fix(p, correctedLeftOf(p))}</td>}
           </tr>

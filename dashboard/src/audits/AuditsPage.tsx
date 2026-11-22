@@ -96,7 +96,8 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
   const next = useMemo(() => nextUpOf(areas, NEXT_UP_ROUNDS * (map.areasPerRound ?? 16)), [areas, map.areasPerRound]);
   const phases = useMemo(() => phasesOf(map.runs), [map.runs]);
   const estimates = useMemo(() => liveEstimatesOf(map.runs), [map.runs]);
-  const pick = (id: string) => selection.set([asNodeId(id)]);
+  // Naming the area already picked unpicks it, as a second click on the map does (Treemap's togglingSelection).
+  const pick = (id: string) => (selection.get()[0] === id ? selection.clear() : selection.set([asNodeId(id)]));
   const on = { onPick: pick, onLight: setLit };
 
   return (

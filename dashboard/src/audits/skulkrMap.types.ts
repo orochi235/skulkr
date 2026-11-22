@@ -12,6 +12,8 @@ export interface AuditPass {
   readonly distinct: number;
   readonly est: number;
   readonly left: number;
+  /** The defects its fixer's report says it fixed, listed or extra; absent where there is no report with verdicts. */
+  readonly fixed?: number;
   /** `left` times the calibration factor for the pass's shared bucket (the map's `calibration`). */
   readonly leftCorrected?: number;
   /** The part of the pass's files this area holds, when it holds only some: `est` and `left` are scaled by it. */

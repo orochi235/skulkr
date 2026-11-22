@@ -4,6 +4,7 @@
  */
 import { calibrationOf, correctedLeftOf } from './calibration.mjs';
 import { churnCacheOf, churnSince } from './churn.mjs';
+import { fixTallyOf } from './findings.mjs';
 import { ROUND_DIR, diskRecords, recordsFor } from './recordFiles.mjs';
 
 /** A pass that found at most this many distinct defects counts toward settling its area. */
@@ -14,12 +15,16 @@ export const chapman = (a, b, m) => (a + 1) * (b + 1) / (m + 1) - 1;
 
 /**
  * A record's pass (`recordFiles.mjs`): its `area.json` with its `round`, and its `files.txt` where that lists no files;
- * `unmerged` when it is read from a batch `main` has not merged.
+ * `unmerged` when it is read from a batch `main` has not merged; `fixed`, the defects its fixer's `fix.md` says it
+ * fixed, listed or extra (`fixTallyOf`), where it has one that gives a verdict.
  */
 const passOfRecord = (rec) => {
   const pass = { round: rec.round, ...JSON.parse(rec.read('area.json')), ...(rec.ref ? { unmerged: true } : {}) };
   const listed = Array.isArray(pass.files) ? null : rec.read('files.txt');
   if (listed !== null) pass.files = listed.split('\n').filter(Boolean);
+  const report = rec.read('fix.md');
+  const tally = report === null ? null : fixTallyOf(report);
+  if (tally) pass.fixed = tally.fixed + (tally.extra ?? 0);
   return pass;
 };
 
@@ -116,8 +121,11 @@ export const passOf = (round, date, a, b, shared, distinct, share = 1) => {
   };
 };
 
-/** A recorded pass (an `area.json` with its `round` and `share`) as the map draws it. */
-export const drawnPassOf = (p) => passOf(p.round, p.date, p.a ?? 0, p.b ?? 0, p.m ?? 0, p.distinct ?? 0, p.share);
+/** A recorded pass (an `area.json` with its `round` and `share`) as the map draws it, with its `fixed` where known. */
+export const drawnPassOf = (p) => ({
+  ...passOf(p.round, p.date, p.a ?? 0, p.b ?? 0, p.m ?? 0, p.distinct ?? 0, p.share),
+  ...(p.fixed !== undefined ? { fixed: p.fixed } : {}),
+});
 
 /** An area's history (`inheritPasses`') by round, oldest first: `{ round, passes, covers }`, `covers` 1 where unknown. */
 export const roundsIn = (list = []) => {
@@ -166,6 +174,7 @@ export const drawnRoundOf = (passes) => {
   return {
     round: drawn[0].round, date: drawn[0].date, a: sum((p) => p.a), b: sum((p) => p.b), shared: sum((p) => p.shared),
     distinct: r1(sum((p) => p.distinct * (p.share ?? 1))), est: r1(sum((p) => p.est)), left: r1(sum((p) => p.left)),
+    ...(drawn.some((p) => p.fixed !== undefined) ? { fixed: r1(sum((p) => (p.fixed ?? 0) * (p.share ?? 1))) } : {}),
   };
 };
 
