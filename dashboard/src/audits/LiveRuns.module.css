@@ -150,7 +150,8 @@
 
 /* The name to the left, the area's pass dots against the right edge of the name column, as on its map cell. */
 .nameText { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.passDots { flex: none; display: inline-flex; gap: 5px; margin-inline-end: var(--wzl-space-1); }
+.passDots { flex: none; display: inline-flex; align-items: center; gap: 5px; margin-inline-end: var(--wzl-space-1); }
+.dotColumn { display: inline-flex; flex-direction: column; gap: 2px; }
 .dotGroup { display: inline-flex; gap: 2px; }
 .dotGroup > i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: 0.85; }
 .dotGroup > i.open { background: none; box-shadow: inset 0 0 0 1px currentColor; }

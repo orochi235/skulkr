@@ -40,35 +40,47 @@ const failedGateRuns = (run: AuditRun) => gateRunsOf(run).flatMap((g) => {
   return failures ? [{ id: g.id, label: g.label, failures }] : [];
 });
 
-/** An area's lane as a stack row: its name, and `spans`, its steps in the view chosen. */
 /** Dots per group in a lane's pass count, set apart like tally marks so a count reads at a glance. */
 const DOT_GROUP = 5;
+/** Groups stacked in a column before the next column starts: two rows of dots fit the lane's line. */
+const GROUP_ROWS = 2;
 
-/** An area's passes as dots, one each, in groups of DOT_GROUP, at the end of its lane's name; while this round's pass
- *  is under way, an open circle stands in for its dot. */
+/** How many dots each group holds, column by column: `total` dots in groups of DOT_GROUP, GROUP_ROWS to a column. */
+const dotColumnsFor = (total: number): number[][] => {
+  const groups = Array.from({ length: Math.ceil(total / DOT_GROUP) }, (_, g) => Math.min(DOT_GROUP, total - g * DOT_GROUP));
+  return Array.from({ length: Math.ceil(groups.length / GROUP_ROWS) }, (_, c) => groups.slice(c * GROUP_ROWS, (c + 1) * GROUP_ROWS));
+};
+
+/** An area's passes as dots, one each, in groups of DOT_GROUP stacked GROUP_ROWS high, at the end of its lane's name;
+ *  while this round's pass is under way, an open circle stands in for its dot. */
 function PassDots({ passes, pending }: { passes: number; pending: boolean }) {
   const total = passes + (pending ? 1 : 0);
   if (total <= 0) return null;
-  const groups = Array.from({ length: Math.ceil(total / DOT_GROUP) }, (_, g) => g * DOT_GROUP);
   const title = `${passes} ${passes === 1 ? 'pass' : 'passes'}${pending ? ', one under way' : ''}`;
+  let at = 0;
   return (
     <span className={s.passDots} title={title}>
-      {groups.map((from) => (
-        <span key={from} className={s.dotGroup}>
-          {Array.from({ length: Math.min(DOT_GROUP, total - from) }, (_, i) => <i key={i} className={from + i >= passes ? s.open : undefined} />)}
+      {dotColumnsFor(total).map((column, c) => (
+        <span key={c} className={s.dotColumn}>
+          {column.map((count, g) => (
+            <span key={g} className={s.dotGroup}>
+              {Array.from({ length: count }, (_, i) => <i key={i} className={at++ >= passes ? s.open : undefined} />)}
+            </span>
+          ))}
         </span>
       ))}
     </span>
   );
 }
 
-/** The room `passes` dots take in their groups, with the gap before them; the widths are PassDots' CSS. */
+/** The room `passes` dots take in their columns, with the gap before them; the widths are PassDots' CSS. */
 export const dotsWidthFor = (passes: number): number => {
   if (passes <= 0) return 0;
-  const groups = Math.ceil(passes / DOT_GROUP);
-  return passes * 4 + (passes - groups) * 2 + (groups - 1) * 5 + 4 + 8;
+  const columns = dotColumnsFor(passes).map((column) => column[0]!);
+  return columns.reduce((w, n) => w + n * 4 + (n - 1) * 2, 0) + (columns.length - 1) * 5 + 4 + 8;
 };
 
+/** An area's lane as a stack row: its name, and `spans`, its steps in the view chosen. */
 function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanStripSpan[], passes: number): SpanStripsRow {
   return {
     id: lane.id,
