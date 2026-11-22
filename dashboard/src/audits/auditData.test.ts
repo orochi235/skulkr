@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changedSincePass, defectsVersionOf, heatScaleOf, labelIn, lastPassOf, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
+import { changedSincePass, correctionShows, defectsVersionOf, heatScaleOf, labelIn, lastPassOf, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
 import { continuousText, headlineOf, logTailsOf, parseJob, recentJobsOf, scrolledOf, spendOf, stepText } from './runData';
 import { stageCountsOf } from './phases';
 import { inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
@@ -368,5 +368,16 @@ describe('wrapAtDots', () => {
     expect(wrapAtDots('core.domains.paths', 8, 2)).toEqual(['core.', 'domains…']);
     expect(wrapAtDots('interactions.x', 6, 3)).toEqual(['inter…', 'x']);
     expect(wrapAtDots('core', 0, 3)).toEqual([]);
+  });
+});
+
+describe('correctionShows', () => {
+  it('shows a corrected figure only a whole defect and a tenth away from the raw one', () => {
+    expect(correctionShows(0.2, 0.2)).toBe(false);
+    expect(correctionShows(13, 13.9)).toBe(false);
+    expect(correctionShows(13, 14.4)).toBe(true);
+    expect(correctionShows(7.5, 17.4)).toBe(true);
+    expect(correctionShows(40, 43)).toBe(false);
+    expect(correctionShows(5, undefined)).toBe(false);
   });
 });

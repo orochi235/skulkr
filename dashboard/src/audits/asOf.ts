@@ -18,3 +18,7 @@ export const areasAsOf = (areas: readonly AuditArea[], round: number): AuditArea
     status: last ? 'due' : 'unaudited', queue: null, stage: null, passes: a.passes.filter((p) => p.round <= round), last,
   };
 });
+
+/** The ids of the areas a pass of `round` read any of; null when there is no round to ask about. */
+export const readIn = (areas: readonly AuditArea[], round: number | null): ReadonlySet<string> | null =>
+  round === null ? null : new Set(areas.filter((a) => a.passes.some((p) => p.round === round)).map((a) => a.id));

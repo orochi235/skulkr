@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { lastPassOf, statsFor } from './areaData';
-import { areasAsOf, pastRoundsOf } from './asOf';
+import { areasAsOf, pastRoundsOf, readIn } from './asOf';
 import type { AuditArea, AuditPass } from './skulkrMap.types';
 
 const pass = (round: number, left: number): AuditPass => ({ round, date: '', a: 2, b: 2, shared: 1, distinct: 2, est: 2 + left, left });
@@ -53,5 +53,11 @@ describe("an area's estimate as of a past round", () => {
     ]);
     expect(stats[0]!.value).toBe('1 / 2');
     expect(stats[3]!.value).toBe('≈6');
+  });
+
+  it('names the areas a round read, for the map to keep in color', () => {
+    expect([...readIn(AREAS, 40)!]).toEqual(['core.ops', 'ui.menu']);
+    expect([...readIn(AREAS, 41)!]).toEqual(['core.ops']);
+    expect(readIn(AREAS, null)).toBeNull();
   });
 });

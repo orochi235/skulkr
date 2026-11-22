@@ -11,7 +11,7 @@ import { Stats } from './Stats';
 import { TopTabs } from './TopTabs';
 import { Treemap } from './Treemap';
 import { RoundPicker } from './RoundPicker';
-import { areasAsOf, pastRoundsOf } from './asOf';
+import { areasAsOf, pastRoundsOf, readIn } from './asOf';
 import { useAsOfRound } from './useAsOfRound';
 import { NEXT_UP_ROUNDS, defectsVersionOf, heatScaleOf, nextUpOf, runHolding, statsFor } from './areaData';
 import { heatColorOf } from './heat';
@@ -92,6 +92,8 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
   const area = shown.find((a) => a.id === shownId);
   const pickedArea = picked ? areas.find((a) => a.id === picked) ?? null : null;
   const stats = useMemo(() => statsFor(shown, past, areas), [shown, past, areas]);
+  const [onlyRound, setOnlyRound, keepOnlyRound] = useViewerPref('onlyRound', false, (v) => (v === 'true' ? true : v === 'false' ? false : undefined));
+  const inColor = useMemo(() => (onlyRound ? readIn(shown, past ?? pastRounds.at(-1) ?? null) : null), [onlyRound, shown, past, pastRounds]);
   const unmerged = useMemo(() => new Set(map.rounds.filter((r) => r.pending === 'unmerged').map((r) => r.round)), [map.rounds]);
   const next = useMemo(() => nextUpOf(areas, NEXT_UP_ROUNDS * (map.areasPerRound ?? 16)), [areas, map.areasPerRound]);
   const phases = useMemo(() => phasesOf(map.runs), [map.runs]);
@@ -120,7 +122,7 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
         <Treemap
           scene={scene} selection={selection} areas={shown} palette={colors} phases={past === null ? phases : NO_PHASES}
           {...(past === null ? { estimates } : {})} onHover={setHovered} lit={lit} areasPerRound={map.areasPerRound} glyphs={map.icons}
-          asOf={past} header={pastRounds.length ? <RoundPicker rounds={pastRounds} value={past} onChange={asOf.choose} /> : null}
+          asOf={past} inColor={inColor} header={pastRounds.length ? <RoundPicker rounds={pastRounds} value={past} onChange={asOf.choose} onlyRound={onlyRound} onOnlyRound={(on) => { setOnlyRound(on); keepOnlyRound(on); }} /> : null}
         />
         <ResizeHandle value={asideWidth} min={ASIDE.min} max={ASIDE.max} invert onInput={setAsideWidth} onChange={keepAside} aria-label="Resize the side panel" />
         <aside className={s.aside} aria-label="Area">

@@ -3,7 +3,7 @@ import { Badge } from '@weasel-js/ui/components/Badge';
 import { DetailList, DetailRow } from '@weasel-js/ui/components/DetailList';
 import { SidebarPanel } from '@weasel-js/ui/components/SidebarPanel';
 import type { Grade } from '@weasel-js/theme';
-import { STATUS_LABEL, correctedEstOf, correctedLeftOf, correctedText, lastPassOf, stageLabelOf } from './areaData';
+import { STATUS_LABEL, correctedEstOf, correctedLeftOf, correctedText, correctionShows, lastPassOf, stageLabelOf } from './areaData';
 import type { AreaStatus, AuditArea, AuditPass, AuditRun } from './skulkrMap.types';
 import s from './AreaDetail.module.css';
 
@@ -17,9 +17,11 @@ const CORRECTED_TITLE = 'corrected by how much later passes found';
 function Passes({ area }: { area: AuditArea }) {
   if (area.passes.length === 0) return <p className={s.hint}>No round has read it yet.</p>;
   const shared = area.passes.some((p) => p.share !== undefined);
-  const corrected = area.passes.some((p) => p.leftCorrected !== undefined);
+  const showsEst = (p: AuditPass) => p.leftCorrected !== undefined && correctionShows(p.est, correctedEstOf(p));
+  const showsLeft = (p: AuditPass) => correctionShows(p.left, p.leftCorrected);
+  const corrected = area.passes.some((p) => showsEst(p) || showsLeft(p));
   const fixes = area.passes.some((p) => p.fixed !== undefined);
-  const fix = (p: AuditPass, value: number) => (p.leftCorrected === undefined ? '' : correctedText(value));
+  const fix = (shows: boolean, value: number) => (shows ? correctedText(value) : '');
   return (
     <table className={s.table}>
       <thead>
@@ -39,8 +41,8 @@ function Passes({ area }: { area: AuditArea }) {
             {shared && <td className={`${s.side} ${s.muted}`}>{p.share === undefined ? '' : `${Math.round(p.share * 100)}%`}</td>}
             <td className={s.vennCell}><Venn a={p.a - p.shared} both={p.shared} b={p.b - p.shared} /></td>
             <td>{p.distinct}</td>{fixes && <td>{p.fixed ?? ''}</td>}
-            <td>{p.est.toFixed(1)}</td>{corrected && <td className={`${s.side} ${s.muted}`}>{fix(p, correctedEstOf(p))}</td>}
-            <td>{p.left.toFixed(1)}</td>{corrected && <td className={`${s.side} ${s.muted}`}>{fix(p, correctedLeftOf(p))}</td>}
+            <td>{p.est.toFixed(1)}</td>{corrected && <td className={`${s.side} ${s.muted}`}>{fix(showsEst(p), correctedEstOf(p))}</td>}
+            <td>{p.left.toFixed(1)}</td>{corrected && <td className={`${s.side} ${s.muted}`}>{fix(showsLeft(p), correctedLeftOf(p))}</td>}
           </tr>
         ))}
       </tbody>
@@ -89,7 +91,7 @@ export function AreaDetail({ area, holder, asOf = null }: { area: AuditArea | un
             <DetailRow label="passes">{area.passes.length}</DetailRow>
             {area.queue !== null && <DetailRow label="queue position">{area.queue}</DetailRow>}
             {area.stage && <DetailRow label="this run">{stageLabelOf(area.stage)}</DetailRow>}
-            {last && <DetailRow label={`left after round ${last.round}`}>{last.left.toFixed(1)}{last.leftCorrected !== undefined && ` (${correctedText(last.leftCorrected)} corrected)`}</DetailRow>}
+            {last && <DetailRow label={`left after round ${last.round}`}>{last.left.toFixed(1)}{correctionShows(last.left, last.leftCorrected) && ` (${correctedText(last.leftCorrected!)} corrected)`}</DetailRow>}
             {area.staleLines ? <DetailRow label="lines changed since">{area.staleLines.toLocaleString()}</DetailRow> : null}
             {area.openFindings ? <DetailRow label="open findings">{area.openFindings}</DetailRow> : null}
           </DetailList>

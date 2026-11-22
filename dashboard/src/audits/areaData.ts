@@ -62,6 +62,10 @@ export const correctedLeftOf = (p: AreaEstimate): number => p.leftCorrected ?? p
 /** A pass's estimate with its left calibrated: what it found plus the corrected left. */
 export const correctedEstOf = (p: AuditPass): number => p.est + correctedLeftOf(p) - p.left;
 
+/** Whether a corrected figure says anything its raw one does not: it differs by a whole defect and by a tenth. */
+export const correctionShows = (raw: number, corrected: number | undefined): corrected is number =>
+  corrected !== undefined && Math.abs(corrected - raw) >= Math.max(1, 0.1 * Math.abs(raw));
+
 /** The corrected figure as it reads beside a raw one: whole defects, approximate. */
 export const correctedText = (n: number): string => `≈${formatCount(Math.round(n))}`;
 
@@ -129,7 +133,7 @@ export function statsFor(areas: readonly AuditArea[], asOf: number | null = null
   const left = audited.reduce((n, a) => n + (lastPassOf(a)?.left ?? 0), 0);
   const staleLeft = audited.reduce((n, a) => n + (a.staleLines ? lastPassOf(a)?.left ?? 0 : 0), 0);
   const leftCorrected = audited.reduce((n, a) => { const p = lastPassOf(a); return n + (p ? correctedLeftOf(p) : 0); }, 0);
-  const calibrated = audited.some((a) => lastPassOf(a)?.leftCorrected !== undefined);
+  const calibrated = correctionShows(left, audited.some((a) => lastPassOf(a)?.leftCorrected !== undefined) ? leftCorrected : undefined);
   // A pass several areas inherited counts once over them, by each one's share.
   const found = Math.round(areas.reduce((n, a) => n + a.passes.reduce((m, p) => m + p.distinct * (p.share ?? 1), 0), 0));
   const settled = now.filter((a) => a.status === 'settled').length;

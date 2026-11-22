@@ -17,6 +17,20 @@
 
 .idle { border-left-color: var(--audit-settled); }
 
+/* The round's title row stays at the top of the runs pane while the rest of its card scrolls under it. */
+.head {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: calc(-1 * var(--wzl-space-3)) 0 0;
+  padding: var(--wzl-space-3) 0 var(--wzl-space-1);
+  background: var(--audit-panel);
+}
+
 .pulse {
   width: 10px;
   height: 10px;

@@ -34,6 +34,8 @@ export interface TreemapProps {
   readonly glyphs?: Readonly<Record<string, string>>;
   /** The past round `areas` stand as of (`areasAsOf`), whose settling, changes and live runs are not known; null for now. */
   readonly asOf?: number | null;
+  /** The areas to keep in color, the rest drawn gray; null keeps every area in color. */
+  readonly inColor?: ReadonlySet<string> | null;
   /** What sits above the map: the round picker. */
   readonly header?: ReactNode;
 }
@@ -49,7 +51,7 @@ const readHalves = (v: string): number | undefined => {
   return Number.isInteger(n) && n >= 0 && n <= MAX_HALVES ? n : undefined;
 };
 
-export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, header }: TreemapProps) {
+export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, inColor = null, header }: TreemapProps) {
   // How many half-rounds of the queue's head to number on the map, each in its area's corner.
   const [halves, setHalves, keepHalves] = useViewerPref('upcomingHalves', 6, readHalves);
   const places = halves * (areasPerRound / 2);
@@ -77,8 +79,8 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
   const heat = useMemo(() => heatScaleOf(areas), [areas]);
   const layout = useMemo(() => layoutMap(areas, size.width, size.height), [areas, size]);
   useLayoutEffect(() => {
-    syncAuditScene(scene, auditNodeSpecs(areas, layout, palette, phases, lit, places, estimates, glyphs));
-  }, [scene, areas, layout, palette, phases, lit, places, estimates, glyphs]);
+    syncAuditScene(scene, auditNodeSpecs(areas, layout, palette, phases, lit, places, estimates, glyphs, inColor));
+  }, [scene, areas, layout, palette, phases, lit, places, estimates, glyphs, inColor]);
 
   // The map's text is set in the theme's faces, which the canvas draws from the document's fonts once each loads.
   useEffect(() => {

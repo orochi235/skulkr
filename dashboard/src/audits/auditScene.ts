@@ -4,7 +4,7 @@ import { deepEqual } from '@weasel-js/registry';
 import { AUDIT_PAINTER, type AuditCellData, type AuditFrameData, type AuditNodeData } from './auditPainter';
 import { glyphPathsOf } from './glyph';
 import { changedSincePass, heatScaleOf, labelIn, toneOf, wrapAtDots, type HeatScale } from './areaData';
-import { heatColorOf, rampAt } from './heat';
+import { grayOf, heatColorOf, rampAt } from './heat';
 import type { MapCell, MapFrame } from './mapLayout';
 import type { AuditPhase } from './phases';
 import type { AuditArea } from './skulkrMap.types';
@@ -111,13 +111,14 @@ function labelLines(area: AuditArea, cell: MapCell, font: string): string[] {
 
 function cellData(
   area: AuditArea, cell: MapCell, palette: AuditPalette, heat: HeatScale, phase: AuditPhase | undefined, lit: boolean, upcoming: number,
-  estimate: number | undefined, glyph: string | undefined,
+  estimate: number | undefined, glyph: string | undefined, gray = false,
 ): AuditCellData {
   const tone = toneOf(area);
   // An estimate older than its files' last changes wears a cut corner; its color stays the heat its estimate gives,
   // since a color washed toward the panel reads as another estimate.
   const worn = typeof tone === 'object' && changedSincePass(area);
-  const fill = tone === 'settled' ? palette.settled : tone === 'unaudited' ? palette.uncharted : heatColorOf(palette.depth, heat.at, tone.left);
+  const toned = tone === 'settled' ? palette.settled : tone === 'unaudited' ? palette.uncharted : heatColorOf(palette.depth, heat.at, tone.left);
+  const fill = gray ? grayOf(toned) : toned;
   const ink = tone === 'unaudited' ? palette.ink : inkOn(fill, palette);
   const live = area.status === 'tonight';
   const labeled = cell.width > 52 && cell.height > 28;
@@ -126,7 +127,7 @@ function cellData(
     kind: 'audit-cell',
     fill: { color: fill },
     ...(tone === 'unaudited' ? {
-      over: { kind: 'hatch', color: estimate === undefined ? palette.hatch : rampAt(palette.depth, heat.at(estimate)), size: 6, lineWidth: 1.6 },
+      over: { kind: 'hatch', color: (gray ? grayOf : String)(estimate === undefined ? palette.hatch : rampAt(palette.depth, heat.at(estimate))), size: 6, lineWidth: 1.6 },
     } : {}),
     ...(worn ? { worn } : {}),
     edge: palette.panel,
@@ -159,6 +160,8 @@ export function auditNodeSpecs(
   estimates: ReadonlyMap<string, number> = new Map(),
   /** Each icon's glyph, by the name an area's `icon` gives. */
   glyphs: Readonly<Record<string, string>> = {},
+  /** The areas to keep in color, the rest drawn gray; null keeps every area in color. */
+  inColor: ReadonlySet<string> | null = null,
 ): AuditNodeSpec[] {
   const byId = new Map(areas.map((a) => [a.id, a]));
   const heat = heatScaleOf(areas);
@@ -181,7 +184,7 @@ export function auditNodeSpecs(
     out.push({
       id: asNodeId(c.id), parent: c.parent === null ? null : frameIdOf(c.parent), pickable: true,
       pose: poseIn(c, parent), data: cellData(area, c, palette, heat, phases.get(area.id), area.id === lit, upcoming, estimates.get(area.id),
-        area.icon !== undefined && Object.hasOwn(glyphs, area.icon) ? glyphs[area.icon] : undefined),
+        area.icon !== undefined && Object.hasOwn(glyphs, area.icon) ? glyphs[area.icon] : undefined, inColor !== null && !inColor.has(area.id)),
     });
   }
   return out;

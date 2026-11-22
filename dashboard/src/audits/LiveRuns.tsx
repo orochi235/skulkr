@@ -155,13 +155,15 @@ function RunStrip({ run, now, mode, hideComplete, on }: {
 }) {
   return (
     <section className={cx(s.run, !run.running && s.idle)} aria-label={`Round ${run.round}`}>
-      <div className={s.pulse} aria-hidden="true" />
-      <div className={s.what}>
-        <span>{headlineOf(run)}</span>
-        {run.started && <span className={s.started}>{startedText(run.started, now)}</span>}
+      <div className={s.head}>
+        <div className={s.pulse} aria-hidden="true" />
+        <div className={s.what}>
+          <span>{headlineOf(run)}</span>
+          {run.started && <span className={s.started}>{startedText(run.started, now)}</span>}
+        </div>
+        <div className={s.line} title={lastLineOf(run)}><InlineMarkdown text={lastLineOf(run)} /></div>
+        <div className={s.spend}>{spendOf(run)}</div>
       </div>
-      <div className={s.line} title={lastLineOf(run)}><InlineMarkdown text={lastLineOf(run)} /></div>
-      <div className={s.spend}>{spendOf(run)}</div>
       {run.lanes.length > 0 && <StageCounts run={run} />}
       <LeftOut run={run} on={on} />
       {run.lanes.length > 0 && (
