@@ -2,6 +2,11 @@
 
 Open work on skulkr. Each entry says when it closes.
 
+- [ ] (P2) weasel's `gate.blame` (`blameStep` in `examples/weasel.config.mjs`) names no package for a failed
+  `npm run lint -w @weasel-js/<pkg>` step, so the capstone leaves a lint failure unattributed and the round strands.
+  Round 71 (2026-11-22) stranded this way: `audit71-core.interactions.actions.defaults` left
+  `packages/labkit/src/lab/LabZoom.tsx` unformatted for biome. The step names its package, and biome's report names
+  the file. Closes when such a failure is laid at the branch that changed the file.
 - [ ] (P2) Fix steps on the dashboard don't show progress reliably, and keep showing an error after it has
   presumably been fixed (reported 2026-11-22, not yet traced): work out where each comes from (the fixer's progress
   counter in `progress.mjs`, the map's run and lane state) and how a fixed error should clear. Closes when a fix
