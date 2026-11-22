@@ -127,6 +127,8 @@ describe('AuditsPage', () => {
     expect(await screen.findByRole('slider', { name: 'Show the map as it stood after a round' })).toHaveAttribute('aria-valuetext', 'after round 40');
 
     cleanup();
+    // Else the page first draws the map kept from the render before, which has past rounds.
+    localStorage.clear();
     serve(200, fixture);
     renderPage();
     expect(await screen.findByText('Round 41 running · fix · 2 areas')).toBeInTheDocument();

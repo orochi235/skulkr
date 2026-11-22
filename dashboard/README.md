@@ -7,7 +7,8 @@ the pipeline's CLI (`../bin/skulkr.mjs tenants ls`, `map` and `defects <area>`),
 The title's menu switches tenants; the URL hash names the one shown. A slider above the treemap shows it as it stood
 after an earlier round, shaded only by what was left then (settling, changes and live runs are known only of now);
 the hash carries the round after an `@` (`#weasel@41`), so the view survives a reload and can be shared. Maps without
-`lastByRound`, the demo's among them, show no slider.
+`lastByRound`, the demo's among them, show no slider. Reaching a round whose record recut the partition (the map's
+`recuts`) flashes a lime outline, fading, on the areas it made or split; the prefs' "Flash recut areas" turns it off.
 
 ```sh
 npm install

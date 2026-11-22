@@ -64,6 +64,7 @@ weasel cutover.
     "carries N open findings" line, and what a fixer is handed (2026-11-21).
   - each map pass's `fixed`, the defects its fixer's `fix.md` says it fixed, listed or extra, for the dashboard's area
     ledger (2026-11-21).
+  - the map's `recuts`, each recorded round's added and split areas, for the dashboard (2026-11-22).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

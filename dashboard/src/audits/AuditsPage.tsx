@@ -99,6 +99,7 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
   const shown = useMemo(() => (past === null ? areas : areasAsOf(map.areas, past)), [areas, map.areas, past]);
   // One scale for now and every past round, so the slider changes what is shaded, never what a shade means.
   const heat = useMemo(() => heatScaleOverRounds(areas), [areas]);
+  const recut = useMemo(() => (past === null ? null : map.recuts?.find((r) => r.round === past)?.areas ?? null), [map.recuts, past]);
   const heatOf = useMemo(() => (left: number) => heatColorOf(colors.depth, heat.at, left), [heat, colors.depth]);
   const area = shown.find((a) => a.id === shownId);
   const pickedArea = picked ? areas.find((a) => a.id === picked) ?? null : null;
@@ -142,7 +143,7 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
         <Treemap
           scene={scene} selection={selection} areas={shown} palette={colors} phases={past === null ? phases : NO_PHASES}
           {...(past === null ? { estimates } : {})} onHover={setHovered} lit={lit} areasPerRound={map.areasPerRound} glyphs={map.icons}
-          asOf={past} inColor={inColor} heat={heat} header={pastRounds.length ? <RoundPicker rounds={pastRounds} value={past} onChange={asOf.choose} onlyRound={onlyRound} onOnlyRound={setOnlyRound} /> : null}
+          asOf={past} inColor={inColor} heat={heat} recut={recut} header={pastRounds.length ? <RoundPicker rounds={pastRounds} value={past} onChange={asOf.choose} onlyRound={onlyRound} onOnlyRound={setOnlyRound} /> : null}
         />
         <ResizeHandle value={asideWidth} min={ASIDE.min} max={ASIDE.max} invert onInput={setAsideWidth} onChange={keepAside} aria-label="Resize the side panel" />
         <aside className={s.aside} aria-label="Area">

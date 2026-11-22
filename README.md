@@ -188,6 +188,11 @@ It also gives `lastByRound`: what `last` was after each round that changed it, `
 `left`), none before passes had read half the area's files. Every entry is corrected by today's calibration, not the
 one that held then. The dashboard's round picker shows the map from it.
 
+A recut area takes its files' history with it, so it starts with an estimate and never shows as unaudited. The map's
+`recuts` lists, for each recorded round whose `partition.json` added an area to the round before's, the areas it added
+and those it took their files from (every part, where a directory was cut into one more), named as the partition now
+holds their files. The dashboard flashes them as the round picker reaches that round.
+
 **Stale estimates.** An area whose files changed since its last pass carries `staleLines` in the map: lines added
 plus deleted in those files (`git log --numstat`, merges left out) by every commit since the pass's commit but that
 pass's own fixes. The plan prints it, the queue weighs it, and the dashboard fades the area and says how much of

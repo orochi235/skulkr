@@ -11,7 +11,7 @@ import type { SkulkrMap } from './skulkrMap.types';
 const map = fixture as unknown as SkulkrMap;
 const PALETTE: AuditPalette = {
   panel: '#ffffff', band: '#eeeeee', ink: '#111111', inkInverse: '#ffffff', uncharted: '#dddddd', hatch: '#aaaaaa',
-  depth: ['#eef4fa', '#c6dcef', '#8fb6d9', '#3f78a8', '#173f63'], settled: '#6fae84', live: '#e0457b',
+  depth: ['#eef4fa', '#c6dcef', '#8fb6d9', '#3f78a8', '#173f63'], settled: '#6fae84', live: '#e0457b', recut: '#a6e22e',
   font: { ui: 'Oswald', numeric: 'Oswald Tabular' },
   phase: { review: '#2e1a6b', reviewed: '#8a1a7c', match: '#d2373a', fix: '#f08a2c', patch: '#f4e7a1', conflict: '#d23b2a', done: '#777777' },
 };

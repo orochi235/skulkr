@@ -218,7 +218,15 @@ export interface SkulkrMap {
   /** Each icon an area names, as its glyph: an SVG body on a 20×20 viewBox. */
   readonly icons?: Readonly<Record<string, string>>;
   readonly rounds: readonly AuditRound[];
+  /** Each recorded round whose partition added areas: those it added and those it took their files from, named as the
+   *  partition now holds their files. Absent from maps built before 2026-11-22. */
+  readonly recuts?: readonly AuditRecut[];
   readonly calibration?: AuditCalibration;
+}
+
+export interface AuditRecut {
+  readonly round: number;
+  readonly areas: readonly string[];
 }
 
 /** One pass checked against the area's next: what it left, and what the next pass found. */

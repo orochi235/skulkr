@@ -22,6 +22,8 @@
   /* Settled is no heat at all: a neutral fill, which the map marks with a check. */
   --audit-settled: color-mix(in oklab, var(--wzl-fg) 14%, var(--wzl-surface));
   --audit-live: var(--wzl-swatch-rose);
+  /* The flash on the areas a round's recut made or split, as the slider reaches it. */
+  --audit-recut: oklch(0.88 0.23 130);
   --audit-live-soft: color-mix(in oklab, var(--wzl-swatch-rose) 16%, transparent);
   /* A live area's phase, in pipeline order along a rainbow from indigo to orange, lightness climbing step by step so
      each reads apart; text on it flips between black and white by its lightness. Conflict is the theme's danger and
@@ -81,6 +83,7 @@
 .depth4 { color: var(--audit-depth-4); }
 .settled { color: var(--audit-settled); }
 .live { color: var(--audit-live); }
+.recut { color: var(--audit-recut); }
 /* The map's outline for a phase: its color, or the edge it names where its color is too dark to outline with. */
 .phase { color: var(--audit-phase-edge, var(--audit-phase)); }
 .fontUi { font-family: var(--wzl-font-ui); }

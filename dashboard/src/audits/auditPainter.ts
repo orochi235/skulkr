@@ -34,6 +34,8 @@ export interface AuditCellData {
   readonly pending?: boolean;
   /** A glow's color while something naming the area elsewhere on the page is hovered. */
   readonly glow?: string;
+  /** The outline flashed on an area a round's recut made or split, fading as the page sets its opacity. */
+  readonly recut?: { readonly color: string; readonly opacity: number };
   /** The live outline's opacity, which the page breathes. */
   readonly pulse: number;
   /** The faces its words and its numbers are set in. */
@@ -108,6 +110,7 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
     out.push(...filled(pathFromD(`M ${x} ${y} L ${x} ${y - cut} L ${x + cut} ${y} Z`), { color: d.edge }));
   }
   if (d.live) out.push({ kind: 'path', path: rect(p, 5), stroke: { paint: { color: d.live, opacity: d.pulse }, width: 9.5 } });
+  if (d.recut) out.push({ kind: 'path', path: rect(p, 2), stroke: { paint: { color: d.recut.color, opacity: d.recut.opacity }, width: 4 } });
   // Drawn inward, since a neighbor paints over anything outside the cell.
   if (d.glow) for (const [by, opacity] of GLOW) out.push({ kind: 'path', path: rect(p, by), stroke: { paint: { color: d.glow, opacity }, width: 3 } });
   if (d.settled && p.width >= 16 && p.height >= 16) {

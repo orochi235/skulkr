@@ -9,12 +9,12 @@ import s from './palette.module.css';
  *  `palette.module.css`, which alone defines the colors. */
 const FALLBACK: AuditPalette = {
   panel: '#fff', band: '#eee', ink: '#000', inkInverse: '#fff', uncharted: '#ddd', hatch: '#999',
-  depth: ['#222', '#555', '#888', '#bbb', '#eee'], settled: '#ddd', live: '#444',
+  depth: ['#222', '#555', '#888', '#bbb', '#eee'], settled: '#ddd', live: '#444', recut: '#9f6',
   font: { ui: 'sans-serif', numeric: 'monospace' },
   phase: Object.fromEntries(AUDIT_PHASES.map((p) => [p, '#777'])) as Record<AuditPhase, string>,
 };
 
-const KEYS = ['panel', 'band', 'ink', 'inkInverse', 'uncharted', 'hatch', 'depth0', 'depth1', 'depth2', 'depth3', 'depth4', 'settled', 'live'] as const;
+const KEYS = ['panel', 'band', 'ink', 'inkInverse', 'uncharted', 'hatch', 'depth0', 'depth1', 'depth2', 'depth3', 'depth4', 'settled', 'live', 'recut'] as const;
 type Key = typeof KEYS[number];
 
 /** The first family a `font-family` list names, unquoted: the one face a canvas is given, which serves no list. */
@@ -40,6 +40,7 @@ function read(host: HTMLElement): AuditPalette {
     depth: [at('depth0', FALLBACK.depth[0]), at('depth1', FALLBACK.depth[1]), at('depth2', FALLBACK.depth[2]), at('depth3', FALLBACK.depth[3]), at('depth4', FALLBACK.depth[4])],
     settled: at('settled', FALLBACK.settled),
     live: at('live', FALLBACK.live),
+    recut: at('recut', FALLBACK.recut),
     phase,
     font: {
       ui: firstFamily(getComputedStyle(host.querySelector('[data-font="ui"]')!).fontFamily) ?? FALLBACK.font.ui,

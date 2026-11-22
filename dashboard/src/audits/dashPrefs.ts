@@ -19,6 +19,9 @@ export const DASH_PREFS = pref.group('Dashboard', {
       description: 'How much color a skipped area loses: 100% is fully gray.',
       min: 0, max: 100, step: 5, control: 'slider', unit: { scale: 1, suffix: '%' },
     }),
+    recut: pref.boolean('Flash recut areas', true, {
+      description: 'Outline in lime, fading, the areas a round made or split as the slider reaches it.',
+    }),
     upcoming: pref.number('Number the queue', 6, {
       description: 'How many half rounds of the queue to number on the map.',
       min: 0, max: MAX_HALVES, step: 1, control: 'slider',

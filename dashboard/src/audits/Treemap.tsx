@@ -3,7 +3,7 @@ import { SceneCanvas, asNodeId, registerCanvasFont, type SelectionApi } from '@w
 import { useAnimator } from '@weasel-js/animator/react';
 import { usePrefersReducedMotion, watchResize } from '@weasel-js/react';
 import * as presets from '@weasel-js/editing/presets';
-import { auditNodeSpecs, breathe, syncAuditScene, type AuditPalette, type AuditScene } from './auditScene';
+import { auditNodeSpecs, breathe, flashRecut, syncAuditScene, type AuditPalette, type AuditScene } from './auditScene';
 import { layoutMap } from './mapLayout';
 import { heatScaleOf, type HeatScale } from './areaData';
 import { HeatLegend } from './HeatLegend';
@@ -38,6 +38,8 @@ export interface TreemapProps {
   readonly inColor?: ReadonlySet<string> | null;
   /** The heat scale to shade on, held across past rounds; by default the one `areas` set. */
   readonly heat?: HeatScale;
+  /** The areas the round shown recut, flashed as it is reached; null where it recut none. */
+  readonly recut?: readonly string[] | null;
   /** What sits above the map: the round picker. */
   readonly header?: ReactNode;
 }
@@ -45,9 +47,11 @@ export interface TreemapProps {
 /** Every audit area as a cell of a treemap drawn on the scene graph: hover and click pick through the canvas's
  *  own hit testing and selection. */
 const NO_GLYPHS: Readonly<Record<string, string>> = {};
+/** How long a recut area's outline takes to fade, from the moment it shows. */
+const RECUT_FADE_MS = 1800;
 const HALF_STOPS = Array.from({ length: MAX_HALVES + 1 }, (_, i) => i);
 
-export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, inColor = null, heat: heatGiven, header }: TreemapProps) {
+export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, inColor = null, heat: heatGiven, recut = null, header }: TreemapProps) {
   // How many half-rounds of the queue's head to number on the map, each in its area's corner.
   const [halves, setHalves] = useDashPref('map.upcoming');
   const [gray] = useDashPref('map.gray');
@@ -102,6 +106,20 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
       breathe(scene, liveIds, 1);
     };
   }, [animator, still, scene, liveIds]);
+
+  const [flashes] = useDashPref('map.recut');
+  useEffect(() => {
+    if (!flashes || !recut?.length) return;
+    const ids = recut.map(asNodeId);
+    const fade = animator.tween({
+      from: 1, to: 0, ms: RECUT_FADE_MS, easing: 'easeInCubic',
+      onTick: (v: number) => flashRecut(scene, ids, palette.recut, v),
+    });
+    return () => {
+      fade.cancel();
+      flashRecut(scene, ids, palette.recut, 0);
+    };
+  }, [animator, scene, recut, flashes, palette.recut]);
 
   return (
     <div className={s.chart}>

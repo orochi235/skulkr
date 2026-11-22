@@ -21,6 +21,8 @@ export interface AuditPalette {
   readonly depth: readonly [string, string, string, string, string];
   readonly settled: string;
   readonly live: string;
+  /** The flash on the areas a round's recut made or split. */
+  readonly recut: string;
   /** The outline a live area's cell wears, by the phase it is in. */
   readonly phase: Readonly<Record<AuditPhase, string>>;
   /** The theme's faces, for labels and for numbers. */
@@ -220,6 +222,18 @@ export function syncAuditScene(scene: AuditScene, specs: readonly AuditNodeSpec[
     // Every node still wanted has moved out from under those going, so removing them takes nothing kept.
     const gone = [...scene.nodes.values()].filter((n) => !wanted.has(n.id)).map((n) => n.id);
     if (gone.length > 0) scene.removeMany(gone);
+  });
+}
+
+/** Set the recut flash on `ids` to `opacity` in `color`, 0 taking it off. */
+export function flashRecut(scene: AuditScene, ids: readonly NodeId[], color: string, opacity: number): void {
+  scene.untracked(() => {
+    for (const id of ids) {
+      const node = scene.get(id);
+      if (node?.data.kind !== 'audit-cell') continue;
+      const { recut: _, ...rest } = node.data;
+      scene.update(id, { data: opacity > 0 ? { ...rest, recut: { color, opacity } } : rest });
+    }
   });
 }
 
