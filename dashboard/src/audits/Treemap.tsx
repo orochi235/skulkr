@@ -5,7 +5,7 @@ import { usePrefersReducedMotion, watchResize } from '@weasel-js/react';
 import * as presets from '@weasel-js/editing/presets';
 import { auditNodeSpecs, breathe, syncAuditScene, type AuditPalette, type AuditScene } from './auditScene';
 import { layoutMap } from './mapLayout';
-import { heatScaleOf } from './areaData';
+import { heatScaleOf, type HeatScale } from './areaData';
 import { HeatLegend } from './HeatLegend';
 import { OFF_PIPELINE, PHASE_LABEL, SWEEP, phaseClass, type AuditPhase } from './phases';
 import { Slider } from '@weasel-js/ui/components/Slider';
@@ -36,6 +36,8 @@ export interface TreemapProps {
   readonly asOf?: number | null;
   /** The areas to keep in color, the rest drawn gray; null keeps every area in color. */
   readonly inColor?: ReadonlySet<string> | null;
+  /** The heat scale to shade on, held across past rounds; by default the one `areas` set. */
+  readonly heat?: HeatScale;
   /** What sits above the map: the round picker. */
   readonly header?: ReactNode;
 }
@@ -45,7 +47,7 @@ export interface TreemapProps {
 const NO_GLYPHS: Readonly<Record<string, string>> = {};
 const HALF_STOPS = Array.from({ length: MAX_HALVES + 1 }, (_, i) => i);
 
-export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, inColor = null, header }: TreemapProps) {
+export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, inColor = null, heat: heatGiven, header }: TreemapProps) {
   // How many half-rounds of the queue's head to number on the map, each in its area's corner.
   const [halves, setHalves] = useDashPref('map.upcoming');
   const [gray] = useDashPref('map.gray');
@@ -71,11 +73,12 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
     const now = selection.get();
     if (was !== null && now.length === 1 && now[0] === was) selection.clear();
   };
-  const heat = useMemo(() => heatScaleOf(areas), [areas]);
+  const heatOwn = useMemo(() => heatScaleOf(areas), [areas]);
+  const heat = heatGiven ?? heatOwn;
   const layout = useMemo(() => layoutMap(areas, size.width, size.height), [areas, size]);
   useLayoutEffect(() => {
-    syncAuditScene(scene, auditNodeSpecs(areas, layout, palette, phases, lit, places, estimates, glyphs, inColor, gray / 100));
-  }, [scene, areas, layout, palette, phases, lit, places, estimates, glyphs, inColor, gray]);
+    syncAuditScene(scene, auditNodeSpecs(areas, layout, palette, phases, lit, places, estimates, glyphs, inColor, gray / 100, heat));
+  }, [scene, areas, layout, palette, phases, lit, places, estimates, glyphs, inColor, gray, heat]);
 
   // The map's text is set in the theme's faces, which the canvas draws from the document's fonts once each loads.
   useEffect(() => {
@@ -121,11 +124,14 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
       <div className={s.legend}>
         <span><i className={`${s.key} ${s.uncharted}`} />never audited</span>
         <span>
-          audited, estimated defects left after {asOf === null ? 'the last pass' : `round ${asOf}`}:
+          audited, estimated defects left after <span className={s.asOfText}>{asOf === null ? 'the last pass' : `round ${asOf}`}:</span>
           <HeatLegend heat={heat} />
         </span>
         <span>· a dot per pass</span>
-        {asOf === null && <NowLegend halves={halves} places={places} onInput={setHalves} onChange={setHalves} />}
+        {/* Kept in place, faded and out of reach, for a past round, so the legend and the map above it never move. */}
+        <span className={asOf === null ? s.nowKeys : `${s.nowKeys} ${s.nowOff}`} inert={asOf !== null} aria-hidden={asOf !== null || undefined}>
+          <NowLegend halves={halves} places={places} onInput={setHalves} onChange={setHalves} />
+        </span>
       </div>
     </div>
   );

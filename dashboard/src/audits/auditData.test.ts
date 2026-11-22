@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changedSincePass, correctionShows, defectsVersionOf, heatScaleOf, labelIn, lastPassOf, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
+import { changedSincePass, correctionShows, heatScaleOverRounds, defectsVersionOf, heatScaleOf, labelIn, lastPassOf, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
 import { continuousText, headlineOf, logTailsOf, parseJob, recentJobsOf, scrolledOf, spendOf, stepText } from './runData';
 import { stageCountsOf } from './phases';
 import { inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
@@ -379,5 +379,17 @@ describe('correctionShows', () => {
     expect(correctionShows(7.5, 17.4)).toBe(true);
     expect(correctionShows(40, 43)).toBe(false);
     expect(correctionShows(5, undefined)).toBe(false);
+  });
+});
+
+describe('heatScaleOverRounds', () => {
+  it('sets one top over now and every past round, so a past round with more left does not overflow it', () => {
+    const area = (id: string, left: number, past: number[]) => ({
+      id, group: 'g', files: 1, status: 'due' as const, queue: null, stage: null, passes: [], last: { round: 9, left },
+      lastByRound: past.map((l, i) => ({ round: i + 1, left: l })),
+    });
+    const areas = [area('a', 1, [40, 30]), area('b', 2, [35]), area('c', 1, [])];
+    expect(heatScaleOf(areas).top).toBeLessThan(10);
+    expect(heatScaleOverRounds(areas).top).toBeGreaterThan(30);
   });
 });

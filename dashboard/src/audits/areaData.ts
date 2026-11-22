@@ -103,9 +103,21 @@ export interface HeatScale {
   readonly ticks: readonly { readonly label: string; readonly value: number }[];
 }
 
+/** What the areas still being audited have left now. */
+const leftNowIn = (areas: readonly AuditArea[]): number[] =>
+  areas.flatMap((a) => (a.status === 'settled' ? [] : [lastPassOf(a)?.left ?? NaN]));
+
 /** The heat scale for `areas`, set by what the areas still being audited have left. */
-export function heatScaleOf(areas: readonly AuditArea[]): HeatScale {
-  const left = areas.flatMap((a) => (a.status === 'settled' ? [] : [lastPassOf(a)?.left ?? NaN])).filter(Number.isFinite).sort((x, y) => x - y);
+export const heatScaleOf = (areas: readonly AuditArea[]): HeatScale => heatScaleFor(leftNowIn(areas));
+
+/** One heat scale for the map now and as of every past round (`lastByRound`), so a color means the same estimate
+ *  whichever round the slider shows. */
+export const heatScaleOverRounds = (areas: readonly AuditArea[]): HeatScale =>
+  heatScaleFor([...leftNowIn(areas), ...areas.flatMap((a) => (a.lastByRound ?? []).map((e) => e.left))]);
+
+/** The heat scale for estimates `values`, its top their 98th percentile. */
+function heatScaleFor(values: readonly number[]): HeatScale {
+  const left = values.filter(Number.isFinite).sort((x, y) => x - y);
   const top = Math.max(HEAT_FLOOR, quantile(left, 0.98));
   const scale = warpScale({ domain: [0, top], range: [0, 1], to: Math.log1p, from: Math.expm1 });
   const at = (v: number) => Math.min(1, Math.max(0, scale.position(Math.max(0, v))));

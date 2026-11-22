@@ -164,9 +164,10 @@ export function auditNodeSpecs(
   inColor: ReadonlySet<string> | null = null,
   /** How much color the rest lose, 0 to 1. */
   grayAmount = 1,
+  /** The heat scale the cells are shaded on; by default the one `areas` themselves set. */
+  heat: HeatScale = heatScaleOf(areas),
 ): AuditNodeSpec[] {
   const byId = new Map(areas.map((a) => [a.id, a]));
-  const heat = heatScaleOf(areas);
   const frameBox = new Map(layout.frames.map((f) => [f.name, f]));
   const out: AuditNodeSpec[] = [];
   // Frames come in the order the layout made them, each after its parent; cells after every frame.

@@ -21,6 +21,13 @@
   height: 100%;
 }
 
+/* The legend's keys for now flow as the legend's own items; as of a past round they keep their room, faded. */
+.nowKeys { display: contents; }
+.nowOff > * { opacity: 0.35; }
+
+/* Sized for "the last pass:", so "round 66:" in its place leaves the keys after it where they were. */
+.asOfText { display: inline-block; min-width: 14ch; }
+
 .legend {
   flex: none;
   display: flex;

@@ -101,14 +101,15 @@ describe('AuditsPage', () => {
     renderPage();
     const picker = await screen.findByRole('slider', { name: 'Show the map as it stood after a round' });
     expect(picker).toHaveAttribute('aria-valuetext', 'now');
-    expect(screen.getByText('settled')).toBeInTheDocument();
+    expect(screen.getByText('settled').closest('[inert]')).toBeNull();
 
     fireEvent.keyDown(picker, { key: 'Home' });
     expect(picker).toHaveAttribute('aria-valuetext', 'after round 39');
     expect(screen.getByText('after round 39', { selector: 'output' })).toBeInTheDocument();
     expect(window.location.hash).toBe('#example@39');
-    expect(screen.getByText(/estimated defects left after round 39/)).toBeInTheDocument();
-    expect(screen.queryByText('settled')).toBeNull();
+    expect(screen.getByText('round 39:')).toBeInTheDocument();
+    // What is known only of now keeps its place in the legend, so the map does not move, but is out of reach.
+    expect(screen.getByText('settled').closest('[inert]')).not.toBeNull();
     const stats = screen.getByRole('region', { name: 'Headline stats' });
     expect(within(stats).getByText('areas audited by round 39')).toBeInTheDocument();
     expect(within(stats).getByText('3 / 6')).toBeInTheDocument();

@@ -16,7 +16,7 @@ import { Input } from '@weasel-js/ui/components/Input';
 import { SidebarPanel } from '@weasel-js/ui/components/SidebarPanel';
 import { NextUp } from './NextUp';
 import { useAsOfRound } from './useAsOfRound';
-import { NEXT_UP_ROUNDS, defectsVersionOf, heatScaleOf, nextUpOf, runHolding, statsFor } from './areaData';
+import { NEXT_UP_ROUNDS, defectsVersionOf, heatScaleOverRounds, nextUpOf, runHolding, statsFor } from './areaData';
 import { heatColorOf } from './heat';
 import { createAuditScene } from './auditScene';
 import { liveEstimatesOf, phasesOf, withLivePasses, type AuditPhase } from './phases';
@@ -91,10 +91,9 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
   const pastRounds = useMemo(() => pastRoundsOf(map), [map]);
   const past = asOf.round !== null && pastRounds.includes(asOf.round) ? asOf.round : null;
   const shown = useMemo(() => (past === null ? areas : areasAsOf(map.areas, past)), [areas, map.areas, past]);
-  const heatOf = useMemo(() => {
-    const { at } = heatScaleOf(areas);
-    return (left: number) => heatColorOf(colors.depth, at, left);
-  }, [areas, colors.depth]);
+  // One scale for now and every past round, so the slider changes what is shaded, never what a shade means.
+  const heat = useMemo(() => heatScaleOverRounds(areas), [areas]);
+  const heatOf = useMemo(() => (left: number) => heatColorOf(colors.depth, heat.at, left), [heat, colors.depth]);
   const area = shown.find((a) => a.id === shownId);
   const pickedArea = picked ? areas.find((a) => a.id === picked) ?? null : null;
   const stats = useMemo(() => statsFor(shown, past, areas), [shown, past, areas]);
@@ -137,7 +136,7 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
         <Treemap
           scene={scene} selection={selection} areas={shown} palette={colors} phases={past === null ? phases : NO_PHASES}
           {...(past === null ? { estimates } : {})} onHover={setHovered} lit={lit} areasPerRound={map.areasPerRound} glyphs={map.icons}
-          asOf={past} inColor={inColor} header={pastRounds.length ? <RoundPicker rounds={pastRounds} value={past} onChange={asOf.choose} onlyRound={onlyRound} onOnlyRound={setOnlyRound} /> : null}
+          asOf={past} inColor={inColor} heat={heat} header={pastRounds.length ? <RoundPicker rounds={pastRounds} value={past} onChange={asOf.choose} onlyRound={onlyRound} onOnlyRound={setOnlyRound} /> : null}
         />
         <ResizeHandle value={asideWidth} min={ASIDE.min} max={ASIDE.max} invert onInput={setAsideWidth} onChange={keepAside} aria-label="Resize the side panel" />
         <aside className={s.aside} aria-label="Area">
