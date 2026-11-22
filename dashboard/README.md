@@ -21,16 +21,13 @@ its root; with neither, `skulkr.config.mjs` in the directory the server starts i
 
 ## weasel
 
-The page is built on weasel (`@weasel-js/*`) and needs more of it than npm has (`SpanStrip` and its neighbors), so
-until a weasel release carries them, `package.json` installs every `@weasel-js` package, its `overrides` included, from
-tarballs on this repository's `weasel-70a055a` release: weasel's built packages at that commit, made with `npm pack`.
-A fresh clone needs nothing else. Once a release carries them, the pins go back to the published version and the
-release can be deleted.
+The page is built on weasel (`@weasel-js/*`), pinned to 2.0.0 from npm. The map's loupe (F2, or "loupe" in its
+legend) is `@weasel-js/hud`'s, over the map's canvas.
 
-On a machine with weasel checked out, alpo can still serve the checkout over those tarballs:
+On a machine with weasel checked out, alpo can serve the checkout over the published packages:
 
 ```sh
-alpo link weasel --for "<why>"   # serve ~/src/weasel's built dist; alpo unlink weasel goes back to the tarballs
+alpo link weasel --for "<why>"   # serve ~/src/weasel's built dist; alpo unlink weasel goes back to npm
 ALPO_WEASEL=<checkout> npm run dev   # another checkout, for one run
 ```
 

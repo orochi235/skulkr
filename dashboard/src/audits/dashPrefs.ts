@@ -19,6 +19,9 @@ export const DASH_PREFS = pref.group('Dashboard', {
       description: 'How much color a skipped area loses: 100% is fully gray.',
       min: 0, max: 100, step: 5, control: 'slider', unit: { scale: 1, suffix: '%' },
     }),
+    loupe: pref.boolean('Loupe', false, {
+      description: 'A magnifier over the map, following the pointer; F2 toggles it.',
+    }),
     recut: pref.boolean('Flash recut areas', true, {
       description: 'Outline in lime, fading, the areas a round made or split as the slider reaches it.',
     }),

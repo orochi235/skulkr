@@ -1,5 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { SceneCanvas, asNodeId, registerCanvasFont, type SelectionApi } from '@weasel-js/core';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { SceneCanvas, asNodeId, registerCanvasFont, type SceneCanvasApi, type SelectionApi } from '@weasel-js/core';
+import { useHud, useHudContribution, useLoupe } from '@weasel-js/hud/react';
+import type { Hud } from '@weasel-js/hud';
+import { Checkbox } from '@weasel-js/ui/components/Checkbox';
 import { useAnimator } from '@weasel-js/animator/react';
 import { usePrefersReducedMotion, watchResize } from '@weasel-js/react';
 import * as presets from '@weasel-js/editing/presets';
@@ -57,6 +60,24 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
   const [gray] = useDashPref('map.gray');
   const places = halves * (areasPerRound / 2);
   const hostRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<SceneCanvasApi>(null);
+  const hud = useHud();
+  const hudEntry = useHudContribution(hud);
+  const ambient = useMemo(() => [hudEntry], [hudEntry]);
+  const [loupe, setLoupe] = useDashPref('map.loupe');
+  const closeLoupe = useCallback(() => setLoupe(false), [setLoupe]);
+  // useLoupe reads the canvas once, on mount, so the lens mounts only after the canvas has.
+  const [canvasReady, setCanvasReady] = useState(false);
+  useEffect(() => setCanvasReady(true), []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'F2' || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      e.preventDefault();
+      setLoupe(!loupe);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [loupe, setLoupe]);
   const [size, setSize] = useState({ width: 0, height: 0 });
   useLayoutEffect(() => {
     const host = hostRef.current;
@@ -129,6 +150,8 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
         onPointerDownCapture={notePress} onClick={unpickRepeat}
       >
         <SceneCanvas
+          ref={canvasRef}
+          ambient={ambient}
           className={s.canvas}
           scene={scene}
           features={FEATURES}
@@ -138,6 +161,7 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
           animator={animator}
           onHover={onHover}
         />
+        {canvasReady && <MapLoupe canvasRef={canvasRef} hud={hud} visible={loupe} onClose={closeLoupe} />}
       </div>
       <div className={s.legend}>
         <span><i className={`${s.key} ${s.uncharted}`} />never audited</span>
@@ -146,6 +170,7 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
           <HeatLegend heat={heat} />
         </span>
         <span>· a dot per pass</span>
+        <Checkbox className={s.loupeToggle} isSelected={loupe} onChange={setLoupe}>loupe (F2)</Checkbox>
         {/* Kept in place, faded and out of reach, for a past round, so the legend and the map above it never move. */}
         <span className={asOf === null ? s.nowKeys : `${s.nowKeys} ${s.nowOff}`} inert={asOf !== null} aria-hidden={asOf !== null || undefined}>
           <NowLegend halves={halves} places={places} onInput={setHalves} onChange={setHalves} />
@@ -153,6 +178,18 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
       </div>
     </div>
   );
+}
+
+const LOUPE_EVENTS_NONE = { onColorChange: () => {} };
+
+/** The magnifier over the map's canvas, re-rendering the map's own layers at eight times. */
+function MapLoupe({ canvasRef, hud, visible, onClose }: {
+  canvasRef: { current: SceneCanvasApi | null }; hud: Hud; visible: boolean; onClose: () => void;
+}) {
+  const settings = useMemo(() => ({ visible, mode: 'vector' as const, factor: 8 }), [visible]);
+  const events = useMemo(() => ({ ...LOUPE_EVENTS_NONE, onClose }), [onClose]);
+  useLoupe(canvasRef, hud, null, settings, events);
+  return null;
 }
 
 /** The legend's keys for what is known only of now: changes since a pass, settling, live runs, the queue numbers. */
@@ -164,7 +201,7 @@ function NowLegend({ halves, places, onInput, onChange }: {
       <span><i className={`${s.key} ${s.worn}`} />changed since its pass</span>
       <span><i className={`${s.key} ${s.settled}`} />settled</span>
       <span>
-        <svg className={s.lock} viewBox="0 0 8 9" aria-hidden="true"><path d="M2 4V2.5a2 2 0 0 1 4 0V4" /><rect x="1" y="4" width="6" height="4.5" /></svg>
+        <svg className={s.lock} width="8" height="10" viewBox="0 0 8 10" aria-hidden="true"><path d="M2.5 4.3V3a1.5 1.5 0 0 1 3 0v1.3" /><rect x="1" y="5" width="6" height="4.5" /></svg>
         held by an unmerged round
       </span>
       <span className={s.phases}>

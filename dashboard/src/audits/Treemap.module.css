@@ -77,13 +77,13 @@
 
 /* The padlock a cell wears while an earlier round's unmerged branch holds it. */
 .lock {
-  width: 10px;
-  height: 12px;
+  width: 8px;
+  height: 10px;
   margin-right: 5px;
   vertical-align: -1px;
 }
 
-.lock path { fill: none; stroke: currentColor; stroke-width: 1.2; }
+.lock path { fill: none; stroke: currentColor; stroke-width: 1.1; }
 .lock rect { fill: currentColor; }
 
 .live {
@@ -139,3 +139,6 @@
   min-width: 3ch;
   text-align: end;
 }
+
+/* At the legend's far end, apart from the keys. */
+.loupeToggle { margin-inline-start: auto; }

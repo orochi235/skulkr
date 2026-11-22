@@ -155,8 +155,9 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
     for (let i = 0; i < dotCount; i++) { const c = at(i + ring); out.push({ kind: 'path', path: circlePath(c.x, c.y, 2, 12), fill: { paint: ink } }); }
     if (d.locked) {
       const { x, y } = at(ring + dotCount);
-      out.push({ kind: 'path', path: pathFromD(`M ${x - 2.5} ${y - 0.5} h 5 v 3.5 h -5 Z`), fill: { paint: ink } });
-      out.push({ kind: 'path', path: pathFromD(`M ${x - 1.5} ${y - 0.5} V ${y - 1.5} A 1.5 1.5 0 0 1 ${x + 1.5} ${y - 1.5} V ${y - 0.5}`), stroke: { paint: ink, width: 1 } });
+      // The shackle stops short of the body, so the two read apart at this size.
+      out.push({ kind: 'path', path: pathFromD(`M ${x - 2.5} ${y - 0.3} h 5 v 3.5 h -5 Z`), fill: { paint: ink } });
+      out.push({ kind: 'path', path: pathFromD(`M ${x - 1.4} ${y - 1.1} V ${y - 2} A 1.4 1.4 0 0 1 ${x + 1.4} ${y - 2} V ${y - 1.1}`), stroke: { paint: ink, width: 0.9 } });
     }
   }
   const texts: DrawCommand[] = [];
