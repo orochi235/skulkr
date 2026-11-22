@@ -68,6 +68,7 @@ weasel cutover.
   - a `held:` line in the dry plan, and a refused start, while an earlier round's batch is unmerged (README "Stranded
     rounds", 2026-11-22).
   - the map's area `locked`, the round whose unmerged branch holds it, for the dashboard (2026-11-22).
+  - the map's top-level `leftOut`, the branches `left-out.json` still retries, for the dashboard (2026-11-22).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.
