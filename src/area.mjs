@@ -168,27 +168,26 @@ export const runArea = async (ctx, area, { previous, changedSince, carried = [] 
   // A preload trial runs a second pair beside the first, its prompt carrying the files, recorded only for comparison.
   const trial = ctx.trial === 'preload';
   if (trial) writeFileSync(join(inDir, 'review-preload.md'), `${fill(brief(ctx.cfg, 'reviewer'), vars)}\n\n${preloadedFiles(ctx.frozen, area.files)}`);
-  const later = (run) => (trial ? sleep(TRIAL_STAGGER_MS).then(run) : run());
+  const later = (run) => (trial ? sleep(ctx.trialStaggerMs ?? TRIAL_STAGGER_MS).then(run) : run());
   const preload = { prompt: 'review-preload.md', stdin: true };
-  const [a, b, pa, pb] = await Promise.all([
-    review(ctx, area, 'A'), later(() => review(ctx, area, 'B')),
-    ...(trial ? [review(ctx, area, 'PA', preload), later(() => review(ctx, area, 'PB', preload))] : []),
-  ]);
-  if (trial) {
-    const [base, pm] = await Promise.all([match(ctx, area, a, b), match(ctx, area, pa, pb, '-P')]);
-    writeTrial(ctx, area, { base: [a, b, base], preload: [pa, pb, pm] });
-    return finishArea(ctx, area, { previous, changedSince, carried, a, b, matched: base });
-  }
+  // Each pair is matched as soon as its own two reviews are in; the fix waits only for the pair that feeds it.
+  const pairOf = (x, y, tag) => Promise.all([x, y]).then(async ([rx, ry]) => [rx, ry, await match(ctx, area, rx, ry, tag)]);
+  const base = pairOf(review(ctx, area, 'A'), later(() => review(ctx, area, 'B')), '');
+  const preloaded = trial ? pairOf(review(ctx, area, 'PA', preload), later(() => review(ctx, area, 'PB', preload)), '-P') : null;
+  const [a, b, matched] = await base;
   const dir = makeRecordDir(ctx, area);
   for (const [name, text] of [['A.md', a.text], ['B.md', b.text]]) {
     writeFileSync(join(dir, name), text);
     writeFileSync(join(inDir, name), text);
   }
-  return finishArea(ctx, area, { previous, changedSince, carried, a, b, matched: await match(ctx, area, a, b) });
+  // The trial pair is only compared, so its failure is said and the area goes on.
+  const compared = preloaded?.then((pair) => writeTrial(ctx, area, { base: [a, b, matched], preload: pair }), (error) => ctx.say(`trial ${area.id}: ${error.message ?? error}`));
+  const [summary] = await Promise.all([finishArea(ctx, area, { dir, previous, changedSince, carried, a, b, matched }), compared]);
+  return summary;
 };
 
 /** The rest of an area once its pair has reviewed and matched: its record, the fix, and its summary. */
-const finishArea = async (ctx, area, { previous, changedSince, carried, a, b, matched }) => {
+const finishArea = async (ctx, area, { dir, previous, changedSince, carried, a, b, matched }) => {
   const claims = (fs) => fs.map((f) => f.claim);
   writeFileSync(join(dir, 'match.json'), `${JSON.stringify({ pairs: matched.pairs, a: claims(a.findings), b: claims(b.findings) }, null, 1)}\n`);
   const [na, nb, m] = [a.findings.length, b.findings.length, matched.pairs.length];
