@@ -86,8 +86,9 @@ export const reviewedSource = (ctx, id) => fill(
   { commit: ctx.commit, reportA: `${JOB_IN}/${id}/A.md`, reportB: `${JOB_IN}/${id}/B.md` },
 );
 
-/** One fixer job on `area`'s findings, which are already in `.skulkr/in/<area>/` in the frozen tree. */
-export const fix = async (ctx, area, findings, source = reviewedSource(ctx, area.id)) => {
+/** One fixer job on `area`'s findings, which are already in `.skulkr/in/<area>/` in the frozen tree. `onReport` hears
+ *  the fixer's report as soon as its job comes home, before verify and any repair. */
+export const fix = async (ctx, area, findings, source = reviewedSource(ctx, area.id), { onReport } = {}) => {
   const to = jobDir(ctx.nightDir, area.id, 'fix');
   const vars = { ...projectVars(ctx.cfg, 'fixer'), round: ctx.round, area: area.id, commit: ctx.commit, source };
   writeFileSync(join(ctx.frozen, JOB_IN, area.id, 'fix.md'), fill(brief(ctx.cfg, 'fixer'), vars));
@@ -103,6 +104,7 @@ export const fix = async (ctx, area, findings, source = reviewedSource(ctx, area
   if (stopped) ctx.say(`fix ${area.id}: ${stopped}`);
   ctx.progress('fix', `${area.id} on ${run.node}: ${patches} commits, ${run.minutes.toFixed(1)} min, ${(run.usage.weightedTokens / 1e6).toFixed(2)}M weighted tokens${run.usage.budgetHit ? ', hit its ceiling' : ''}`, ctx.total.fix);
   const fixed = { mbox: patches > 0 ? mbox : undefined, patches, report: run.reply, ...run };
+  if (fixed.report) onReport?.(fixed.report);
   if (!fixed.mbox || !verifyOf(ctx.cfg)) return fixed;
   const checked = await verifyAndRepair(ctx, area, fixed, to);
   return {
@@ -128,10 +130,11 @@ export const makeRecordDir = (ctx, area) => {
   return dir;
 };
 
-/** {@link fix}, its report and commits then copied into the area's record directory `dir`. */
+/** {@link fix}, its report copied into the area's record directory `dir` as it comes home, its commits once verified. */
 export const fixInto = async (ctx, area, dir, findings, source) => {
-  const fixed = await fix(ctx, area, findings, source);
-  if (fixed.report) writeFileSync(join(dir, 'fix.md'), fixed.report);
+  // The report is the fixer's alone, so it goes in as soon as it comes home: what the fixer says of each finding shows
+  // while its commits are still being verified.
+  const fixed = await fix(ctx, area, findings, source, { onReport: (report) => writeFileSync(join(dir, 'fix.md'), report) });
   if (fixed.mbox) copyFileSync(fixed.mbox, join(dir, 'fix.mbox'));
   return fixed;
 };

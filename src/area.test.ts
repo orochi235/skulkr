@@ -87,6 +87,7 @@ describe('runArea', () => {
     const summary = await runArea(ctx, area, { previous: undefined, changedSince: [] });
     expect(summary).toMatchObject({ id: 'a', a: 1, b: 1, m: 1 });
     expect([...order].sort()).toEqual(['A', 'B', 'fix', 'match']);
+    expect(readFileSync(join(ctx.nightDir, 'areas/a/fix.md'), 'utf8')).toBe('nothing to fix');
     expect(existsSync(join(ctx.nightDir, 'trial'))).toBe(false);
   });
 });

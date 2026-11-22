@@ -201,7 +201,7 @@ export const runHolding = (runs: readonly AuditRun[], id: string): AuditRun | un
 export function defectsVersionOf(map: Pick<SkulkrMap, 'areas' | 'runs'>, id: string): string {
   const passes = map.areas.find((a) => a.id === id)?.passes.map((p) => p.round) ?? [];
   const lanes = map.runs.flatMap((r) => r.lanes.filter((l) => l.id === id).map((l) => [
-    r.round, Object.entries(l.steps).map(([k, s]) => `${k}:${s.state}:${s.commits ?? ''}:${s.done ?? ''}`),
+    r.round, Object.entries(l.steps).map(([k, s]) => `${k}:${s.state}:${s.commits ?? ''}:${s.done ?? ''}:${s.fixed ?? ''}`),
   ]));
   return JSON.stringify([passes, lanes]);
 }
