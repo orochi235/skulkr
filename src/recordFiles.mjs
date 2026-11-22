@@ -70,9 +70,9 @@ export const refRecords = (git, root, recordDir, refs, known = new Set()) => {
 };
 
 /** The batch branches not yet merged into `main`, newest name first. */
-export const unlandedBatches = (git, batchPrefix, main) =>
-  git('for-each-ref', `--no-merged=${main}`, '--sort=-refname', '--format=%(refname:short)', `refs/heads/${batchPrefix}/`)
-    .split('\n').filter(Boolean);
+export const unlandedBatches = (git, cfg) =>
+  git('for-each-ref', `--no-merged=${cfg.git.main}`, '--sort=-refname', '--format=%(refname:short)', 'refs/heads/')
+    .split('\n').filter((b) => b && cfg.names.batchRoundOf(b) !== undefined);
 
 const NIGHT = /^(\d{4}-\d{2}-\d{2})T.*-round(\d+)$/;
 
@@ -105,7 +105,6 @@ export const abandonedRounds = (state, nights = nightsByRound(state)) =>
 export const recordsFor = (cfg, git, root) => {
   const disk = diskRecords(root, cfg.record.dir);
   const abandoned = abandonedRounds(cfg.state);
-  const refs = unlandedBatches(git, cfg.naming.batchPrefix, cfg.git.main)
-    .filter((ref) => !abandoned.has(Number(cfg.names.roundIn.exec(ref)?.[1])));
+  const refs = unlandedBatches(git, cfg).filter((ref) => !abandoned.has(cfg.names.batchRoundOf(ref)));
   return [...disk, ...refRecords(git, root, cfg.record.dir, refs, new Set(disk.map((r) => r.round)))];
 };

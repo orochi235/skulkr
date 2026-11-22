@@ -45,6 +45,9 @@ export const DEFAULTS = {
     prefix: 'audit',
     /** `batch` makes `batch/<date>-audit<N>`. */
     batchPrefix: 'batch',
+    /** A batch branch's whole name, from `{date}` (YYYY-MM-DD) and `{round}`, which it must hold; unset, it is
+     *  `<batchPrefix>/{date}-<prefix>{round}`. */
+    batch: undefined,
   },
 
   record: {
@@ -285,6 +288,16 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
   const tops = topDirs(p.roots);
   const { prefix, batchPrefix } = c.naming;
   const pre = escape(prefix);
+  const batchPattern = c.naming.batch ?? `${batchPrefix}/{date}-${prefix}{round}`;
+  if (!batchPattern.includes('{round}')) throw new Error(`naming.batch must hold {round}: ${batchPattern}`);
+  const fillBatch = (pattern, date, round) => pattern.replaceAll('{date}', date).replaceAll('{round}', String(round));
+  /** `pattern` as a regex source, `{date}` a date, `{round}` as `round`, and a `<prefix>` just before it also as `skulkr`. */
+  const batchSource = (pattern, round) => pattern.split(/(\{date\}|\{round\})/).map((part, i, parts) => {
+    if (part === '{date}') return '\\d{4}-\\d\\d-\\d\\d';
+    if (part === '{round}') return round;
+    return parts[i + 1] === '{round}' && part.endsWith(prefix) ? `${escape(part.slice(0, -prefix.length))}(?:${pre}|skulkr)` : escape(part);
+  }).join('');
+  const batchRe = new RegExp(`^${batchSource(batchPattern, '(\\d+)')}$`);
   const leftOutRe = new RegExp(`^batch: ${pre}\\d+-(\\S+?)(?: \\(round (\\d+)\\))? left out: (.+)$`);
   const oldConflictRe = new RegExp(`^batch: ${pre}\\d+-(\\S+) conflicts`);
   const areaBranch = new RegExp(`^${pre}(\\d+)-(.+)$`);
@@ -312,11 +325,16 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
     gate: { ...c.gate, logSuffix: `.${c.gate.name.replace(/[^\w.-]+/g, '-')}.log` },
     names: {
       area: (round, area) => `${prefix}${round}-${area}`,
-      batch: (date, round) => `${batchPrefix}/${date}-${prefix}${round}`,
+      batch: (date, round) => fillBatch(batchPattern, date, round),
       task: (round, area, step) => `${prefix}${round}-${area}-${step}`,
       frozen: (round) => `${prefix}${round}-frozen-night`,
       am: (round, area) => `${prefix}${round}-am-${area}`,
-      batchTree: (date, round) => `${batchPrefix}-${date}-${prefix}${round}`,
+      batchTree: (date, round) => fillBatch(batchPattern, date, round).replaceAll('/', '-'),
+      /** A batch branch → its round, or undefined for any other branch. */
+      batchRoundOf: (branch) => {
+        const m = batchRe.exec(branch);
+        return m ? Number(m[1]) : undefined;
+      },
       /** An area branch `<prefix><N>-<area>` → `{ round, id }`, or undefined for any other branch. */
       branchOf: (branch) => {
         const m = areaBranch.exec(branch);
@@ -329,7 +347,7 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
       /** A job of round `round` (any round when omitted), by its task name. */
       jobOf: (round = '\\d+') => new RegExp(`^(?:${pre}|skulkr)${round}-`),
       /** A runner job of round `round`'s batch gate, by its task name. */
-      batchJobOf: (round) => new RegExp(`${escape(batchPrefix)}-\\d{4}-\\d\\d-\\d\\d-(?:${pre}|skulkr)${round}(?:-|$)`),
+      batchJobOf: (round) => new RegExp(`${batchSource(batchPattern.replaceAll('/', '-'), round)}(?:-|$)`),
       /** A step's task name → `[area, step]`. */
       step: new RegExp(`^(?:${pre}|skulkr)\\d+-(.+)-(A|B|match|fix|repair|verify)$`),
       /**

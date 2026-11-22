@@ -52,3 +52,22 @@ describe('strandedHoldFor', () => {
     expect(strandedHoldFor([{ round: 66, branch: 'b66' }, ...one], 0)).toMatch(/^rounds 66 and 67's batches are unmerged/);
   });
 });
+
+describe('naming.batch', () => {
+  it('names, reads back, and finds the gate jobs of a batch by its pattern', () => {
+    const { names } = resolveConfig({ naming: { batch: 'rounds/r{round}-{date}' } });
+    expect(names.batch('2026-11-22', 9)).toBe('rounds/r9-2026-11-22');
+    expect(names.batchTree('2026-11-22', 9)).toBe('rounds-r9-2026-11-22');
+    expect(names.batchRoundOf('rounds/r9-2026-11-22')).toBe(9);
+    expect(names.batchRoundOf('batch/2026-11-22-audit9')).toBeUndefined();
+    expect(names.batchJobOf(9).test('rounds-r9-2026-11-22-gate')).toBe(true);
+    expect(() => resolveConfig({ naming: { batch: 'rounds/{date}' } })).toThrow('must hold {round}');
+  });
+
+  it('keeps the default names', () => {
+    const { names } = resolveConfig({});
+    expect(names.batch('2026-11-22', 67)).toBe('batch/2026-11-22-audit67');
+    expect(names.batchRoundOf('batch/2026-11-22')).toBeUndefined();
+    expect(names.batchJobOf(67).test('batch-2026-11-22-skulkr67-gate')).toBe(true);
+  });
+});

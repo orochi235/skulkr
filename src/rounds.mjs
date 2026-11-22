@@ -234,10 +234,10 @@ export const scaledOf = (pass) => ({ chapman: pass.chapman * (pass.share ?? 1), 
 /**
  * The round after every number already used: round directories, the ledger's text ("round 12",
  * "rounds 28–30"), branches named for a round (`roundIn`, the config's `names.roundIn`: `audit30-ui`,
- * `batch/…-audit31`), and the rounds runs have claimed (`claimed`, numbers as strings or numbers).
+ * `batch/…-audit31`) or for a batch (`batchRoundOf`, the config's `names.batchRoundOf`), and the rounds runs have claimed (`claimed`, numbers as strings or numbers).
  */
-/** @param {{ roundDirs?: string[], hardening?: string, branches?: string[], claimed?: (string | number)[], roundIn?: RegExp }} used */
-export const nextRound = ({ roundDirs = [], hardening = '', branches = [], claimed = [], roundIn }) => {
+/** @param {{ roundDirs?: string[], hardening?: string, branches?: string[], claimed?: (string | number)[], roundIn?: RegExp, batchRoundOf?: (branch: string) => number | undefined }} used */
+export const nextRound = ({ roundDirs = [], hardening = '', branches = [], claimed = [], roundIn, batchRoundOf }) => {
   const used = [0, ...claimed.map(Number)];
   for (const name of roundDirs) {
     const m = ROUND_DIR.exec(name);
@@ -247,6 +247,8 @@ export const nextRound = ({ roundDirs = [], hardening = '', branches = [], claim
   for (const name of branches) {
     const m = roundIn.exec(name);
     if (m) used.push(Number(m[1]));
+    const batch = batchRoundOf?.(name);
+    if (batch !== undefined) used.push(batch);
   }
   return Math.max(...used) + 1;
 };

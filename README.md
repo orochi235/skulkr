@@ -82,6 +82,7 @@ export default {
     trailer: '',                      // lines ending the record commit's message
   },
   naming: { prefix: 'audit', batchPrefix: 'batch' }, // audit<N>-<area>, batch/<date>-audit<N>
+  // naming.batch: 'rounds/r{round}-{date}' names batch branches whole instead; it must hold {round}
   git: { main: 'main', remote: 'origin', push: true }, // push: main goes to remote once a green round lands
 
   setup: {                            // readying a node tree for a fixer

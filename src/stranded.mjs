@@ -11,10 +11,10 @@ import { liveRuns } from './runs.mjs';
 export const strandedRoundsFor = (cfg, git = gitIn(mainCheckout(cfg))) => {
   const live = new Set(liveRuns(cfg.state).map((r) => r.round));
   const abandoned = abandonedRounds(cfg.state);
-  return unlandedBatches(git, cfg.naming.batchPrefix, cfg.git.main)
+  return unlandedBatches(git, cfg)
     .flatMap((branch) => {
-      const round = Number(cfg.names.roundIn.exec(branch)?.[1]);
-      return round && !live.has(round) && !abandoned.has(round) ? [{ round, branch }] : [];
+      const round = cfg.names.batchRoundOf(branch);
+      return round !== undefined && !live.has(round) && !abandoned.has(round) ? [{ round, branch }] : [];
     })
     .sort((a, b) => a.round - b.round);
 };

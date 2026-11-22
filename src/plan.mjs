@@ -31,7 +31,7 @@ export const plan = (cfg, root, args) => {
   const roundDirs = existsSync(recordDir) ? readdirSync(recordDir) : [];
   const ledger = cfg.record.ledger && join(root, cfg.record.ledger.path);
   const hardening = ledger && existsSync(ledger) ? readFileSync(ledger, 'utf8') : '';
-  const round = nextRound({ roundDirs, hardening, branches, claimed: claimedRounds(cfg.state), roundIn: cfg.names.roundIn });
+  const round = nextRound({ roundDirs, hardening, branches, claimed: claimedRounds(cfg.state), roundIn: cfg.names.roundIn, batchRoundOf: cfg.names.batchRoundOf });
   const areas = partitionAt(cfg, root, commit);
   const records = recordsFor(cfg, git, root);
   const { history: passes, covered, staleLines, touched } = areaStats(cfg, git, areas, passesIn(cfg, git, root, records), root);
