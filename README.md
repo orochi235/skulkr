@@ -106,6 +106,7 @@ export default {
   },
 
   areasPerRound: 16,
+  maxUnmergedRounds: 0,               // stranded rounds allowed before a new one waits (see "Stranded rounds")
   budget: { review: 8, match: 1, fix: 15, capUsd: 160, areaGuessUsd: 10, nightUsd: undefined }, // list-price dollars
   schedule: { startAt: '23:00', stopAt: '07:00', continuous: false }, // the service's start; when a run stops dispatching
   state: undefined,                   // default ~/.local/state/skulkr/<name>
@@ -156,6 +157,7 @@ file is regenerated, and the ledger, when the config names one, gets a row.
 | `--nodes a,b` | | only these nodes |
 | `--dry` | | print the plan and stop |
 | `--no-merge` | | leave `main` alone even when the batch is green |
+| `--anyway` | | start even though stranded rounds hold new ones back (see "Stranded rounds") |
 | `--sweep` | | run the configured sweep too |
 | `--fix-only [a,b]` | | a fix-only round for these areas, or every area with open findings; see "Carried findings" |
 | `--resume N` | | pick round N back up, reusing every job whose result came home; it stops starting areas at the first `schedule.stopAt` after the resume. Under the plan lock, it leaves out the areas a live run holds. A round lands once: when its status or `summary.json` names a `landed` tip (set once `main` fast-forwards, with the areas it carried) that `main` still holds, it resumes nothing and says the round already landed |
@@ -355,6 +357,15 @@ onto, as the service `skulkr` hosting every registered tenant, on the machine ho
 `SKULKR_BIN` makes each run start from the skulkr checkout rather than the service's synced copy, so a change to
 the pipeline reaches the next run without a sync.
 
+## Stranded rounds
+
+A round is stranded when its batch branch is unmerged into `main`, no live run owns it, and it was not abandoned: a red
+gate kept it, or `--no-merge` did. A round started past one plans from a `main` without its fixes, so its estimates
+are out of date, its reviewers can re-find what the stranded fixes closed, and its batch drifts further from the
+stranded one, so each merges worse. While more rounds are stranded than `maxUnmergedRounds` (default 0) allows,
+`skulkr night` refuses to start one and names them (`--anyway` starts it regardless; `--dry` and `--resume` are not
+held), and continuous mode waits, its `next` saying why. Land, delete, or abandon the batch to let rounds start again.
+
 ## Continuous rounds
 
 A round's model work (reviews, matches, fixes) is cheap on fleet CPU and bound by spend; its gate is one suite-sized
@@ -380,7 +391,8 @@ Each tick (every 30 seconds) the service starts a tenant's next round when all o
 
 - the mode is on, and the tenant is not read-only;
 - no round of the tenant is in its model steps, or started and not yet claimed, and no other tenant's is;
-- the night's spend plus the next round's estimate stays within `budget.nightUsd`.
+- the night's spend plus the next round's estimate stays within `budget.nightUsd`;
+- no more rounds are stranded than `maxUnmergedRounds` allows (see "Stranded rounds").
 
 The night, for the budget, runs from one `stopAt` to the next, so a round started in the afternoon counts against
 the coming night. Its spend is every round started in it, from `status.json` while live and `summary.json` after, or

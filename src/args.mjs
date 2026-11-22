@@ -23,6 +23,7 @@ export const parseArgs = (cfg, argv) => {
     resume: value('--resume') === undefined ? undefined : number('--resume', 0),
     merge: !argv.includes('--no-merge'),
     sweep: argv.includes('--sweep'),
+    anyway: argv.includes('--anyway'),
     capUsd: number('--cap-usd', cfg.budget.capUsd),
     budget: {
       review: number('--budget-review', cfg.budget.review),

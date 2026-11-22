@@ -202,6 +202,8 @@ export const DEFAULTS = {
   },
 
   areasPerRound: 16,
+  /** How many rounds may sit with their batch unmerged (`stranded.mjs`) before a new round waits; `--anyway` starts one regardless. */
+  maxUnmergedRounds: 0,
   /**
    * List-price dollars: each job's `--max-budget-usd` by role, a run's `capUsd`, the guess at an area's cost, and
    * `nightUsd`, what continuous mode may spend from one `stopAt` to the next (unset: no continuous mode).

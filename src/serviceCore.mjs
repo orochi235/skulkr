@@ -25,7 +25,7 @@ const list = (v) => (Array.isArray(v) ? v.join(',') : String(v));
 
 /** `skulkr night`'s arguments for a `start` request's fields. Throws on a field it does not know. */
 export const startArgs = (req) => {
-  const known = new Set(['id', 'start', 'resume', 'areas', 'only', 'nodes', 'capUsd', 'budget', 'merge', 'sweep', 'fixOnly']);
+  const known = new Set(['id', 'start', 'resume', 'areas', 'only', 'nodes', 'capUsd', 'budget', 'merge', 'sweep', 'fixOnly', 'anyway']);
   const unknown = Object.keys(req).filter((k) => !known.has(k));
   if (unknown.length > 0) throw new Error(`start does not take ${unknown.join(', ')}`);
   const args = [];
@@ -46,6 +46,7 @@ export const startArgs = (req) => {
   }
   if (req.merge === false) args.push('--no-merge');
   if (req.sweep === true) args.push('--sweep');
+  if (req.anyway === true) args.push('--anyway');
   if (req.fixOnly === true) args.push('--fix-only', 'all');
   else if (req.fixOnly !== undefined && req.fixOnly !== false) args.push('--fix-only', list(req.fixOnly));
   return args;

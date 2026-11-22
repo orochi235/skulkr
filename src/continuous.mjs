@@ -63,16 +63,18 @@ export const modeOf = ({ now, schedule, nightUsd, override }) => {
  * Whether tenant's next continuous round starts now, and with what cap; else why not. Inputs:
  * `mode` (`modeOf`), `readOnly`, `runs` (its live runs, each with its `step`), `pending` (rounds started but not yet
  * claimed), `spentUsd` tonight, `estimateUsd` for the next round, `nightUsd`, `capUsd` (the per-run cap), and
- * `idleUntil`, set when the last round it started found nothing to do or failed.
+ * `idleUntil`, set when the last round it started found nothing to do or failed, and `held`, why stranded rounds hold
+ * the next one back (`strandedHoldFor`), or null.
  * Answers `{ start, capUsd?, why?, behind? }`; `behind` is the round whose model steps it waits on.
  */
 /**
  * @param {{ now: Date, mode: any, readOnly: boolean, runs: any[], pending?: number, spentUsd: number, estimateUsd: number,
- *   nightUsd: number | null, capUsd: number, idleUntil?: string }} input
+ *   nightUsd: number | null, capUsd: number, idleUntil?: string, held?: string | null }} input
  */
-export const nextContinuous = ({ now, mode, readOnly, runs, pending = 0, spentUsd, estimateUsd, nightUsd, capUsd, idleUntil }) => {
+export const nextContinuous = ({ now, mode, readOnly, runs, pending = 0, spentUsd, estimateUsd, nightUsd, capUsd, idleUntil, held = null }) => {
   if (readOnly) return { start: false, why: 'read-only here' };
   if (!mode.on) return { start: false, why: mode.why ?? (mode.by === 'stop' ? 'stopped for the night' : 'off') };
+  if (held) return { start: false, why: held };
   if (idleUntil && now < new Date(idleUntil)) return { start: false, why: 'the last round it started found nothing to do or failed' };
   const model = runs.find(inModelSteps);
   if (model) return { start: false, why: `round ${model.round} is in its model steps`, behind: model.round };

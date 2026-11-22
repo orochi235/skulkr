@@ -1,7 +1,17 @@
 /** A tenant's continuous mode as its state on disk says now: what the service decides from, and what status shows. */
 import { budgetNight, modeOf, nextContinuous, queuesOf, roundEstimate, spentSince } from './continuous.mjs';
 import { readFleet } from './fleet.mjs';
+import { strandedHoldFor, strandedRoundsFor } from './stranded.mjs';
 import { finishedRuns, lastWords, liveRuns, readContinuous, readIdle } from './runs.mjs';
+
+/** Why a new round waits on stranded batches (`strandedHoldFor`), or null; null too where the checkout can't be read. */
+const heldFor = (cfg) => {
+  try {
+    return strandedHoldFor(strandedRoundsFor(cfg), cfg.maxUnmergedRounds);
+  } catch {
+    return null;
+  }
+};
 
 const cents = (n) => Math.round(n * 100) / 100;
 
@@ -22,6 +32,7 @@ export const continuousOf = (cfg, { now = new Date(), pending = 0, readOnly = fa
   const mode = modeOf({ now, schedule: cfg.schedule, nightUsd, override: readContinuous(cfg.state) });
   const next = nextContinuous({
     now, mode, readOnly, runs: live, pending, spentUsd, estimateUsd: estimate.usd, nightUsd, capUsd: cfg.budget.capUsd, idleUntil: readIdle(cfg.state)?.until,
+    held: mode.on && !readOnly ? heldFor(cfg) : null,
   });
   return {
     mode, next,

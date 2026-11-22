@@ -9,6 +9,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node
 import { basename, join } from 'node:path';
 import { runArea } from './area.mjs';
 import { parseArgs } from './args.mjs';
+import { strandedHoldFor, strandedRoundsFor } from './stranded.mjs';
 import { capstoneRepairer, repairRefusal } from './capstone.mjs';
 import { gateBaseline } from './repair.mjs';
 import { gateAhead } from './fleet.mjs';
@@ -155,11 +156,14 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
   }
   const root = mainCheckout(cfg);
   const git = gitIn(root);
+  const held = args.resume === undefined ? strandedHoldFor(strandedRoundsFor(cfg, git), cfg.maxUnmergedRounds) : null;
   if (args.dry) {
     const p = plan(cfg, root, args);
+    if (held) say(`held: ${held}`);
     printPlan(cfg, p, args, say);
     return { round: p.round, dry: true };
   }
+  if (held && !args.anyway) throw new Error(`not starting: ${held}; --anyway starts it regardless`);
   mkdirSync(cfg.state, { recursive: true });
   const { p, status } = args.resume === undefined ? await begin(cfg, root, args, say) : await resume(cfg, root, args, say);
   if (!status) return { round: p.round, dry: true };
