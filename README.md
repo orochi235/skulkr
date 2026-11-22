@@ -75,6 +75,7 @@ export default {
     fixer: 'Every fix that a user could notice gets a changelog line.',
   },
   briefs: { fixer: './audit/fixer.md' }, // or replace a brief outright (paths from this file)
+  review: { preload: true },          // the default: each reviewer's prompt carries its area's files
 
   record: {
     dir: 'docs/audits',               // round-<N>/ and partition.json are committed here
@@ -137,7 +138,7 @@ Each step prints one line as it completes (`review 3/16 …`).
 | plan | Areas come from the partition, less every area a live run holds. The round number is one past the highest used by a `<record.dir>/round-<N>/` directory, the ledger's text, a branch named `audit<N>-…`, or a run's claim. The run claims it by creating `runs/<N>/`; if another run got there first it takes the next. Planning holds `plan.lock`, so two runs starting at once never pick the same area. |
 | freeze | A detached worktree at `main`'s tip, `.worktrees/audit<N>-frozen-night`. That sha is the round's commit. |
 | sweep | Only with `--sweep` and a configured sweep: one job at the frozen commit beside the reviews; its findings go to one fixer. |
-| review | Per area, two reviewer jobs from the frozen tree with the reviewer brief and the area's file list. Reviewers may read, search, and run `git log/show/diff/blame`, and write only `.skulkr/out/`; their shell stays in the tree's root (`CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR`), since that write rule is relative to the working directory. Each lists the files it read; its stream goes through `src/progress.mjs`, so the runner shows how many of the area's files it has opened. |
+| review | Per area, two reviewer jobs from the frozen tree with the reviewer brief and the area's file list, and with `review.preload` (the default, adopted 2026-11-22 after round 72's trial: 6.5% cheaper, a third of the turns, overlap not up) every listed file's contents, so a reviewer need not open them; B then starts 30 seconds after A, to read A's cached prompt. Preloading needs a review agent that takes its prompt on stdin (Claude's does; Codex's reviewers read the files themselves). Reviewers may read, search, and run `git log/show/diff/blame`, and write only `.skulkr/out/`; their shell stays in the tree's root (`CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR`), since that write rule is relative to the working directory. Each lists the files it read; its stream goes through `src/progress.mjs`, so the runner shows how many of the area's files it has opened. |
 | match | One job per area pairs the two lists (the matcher brief); the pipeline keeps only one-to-one pairs and computes the estimate. |
 | fix | Per area with findings, one fixer job, permissions bypassed, in the node's synced tree. It first commits the synced tree and checks it hashes to the frozen commit's tree, installs if the lockfile changed (an install that fails stops the job before the model runs, leaving `install.log`), then hands back its commits as an mbox. |
 | verify | Per fixer with commits, the config's `checks.verify` over the files they changed, run by skulkr, never read from the fixer's report; see "Verify and repair". |
@@ -159,7 +160,7 @@ the config names one, gets a row.
 | `--nodes a,b` | | only these nodes |
 | `--dry` | | print the plan and stop |
 | `--no-merge` | | leave `main` alone even when the batch is green |
-| `--trial preload` | | beside each area's pair, run a second pair whose prompt carries the area's files, recorded only at `<night>/trial/<area>.json` for `skulkr trial` to compare: cost per review and overlap. The first pair alone feeds the fix and the record; each pair's B starts 30 seconds after its A |
+| `--trial preload` | | beside each area's pair, run a second pair of the other kind (reading its files itself where the area's pair preloads them, and the reverse), recorded only at `<night>/trial/<area>.json` for `skulkr trial` to compare: cost per review and overlap. The area's own pair alone feeds the fix and the record |
 | `--anyway` | | start even though stranded rounds hold new ones back (see "Stranded rounds") |
 | `--sweep` | | run the configured sweep too |
 | `--fix-only [a,b]` | | a fix-only round for these areas, or every area with open findings; see "Carried findings" |

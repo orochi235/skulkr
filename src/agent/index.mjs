@@ -12,6 +12,7 @@
  *   record (tokens, `weightedTokens`, `costUsd`, `turns`, `terminalReason`, `budgetHit`, …) and `error` a reply that
  *   did no work;
  * - `timeoutMin(cfg)` and `reviewExpect(cfg)`: how long a job may run, and a reviewer's expected duration;
+ * - `stdin`: true where `line` honors `stdin`, so a prompt too large for one argument (a preloaded review's) can go;
  * - optionally `problemFor(cfg, role)`, why the config cannot run `role` on it ('' when it can), and
  *   `briefPath(cfg, brief)`, its own brief for `reviewer`, `matcher`, `fixer` or `repair` in place of the config's.
  */

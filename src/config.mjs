@@ -104,6 +104,12 @@ export const DEFAULTS = {
   },
   /** Project rules added to the default briefs (a string of Markdown), per brief. */
   rules: { reviewer: '', fixer: '' },
+  /**
+   * `preload`: each reviewer's prompt carries its area's files, so it need not open them, and each pair's B starts 30
+   * seconds after its A to read A's cached prompt. Adopted 2026-11-22 from round 72's trial (6.5% cheaper, a third of
+   * the turns, overlap not up). Only where the review agent takes its prompt on stdin (`stdin` in `agent/index.mjs`).
+   */
+  review: { preload: true },
   /** Brief templates, paths relative to the config file; unset uses the shipped default. */
   briefs: { reviewer: undefined, matcher: undefined, fixer: undefined, repair: undefined },
 

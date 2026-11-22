@@ -92,4 +92,5 @@ export const claude = {
   resultOf,
   timeoutMin: (cfg) => cfg.claude.timeoutMin,
   reviewExpect: (cfg) => cfg.claude.reviewExpect,
+  stdin: true,
 };
