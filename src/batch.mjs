@@ -97,16 +97,16 @@ export const mergeIn = (git, args, { retryMs = LOCK_RETRY_MS, wait = sleep } = {
 };
 
 /**
- * Merges each branch into a new batch branch at `commit`. One that conflicts is left out in `conflicted` with its
+ * Merges each branch into a new batch branch at `commit`, its name and worktree's ending in `suffix`. One that conflicts is left out in `conflicted` with its
  * unmerged `paths`; one whose merge failed otherwise, in `failed` with git's `error`.
  */
-export const makeBatch = (cfg, root, { round, date, commit, branches, retryMs = LOCK_RETRY_MS, wait = sleep }) => {
-  const name = cfg.names.batch(date, round);
+export const makeBatch = (cfg, root, { round, date, commit, branches, suffix = '', retryMs = LOCK_RETRY_MS, wait = sleep }) => {
+  const name = `${cfg.names.batch(date, round)}${suffix}`;
   // On main as it is now, so whatever landed since the round froze is in from the start and a branch that conflicts
   // with it is left out here, alone, rather than failing the whole batch's catch-up later.
   const main = cfg.git.main;
   const base = tryGit(gitIn(root), 'merge-base', '--is-ancestor', commit, main).ok ? main : commit;
-  const tree = addWorktree(root, cfg.names.batchTree(date, round), base, name);
+  const tree = addWorktree(root, `${cfg.names.batchTree(date, round)}${suffix}`, base, name);
   const git = gitIn(tree);
   const merged = [];
   const conflicted = [];

@@ -218,6 +218,14 @@ export const DEFAULTS = {
    */
   schedule: { startAt: '23:00', stopAt: '07:00', continuous: false },
 
+  /**
+   * An early landing (README "Early landings"): once per round, while areas are still fixing, the ready half is batched,
+   * gated and landed. It starts when `share` of the picked areas have branches ready, at least `left` of them have yet to
+   * finish, and the runner reports `coresFree` of the fleet's cores free with nobody else waiting for the gate. `null`
+   * turns it off; so does a runner that cannot say how busy it is.
+   */
+  early: { share: 0.5, left: 0.25, coresFree: 0.5 },
+
   /** An extra check run beside the reviews whose findings go to one fixer; see README "A sweep". */
   sweep: null,
 

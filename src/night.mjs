@@ -19,6 +19,7 @@ import { JOB_IN, nextClock } from './config.mjs';
 import { fixOnlyAreas } from './fixOnly.mjs';
 import { runUntilFree } from './jobs.mjs';
 import { createSlots } from './slots.mjs';
+import { watchEarly } from './early.mjs';
 import { batchAndTest, patchAreas, patchSweep } from './land.mjs';
 import { begin, localDate, plan, printPlan } from './plan.mjs';
 import { resume } from './resume.mjs';
@@ -197,26 +198,52 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     const sweepFix = args.sweep ? startSweep(ctx, (s) => (sweep = s)) : Promise.resolve(undefined);
     setStep('review');
     const deadline = deadlineOf(cfg, status);
-    if (args.fixOnly) await fixOnlyAreas({ ctx, picked: p.picked, open: p.open, args, status, deadline, results });
-    else await reviewAreas({ ctx, git, picked: p.picked, passes: p.passes, open: p.open, args, status, deadline, results });
-    const sweepFixed = await sweepFix;
-    if (results.length === 0 && !sweepFixed?.mbox) throw new Error('no area finished');
-    results.sort((a, b) => (a.id < b.id ? -1 : 1));
-    setStep('patch');
-    const landing = { cfg, root, round: p.round, commit: p.commit, outcomes, say };
-    const branches = patchAreas({ ...landing, nightDir: status.nightDir, results });
-    if (sweepFixed) sweep.fix = { ...patchSweep({ ...landing, fixed: sweepFixed, branches }), ...(sweepFixed.verify ? { verify: sweepFixed.verify } : {}) };
-    setStep('batch');
+    let sweepFixed;
     const mboxOf = (id) => (id === cfg.sweep?.id ? sweepFixed?.mbox : undefined);
     const repair = verifyOf(cfg) ? capstoneRepairer(ctx, { root, results, mboxOf }) : undefined;
     const baseline = verifyOf(cfg) ? gateBaseline(ctx) : undefined;
     const mayRepair = (started) => repairRefusal({ stopped: ctx.stopped(), used: status.costUsd, started, fix: args.budget.fix, cap: args.capUsd });
-    report = await batchAndTest({ ...landing, git, date: ctx.date, nightDir: status.nightDir, branches, results, sweep, merge: args.merge, setStep, repair, mayRepair, baseline,
-      onLanded: (landed) => {
-        status.landed = { tip: landed.tip, areas: [...new Set([...(status.landed?.areas ?? []), ...landed.areas])] };
+    const landing = { cfg, root, git, round: p.round, commit: p.commit, date: ctx.date, nightDir: status.nightDir, outcomes, say, merge: args.merge, repair, mayRepair, baseline,
+      onLanded: (landed, early = false) => {
+        status.landed = { tip: landed.tip, areas: [...new Set([...(status.landed?.areas ?? []), ...landed.areas])], ...(early ? { early: true } : {}) };
         writeStatus(p.round, status, cfg.state);
       },
-    });
+    };
+    // Areas a resumed round already landed early are not landed twice, nor a second early landing tried.
+    const before = new Set(p.landedEarly ?? []);
+    for (const id of before) outcomes[id] = `\`${cfg.names.area(p.round, id)}\`, landed early, before the resume`;
+    let areasDone = false;
+    const earlyLanding = args.merge && cfg.early && !before.size ? watchEarly({
+      ctx, early: cfg.early, picked: p.picked.length, results, done: () => areasDone,
+      land: { ...landing, sweep: undefined, onLanded: (l) => landing.onLanded(l, true),
+        setStep: (step, { behind } = {}) => {
+          status.early = { step, ...(behind ? { behind } : {}) };
+          writeStatus(p.round, status, cfg.state);
+        } },
+    }).catch((error) => {
+      say(`early: failed: ${error.stack ?? error}`);
+      return null;
+    }).finally(() => {
+      delete status.early;
+      writeStatus(p.round, status, cfg.state);
+    }) : Promise.resolve(null);
+    try {
+      if (args.fixOnly) await fixOnlyAreas({ ctx, picked: p.picked, open: p.open, args, status, deadline, results });
+      else await reviewAreas({ ctx, git, picked: p.picked, passes: p.passes, open: p.open, args, status, deadline, results });
+    } finally {
+      areasDone = true;
+    }
+    sweepFixed = await sweepFix;
+    const early = await earlyLanding;
+    if (results.length === 0 && !sweepFixed?.mbox) throw new Error('no area finished');
+    results.sort((a, b) => (a.id < b.id ? -1 : 1));
+    setStep('patch');
+    const skip = new Set([...before, ...(early?.patched ?? [])]);
+    const branches = [...(early?.back ?? []), ...patchAreas({ ...landing, results: results.filter((r) => !skip.has(r.id)) })].sort();
+    if (sweepFixed) sweep.fix = { ...patchSweep({ ...landing, fixed: sweepFixed, branches }), ...(sweepFixed.verify ? { verify: sweepFixed.verify } : {}) };
+    setStep('batch');
+    report = await batchAndTest({ ...landing, branches, results, sweep, setStep });
+    if (early?.landed.size) report = `${early.landed.size} areas landed early; ${report}`;
     const checked = verifyLine(results);
     if (checked) report += `; ${checked}`;
     const unrun = results.filter((s) => s.incomplete?.length).map((s) => `${s.id} (${s.incomplete.join(', ')})`);

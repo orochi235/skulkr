@@ -28,6 +28,12 @@ describe('resumable', () => {
     expect(resumable({ prior: { areas: ['a', 'b'] }, held: new Set(), inMain: () => true }).ids).toEqual(['a', 'b']);
   });
 
+  it('resumes every area after an early landing, naming the areas it landed', () => {
+    const early = { ...summary, landed: { ...summary.landed, early: true } };
+    expect(resumable({ prior: early, held: new Set(), inMain: (tip: string) => tip === 'abc' })).toEqual({ ids: ['a', 'b', 'c', 'd'], held: [], landedEarly: ['a', 'b'] });
+    expect(resumable({ prior: early, held: new Set(), inMain: () => false })).toEqual({ ids: ['a', 'b', 'c', 'd'], held: [] });
+  });
+
   it('leaves out the areas a live run holds, as a new plan does', () => {
     expect(resumable({ prior: summary, held: new Set(['c']), inMain: () => false })).toEqual({ ids: ['a', 'b', 'd'], held: ['c'] });
   });

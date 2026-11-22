@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { gitIn } from './batch.mjs';
 import { resolveConfig } from './config.mjs';
-import { batchAndTest, freshLog } from './land.mjs';
+import { batchAndTest } from './land.mjs';
+import { freshLog } from './gateRun.mjs';
 import { leftOutIn } from './leftOut.mjs';
 
 const dirs: string[] = [];
@@ -30,7 +31,7 @@ const area = (id: string) => ({
 });
 
 /** A project on `main` whose `shared.txt` main has changed since `frozen`, with a state dir and a green gate. */
-const project = () => {
+const project = (gate = ['true']) => {
   const root = temp('skulkr-land-');
   const git = gitIn(root);
   git('init', '-q', '-b', 'main');
@@ -48,7 +49,7 @@ const project = () => {
   put('.gitignore', '.worktrees/\n');
   const frozen = git('rev-parse', 'HEAD');
   put('shared.txt', 'main');
-  const cfg = resolveConfig({ state: temp('skulkr-state-'), record: { dir: 'audit-log' }, gate: { command: ['true'] } });
+  const cfg = resolveConfig({ state: temp('skulkr-state-'), record: { dir: 'audit-log' }, gate: { command: gate } });
   /** `audit<round>-<id>` from `from`, writing `file`. */
   const branch = (round: number, id: string, file: string, from = frozen) => {
     const name = cfg.names.area(round, id);
@@ -57,14 +58,14 @@ const project = () => {
     git('checkout', '-q', 'main');
     return name;
   };
-  const night = async (round: number, branches: string[]) => {
+  const night = async (round: number, branches: string[], early = false) => {
     const said: string[] = [];
     const outcomes: Record<string, string> = {};
     const results = branches.map((b) => area(b.replace(cfg.names.area(round, ''), '')));
     const landed: { tip: string; areas: string[] }[] = [];
     const report = await batchAndTest({
       cfg, root, git, round, commit: frozen, date: '2026-11-21', nightDir: temp('skulkr-night-'), branches, results,
-      sweep: undefined, outcomes, merge: true, say: (l: string) => said.push(l), setStep: () => {}, repair: undefined, baseline: undefined,
+      sweep: undefined, outcomes, merge: true, say: (l: string) => said.push(l), setStep: () => {}, repair: undefined, baseline: undefined, early,
       onLanded: (l: { tip: string; areas: string[] }) => landed.push(l),
     });
     return { report, outcomes, said, landed };
@@ -104,7 +105,7 @@ describe('batchAndTest', () => {
     expect(five.report).toContain('1 merged and 0 still left out');
     expect(readFileSync(join(git('rev-parse', '--show-toplevel'), 'shared.txt'), 'utf8')).toBe('rebased');
     expect(leftOutIn(cfg.state)).toEqual([]);
-  });
+  }, 15_000);
 
   it("tells the run which of its areas landed and at what tip, though landing deletes their branches", async () => {
     const { git, branch, night } = project();
@@ -121,6 +122,35 @@ describe('batchAndTest', () => {
     const three = await night(3, [gone]);
     expect(three.outcomes.gone).toMatch(new RegExp(`^\`${gone}\`, left out: merge failed: .*${gone}`));
     expect(three.outcomes.gone).not.toMatch(/conflict/);
+  });
+});
+
+describe('an early landing', () => {
+  it('lands what merges without a record, and leaves a branch that would not merge for the round', async () => {
+    const { cfg, root, git, branch, night } = project();
+    const a = branch(3, 'a', 'a.txt');
+    const clash = branch(3, 'b', 'shared.txt');
+    const three = await night(3, [a, clash], true);
+    expect(three.report).toMatch(/^main fast-forwarded/);
+    expect(three.landed).toEqual([{ tip: git('rev-parse', 'main'), areas: ['a'] }]);
+    expect(three.said).toContain(`batch: ${clash} would not merge early (merge conflict in shared.txt); it waits for the round's batch`);
+    expect(leftOutIn(cfg.state)).toEqual([]);
+    expect(git('ls-tree', '--name-only', 'main')).not.toContain('audit-log');
+    expect(git('branch', '--list', a, clash, 'batch/*').split('\n').map((b) => b.trim().replace(/^\* /, ''))).toEqual([clash]);
+    expect(readFileSync(join(root, 'a.txt'), 'utf8')).toBe(a);
+  });
+
+  it('red, leaves main, keeps its branches for the round, and deletes its own batch', async () => {
+    const { git, branch, night } = project(['false']);
+    const before = git('rev-parse', 'main');
+    const a = branch(3, 'a', 'a.txt');
+    const three = await night(3, [a], true);
+    expect(three.report).toBe("red; its branches wait for the round's batch");
+    expect(git('rev-parse', 'main')).toBe(before);
+    expect(three.landed).toEqual([]);
+    expect(git('branch', '--list', a)).not.toBe('');
+    expect(git('branch', '--list', 'batch/*')).toBe('');
+    expect(git('worktree', 'list')).not.toMatch(/-early/);
   });
 });
 

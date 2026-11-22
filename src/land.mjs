@@ -4,18 +4,16 @@
  * The gate run through the fast-forward holds the merge lock, so runs land one at a time, and the gate itself holds
  * the fleet queue's lease (`fleet.mjs`), so one gate runs at a time across every tenant.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { applyFix, catchUpWithMain, commitRecord, fastForwardMain, makeBatch, pushMain, removeWorktree, runGate } from './batch.mjs';
+import { applyFix, commitRecord, fastForwardMain, gitIn, makeBatch, pushMain, removeWorktree } from './batch.mjs';
 import { capstoneText, repairCapstone } from './capstone.mjs';
-import { failedWhereIn } from './gate.mjs';
-import { fleetDir, waitForFleet } from './fleet.mjs';
+import { alreadyFailing, failuresIn, gateOnFleet } from './gateRun.mjs';
 import { leftOutIn, leftOutWhy, recordLeftOut, retryable } from './leftOut.mjs';
 import { waitForLease } from './lease.mjs';
 import { mergeLock } from './runs.mjs';
-import { isTestPath } from './verify.mjs';
-/** How many times a green batch merges a moved main in and tests again before leaving the fast-forward to fail. */
-const MAIN_CATCH_UPS = 2;
+/** What an early landing's batch branch, worktree and gate logs end in (README "Early landings"). */
+export const EARLY = '-early';
 
 /** Whether a fixer's verify step failed for good: a run that timed out lands, for the capstone to check. */
 export const failedVerify = (verify) => verify?.ok === false && !verify.timedOut;
@@ -72,28 +70,6 @@ export const patchSweep = ({ cfg, root, round, commit, fixed, branches, outcomes
   return { patches: fixed.patches, commits: applied.commits, report: fixed.report, costUsd: fixed.usage?.costUsd };
 };
 
-/** Tests the batch with the config's gate, merging a moved `main` in first and between passes. Where that merge
- *  conflicts, `rebuild` makes the batch again on the new `main`, leaving out the branches that now conflict, and the
- *  round goes on with the rest. Answers the batch and the tip to land, or, red, the batch, its gate log, and `{ report }`;
- *  `tag` marks the gate's logs apart from an earlier test of the round's batch. */
-/** `<dir>/<name><suffix>`, or with `.r2`, `.r3`… before `suffix` where an earlier run of the round (a resumed one's)
- *  left that file: the gate appends to its log, and progress read from a log holding two runs reads the first. */
-export const freshLog = (dir, name, suffix) => {
-  for (let n = 1; ; n++) {
-    const path = join(dir, `${name}${n === 1 ? '' : `.r${n}`}${suffix}`);
-    if (!existsSync(path)) return path;
-  }
-};
-
-/** How many failures the gate log at `log` names (`failedWhereIn`); 0 where it cannot be read. */
-const failuresIn = (log, gate) => {
-  try {
-    return failedWhereIn(readFileSync(log, 'utf8'), gate).length;
-  } catch {
-    return 0;
-  }
-};
-
 /** Two capstone cycles' outcomes as one, a branch's later outcome replacing its earlier; `a` may be undefined. */
 const mergeCycles = (a, b) => {
   if (!a) return { ...b, cycles: 1 };
@@ -109,52 +85,6 @@ const mergeCycles = (a, b) => {
   };
 };
 
-/** Whether the gate log at `log` names no failure though the gate failed: only where the gate marks its failures. */
-const crashedIn = (log, gate) => {
-  if (!gate.failPrefix) return false;
-  try {
-    return failedWhereIn(readFileSync(log, 'utf8'), gate).length === 0;
-  } catch {
-    return false;
-  }
-};
-
-const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild, tag = '' }) => {
-  const logName = `${batch.name.replace(/\//g, '-')}${tag}`;
-  const main = cfg.git.main;
-  const gate = cfg.gate.name;
-  const catchUp = () => {
-    const caught = catchUpWithMain(batch.tree, main, cfg.record.ledger ?? null);
-    if (caught.moved) {
-      tip = caught.tip;
-      say(`batch: ${main} moved; merged it in at ${tip.slice(0, 10)} and testing that`);
-      return true;
-    }
-    if (!caught.conflict && !caught.failed) return false;
-    ({ batch, tip } = rebuild());
-    const why = caught.conflict ? 'conflicted' : `failed (${caught.failed})`;
-    say(`batch: ${main} moved and merging it ${why}; rebuilt the batch on it at ${tip.slice(0, 10)} and testing that`);
-    return true;
-  };
-  // Another run may have landed while this one waited for the lock: test with its work in, not twice.
-  if (merge) catchUp();
-  for (let pass = 1; ; pass++) {
-    const suffix = pass === 1 ? '' : `.${pass}`;
-    let log = freshLog(nightDir, `${logName}${suffix}`, cfg.gate.logSuffix);
-    let status = await runGate(cfg, { root, batch, logPath: log });
-    say(`gate: ${gate} ${status === 0 ? 'passed' : `failed (${status}); its log is ${log}`}`);
-    // A failed gate whose log names no failure crashed or was killed, which says nothing of the batch: run it once more.
-    if (status !== 0 && crashedIn(log, cfg.gate)) {
-      say(`gate: ${gate} named no failure, as a crashed run does; running it once more`);
-      log = freshLog(nightDir, `${logName}${suffix}.rerun`, cfg.gate.logSuffix);
-      status = await runGate(cfg, { root, batch, logPath: log });
-      say(`gate: ${gate} ${status === 0 ? 'passed' : `failed (${status}); its log is ${log}`}`);
-    }
-    if (status !== 0) return { batch, tip, log, report: `red: ${batch.name} and its branches kept; worktree ${batch.tree}; logs in ${nightDir}` };
-    if (!merge || pass === MAIN_CATCH_UPS + 1 || !catchUp()) return { batch, tip };
-  }
-};
-
 /**
  * Merges the branches into the batch, records the round there, runs the gate on its tip, and merges if green. A red
  * gate gets one capstone repair cycle where `repair` is given (`capstone.mjs`): its failures go to the branches that
@@ -162,20 +92,22 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
  * where `baseline(files)` says every failure left is a test file that fails on the frozen commit too: `main` has
  * those failures already, so landing leaves it no worse. A branch left out because it would not merge is recorded
  * (`leftOut.mjs`), and the next round's batch tries it again after its own branches. `onLanded({ tip, areas })` hears
- * that `main` fast-forwarded to `tip` with the round's `areas` in it.
+ * that `main` fast-forwarded to `tip` with the round's `areas` in it. `early` makes it an early landing (README "Early
+ * landings"): no record, no retry of earlier rounds' branches, and a branch that will not merge, or a batch still red,
+ * leaves its branches for the round's own batch rather than out of it.
  */
-export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, mayRepair = /** @type {(started: number) => string} */ (() => ''), baseline, onLanded = /** @type {(landed: { tip: string, areas: string[] }) => void} */ (() => {}) }) => {
+export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, mayRepair = /** @type {(started: number) => string} */ (() => ''), baseline, early = false, onLanded = /** @type {(landed: { tip: string, areas: string[] }) => void} */ (() => {}) }) => {
   const idOf = cfg.names.idOf;
   const fixCommits = new Map(results.map((a) => [a.id, a.fixCommits]));
   const main = cfg.git.main;
-  const earlier = new Map(retryable(git, leftOutIn(cfg.state), main).filter((e) => !branches.includes(e.branch)).map((e) => [e.branch, e]));
+  const earlier = early ? new Map() : new Map(retryable(git, leftOutIn(cfg.state), main).filter((e) => !branches.includes(e.branch)).map((e) => [e.branch, e]));
   if (earlier.size) say(`batch: retrying ${earlier.size} branches left out of earlier rounds: ${[...earlier.keys()].join(', ')}`);
   let landing = [...branches, ...earlier.keys()];
   let left = [];
   let retried = { merged: 0, out: 0 };
   /** The batch on main as it is now, with the round's record committed on it. */
   const build = () => {
-    const made = makeBatch(cfg, root, { round, date, commit, branches: landing });
+    const made = makeBatch(cfg, root, { round, date, commit, branches: landing, ...(early ? { suffix: EARLY } : {}) });
     retried = { merged: made.merged.filter((b) => earlier.has(b)).length, out: 0 };
     for (const branch of made.merged) {
       if (earlier.has(branch)) {
@@ -190,6 +122,10 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     for (const out of [...made.conflicted, ...made.failed]) {
       const { branch } = out;
       const why = leftOutWhy(out);
+      if (early) {
+        say(`batch: ${branch} would not merge early (${why}); it waits for the round's batch`);
+        continue;
+      }
       const before = earlier.get(branch);
       left.push({ branch, round: before?.round ?? round, why });
       say(`batch: ${branch}${before ? ` (round ${before.round})` : ''} left out: ${why}`);
@@ -201,6 +137,7 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
       const area = results.find((a) => a.id === idOf(branch));
       if (area) area.fixCommits = [];
     }
+    if (early) return { batch: made, tip: gitIn(made.tree)('rev-parse', 'HEAD') };
     const tip = commitRecord(cfg, made.tree, { round, commit, date, nightDir, areas: results, sweep, outcomes });
     say(`record: ${cfg.record.dir}/round-${round}/ committed on ${made.name} at ${tip.slice(0, 10)}`);
     return { batch: made, tip };
@@ -221,7 +158,7 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     /** How many failures the gate before the last repair cycle named. */
     let before = Infinity;
     for (;;) {
-      tested = await gateOnFleet({ cfg, root, batch, nightDir, merge, say, setStep, round, tip: recorded, rebuild: build, tag: cycles === 0 ? '' : cycles === 1 ? '.capstone' : `.capstone${cycles}` });
+      tested = await gateOnFleet({ cfg, root, batch, nightDir, merge, say, setStep, round, tip: recorded, rebuild: build, tag: `${early ? EARLY.replace('-', '.') : ''}${cycles === 0 ? '' : cycles === 1 ? '.capstone' : `.capstone${cycles}`}` });
       batch = tested.batch ?? batch;
       if (!tested.report || !repair) break;
       // One repair cycle per round, and another after it only while each leaves fewer failures than the one before.
@@ -253,6 +190,10 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     if (over) {
       say(`gate: every failure left (${over.length}) fails on ${commit.slice(0, 10)} too; landing over them`);
       tried += `; landed over ${over.length} failures ${cfg.git.main} already has (${over.slice(0, 3).join(', ')}${over.length > 3 ? ', …' : ''})`;
+    } else if (tested.report && early) {
+      removeWorktree(root, batch.tree);
+      tryDelete(git, batch.name);
+      return `red${tried}; its branches wait for the round's batch`;
     } else if (tested.report) return `${tested.report}${tried}`;
     removeWorktree(root, batch.tree);
     if (!merge) return `green; --no-merge, so ${cfg.git.main} is untouched and ${batch.name} and its branches are kept${tried}`;
@@ -275,7 +216,7 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     }
     return `${result}${tried}`;
   } finally {
-    recordLeftOut(cfg.state, git, main, left);
+    if (!early) recordLeftOut(cfg.state, git, main, left);
     release();
   }
 };
@@ -284,33 +225,4 @@ const tryDelete = (git, branch) => {
   try {
     git('branch', '-D', branch);
   } catch {}
-};
-
-/**
- * The failures a red gate's log at `logPath` names, when every one is a test file `baseline` finds failing on the
- * frozen commit as well; else null. A failed step, or a log naming no failure, is never discounted.
- */
-const alreadyFailing = async (cfg, logPath, baseline) => {
-  const where = failedWhereIn(readFileSync(logPath, 'utf8'), cfg.gate);
-  if (!where.length || where.some((w) => !isTestPath(w))) return null;
-  const old = await baseline(where);
-  return where.every((w) => old.includes(w)) ? where : null;
-};
-
-/** The gate on the batch, in its turn in the fleet queue, which it holds only while it runs. */
-const gateOnFleet = async ({ cfg, setStep, round, say, ...test }) => {
-  setStep('fleet-wait');
-  const releaseFleet = await waitForFleet(fleetDir(), { tenant: cfg.name, round }, {
-    onWait: ({ holder, ahead }) => {
-      const behind = holder ? `${holder.tenant} round ${holder.round}` : ahead[0] ? `${ahead[0].tenant} round ${ahead[0].round}` : undefined;
-      say(`batch: waiting for the fleet${behind ? `, behind ${behind}` : ''}${ahead.length ? ` (${ahead.length} ahead)` : ''}`);
-      setStep('fleet-wait', behind ? { behind } : {});
-    },
-  });
-  try {
-    setStep('fleet');
-    return await testBatch({ cfg, say, ...test });
-  } finally {
-    releaseFleet();
-  }
 };

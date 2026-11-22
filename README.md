@@ -253,6 +253,37 @@ step after the fix.
 weasel's config runs `npx vitest related --run` from the tree root over every project but `gate` and the browser
 ones, with four workers, and the browser projects with two on a GUI node.
 
+## Early landings
+
+A round's fixers finish over most of an hour, and its batch waits for the last of them, so a test failure in the
+first area to finish surfaces only after the last. An early landing lands the ready part sooner: once per round,
+while areas are still running, it patches the areas whose fixes came home and passed verify, batches them on `main`
+as `batch/<date>-audit<N>-early`, runs the gate (its logs tagged `.early`) with a capstone cycle when red, and
+fast-forwards `main` when green. The round goes on meanwhile; the run's status shows the landing's own step as `early`.
+
+It starts when all of these hold, checked each minute (`src/early.mjs`, the config's `early`):
+
+| Condition | Default |
+|---|---|
+| ready areas, of those the round picked | at least `share`, half |
+| areas not yet finished | at least `left`, a quarter, so it never runs just before the round's own batch |
+| the runner's free cores (`spare()`, onto's `onto top`) | at least `coresFree`, half |
+| the fleet queue and this tenant's merge lock | nobody holds or waits for either |
+
+What it differs in from the round's batch:
+
+| | Early landing | The round's batch |
+|---|---|---|
+| record | none; the round's batch commits the whole round's, early areas' outcomes reading `landed early at <sha>` | committed on the batch |
+| branches left out of earlier rounds | not retried | retried |
+| a branch that will not merge | waits for the round's batch | left out, in `left-out.json` |
+| still red after its capstone | its branches wait for the round's batch, and its batch branch goes | the batch and branches are kept |
+
+The round's batch merges the landed `main` in, as it does after any landing. `status.landed` carries `early: true`
+until the round's batch lands, so `--resume` runs the round on rather than calling it landed, and skips the areas
+already on `main`; their record then lacks `fixCommits`, which the early landing's status does not keep. `early:
+null`, `--no-merge`, and a runner without `spare()` (the local one) turn it off.
+
 ## Carried findings
 
 A fix job that never really ran (no node had room, a usage limit) leaves its area's findings unfixed, and the next

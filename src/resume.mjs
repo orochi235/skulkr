@@ -13,13 +13,15 @@ import { clearStop, liveRuns, planLock, runDir, writeStatus } from './runs.mjs';
 /**
  * The areas a resume of `prior` (the round's status or summary) runs again: every one it planned, less those `held` by
  * a live run; none once its `landed` record names a tip `main` still holds (`inMain(tip)`), as a round lands once and
- * its record is already on `main`. Answers `{ ids, held, landed? }`, `held` the ids a live run holds and `landed`
- * that tip.
+ * its record is already on `main`. Answers `{ ids, held, landed?, landedEarly? }`, `held` the ids a live run holds,
+ * `landed` that tip, and `landedEarly` the areas an early landing put on `main` (README "Early landings"), whose
+ * round has its own batch still to land.
  */
 export const resumable = ({ prior, held, inMain }) => {
-  if (prior.landed?.tip && inMain(prior.landed.tip)) return { ids: [], held: [], landed: prior.landed.tip };
+  const onMain = Boolean(prior.landed?.tip && inMain(prior.landed.tip));
+  if (onMain && !prior.landed.early) return { ids: [], held: [], landed: prior.landed.tip };
   const planned = (prior.planned ?? prior.areas ?? []).map((a) => (typeof a === 'string' ? a : a.id));
-  return { ids: planned.filter((id) => !held.has(id)), held: planned.filter((id) => held.has(id)) };
+  return { ids: planned.filter((id) => !held.has(id)), held: planned.filter((id) => held.has(id)), ...(onMain ? { landedEarly: prior.landed.areas } : {}) };
 };
 
 /**
@@ -49,7 +51,7 @@ export const resume = async (cfg, root, args, say) => {
         return false;
       }
     };
-    const { ids, landed, held } = resumable({ prior, held: new Set(running.flatMap((r) => r.areas ?? [])), inMain });
+    const { ids, landed, held, landedEarly } = resumable({ prior, held: new Set(running.flatMap((r) => r.areas ?? [])), inMain });
     if (landed) {
       say(`resume: round ${round} already landed on ${cfg.git.main} at ${landed.slice(0, 10)}; nothing to resume`);
       return { p: { round } };
@@ -61,11 +63,12 @@ export const resume = async (cfg, root, args, say) => {
     const records = recordsFor(cfg, git, root);
     const p = {
       commit, round, picked: ids.flatMap((id) => (byId.has(id) ? [byId.get(id)] : [])), passes: inheritPasses([...byId.values()], passesIn(cfg, git, root, records)).history,
-      running, open: openFindingsIn(cfg, git, root, records, [...byId.values()]),
+      running, open: openFindingsIn(cfg, git, root, records, [...byId.values()]), ...(landedEarly ? { landedEarly } : {}),
     };
     const status = {
       round, commit, started: prior.started, resumed: new Date().toISOString(), step: 'freeze', areas: ids, nightDir: prior.nightDir,
       weightedTokens: prior.weightedTokens ?? 0, costUsd: prior.costUsd ?? 0, capUsd: args.capUsd, args,
+      ...(landedEarly ? { landed: prior.landed } : {}),
     };
     writeStatus(round, status, state);
     say(`resuming round ${round} at ${commit.slice(0, 10)}: ${p.picked.length} areas, reusing every job whose result came home`);

@@ -278,7 +278,8 @@ export interface AuditCalibration {
 /** One defect as a round tells it: what was broken, who listed it, what became of it, and what the fix changed. */
 export interface AuditDefect {
   readonly claim: string;
-  /** `A`, `B`, `A+B`, `sweep`, or `extra` for one the fixer found itself. */
+  /** `A`, `B`, `A+B`, `sweep`, `carried` for an earlier round's open finding handed to this round's fixer (README
+   *  "Carried findings"), or `extra` for one the fixer found itself. */
   readonly from: string;
   readonly verdict: 'fixed' | 'not a defect' | 'duplicate' | 'question' | 'not fixed' | 'open';
   readonly note: string;

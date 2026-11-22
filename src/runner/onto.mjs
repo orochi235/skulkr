@@ -144,9 +144,17 @@ export const progressOfTop = (top) => {
  * - `unavailableNodes()` answers the nodes the runner reports as quiet or unavailable now, as a Set.
  * - `jobs(sinceIso)` answers the runner's jobs running now or started since then, each
  *   `{ task, node, state, started, finished? }`, or `[]` when it cannot say.
+ * - `spare()` (optional) answers how much of its capacity is idle now, `{ coresFree, cores }`, or null when it cannot
+ *   say.
  * - `progress()` (optional) answers each running job's own count of its work by its task, a Map of `{ done, total }`
  *   (its first counter: a reviewer's files read, a fixer's commits of its findings), empty when it cannot say.
  */
+/** `onto top --json`'s fleet totals as `{ coresFree, cores }`, or null where it gives none. */
+export const spareOfTop = (top) => {
+  const fleet = top?.fleet;
+  return Number.isFinite(fleet?.cores) && Number.isFinite(fleet?.cores_free) ? { coresFree: fleet.cores_free, cores: fleet.cores } : null;
+};
+
 /** How long one job listing answers for: the dashboard asks on every poll, and onto takes seconds to list. */
 export const JOBS_TTL_MS = 10_000;
 
@@ -204,6 +212,14 @@ export const createOntoRunner = () => {
   run: async (job, { cwd, log }) => launchOf(await ontoOnce(ontoArgs(job), cwd, log)),
   // onto places each job where there is room, so no node needs ruling out here.
   unavailableNodes: () => new Set(),
+  spare: () => {
+    try {
+      const out = execFileSync('onto', ['top', '--json', '--once'], { encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'] });
+      return spareOfTop(JSON.parse(out));
+    } catch {
+      return null;
+    }
+  },
   progress: () => {
     try {
       const out = execFileSync('onto', ['top', '--json', '--once'], { encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'] });
