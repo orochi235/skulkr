@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { lastPassOf, statsFor } from './areaData';
-import { areasAsOf, bothIn, matchingIn, pastRoundsOf, readIn } from './asOf';
+import { areasAsOf, bothIn, matchingIn, pastRoundsOf, readIn, roundScopeIn } from './asOf';
 import type { AuditArea, AuditPass } from './skulkrMap.types';
 
 const pass = (round: number, left: number): AuditPass => ({ round, date: '', a: 2, b: 2, shared: 1, distinct: 2, est: 2 + left, left });
@@ -68,5 +68,11 @@ describe("an area's estimate as of a past round", () => {
     expect(matchingIn(AREAS, '  ')).toBeNull();
     expect([...bothIn(readIn(AREAS, 40), matchingIn(AREAS, 'menu'))!]).toEqual(['ui.menu']);
     expect(bothIn(null, null)).toBeNull();
+  });
+
+  it('keeps a live round\'s areas in color at now, beside what the last recorded round read', () => {
+    const live = area('core.live', { status: 'tonight', passes: [] });
+    expect([...roundScopeIn([...AREAS, live], null, 41)!]).toEqual(['core.ops', 'core.live']);
+    expect([...roundScopeIn([...AREAS, live], 40, 41)!]).toEqual(['core.ops', 'ui.menu']);
   });
 });

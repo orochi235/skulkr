@@ -11,7 +11,7 @@ import { Stats } from './Stats';
 import { TopTabs } from './TopTabs';
 import { Treemap } from './Treemap';
 import { RoundPicker } from './RoundPicker';
-import { areasAsOf, bothIn, matchingIn, pastRoundsOf, readIn } from './asOf';
+import { areasAsOf, bothIn, matchingIn, pastRoundsOf, roundScopeIn } from './asOf';
 import { Input } from '@weasel-js/ui/components/Input';
 import { SidebarPanel } from '@weasel-js/ui/components/SidebarPanel';
 import { NextUp } from './NextUp';
@@ -30,6 +30,7 @@ import { titleFor } from '@dash/title';
 import { useTenantChoice, useTenants } from '@dash/tenants/useTenants';
 import { readSize, useViewerPref } from './viewerPref';
 import { useDashPref } from './dashPrefs';
+import { heatStopsOf } from './heatSchemes';
 import { PrefsButton } from './PrefsButton';
 import type { SkulkrMap } from './skulkrMap.types';
 import palette from './palette.module.css';
@@ -69,7 +70,12 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
   const selection = useSelection({ scene, mode: 'single' });
   const [hovered, setHovered] = useState<string | null>(null);
   const [lit, setLit] = useState<string | null>(null);
-  const { probes, palette: colors } = useAuditPalette();
+  const { probes, palette: themed } = useAuditPalette();
+  const [scheme] = useDashPref('map.scheme');
+  const colors = useMemo(() => {
+    const depth = heatStopsOf(scheme);
+    return depth ? { ...themed, depth } : themed;
+  }, [themed, scheme]);
   const [asideWidth, setAsideWidth, keepAside] = usePaneSize(ASIDE);
   const [topHeight, setTopHeight, keepTop] = usePaneSize(TOP);
   const [tabsWidth, setTabsWidth, keepTabs] = usePaneSize(TABS);
@@ -104,7 +110,7 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
     return ids && shown.filter((a) => ids.has(a.id));
   }, [shown, query]);
   const inColor = useMemo(
-    () => bothIn(onlyRound ? readIn(shown, past ?? pastRounds.at(-1) ?? null) : null, matchingIn(shown, query)),
+    () => bothIn(onlyRound ? roundScopeIn(shown, past, pastRounds.at(-1) ?? null) : null, matchingIn(shown, query)),
     [onlyRound, shown, past, pastRounds, query],
   );
 
@@ -176,6 +182,18 @@ export interface AuditsSource {
  *  queue, the rounds, and the jobs coming back, for the tenant the title's menu picks. Reads the dashboard's dev
  *  server: `api/tenants`, then `api/t/<tenant>/map`. */
 export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
+  // A heat scheme other than the theme's sets the ramp's stops where the CSS reads them: the legend's bar and the charts.
+  const paletteRoot = useRef<HTMLDivElement>(null);
+  const [scheme] = useDashPref('map.scheme');
+  useLayoutEffect(() => {
+    const root = paletteRoot.current;
+    if (!root) return;
+    const stops = heatStopsOf(scheme);
+    for (let i = 0; i < 5; i++) {
+      if (stops) root.style.setProperty(`--audit-depth-${i}`, stops[i]!);
+      else root.style.removeProperty(`--audit-depth-${i}`);
+    }
+  }, [scheme]);
   const { base = import.meta.env.BASE_URL, everyMs, dev = true } = source;
   const tenants = useTenants({ url: tenantsUrl(base), dev });
   const names = tenants.status === 'ready' ? tenants.names : [];
@@ -200,7 +218,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
     : state.status === 'failed' ? `Couldn't read the audit map: ${state.error}` : null;
   return (
     <Shell title={titleFor(tenant ?? map?.project ?? null)} heading={heading ?? <AppTitle />} header={header}>
-      <div className={`${palette.palette} ${s.root}`}>
+      <div ref={paletteRoot} className={`${palette.palette} ${s.root}`}>
         {!noServer && !failed && state.status === 'loading' && <p className={s.note}>Reading the audit map…</p>}
         {noServer && (
           <p className={s.note}>

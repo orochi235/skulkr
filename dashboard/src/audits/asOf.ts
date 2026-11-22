@@ -33,3 +33,12 @@ export function matchingIn(areas: readonly AuditArea[], query: string): Readonly
 /** The areas both `a` and `b` keep in color, either one standing alone where the other keeps every area. */
 export const bothIn = (a: ReadonlySet<string> | null, b: ReadonlySet<string> | null): ReadonlySet<string> | null =>
   a === null ? b : b === null ? a : new Set([...a].filter((id) => b.has(id)));
+
+/** The areas the gray-out keeps in color: those a pass of the round picked read, or at now (`past` null) those the last
+ *  recorded round read and every area a live round holds, its pass not yet recorded. */
+export function roundScopeIn(areas: readonly AuditArea[], past: number | null, lastRound: number | null): ReadonlySet<string> | null {
+  if (past !== null) return readIn(areas, past);
+  const live = areas.filter((a) => a.status === 'tonight').map((a) => a.id);
+  const last = readIn(areas, lastRound);
+  return last === null && live.length === 0 ? null : new Set([...(last ?? []), ...live]);
+}

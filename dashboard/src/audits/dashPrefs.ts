@@ -2,12 +2,16 @@
 import { pref, type PrefPath } from '@weasel-js/prefs';
 import { usePref, usePrefsStore } from '@weasel-js/prefs/react';
 import { localStorageAdapter } from '@weasel-js/storage';
+import { HEAT_SCHEMES, type HeatScheme } from './heatSchemes';
 
 /** The most the map numbers: eight rounds of the queue, in half rounds. */
 export const MAX_HALVES = 16;
 
 export const DASH_PREFS = pref.group('Dashboard', {
   map: pref.group('Map', {
+    scheme: pref.enum<HeatScheme>('Heat colors', 'thermal', HEAT_SCHEMES, {
+      description: 'The ramp the map shades estimated defects left along, and its legend and charts with it.',
+    }),
     grayOut: pref.boolean('Gray out areas the round shown skipped', false, {
       description: 'The round picked on the slider, or the last round at now.',
     }),

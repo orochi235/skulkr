@@ -157,7 +157,8 @@ describe('AuditsPage', () => {
     renderPage();
     expect(await screen.findByText('6b331e4', { exact: false })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Project' })).toHaveValue('example');
-    expect(screen.getByText(/Each area is a directory of source files\./)).toBeInTheDocument();
+    // The first render's map is kept and drawn at once, with the same commit; wait for the bare map's own note.
+    expect(await screen.findByText(/Each area is a directory of source files\./)).toBeInTheDocument();
   });
 
   it('says why the map could not be read', async () => {
