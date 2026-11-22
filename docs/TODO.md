@@ -2,6 +2,15 @@
 
 Open work on skulkr. Each entry says when it closes.
 
+- [ ] (P3) Compare fixers' cost and effectiveness with the same fixes made in an interactive Claude Code session,
+  which carries the user's account-level rules a fixer never gets (fixers run with `--setting-sources project,local`,
+  mostly on nodes without the user's config; decided 2026-11-22 not to send that prompt to them). Fixer side, already
+  recorded: each job's `usage.jsonl` record (dollars, tokens by kind, turns, minutes), `fix.md`'s verdicts and tally,
+  verify and its repairs, capstone failures laid at the branch, and calibration's later finds. Missing: (1) a way to
+  hand a session the same work, e.g. `skulkr brief <round> <area>` printing the fixer's brief and findings as it was
+  dispatched; (2) the session's cost, summed from its transcript's per-reply `usage` (`~/.claude*/projects/<cwd>/
+  <session>.jsonl`); (3) its outcome put through the same verify, and the two diffs scored side by side. Closes when
+  one area has been fixed both ways and the comparison reads from a command.
 - [ ] (P2) Fix steps on the dashboard don't show progress reliably, and keep showing an error after it has
   presumably been fixed (reported 2026-11-22, not yet traced): work out where each comes from (the fixer's progress
   counter in `progress.mjs`, the map's run and lane state) and how a fixed error should clear. Closes when a fix
