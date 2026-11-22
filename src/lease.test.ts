@@ -82,6 +82,8 @@ describe('takeLease', () => {
     writeFileSync(path, JSON.stringify({ pid: process.pid, at: before, round: 1 }));
     expect(pidAlive(process.pid, before)).toBe(false);
     expect(pidAlive(process.pid, new Date().toISOString())).toBe(true);
+    // A record written before its pid's process started names a process that has since died, its pid reused.
+    expect(pidAlive(process.pid, new Date(Date.now() - 3_600_000 * 24 * 365).toISOString(), 0)).toBe(false);
     const release = takeLease(path, { round: 2 });
     expect(leaseAt(path)).toMatchObject({ round: 2 });
     release!();

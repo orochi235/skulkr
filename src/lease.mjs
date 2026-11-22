@@ -3,6 +3,7 @@
  * one process, and a lease whose process has died is taken back. Node tree slots, the merge lock and the
  * plan lock are all leases.
  */
+import { execFileSync } from 'node:child_process';
 import { linkSync, mkdirSync, openSync, renameSync, rmSync, writeSync, closeSync } from 'node:fs';
 import { uptime } from 'node:os';
 import { dirname } from 'node:path';
@@ -19,7 +20,28 @@ const BOOT_SLACK_MS = 60_000;
  * Whether process `pid` is alive. EPERM means it is, owned by someone else. `since`, when given, is when the record
  * naming `pid` was written: one written before this machine booted names a pid that may since have been reused, and is dead.
  */
-export const pidAlive = (pid, since, booted = bootedAt()) => Number.isInteger(pid) && pid > 0 && sinceBoot(since, booted) && answers(pid);
+export const pidAlive = (pid, since, booted = bootedAt()) =>
+  Number.isInteger(pid) && pid > 0 && sinceBoot(since, booted) && answers(pid) && !startedAfter(pid, since);
+
+/** Leeway for a process's start time, read to the second, against the record it wrote. */
+const START_SLACK_MS = 5_000;
+
+/**
+ * Whether process `pid` started after `since`, the time its record was written: then it is another process that got the
+ * pid once the record's own had died without clearing it (round 52's status.json, left by a stopped run, read as live
+ * on 2026-11-22). False when either time cannot be read.
+ */
+const startedAfter = (pid, since) => {
+  const at = Date.parse(since);
+  if (!Number.isFinite(at)) return false;
+  let started;
+  try {
+    started = Date.parse(execFileSync('ps', ['-p', String(pid), '-o', 'lstart='], { encoding: 'utf8', timeout: 5_000 }).trim());
+  } catch {
+    return false;
+  }
+  return Number.isFinite(started) && started > at + START_SLACK_MS;
+};
 
 const sinceBoot = (since, booted) => !(Date.parse(since) < booted - BOOT_SLACK_MS);
 
