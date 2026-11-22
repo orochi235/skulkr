@@ -88,9 +88,16 @@ describe('AuditsPage', () => {
     expect(await screen.findByText('Undo now keeps it.')).toBeInTheDocument();
     fireEvent.keyDown(screen.getByRole('dialog', { name: 'Defect details' }), { key: 'Escape' });
     await waitFor(() => expect(screen.queryByText('Undo now keeps it.')).toBeNull());
+    // The dialog took that Escape; the area stays picked.
+    expect(screen.getByText('A scene write is lost on undo')).toBeInTheDocument();
 
     fireEvent.click(within(screen.getByRole('list', { name: 'Round 41 lanes' })).getByRole('button', { name: 'core.ops' }));
     expect(screen.getByText('in round 41')).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('searchbox', { name: 'Filter areas by name' }), { key: 'Escape' });
+    expect(screen.getByText('in round 41')).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByText('in round 41')).toBeNull());
+    expect(screen.getByText('Hover or click an area for its passes.')).toBeInTheDocument();
   });
 
   it('shows the map as it stood after a past round, picked from the keyboard and kept in the hash', async () => {

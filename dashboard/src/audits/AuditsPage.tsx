@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { asNodeId } from '@weasel-js/core';
 import { useSelection } from '@weasel-js/editing';
 import { ResizeHandle } from '@weasel-js/ui/components/ResizeHandle';
@@ -35,6 +35,7 @@ import { PrefsButton } from './PrefsButton';
 import type { SkulkrMap } from './skulkrMap.types';
 import palette from './palette.module.css';
 import s from './AuditsPage.module.css';
+import { useReleaseOnEscape } from './useReleaseOnEscape';
 
 const ASIDE = { key: 'aside', min: 240, max: 560, initial: 300 } as const;
 const TOP = { key: 'top', min: 80, max: 900, initial: 260 } as const;
@@ -122,6 +123,7 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
   // Naming the area already picked unpicks it, as a second click on the map does (Treemap's togglingSelection).
   const pick = (id: string) => (selection.get()[0] === id ? selection.clear() : selection.set([asNodeId(id)]));
   const on = { onPick: pick, onLight: setLit };
+  useReleaseOnEscape(useCallback(() => selection.clear(), [selection]));
 
   return (
     <>
