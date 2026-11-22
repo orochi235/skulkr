@@ -74,6 +74,18 @@ describe('nightRoundOf', () => {
 });
 
 describe('readRuns', () => {
+  it('lists a resumed round once, as its live run, not beside the summary its earlier run left', () => {
+    const state = mkdtempSync(join(tmpdir(), 'skulkr-map-'));
+    dirs.push(state);
+    const dir = join(state, 'nights', 'r70');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'night.log'), '');
+    claimRound(70, state);
+    writeSummary(70, { round: 70, started: 's', ended: 'e', areas: [{ id: 'a' }], nightDir: dir, report: 'red: …' }, state);
+    writeStatus(70, { step: 'fleet', areas: ['a'], nightDir: dir }, state);
+    expect(readRuns(state, []).map((r) => [r.round, r.running])).toEqual([[70, true]]);
+  });
+
   it('lists every live run with its own stages, lanes and lines, then the last finished', () => {
     const state = mkdtempSync(join(tmpdir(), 'skulkr-map-'));
     dirs.push(state);

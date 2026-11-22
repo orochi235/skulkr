@@ -91,8 +91,10 @@ export const readRuns = (state, jobs = null, { listJobs = () => [], listProgress
   const current = legacy ? readJson(join(state, 'current.json')) : null;
   // A service still on the one-night runner keeps current.json and last.json instead of runs/.
   const lastJson = legacy ? readJson(join(state, 'last.json')) : null;
-  const last = legacy ? (lastJson && lastJson.round !== current?.round ? lastJson : null) : lastFinished(state);
   const live = legacy ? (current ? [current] : []) : liveRuns(state);
+  // A resumed round is live again beside the summary its earlier run left: it is listed once, as the live run.
+  const ended = legacy ? (lastJson && lastJson.round !== current?.round ? lastJson : null) : lastFinished(state);
+  const last = ended && !live.some((r) => r.round === ended.round) ? ended : null;
   const all = [...live, ...(last ? [last] : [])];
   const since = all.map((r) => r.started).filter(Boolean).sort()[0];
   const asked = all.length ? (jobs ?? (since ? listJobs(since) : [])) : [];
