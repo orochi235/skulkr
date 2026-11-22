@@ -4,19 +4,22 @@ import type { AuditArea } from './skulkrMap.types';
 import s from './NextUp.module.css';
 import { ordinal } from './ordinal';
 
-/** The areas a run would pick next, in queue order; each picks its cell on the map, and lights it while hovered. */
-
-export function NextUp({ areas, onPick, onLight, note }: {
+/** A list of areas, by default the ones a run would pick next, numbered by their queue places; each picks its cell on
+ *  the map, and lights it while hovered. */
+export function NextUp({ areas, onPick, onLight, note, numbered = true }: {
   areas: readonly AuditArea[]; onPick: (id: string) => void; onLight: (id: string | null) => void;
   /** A line above the list, as when the map beside it shows a past round and the queue is today's. */
   note?: string | undefined;
+  /** Whether each carries its queue place; false for a list in another order, as the filter's matches. */
+  numbered?: boolean;
 }) {
+  const List = numbered ? 'ol' : 'ul';
   return (
     <>
       {note && <p className={s.note}>{note}</p>}
-      <ol className={s.list}>
+      <List className={numbered ? s.list : `${s.list} ${s.plain}`}>
         {areas.map((a) => (
-          <li key={a.id} value={a.queue ?? undefined}>
+          <li key={a.id} value={numbered ? a.queue ?? undefined : undefined}>
             <button
               type="button" className={s.pick} onClick={() => onPick(a.id)}
               onPointerEnter={() => onLight(a.id)} onPointerLeave={() => onLight(null)} onFocus={() => onLight(a.id)} onBlur={() => onLight(null)}
@@ -31,7 +34,7 @@ export function NextUp({ areas, onPick, onLight, note }: {
             </button>
           </li>
         ))}
-      </ol>
+      </List>
     </>
   );
 }

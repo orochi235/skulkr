@@ -22,3 +22,14 @@ export const areasAsOf = (areas: readonly AuditArea[], round: number): AuditArea
 /** The ids of the areas a pass of `round` read any of; null when there is no round to ask about. */
 export const readIn = (areas: readonly AuditArea[], round: number | null): ReadonlySet<string> | null =>
   round === null ? null : new Set(areas.filter((a) => a.passes.some((p) => p.round === round)).map((a) => a.id));
+
+/** The ids of the areas whose id holds every word of `query`, ignoring case; null for a query with no words. */
+export function matchingIn(areas: readonly AuditArea[], query: string): ReadonlySet<string> | null {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return null;
+  return new Set(areas.filter((a) => words.every((w) => a.id.toLowerCase().includes(w))).map((a) => a.id));
+}
+
+/** The areas both `a` and `b` keep in color, either one standing alone where the other keeps every area. */
+export const bothIn = (a: ReadonlySet<string> | null, b: ReadonlySet<string> | null): ReadonlySet<string> | null =>
+  a === null ? b : b === null ? a : new Set([...a].filter((id) => b.has(id)));

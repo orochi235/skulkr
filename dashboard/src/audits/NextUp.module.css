@@ -47,3 +47,6 @@
   font-size: var(--wzl-font-size-sm);
   color: var(--audit-muted);
 }
+
+/* A list in its own order, not the queue's: no place numbers. */
+.plain { list-style: none; padding-left: 0; }

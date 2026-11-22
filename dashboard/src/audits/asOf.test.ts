@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { lastPassOf, statsFor } from './areaData';
-import { areasAsOf, pastRoundsOf, readIn } from './asOf';
+import { areasAsOf, bothIn, matchingIn, pastRoundsOf, readIn } from './asOf';
 import type { AuditArea, AuditPass } from './skulkrMap.types';
 
 const pass = (round: number, left: number): AuditPass => ({ round, date: '', a: 2, b: 2, shared: 1, distinct: 2, est: 2 + left, left });
@@ -59,5 +59,14 @@ describe("an area's estimate as of a past round", () => {
     expect([...readIn(AREAS, 40)!]).toEqual(['core.ops', 'ui.menu']);
     expect([...readIn(AREAS, 41)!]).toEqual(['core.ops']);
     expect(readIn(AREAS, null)).toBeNull();
+  });
+
+  it('keeps in color the areas whose name holds every word typed, with the round filter where both are on', () => {
+    expect([...matchingIn(AREAS, 'OPS')!]).toEqual(['core.ops']);
+    expect([...matchingIn(AREAS, ' ui  menu ')!]).toEqual(['ui.menu']);
+    expect([...matchingIn(AREAS, 'core menu')!]).toEqual([]);
+    expect(matchingIn(AREAS, '  ')).toBeNull();
+    expect([...bothIn(readIn(AREAS, 40), matchingIn(AREAS, 'menu'))!]).toEqual(['ui.menu']);
+    expect(bothIn(null, null)).toBeNull();
   });
 });

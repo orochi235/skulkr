@@ -11,7 +11,10 @@ import { Stats } from './Stats';
 import { TopTabs } from './TopTabs';
 import { Treemap } from './Treemap';
 import { RoundPicker } from './RoundPicker';
-import { areasAsOf, pastRoundsOf, readIn } from './asOf';
+import { areasAsOf, bothIn, matchingIn, pastRoundsOf, readIn } from './asOf';
+import { Input } from '@weasel-js/ui/components/Input';
+import { SidebarPanel } from '@weasel-js/ui/components/SidebarPanel';
+import { NextUp } from './NextUp';
 import { useAsOfRound } from './useAsOfRound';
 import { NEXT_UP_ROUNDS, defectsVersionOf, heatScaleOf, nextUpOf, runHolding, statsFor } from './areaData';
 import { heatColorOf } from './heat';
@@ -95,7 +98,16 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
   const pickedArea = picked ? areas.find((a) => a.id === picked) ?? null : null;
   const stats = useMemo(() => statsFor(shown, past, areas), [shown, past, areas]);
   const [onlyRound, setOnlyRound] = useDashPref('map.grayOut');
-  const inColor = useMemo(() => (onlyRound ? readIn(shown, past ?? pastRounds.at(-1) ?? null) : null), [onlyRound, shown, past, pastRounds]);
+  const [query, setQuery] = useState('');
+  const matches = useMemo(() => {
+    const ids = matchingIn(shown, query);
+    return ids && shown.filter((a) => ids.has(a.id));
+  }, [shown, query]);
+  const inColor = useMemo(
+    () => bothIn(onlyRound ? readIn(shown, past ?? pastRounds.at(-1) ?? null) : null, matchingIn(shown, query)),
+    [onlyRound, shown, past, pastRounds, query],
+  );
+
   const unmerged = useMemo(() => new Set(map.rounds.filter((r) => r.pending === 'unmerged').map((r) => r.round)), [map.rounds]);
   const next = useMemo(() => nextUpOf(areas, NEXT_UP_ROUNDS * (map.areasPerRound ?? 16)), [areas, map.areasPerRound]);
   const phases = useMemo(() => phasesOf(map.runs), [map.runs]);
@@ -128,7 +140,18 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
         />
         <ResizeHandle value={asideWidth} min={ASIDE.min} max={ASIDE.max} invert onInput={setAsideWidth} onChange={keepAside} aria-label="Resize the side panel" />
         <aside className={s.aside} aria-label="Area">
-          <AreaDetail area={area} holder={area && past === null ? runHolding(map.runs, area.id) : undefined} asOf={past} />
+          <Input
+            type="search" size="sm" aria-label="Filter areas by name" placeholder="filter areas"
+            value={query} onChange={setQuery} spellCheck={false} autoCapitalize="off"
+          />
+          {matches && !picked ? (
+            <SidebarPanel title="Matches">
+              <NextUp
+                areas={matches} onPick={pick} onLight={setLit} numbered={false}
+                note={`${matches.length.toLocaleString()} of ${shown.length.toLocaleString()} areas`}
+              />
+            </SidebarPanel>
+          ) : <AreaDetail area={area} holder={area && past === null ? runHolding(map.runs, area.id) : undefined} asOf={past} />}
           {picked && <AreaDefects urlOf={areaUrl} id={picked} version={defectsVersionOf(map, picked)} />}
         </aside>
       </div>
