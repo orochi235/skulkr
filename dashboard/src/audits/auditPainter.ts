@@ -4,7 +4,7 @@ import { circlePath, pathFromD, type Path } from '@weasel-js/geom';
 import { glyphCommands, type GlyphPath } from './glyph';
 import { framePadOf, iconBoxIn } from './mapLayout';
 
-/** The most pass dots an area wears, on the map and on its lane: one per pass, up to this many. */
+/** The most pass dots an area wears on its map cell: one per pass, up to this many. */
 export const MAX_PASS_DOTS = 4;
 
 export interface AuditCellData {

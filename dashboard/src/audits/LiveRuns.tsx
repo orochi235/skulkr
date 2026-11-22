@@ -12,7 +12,6 @@ import { STEP_COLUMN_COUNT, laneStepsOf } from './stepsLane';
 import { gateRunsOf, inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
 import { NODE_SEP, headlineOf, lastLineOf, spendOf, startedText } from './runData';
 import { useDashPref } from './dashPrefs';
-import { MAX_PASS_DOTS } from './auditPainter';
 import type { AuditLane, AuditRun } from './skulkrMap.types';
 import s from './LiveRuns.module.css';
 
@@ -42,15 +41,26 @@ const failedGateRuns = (run: AuditRun) => gateRunsOf(run).flatMap((g) => {
 });
 
 /** An area's lane as a stack row: its name, and `spans`, its steps in the view chosen. */
-/** An area's passes as the map's dots: one each, up to MAX_PASS_DOTS, at the end of its lane's name. */
+/** Dots per group in a lane's pass count, set apart like tally marks so a count reads at a glance. */
+const DOT_GROUP = 5;
+
+/** An area's passes as dots, one each, in groups of DOT_GROUP, at the end of its lane's name. */
 function PassDots({ passes }: { passes: number }) {
   if (passes <= 0) return null;
+  const groups = Array.from({ length: Math.ceil(passes / DOT_GROUP) }, (_, g) => Math.min(DOT_GROUP, passes - g * DOT_GROUP));
   return (
     <span className={s.passDots} title={`${passes} ${passes === 1 ? 'pass' : 'passes'}`}>
-      {Array.from({ length: Math.min(passes, MAX_PASS_DOTS) }, (_, i) => <i key={i} />)}
+      {groups.map((n, g) => <span key={g} className={s.dotGroup}>{Array.from({ length: n }, (_, i) => <i key={i} />)}</span>)}
     </span>
   );
 }
+
+/** The room `passes` dots take in their groups, with the gap before them; the widths are PassDots' CSS. */
+export const dotsWidthFor = (passes: number): number => {
+  if (passes <= 0) return 0;
+  const groups = Math.ceil(passes / DOT_GROUP);
+  return passes * 4 + (passes - groups) * 2 + (groups - 1) * 5 + 4 + 8;
+};
 
 function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanStripSpan[], passes: number): SpanStripsRow {
   return {
@@ -111,6 +121,8 @@ function Lanes({ run, now, mode, hideComplete, on, passes }: {
   const lanes = run.lanes.map((lane) => ({ lane, view: laneViewOf(lane, now, clock.from) })).filter(({ lane }) => !hideComplete || !passDone(lane));
   const widest = Math.max(0, ...run.lanes.map((l) => l.id.length));
   useLayoutEffect(() => { ref.current?.style.setProperty('--audit-lead-ch', String(widest)); }, [widest]);
+  const dotsPx = dotsWidthFor(Math.max(0, ...run.lanes.map((l) => passes.get(l.id) ?? 0)));
+  useLayoutEffect(() => { ref.current?.style.setProperty('--audit-dots-px', `${dotsPx}px`); }, [dotsPx]);
   // A label's element is remade whenever its text changes, restarting its pulse; one shared start keeps every pulse in step.
   useLayoutEffect(() => {
     for (const a of ref.current?.getAnimations?.({ subtree: true }) ?? []) {
