@@ -91,7 +91,7 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
   }, [areas, colors.depth]);
   const area = shown.find((a) => a.id === shownId);
   const pickedArea = picked ? areas.find((a) => a.id === picked) ?? null : null;
-  const stats = useMemo(() => statsFor(shown, past), [shown, past]);
+  const stats = useMemo(() => statsFor(shown, past, areas), [shown, past, areas]);
   const unmerged = useMemo(() => new Set(map.rounds.filter((r) => r.pending === 'unmerged').map((r) => r.round)), [map.rounds]);
   const next = useMemo(() => nextUpOf(areas, NEXT_UP_ROUNDS * (map.areasPerRound ?? 16)), [areas, map.areasPerRound]);
   const phases = useMemo(() => phasesOf(map.runs), [map.runs]);

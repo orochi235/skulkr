@@ -120,9 +120,9 @@ export interface Stat {
   readonly label: string;
 }
 
-/** The headline numbers over every area, or over the areas as of a past round (`areasAsOf`), whose settling is not
- *  known. */
-export function statsFor(areas: readonly AuditArea[], asOf: number | null = null): Stat[] {
+/** The headline numbers over every area, or over the areas as of a past round (`areasAsOf`). Settling is not known
+ *  of a past round, so it is counted over `now`, every area as it stands. */
+export function statsFor(areas: readonly AuditArea[], asOf: number | null = null, now: readonly AuditArea[] = areas): Stat[] {
   const files = areas.reduce((n, a) => n + a.files, 0);
   const audited = areas.filter((a) => a.passes.length > 0 && a.status !== 'unaudited');
   const auditedFiles = audited.reduce((n, a) => n + a.files, 0);
@@ -132,7 +132,7 @@ export function statsFor(areas: readonly AuditArea[], asOf: number | null = null
   const calibrated = audited.some((a) => lastPassOf(a)?.leftCorrected !== undefined);
   // A pass several areas inherited counts once over them, by each one's share.
   const found = Math.round(areas.reduce((n, a) => n + a.passes.reduce((m, p) => m + p.distinct * (p.share ?? 1), 0), 0));
-  const settled = areas.filter((a) => a.status === 'settled').length;
+  const settled = now.filter((a) => a.status === 'settled').length;
   return [
     { value: `${formatCount(audited.length)} / ${formatCount(areas.length)}`, label: asOf === null ? 'areas audited at least once' : `areas audited by round ${asOf}` },
     { value: `${files ? Math.round((100 * auditedFiles) / files) : 0}%`, label: `of ${formatCount(files)} source files charted` },
@@ -141,7 +141,7 @@ export function statsFor(areas: readonly AuditArea[], asOf: number | null = null
       value: `≈${formatCount(Math.round(left))}`,
       label: `estimated still in audited areas${calibrated ? ` (${correctedText(leftCorrected)} corrected)` : ''}${staleLeft >= 0.5 ? `, ≈${formatCount(Math.round(staleLeft))} of it in areas changed since` : ''}`,
     },
-    ...(asOf === null ? [{ value: formatCount(settled), label: 'areas settled' }] : []),
+    { value: formatCount(settled), label: asOf === null ? 'areas settled' : 'areas settled now' },
   ];
 }
 

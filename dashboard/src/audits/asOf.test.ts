@@ -42,13 +42,14 @@ describe("an area's estimate as of a past round", () => {
     expect(pastRoundsOf({ areas: [AREAS[1]!], rounds })).toEqual([]);
   });
 
-  it('labels the headline numbers by the round, and leaves out settling', () => {
-    const stats = statsFor(areasAsOf(AREAS, 39), 39);
+  it('labels the headline numbers by the round, and counts settling as it stands now', () => {
+    const stats = statsFor(areasAsOf(AREAS, 39), 39, AREAS);
     expect(stats.map((s) => s.label)).toEqual([
       'areas audited by round 39',
       'of 20 source files charted',
       'defects found and fixed through round 39',
       'estimated still in audited areas (≈9 corrected)',
+      'areas settled now',
     ]);
     expect(stats[0]!.value).toBe('1 / 2');
     expect(stats[3]!.value).toBe('≈6');
