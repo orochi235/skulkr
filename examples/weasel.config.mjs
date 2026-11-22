@@ -157,7 +157,7 @@ export default {
     timeoutMin: 45,
   },
 
-  areasPerRound: 16,
+  areasPerRound: 8,
   budget: { review: 8, match: 1, fix: 15, capUsd: 160, areaGuessUsd: 10 },
   schedule: { startAt: '23:00', stopAt: '07:00' },
 
