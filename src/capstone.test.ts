@@ -57,7 +57,7 @@ const summary = (id: string) => ({
   jobs: { minutes: {}, weightedTokens: 0, costUsd: 0 },
 });
 
-const land = async (r: ReturnType<typeof round>, repair?: (id: string, files: string[], log: string) => Promise<{ ok: boolean }>, gate: object = {}, baseline?: (files: string[]) => Promise<string[]>, state = scratch(), mayRepair?: (started: number) => string) => {
+const land = async (r: ReturnType<typeof round>, repair?: (id: string, files: string[], log: string, attempt: number) => Promise<{ ok: boolean }>, gate: object = {}, baseline?: (files: string[]) => Promise<string[]>, state = scratch(), mayRepair?: (started: number) => string) => {
   const said: string[] = [];
   const cfg = resolveConfig({ name: 't', state, git: { push: false }, gate: { name: 'test', command: ['bash', '-c', GATE], cwd: 'batch', failPrefix: 'fleet-fail:', ...gate } });
   const results = r.branches.map((b) => summary(b.replace('audit5-', '')));
@@ -70,6 +70,34 @@ const land = async (r: ReturnType<typeof round>, repair?: (id: string, files: st
 };
 
 describe('a red capstone', () => {
+  // Fails each of src/a.ts and src/b.ts that says broken, naming its test file.
+  const TWO = 'n=0; for f in a b; do if grep -q broken src/$f.ts; then echo "fleet-fail: core src/$f.test.ts :: $f > works"; n=1; fi; done; exit $n';
+  const repairing = (r: ReturnType<typeof round>, fixes: string[][], attempts: number[]) => async (_id: string, _files: string[], _log: string, attempt: number) => {
+    attempts.push(attempt);
+    r.git('checkout', '-q', 'audit5-src');
+    for (const f of fixes[attempt - 1] ?? []) writeFileSync(join(r.root, f), 'fixed');
+    r.git('commit', '-q', '--allow-empty', '-am', `repair ${attempt}`);
+    r.git('checkout', '-q', 'main');
+    return { ok: true };
+  };
+
+  it('repairs again while each cycle leaves fewer failures than the one before', async () => {
+    const r = round({ src: { 'src/a.ts': 'broken', 'src/b.ts': 'broken', 'src/b.test.ts': "import './b';" } });
+    const attempts: number[] = [];
+    const { report, said } = await land(r, repairing(r, [['src/a.ts'], ['src/b.ts']], attempts), { command: ['bash', '-c', TWO] });
+    expect(attempts).toEqual([1, 2]);
+    expect(said).toContain('capstone: 1 failures, down from 2; repairing again');
+    expect(report).toMatch(/^main fast-forwarded to \w+; capstone repair: repaired src; 2 cycles; the capstone ran again green$/);
+  });
+
+  it('stops repairing once a cycle leaves no fewer failures', async () => {
+    const r = round({ src: { 'src/a.ts': 'broken', 'src/b.ts': 'broken', 'src/b.test.ts': "import './b';" } });
+    const attempts: number[] = [];
+    const { report } = await land(r, repairing(r, [[]], attempts), { command: ['bash', '-c', TWO] });
+    expect(attempts).toEqual([1]);
+    expect(report).toMatch(/the capstone ran again red/);
+  });
+
   it('runs a gate that failed without naming a failure once more, and lands when that passes', async () => {
     const r = round({ docs: { 'docs/d.md': 'e' } });
     const marker = join(scratch(), 'crashed');

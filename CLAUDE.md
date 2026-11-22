@@ -69,6 +69,8 @@ weasel cutover.
     rounds", 2026-11-22).
   - the map's area `locked`, the round whose unmerged branch holds it, for the dashboard (2026-11-22).
   - the map's top-level `leftOut`, the branches `left-out.json` still retries, for the dashboard (2026-11-22).
+  - a round that runs a capstone cycle past the first, while each leaves fewer failures, and a gate rerun once when it
+    fails naming no failure (README "capstone" and "merge" steps, 2026-11-22).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

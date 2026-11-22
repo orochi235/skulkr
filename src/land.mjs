@@ -76,6 +76,30 @@ export const patchSweep = ({ cfg, root, round, commit, fixed, branches, outcomes
  *  conflicts, `rebuild` makes the batch again on the new `main`, leaving out the branches that now conflict, and the
  *  round goes on with the rest. Answers the batch and the tip to land, or, red, the batch, its gate log, and `{ report }`;
  *  `tag` marks the gate's logs apart from an earlier test of the round's batch. */
+/** How many failures the gate log at `log` names (`failedWhereIn`); 0 where it cannot be read. */
+const failuresIn = (log, gate) => {
+  try {
+    return failedWhereIn(readFileSync(log, 'utf8'), gate).length;
+  } catch {
+    return 0;
+  }
+};
+
+/** Two capstone cycles' outcomes as one, a branch's later outcome replacing its earlier; `a` may be undefined. */
+const mergeCycles = (a, b) => {
+  if (!a) return { ...b, cycles: 1 };
+  const out = new Set([...a.dropped, ...a.skipped, ...a.unrepairable, ...b.dropped, ...b.skipped, ...b.unrepairable]);
+  return {
+    repaired: [...new Set([...a.repaired, ...b.repaired])].filter((x) => !out.has(x)),
+    dropped: [...new Set([...a.dropped, ...b.dropped])],
+    skipped: [...new Set([...a.skipped, ...b.skipped])],
+    unrepairable: [...new Set([...a.unrepairable, ...b.unrepairable])],
+    byBranch: { ...a.byBranch, ...b.byBranch },
+    unattributed: b.unattributed,
+    cycles: a.cycles + 1,
+  };
+};
+
 /** Whether the gate log at `log` names no failure though the gate failed: only where the gate marks its failures. */
 const crashedIn = (log, gate) => {
   if (!gate.failPrefix) return false;
@@ -184,24 +208,34 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
   try {
     let tested;
     let cycle;
+    let cycles = 0;
+    /** How many failures the gate before the last repair cycle named. */
+    let before = Infinity;
     for (;;) {
-      tested = await gateOnFleet({ cfg, root, batch, nightDir, merge, say, setStep, round, tip: recorded, rebuild: build, tag: cycle ? '.capstone' : '' });
+      tested = await gateOnFleet({ cfg, root, batch, nightDir, merge, say, setStep, round, tip: recorded, rebuild: build, tag: cycles === 0 ? '' : cycles === 1 ? '.capstone' : `.capstone${cycles}` });
       batch = tested.batch ?? batch;
-      if (!tested.report || cycle || !repair) break;
+      if (!tested.report || !repair) break;
+      // One repair cycle per round, and another after it only while each leaves fewer failures than the one before.
+      const failures = failuresIn(tested.log, cfg.gate);
+      if (cycles > 0 && !(failures < before)) break;
+      if (cycles > 0) say(`capstone: ${failures} failures, down from ${before}; repairing again`);
+      before = failures;
+      cycles += 1;
       setStep('repair');
-      cycle = await repairCapstone({ cfg, root, round, commit, batch, logPath: tested.log, repair, say, mayRepair });
-      for (const id of cycle.repaired.map(idOf)) fixCommits.set(id, results.find((a) => a.id === id)?.fixCommits);
-      for (const branch of [...cycle.dropped, ...cycle.skipped]) {
+      const now = await repairCapstone({ cfg, root, round, commit, batch, logPath: tested.log, repair, say, mayRepair, attempt: cycles });
+      cycle = mergeCycles(cycle, now);
+      for (const id of now.repaired.map(idOf)) fixCommits.set(id, results.find((a) => a.id === id)?.fixCommits);
+      for (const branch of [...now.dropped, ...now.skipped]) {
         fixCommits.set(idOf(branch), []);
         const area = results.find((a) => a.id === idOf(branch));
         if (area) area.fixCommits = [];
-        outcomes[idOf(branch)] = `\`${branch}\`, left out: ${cycle.skipped.includes(branch) ? 'its capstone repair never started, for the dollar cap or a stop request' : 'its capstone failures still failed after a repair'}`;
+        outcomes[idOf(branch)] = `\`${branch}\`, left out: ${now.skipped.includes(branch) ? 'its capstone repair never started, for the dollar cap or a stop request' : 'its capstone failures still failed after a repair'}`;
       }
-      const out = [...cycle.dropped, ...cycle.skipped, ...cycle.unrepairable];
-      if (!cycle.repaired.length && !out.length) break;
+      const out = [...now.dropped, ...now.skipped, ...now.unrepairable];
+      if (!now.repaired.length && !out.length) break;
       landing = landing.filter((b) => !out.includes(b));
       ({ batch, tip: recorded } = build());
-      say(`capstone: rebuilt ${batch.name} with ${cycle.repaired.length} repaired and ${out.length} left out; testing again`);
+      say(`capstone: rebuilt ${batch.name} with ${now.repaired.length} repaired and ${out.length} left out; testing again`);
     }
     const retested = cycle && (cycle.repaired.length || cycle.dropped.length || cycle.skipped.length || cycle.unrepairable.length) ? !tested.report : undefined;
     let tried = earlier.size ? `; retried ${earlier.size} branches left out of earlier rounds, ${retried.merged} merged and ${retried.out} still left out` : '';

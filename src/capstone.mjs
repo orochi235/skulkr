@@ -37,15 +37,17 @@ export const excerptFor = (text, files, after = files.some((f) => !isTestPath(f)
  * lines about them, it checks those files beside the area's own, and on a pass patches the branch again. `mboxOf`
  * answers the commits of a branch that is not an area's, the sweep's. Answers `{ ok, commits?, verify }`.
  */
-export const capstoneRepairer = (ctx, { root, results, mboxOf = () => undefined }) => async (id, files, log) => {
+export const capstoneRepairer = (ctx, { root, results, mboxOf = () => undefined }) => async (id, files, log, attempt = 1) => {
+  // The first cycle's names are kept; a later cycle's job and verdict get their own.
+  const label = attempt === 1 ? 'capstone' : `capstone-${attempt}`;
   const { cfg, nightDir, round, commit } = ctx;
   const own = join(nightDir, 'areas', id, 'fix.mbox');
   const mbox = existsSync(own) ? own : mboxOf(id);
   if (!mbox) return { ok: false };
   const area = { id };
-  const run = await repairJob(ctx, area, { mbox, log, label: 'capstone', attempt: 'capstone', extra: files });
-  const verdict = await checkedIn(ctx, area, run.to, run.mbox, 'repair-capstone', files);
-  ctx.say(`repair ${id} capstone on ${run.node}: ${run.added} commits, ${run.minutes.toFixed(1)} min; verify ${verdict.ok ? 'passed' : verdictText(verdict)}`);
+  const run = await repairJob(ctx, area, { mbox, log, label, attempt: label, extra: files });
+  const verdict = await checkedIn(ctx, area, run.to, run.mbox, `repair-${label}`, files);
+  ctx.say(`repair ${id} ${label} on ${run.node}: ${run.added} commits, ${run.minutes.toFixed(1)} min; verify ${verdict.ok ? 'passed' : verdictText(verdict)}`);
   const verify = { ...summaryOf(verdict), capstone: true };
   const summary = results.find((r) => r.id === id);
   if (summary) summary.verify = { ...summary.verify, ...verify, repairs: (summary.verify?.repairs ?? 0) + 1 };
@@ -80,7 +82,7 @@ export const repairRefusal = ({ stopped, used, started, fix, cap }) => {
  * branches failures were laid at, `byBranch`, the failing files laid at each, and `unattributed`, the failures no
  * branch reaches.
  */
-export const repairCapstone = async ({ cfg, root, round, commit, batch, logPath, repair, say, mayRepair = /** @type {(started: number) => string} */ (() => '') }) => {
+export const repairCapstone = async ({ cfg, root, round, commit, batch, logPath, repair, say, mayRepair = /** @type {(started: number) => string} */ (() => ''), attempt = 1 }) => {
   const text = readFileSync(logPath, 'utf8');
   const where = failedWhereIn(text, cfg.gate);
   const failing = where.filter(isTestPath);
@@ -120,7 +122,7 @@ export const repairCapstone = async ({ cfg, root, round, commit, batch, logPath,
     }
     started += 1;
     try {
-      return { branch, ...(await repair(idOf(branch), files, excerptFor(text, files))) };
+      return { branch, ...(await repair(idOf(branch), files, excerptFor(text, files), attempt)) };
     } catch (error) {
       say(`repair ${idOf(branch)} capstone failed: ${error.stack ?? error}`);
       return { branch, ok: false };
@@ -146,6 +148,7 @@ export const capstoneText = (cycle, idOf, again) => {
     cycle.skipped?.length ? ` left out ${ids(cycle.skipped)}, whose repair the dollar cap or a stop request kept from starting;` : '',
     cycle.unrepairable?.length ? ` left out ${cycle.unrepairable.join(', ')}, not repairable this round;` : '',
     cycle.unattributed.length ? ` unattributed: ${cycle.unattributed.slice(0, 5).join(', ')}${cycle.unattributed.length > 5 ? ', …' : ''};` : '',
+    cycle.cycles > 1 ? ` ${cycle.cycles} cycles;` : '',
     again === undefined ? ' nothing to retest' : ` the capstone ran again ${again ? 'green' : 'red'}`,
   ].join('');
 };
