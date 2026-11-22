@@ -95,7 +95,7 @@ export function partPhase(p: PartState): AuditPhase {
 export function stageCountsOf(lanes: readonly AuditLane[]): { done: number; total: number; stages: { phase: AuditPhase; n: number }[] } {
   const by = new Map<AuditPhase, number>();
   for (const lane of lanes) {
-    const phase = phaseOf(lane);
+    const phase = livePhaseOf(lane);
     by.set(phase, (by.get(phase) ?? 0) + 1);
   }
   const stages = [...PIPELINE, 'conflict' as const].flatMap((phase) => (by.get(phase) ? [{ phase, n: by.get(phase)! }] : []));
@@ -107,13 +107,16 @@ export function stageCountsOf(lanes: readonly AuditLane[]): { done: number; tota
 export const passDone = (lane: AuditLane): boolean =>
   isFinished(lane) || (lane.steps.fix.state === 'done' && lane.steps.repair?.state !== 'running');
 
-/** Every area a live run holds, by id, and its phase on the map: a conflict once a step fails, as its lane says, else
- *  `done` once its pass is. */
+/** A live area's phase as the map, the stage counts and "Hide complete" all read it: a conflict once a step fails, as
+ *  its lane says, else `done` once its pass is (`passDone`). */
+export function livePhaseOf(lane: AuditLane): AuditPhase {
+  const phase = phaseOf(lane);
+  return phase !== 'conflict' && passDone(lane) ? 'done' : phase;
+}
+
+/** Every area a live run holds, by id, and its phase on the map (`livePhaseOf`). */
 export function phasesOf(runs: readonly AuditRun[]): ReadonlyMap<string, AuditPhase> {
-  return new Map(runs.filter((r) => r.running).flatMap((r) => r.lanes.map((lane) => {
-    const phase = phaseOf(lane);
-    return [lane.id, phase !== 'conflict' && passDone(lane) ? 'done' : phase] as const;
-  })));
+  return new Map(runs.filter((r) => r.running).flatMap((r) => r.lanes.map((lane) => [lane.id, livePhaseOf(lane)] as const)));
 }
 
 /** What a live run estimates each of its areas still holds once both reviews are matched, before the pass is done. */

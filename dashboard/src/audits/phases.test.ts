@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CLOCK_AHEAD_MINUTES, laneViewOf, runClockOf } from './clockLane';
-import { TYPICAL_MINUTES, isFinished, passDone, phaseColor, phaseOf, phasesOf, withLivePasses } from './phases';
+import { TYPICAL_MINUTES, isFinished, passDone, phaseColor, phaseOf, phasesOf, stageCountsOf, withLivePasses } from './phases';
 import { STEP_COLUMN_COUNT, laneStepsOf } from './stepsLane';
 import fixture from './fixture.map.json';
 import type { AuditLane, AuditRun, LaneStep, LaneStepName, SkulkrMap } from './skulkrMap.types';
@@ -112,6 +112,8 @@ describe('laneViewOf', () => {
     const leftOut = { ...lane({ match: matched(3, 2, 1), fix: done({ commits: 4 }), patch: { state: 'failed', why: 'conflicts; left out of the batch' } }), pass };
     expect(passDone(leftOut)).toBe(true);
     expect(phasesOf([run(leftOut)]).get('x')).toBe('conflict');
+    // The round's counts read done as the map and "Hide complete" do: a fixed area waiting on its patch is done.
+    expect(stageCountsOf([fixing, fixed, leftOut])).toMatchObject({ done: 1, total: 3 });
   });
 
   it('colors a failed part as a conflict and says why', () => {
