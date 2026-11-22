@@ -8,7 +8,7 @@ export function Stats({ stats }: { stats: readonly Stat[] }) {
       {stats.map((stat) => (
         <div key={stat.label} className={s.stat}>
           <b className={s.value}>{stat.value}</b>
-          <span className={s.label}>{stat.label}</span>
+          <span className={s.label} title={stat.label}>{stat.label}</span>
         </div>
       ))}
     </section>

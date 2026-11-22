@@ -34,10 +34,11 @@ export function rampAt(stops: readonly string[], f: number): string {
   return `oklch(${mix(a[0], b[0]).toFixed(4)} ${mix(a[1], b[1]).toFixed(4)} ${hueBetween(a[2], b[2], t).toFixed(2)})`;
 }
 
-/** `color` with its chroma taken out, for an area the map sets aside; a color not in oklch stays as it is. */
-export function grayOf(color: string): string {
+/** `color` with `amount` (0 to 1) of its chroma taken out, for an area the map sets aside; a color not in oklch stays
+ *  as it is. */
+export function grayOf(color: string, amount = 1): string {
   const c = oklchOf(color);
-  return c ? `oklch(${c[0].toFixed(4)} 0 0)` : color;
+  return c ? `oklch(${c[0].toFixed(4)} ${(c[1] * (1 - Math.min(1, Math.max(0, amount)))).toFixed(4)} ${c[2].toFixed(2)})` : color;
 }
 
 /** The treemap's fill for an area with `left` defects estimated left, on the heat scale `at` sets, along `depth`. */

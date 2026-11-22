@@ -16,7 +16,15 @@
   font-weight: var(--wzl-font-weight-bold);
 }
 
+/* Every caption holds two lines and never more, so one that wraps cannot change the strip's height and move the map
+   under it; the rest is in its title. */
 .label {
   font-size: var(--wzl-font-size-sm);
+  line-height: 1.35;
   color: var(--audit-muted);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  min-height: calc(2 * 1.35em);
 }

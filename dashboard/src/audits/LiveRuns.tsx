@@ -11,7 +11,7 @@ import { passDone, PHASE_LABEL, phaseClass, stageCountsOf, BRIGHT_FILLS } from '
 import { STEP_COLUMN_COUNT, laneStepsOf } from './stepsLane';
 import { gateRunsOf, inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
 import { NODE_SEP, headlineOf, lastLineOf, spendOf, startedText } from './runData';
-import { useViewerPref } from './viewerPref';
+import { useDashPref } from './dashPrefs';
 import type { AuditLane, AuditRun } from './skulkrMap.types';
 import s from './LiveRuns.module.css';
 
@@ -61,17 +61,6 @@ function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanS
 export type LaneMode = 'clock' | 'steps';
 const MODES = [{ value: 'clock', label: 'Clock' }, { value: 'steps', label: 'Steps' }] as const;
 
-/** The viewer's lane view, kept between visits: on the run's clock (the default), or as a grid of steps. */
-function useLaneMode(): [LaneMode, (mode: LaneMode) => void] {
-  const [mode, setMode, keep] = useViewerPref<LaneMode>('lanes', 'clock', (s) => (s === 'steps' ? 'steps' : undefined));
-  return [mode, (next) => { setMode(next); keep(next); }];
-}
-
-/** Whether the viewer hides finished lanes, kept between visits. */
-function useHideComplete(): [boolean, (hide: boolean) => void] {
-  const [hide, setHide, keep] = useViewerPref('hideComplete', false, (s) => s === 'true');
-  return [hide, (next) => { setHide(next); keep(next); }];
-}
 
 /** How every round's lanes are drawn: on the clock or as steps, and whether finished lanes hide. */
 export interface LaneSettings {
@@ -83,8 +72,8 @@ export interface LaneSettings {
 
 /** The viewer's lane view, kept between visits, for the page to hand every round and its controls. */
 export function useLaneView(): LaneSettings {
-  const [mode, setMode] = useLaneMode();
-  const [hideComplete, setHideComplete] = useHideComplete();
+  const [mode, setMode] = useDashPref('lanes.mode');
+  const [hideComplete, setHideComplete] = useDashPref('lanes.hideComplete');
   return { mode, hideComplete, setMode, setHideComplete };
 }
 

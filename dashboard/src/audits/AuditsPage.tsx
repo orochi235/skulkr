@@ -26,6 +26,8 @@ import { TenantTitle } from '@dash/tenants/TenantTitle';
 import { titleFor } from '@dash/title';
 import { useTenantChoice, useTenants } from '@dash/tenants/useTenants';
 import { readSize, useViewerPref } from './viewerPref';
+import { useDashPref } from './dashPrefs';
+import { PrefsButton } from './PrefsButton';
 import type { SkulkrMap } from './skulkrMap.types';
 import palette from './palette.module.css';
 import s from './AuditsPage.module.css';
@@ -92,7 +94,7 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
   const area = shown.find((a) => a.id === shownId);
   const pickedArea = picked ? areas.find((a) => a.id === picked) ?? null : null;
   const stats = useMemo(() => statsFor(shown, past, areas), [shown, past, areas]);
-  const [onlyRound, setOnlyRound, keepOnlyRound] = useViewerPref('onlyRound', false, (v) => (v === 'true' ? true : v === 'false' ? false : undefined));
+  const [onlyRound, setOnlyRound] = useDashPref('map.grayOut');
   const inColor = useMemo(() => (onlyRound ? readIn(shown, past ?? pastRounds.at(-1) ?? null) : null), [onlyRound, shown, past, pastRounds]);
   const unmerged = useMemo(() => new Set(map.rounds.filter((r) => r.pending === 'unmerged').map((r) => r.round)), [map.rounds]);
   const next = useMemo(() => nextUpOf(areas, NEXT_UP_ROUNDS * (map.areasPerRound ?? 16)), [areas, map.areasPerRound]);
@@ -122,7 +124,7 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
         <Treemap
           scene={scene} selection={selection} areas={shown} palette={colors} phases={past === null ? phases : NO_PHASES}
           {...(past === null ? { estimates } : {})} onHover={setHovered} lit={lit} areasPerRound={map.areasPerRound} glyphs={map.icons}
-          asOf={past} inColor={inColor} header={pastRounds.length ? <RoundPicker rounds={pastRounds} value={past} onChange={asOf.choose} onlyRound={onlyRound} onOnlyRound={(on) => { setOnlyRound(on); keepOnlyRound(on); }} /> : null}
+          asOf={past} inColor={inColor} header={pastRounds.length ? <RoundPicker rounds={pastRounds} value={past} onChange={asOf.choose} onlyRound={onlyRound} onOnlyRound={setOnlyRound} /> : null}
         />
         <ResizeHandle value={asideWidth} min={ASIDE.min} max={ASIDE.max} invert onInput={setAsideWidth} onChange={keepAside} aria-label="Resize the side panel" />
         <aside className={s.aside} aria-label="Area">
@@ -163,6 +165,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
   const header = map ? (
     <>
       <LaneViewControls view={view} />
+      <PrefsButton />
       {continuous && <span className={s.continuous} title={map.continuous?.next}>{continuous}</span>}
       <span className={s.stamp}>{stampOf(map)}</span>
     </>
