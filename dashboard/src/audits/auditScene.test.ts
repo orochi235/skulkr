@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { asNodeId } from '@weasel-js/core';
 import { auditNodeSpecs, createAuditScene, frameIdOf, syncAuditScene, type AuditPalette } from './auditScene';
-import { AUDIT_PAINTER, pipCountOf, pipsPerRowIn, type AuditCellData } from './auditPainter';
+import { AUDIT_PAINTER, outline, pipCountOf, pipsPerRowIn, type AuditCellData } from './auditPainter';
 import { ICON, layoutMap } from './mapLayout';
 import { phasesOf } from './phases';
 import { rampAt } from './heat';
@@ -149,5 +149,24 @@ describe('pips', () => {
     expect(pipsPerRowIn(6)).toBe(1);
     expect(pipCountOf(4, false, true)).toBe(5);
     expect(pipCountOf(9, true, false)).toBe(4);
+  });
+});
+
+describe('outline', () => {
+  const p = { x: 0, y: 0, width: 100, height: 60 };
+  it('is the inset rectangle on a cell with no cut corner', () => {
+    expect(outline(p, 5, 0)).toEqual({ kind: 'rect', x: 5, y: 5, width: 90, height: 50 });
+  });
+
+  it('cuts its bottom-left corner parallel to the worn corner, moved in as far as the outline is', () => {
+    const path = outline(p, 5, 12);
+    expect(path.kind).not.toBe('rect');
+    // The diagonal sits `by` in from the cut: x + (bottom - y) = cut + by·√2 on every point of it.
+    const c = 12 - 5 * (2 - Math.SQRT2);
+    for (const [x, y] of [[5 + c, 55], [5, 55 - c]] as const) expect(x + (60 - y)).toBeCloseTo(12 + 5 * Math.SQRT2);
+  });
+
+  it('keeps square corners where the outline sits inside the cut', () => {
+    expect(outline(p, 30, 12).kind).toBe('rect');
   });
 });

@@ -76,6 +76,17 @@ const ICON_INK = 0.3;
 
 /** The side of a changed area's cut corner, in pixels. */
 const CUT_PX = 12;
+/**
+ * The cell's edge inset by `by`, its bottom-left corner cut where the cell's `cut` (the worn corner's leg) reaches it:
+ * the diagonal moved in by `by` too, so an outline runs parallel to the cut rather than over it.
+ */
+export const outline = (p: RectPose, by: number, cut: number): Path => {
+  const c = cut - by * (2 - Math.SQRT2);
+  if (c <= 0) return rect(p, by);
+  const x0 = p.x + by, y0 = p.y + by, x1 = p.x + p.width - by, y1 = p.y + p.height - by;
+  return pathFromD(`M ${x0} ${y0} H ${x1} V ${y1} H ${x0 + c} L ${x0} ${y1 - c} Z`);
+};
+
 const rect = (p: RectPose, by = 0): Path => ({ kind: 'rect', x: p.x + by, y: p.y + by, width: Math.max(0, p.width - 2 * by), height: Math.max(0, p.height - 2 * by) });
 
 /** `y` is the text's top: a text command is top-anchored by default. */
@@ -115,16 +126,16 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
   ];
   const iconBox = d.icon ? iconBoxIn(p) : null;
   if (d.icon && iconBox) out.push(glyphCommands(d.icon, { x: iconBox.x, y: iconBox.y, size: iconBox.width }, d.ink, ICON_INK));
+  // One size for every cell, shrunk only where a cell is too small to hold it.
+  const cut = d.worn ? Math.min(Math.min(p.width, p.height) * 0.45, CUT_PX) : 0;
   if (d.worn) {
-    // One size for every cell, shrunk only where a cell is too small to hold it.
-    const cut = Math.min(Math.min(p.width, p.height) * 0.45, CUT_PX);
     const x = p.x, y = p.y + p.height;
     out.push(...filled(pathFromD(`M ${x} ${y} L ${x} ${y - cut} L ${x + cut} ${y} Z`), { color: d.edge }));
   }
-  if (d.live) out.push({ kind: 'path', path: rect(p, 5), stroke: { paint: { color: d.live, opacity: d.pulse }, width: 9.5 } });
-  if (d.recut) out.push({ kind: 'path', path: rect(p, 2), stroke: { paint: { color: d.recut.color, opacity: d.recut.opacity }, width: 4 } });
+  if (d.live) out.push({ kind: 'path', path: outline(p, 5, cut), stroke: { paint: { color: d.live, opacity: d.pulse }, width: 9.5 } });
+  if (d.recut) out.push({ kind: 'path', path: outline(p, 2, cut), stroke: { paint: { color: d.recut.color, opacity: d.recut.opacity }, width: 4 } });
   // Drawn inward, since a neighbor paints over anything outside the cell.
-  if (d.glow) for (const [by, opacity] of GLOW) out.push({ kind: 'path', path: rect(p, by), stroke: { paint: { color: d.glow, opacity }, width: 3 } });
+  if (d.glow) for (const [by, opacity] of GLOW) out.push({ kind: 'path', path: outline(p, by, cut), stroke: { paint: { color: d.glow, opacity }, width: 3 } });
   if (d.settled && p.width >= 16 && p.height >= 16) {
     const x = p.x + p.width - 13, y = p.y + p.height - 12;
     const check = pathFromD(`M ${x} ${y + 4} L ${x + 3} ${y + 7} L ${x + 9} ${y}`);
