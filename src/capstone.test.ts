@@ -70,6 +70,23 @@ const land = async (r: ReturnType<typeof round>, repair?: (id: string, files: st
 };
 
 describe('a red capstone', () => {
+  it('runs a gate that failed without naming a failure once more, and lands when that passes', async () => {
+    const r = round({ docs: { 'docs/d.md': 'e' } });
+    const marker = join(scratch(), 'crashed');
+    // The first run dies with nothing named; the second passes.
+    const crashOnce = `if [ ! -e ${marker} ]; then touch ${marker}; echo "progress 20021/36960"; exit 1; fi`;
+    const { report, said } = await land(r, undefined, { command: ['bash', '-c', crashOnce] });
+    expect(said).toContain('gate: test named no failure, as a crashed run does; running it once more');
+    expect(report).toMatch(/^main fast-forwarded to \w+/);
+  });
+
+  it('runs a gate that names its failures only once', async () => {
+    const r = round({ src: { 'src/a.ts': 'broken' } });
+    const { said } = await land(r);
+    expect(said.filter((l) => l.startsWith('gate: test failed'))).toHaveLength(1);
+    expect(said.some((l) => l.includes('running it once more'))).toBe(false);
+  });
+
   it('repairs the branch whose commit broke a failing file, rebuilds the batch, and lands it green', async () => {
     const r = round({ src: { 'src/a.ts': 'broken' }, docs: { 'docs/d.md': 'e' } });
     const asked: [string, string[], string][] = [];

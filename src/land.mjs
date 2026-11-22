@@ -76,6 +76,16 @@ export const patchSweep = ({ cfg, root, round, commit, fixed, branches, outcomes
  *  conflicts, `rebuild` makes the batch again on the new `main`, leaving out the branches that now conflict, and the
  *  round goes on with the rest. Answers the batch and the tip to land, or, red, the batch, its gate log, and `{ report }`;
  *  `tag` marks the gate's logs apart from an earlier test of the round's batch. */
+/** Whether the gate log at `log` names no failure though the gate failed: only where the gate marks its failures. */
+const crashedIn = (log, gate) => {
+  if (!gate.failPrefix) return false;
+  try {
+    return failedWhereIn(readFileSync(log, 'utf8'), gate).length === 0;
+  } catch {
+    return false;
+  }
+};
+
 const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild, tag = '' }) => {
   const logName = `${batch.name.replace(/\//g, '-')}${tag}`;
   const main = cfg.git.main;
@@ -97,9 +107,16 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
   if (merge) catchUp();
   for (let pass = 1; ; pass++) {
     const suffix = pass === 1 ? '' : `.${pass}`;
-    const log = join(nightDir, `${logName}${suffix}${cfg.gate.logSuffix}`);
-    const status = await runGate(cfg, { root, batch, logPath: log });
+    let log = join(nightDir, `${logName}${suffix}${cfg.gate.logSuffix}`);
+    let status = await runGate(cfg, { root, batch, logPath: log });
     say(`gate: ${gate} ${status === 0 ? 'passed' : `failed (${status}); its log is ${log}`}`);
+    // A failed gate whose log names no failure crashed or was killed, which says nothing of the batch: run it once more.
+    if (status !== 0 && crashedIn(log, cfg.gate)) {
+      say(`gate: ${gate} named no failure, as a crashed run does; running it once more`);
+      log = join(nightDir, `${logName}${suffix}.rerun${cfg.gate.logSuffix}`);
+      status = await runGate(cfg, { root, batch, logPath: log });
+      say(`gate: ${gate} ${status === 0 ? 'passed' : `failed (${status}); its log is ${log}`}`);
+    }
     if (status !== 0) return { batch, tip, log, report: `red: ${batch.name} and its branches kept; worktree ${batch.tree}; logs in ${nightDir}` };
     if (!merge || pass === MAIN_CATCH_UPS + 1 || !catchUp()) return { batch, tip };
   }
