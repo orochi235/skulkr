@@ -174,7 +174,7 @@ function StageCounts({ run }: { run: AuditRun }) {
   const { done, total, stages } = stageCountsOf(run.lanes);
   return (
     <div className={s.counts} aria-label={`Round ${run.round} areas by stage`}>
-      <span className={s.count}>{done} of {total} done</span>
+      <span className={cx(s.count, s.doneCount)}>{done} of {total} done</span>
       {stages.map(({ phase, n }) => (
         <span key={phase} className={cx(s.count, phaseClass(phase))}><i className={s.dot} aria-hidden="true" />{n} {PHASE_LABEL[phase]}</span>
       ))}
@@ -195,10 +195,10 @@ function RunStrip({ run, now, mode, hideComplete, on, passes }: {
           <span>{headlineOf(run)}</span>
           {run.started && <span className={s.started}>{startedText(run.started, now)}</span>}
         </div>
+        {run.lanes.length > 0 ? <StageCounts run={run} /> : <span />}
         <div className={s.line} title={lastLineOf(run)}><InlineMarkdown text={lastLineOf(run)} /></div>
         <div className={s.spend}>{spendOf(run)}</div>
       </div>
-      {run.lanes.length > 0 && <StageCounts run={run} />}
       {/* Only its own round's: a branch an earlier round left out, retried here, is listed once, below every run. */}
       <LeftOut entries={(run.leftOut ?? []).filter((e) => e.round === run.round)} label="left out" name={`Round ${run.round}, left out of the batch`} on={on} />
       {run.lanes.length > 0 && (

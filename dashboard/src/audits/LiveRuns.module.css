@@ -5,7 +5,7 @@
 
 .run {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--wzl-space-3) 18px;
   padding: var(--wzl-space-3) var(--wzl-space-4);
@@ -58,9 +58,8 @@
 }
 
 .counts {
-  grid-column: 1 / -1;
   display: flex;
-  flex-wrap: wrap;
+  align-items: baseline;
   gap: var(--wzl-space-1) var(--wzl-space-3);
   font-size: var(--wzl-font-size-sm);
   font-variant-numeric: tabular-nums;
@@ -68,6 +67,7 @@
 }
 
 .count { white-space: nowrap; }
+.doneCount { font-size: var(--wzl-font-size-md); font-weight: var(--wzl-font-weight-bold); color: var(--audit-ink); }
 
 .dot {
   display: inline-block;
