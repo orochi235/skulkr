@@ -76,6 +76,15 @@ export const patchSweep = ({ cfg, root, round, commit, fixed, branches, outcomes
  *  conflicts, `rebuild` makes the batch again on the new `main`, leaving out the branches that now conflict, and the
  *  round goes on with the rest. Answers the batch and the tip to land, or, red, the batch, its gate log, and `{ report }`;
  *  `tag` marks the gate's logs apart from an earlier test of the round's batch. */
+/** `<dir>/<name><suffix>`, or with `.r2`, `.r3`… before `suffix` where an earlier run of the round (a resumed one's)
+ *  left that file: the gate appends to its log, and progress read from a log holding two runs reads the first. */
+export const freshLog = (dir, name, suffix) => {
+  for (let n = 1; ; n++) {
+    const path = join(dir, `${name}${n === 1 ? '' : `.r${n}`}${suffix}`);
+    if (!existsSync(path)) return path;
+  }
+};
+
 /** How many failures the gate log at `log` names (`failedWhereIn`); 0 where it cannot be read. */
 const failuresIn = (log, gate) => {
   try {
@@ -131,13 +140,13 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
   if (merge) catchUp();
   for (let pass = 1; ; pass++) {
     const suffix = pass === 1 ? '' : `.${pass}`;
-    let log = join(nightDir, `${logName}${suffix}${cfg.gate.logSuffix}`);
+    let log = freshLog(nightDir, `${logName}${suffix}`, cfg.gate.logSuffix);
     let status = await runGate(cfg, { root, batch, logPath: log });
     say(`gate: ${gate} ${status === 0 ? 'passed' : `failed (${status}); its log is ${log}`}`);
     // A failed gate whose log names no failure crashed or was killed, which says nothing of the batch: run it once more.
     if (status !== 0 && crashedIn(log, cfg.gate)) {
       say(`gate: ${gate} named no failure, as a crashed run does; running it once more`);
-      log = join(nightDir, `${logName}${suffix}.rerun${cfg.gate.logSuffix}`);
+      log = freshLog(nightDir, `${logName}${suffix}.rerun`, cfg.gate.logSuffix);
       status = await runGate(cfg, { root, batch, logPath: log });
       say(`gate: ${gate} ${status === 0 ? 'passed' : `failed (${status}); its log is ${log}`}`);
     }

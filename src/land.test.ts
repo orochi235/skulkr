@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { gitIn } from './batch.mjs';
 import { resolveConfig } from './config.mjs';
-import { batchAndTest } from './land.mjs';
+import { batchAndTest, freshLog } from './land.mjs';
 import { leftOutIn } from './leftOut.mjs';
 
 const dirs: string[] = [];
@@ -121,5 +121,16 @@ describe('batchAndTest', () => {
     const three = await night(3, [gone]);
     expect(three.outcomes.gone).toMatch(new RegExp(`^\`${gone}\`, left out: merge failed: .*${gone}`));
     expect(three.outcomes.gone).not.toMatch(/conflict/);
+  });
+});
+
+describe('freshLog', () => {
+  it("names a log no earlier run of the round left, so a resumed gate's progress is its own", () => {
+    const dir = temp('skulkr-logs-');
+    expect(freshLog(dir, 'batch-x', '.test.log')).toBe(join(dir, 'batch-x.test.log'));
+    writeFileSync(join(dir, 'batch-x.test.log'), 'onto: progress 36960/36960 tests\n');
+    expect(freshLog(dir, 'batch-x', '.test.log')).toBe(join(dir, 'batch-x.r2.test.log'));
+    writeFileSync(join(dir, 'batch-x.r2.test.log'), '');
+    expect(freshLog(dir, 'batch-x', '.test.log')).toBe(join(dir, 'batch-x.r3.test.log'));
   });
 });
