@@ -44,13 +44,20 @@ const failedGateRuns = (run: AuditRun) => gateRunsOf(run).flatMap((g) => {
 /** Dots per group in a lane's pass count, set apart like tally marks so a count reads at a glance. */
 const DOT_GROUP = 5;
 
-/** An area's passes as dots, one each, in groups of DOT_GROUP, at the end of its lane's name. */
-function PassDots({ passes }: { passes: number }) {
-  if (passes <= 0) return null;
-  const groups = Array.from({ length: Math.ceil(passes / DOT_GROUP) }, (_, g) => Math.min(DOT_GROUP, passes - g * DOT_GROUP));
+/** An area's passes as dots, one each, in groups of DOT_GROUP, at the end of its lane's name; while this round's pass
+ *  is under way, an open circle stands in for its dot. */
+function PassDots({ passes, pending }: { passes: number; pending: boolean }) {
+  const total = passes + (pending ? 1 : 0);
+  if (total <= 0) return null;
+  const groups = Array.from({ length: Math.ceil(total / DOT_GROUP) }, (_, g) => g * DOT_GROUP);
+  const title = `${passes} ${passes === 1 ? 'pass' : 'passes'}${pending ? ', one under way' : ''}`;
   return (
-    <span className={s.passDots} title={`${passes} ${passes === 1 ? 'pass' : 'passes'}`}>
-      {groups.map((n, g) => <span key={g} className={s.dotGroup}>{Array.from({ length: n }, (_, i) => <i key={i} />)}</span>)}
+    <span className={s.passDots} title={title}>
+      {groups.map((from) => (
+        <span key={from} className={s.dotGroup}>
+          {Array.from({ length: Math.min(DOT_GROUP, total - from) }, (_, i) => <i key={i} className={from + i >= passes ? s.open : undefined} />)}
+        </span>
+      ))}
     </span>
   );
 }
@@ -74,7 +81,7 @@ function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanS
         onPointerEnter={() => on.onLight(lane.id)} onPointerLeave={() => on.onLight(null)} onFocus={() => on.onLight(lane.id)} onBlur={() => on.onLight(null)}
       >
         <span className={s.nameText}>{lane.id}</span>
-        <PassDots passes={passes} />
+        <PassDots passes={passes} pending={!passDone(lane)} />
       </button>
     ),
   };
@@ -121,7 +128,7 @@ function Lanes({ run, now, mode, hideComplete, on, passes }: {
   const lanes = run.lanes.map((lane) => ({ lane, view: laneViewOf(lane, now, clock.from) })).filter(({ lane }) => !hideComplete || !passDone(lane));
   const widest = Math.max(0, ...run.lanes.map((l) => l.id.length));
   useLayoutEffect(() => { ref.current?.style.setProperty('--audit-lead-ch', String(widest)); }, [widest]);
-  const dotsPx = dotsWidthFor(Math.max(0, ...run.lanes.map((l) => passes.get(l.id) ?? 0)));
+  const dotsPx = dotsWidthFor(Math.max(0, ...run.lanes.map((l) => (passes.get(l.id) ?? 0) + (passDone(l) ? 0 : 1))));
   useLayoutEffect(() => { ref.current?.style.setProperty('--audit-dots-px', `${dotsPx}px`); }, [dotsPx]);
   // A label's element is remade whenever its text changes, restarting its pulse; one shared start keeps every pulse in step.
   useLayoutEffect(() => {

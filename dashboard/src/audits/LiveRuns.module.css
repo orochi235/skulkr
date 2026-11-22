@@ -153,6 +153,7 @@
 .passDots { flex: none; display: inline-flex; gap: 5px; margin-inline-end: var(--wzl-space-1); }
 .dotGroup { display: inline-flex; gap: 2px; }
 .dotGroup > i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: 0.85; }
+.dotGroup > i.open { background: none; box-shadow: inset 0 0 0 1px currentColor; }
 
 .name:hover,
 .name:focus-visible { outline: 2px solid var(--audit-ink); outline-offset: -2px; }

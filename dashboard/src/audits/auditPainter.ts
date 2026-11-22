@@ -30,6 +30,8 @@ export interface AuditCellData {
   readonly settled?: boolean;
   /** One per pass, up to four. */
   readonly dots: number;
+  /** A live run's pass over the area is under way: an open circle after the dots until its own dot replaces it. */
+  readonly pending?: boolean;
   /** A glow's color while something naming the area elsewhere on the page is hovered. */
   readonly glow?: string;
   /** The live outline's opacity, which the page breathes. */
@@ -113,9 +115,14 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
     const check = pathFromD(`M ${x} ${y + 4} L ${x + 3} ${y + 7} L ${x + 9} ${y}`);
     out.push({ kind: 'path', path: check, stroke: { paint: { color: d.ink, opacity: 0.8 }, width: 1.6 } });
   }
-  if (d.dots > 0 && p.width >= 14 && p.height >= 10) {
-    for (let i = 0; i < Math.min(d.dots, MAX_PASS_DOTS); i++) {
-      out.push({ kind: 'path', path: circlePath(p.x + p.width - 5 - i * 6, p.y + 5, 2, 12), fill: { paint: { color: d.ink, opacity: 0.85 } } });
+  if ((d.dots > 0 || d.pending) && p.width >= 14 && p.height >= 10) {
+    // Read left to right, oldest first: the open circle, when there is one, takes the rightmost place.
+    const ring = d.pending ? 1 : 0;
+    const filled = Math.min(d.dots, MAX_PASS_DOTS - ring);
+    const at = (i: number) => p.x + p.width - 5 - i * 6;
+    if (ring) out.push({ kind: 'path', path: circlePath(at(0), p.y + 5, 1.6, 12), stroke: { paint: { color: d.ink, opacity: 0.85 }, width: 1 } });
+    for (let i = 0; i < filled; i++) {
+      out.push({ kind: 'path', path: circlePath(at(i + ring), p.y + 5, 2, 12), fill: { paint: { color: d.ink, opacity: 0.85 } } });
     }
   }
   const texts: DrawCommand[] = [];
