@@ -4,6 +4,9 @@ import { circlePath, pathFromD, type Path } from '@weasel-js/geom';
 import { glyphCommands, type GlyphPath } from './glyph';
 import { framePadOf, iconBoxIn } from './mapLayout';
 
+/** The most pass dots an area wears, on the map and on its lane: one per pass, up to this many. */
+export const MAX_PASS_DOTS = 4;
+
 export interface AuditCellData {
   readonly kind: 'audit-cell';
   readonly fill: PosedPaint;
@@ -111,7 +114,7 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
     out.push({ kind: 'path', path: check, stroke: { paint: { color: d.ink, opacity: 0.8 }, width: 1.6 } });
   }
   if (d.dots > 0 && p.width >= 14 && p.height >= 10) {
-    for (let i = 0; i < Math.min(d.dots, 4); i++) {
+    for (let i = 0; i < Math.min(d.dots, MAX_PASS_DOTS); i++) {
       out.push({ kind: 'path', path: circlePath(p.x + p.width - 5 - i * 6, p.y + 5, 2, 12), fill: { paint: { color: d.ink, opacity: 0.85 } } });
     }
   }

@@ -12,6 +12,7 @@ import { STEP_COLUMN_COUNT, laneStepsOf } from './stepsLane';
 import { gateRunsOf, inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
 import { NODE_SEP, headlineOf, lastLineOf, spendOf, startedText } from './runData';
 import { useDashPref } from './dashPrefs';
+import { MAX_PASS_DOTS } from './auditPainter';
 import type { AuditLane, AuditRun } from './skulkrMap.types';
 import s from './LiveRuns.module.css';
 
@@ -41,7 +42,17 @@ const failedGateRuns = (run: AuditRun) => gateRunsOf(run).flatMap((g) => {
 });
 
 /** An area's lane as a stack row: its name, and `spans`, its steps in the view chosen. */
-function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanStripSpan[]): SpanStripsRow {
+/** An area's passes as the map's dots: one each, up to MAX_PASS_DOTS, at the end of its lane's name. */
+function PassDots({ passes }: { passes: number }) {
+  if (passes <= 0) return null;
+  return (
+    <span className={s.passDots} title={`${passes} ${passes === 1 ? 'pass' : 'passes'}`}>
+      {Array.from({ length: Math.min(passes, MAX_PASS_DOTS) }, (_, i) => <i key={i} />)}
+    </span>
+  );
+}
+
+function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanStripSpan[], passes: number): SpanStripsRow {
   return {
     id: lane.id,
     spans: spans.map(withNode),
@@ -52,7 +63,8 @@ function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanS
         type="button" className={s.name} data-lane={lane.id} onClick={(e) => { e.stopPropagation(); on.onPick(lane.id); }}
         onPointerEnter={() => on.onLight(lane.id)} onPointerLeave={() => on.onLight(null)} onFocus={() => on.onLight(lane.id)} onBlur={() => on.onLight(null)}
       >
-        {lane.id}
+        <span className={s.nameText}>{lane.id}</span>
+        <PassDots passes={passes} />
       </button>
     ),
   };
@@ -91,7 +103,9 @@ const SHARED_WINDOW = { from: 0, to: 2 };
 
 /** The run's areas, on the run's clock or as a grid of steps; a finished one stays, filled, until the run ends, unless
  *  the viewer hides those whose pass is done, as the map shows them. */
-function Lanes({ run, now, mode, hideComplete, on }: { run: AuditRun; now: number; mode: LaneMode; hideComplete: boolean; on: AreaHandlers }) {
+function Lanes({ run, now, mode, hideComplete, on, passes }: {
+  run: AuditRun; now: number; mode: LaneMode; hideComplete: boolean; on: AreaHandlers; passes: ReadonlyMap<string, number>;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const clock = runClockOf(run, now);
   const lanes = run.lanes.map((lane) => ({ lane, view: laneViewOf(lane, now, clock.from) })).filter(({ lane }) => !hideComplete || !passDone(lane));
@@ -104,7 +118,7 @@ function Lanes({ run, now, mode, hideComplete, on }: { run: AuditRun; now: numbe
     }
   });
   if (lanes.length === 0) return null;
-  const rows = lanes.map(({ lane, view }) => laneRow(lane, view, on, mode === 'steps' ? laneStepsOf(lane, now) : view.spans));
+  const rows = lanes.map(({ lane, view }) => laneRow(lane, view, on, mode === 'steps' ? laneStepsOf(lane, now) : view.spans, passes.get(lane.id) ?? 0));
   // Anywhere on a lane picks and lights its area, as its name does; the name stays the keyboard's way in.
   const areaAt = (target: EventTarget) => {
     const row = target instanceof Element ? target.closest('[role="listitem"]') : null;
@@ -139,8 +153,8 @@ function StageCounts({ run }: { run: AuditRun }) {
 
 /** One run's strip: what it is doing and what it has spent, its last line, what its batch left out, and a lane per
  *  area in flight. */
-function RunStrip({ run, now, mode, hideComplete, on }: {
-  run: AuditRun; now: number; mode: LaneMode; hideComplete: boolean; on: AreaHandlers;
+function RunStrip({ run, now, mode, hideComplete, on, passes }: {
+  run: AuditRun; now: number; mode: LaneMode; hideComplete: boolean; on: AreaHandlers; passes: ReadonlyMap<string, number>;
 }) {
   return (
     <section className={cx(s.run, !run.running && s.idle)} aria-label={`Round ${run.round}`}>
@@ -157,7 +171,7 @@ function RunStrip({ run, now, mode, hideComplete, on }: {
       <LeftOut run={run} on={on} />
       {run.lanes.length > 0 && (
         <div className={s.lanes} data-mode={mode}>
-          <Lanes run={run} now={now} mode={mode} hideComplete={hideComplete} on={on} />
+          <Lanes run={run} now={now} mode={mode} hideComplete={hideComplete} on={on} passes={passes} />
           {(inSharedSteps(run) || run.lanes.every(passDone)) && (
             <SpanStrips
               aria-label={`Round ${run.round}, every area`} window={SHARED_WINDOW}
@@ -184,8 +198,12 @@ function RunStrip({ run, now, mode, hideComplete, on }: {
 
 /** A strip for every run still running, and for every finished one whose batch has not merged; a merged round lives on
  *  in the rounds chart and the map. */
-export function LiveRuns({ runs, unmerged, now, on, view, focus = null }: {
+const NO_PASSES: ReadonlyMap<string, number> = new Map();
+
+export function LiveRuns({ runs, unmerged, now, on, view, focus = null, passes = NO_PASSES }: {
   runs: readonly AuditRun[]; unmerged: ReadonlySet<number>; now: number; on: AreaHandlers;
+  /** How many passes each area has had, by id, for the dots on its lane as on its map cell. */
+  passes?: ReadonlyMap<string, number>;
   /** How every round's lanes are drawn; the page holds it, and its controls, so one setting covers them all. */
   view: LaneSettings;
   /** The area picked elsewhere on the page: its lane, where one shows, is brought into view. */
@@ -200,7 +218,7 @@ export function LiveRuns({ runs, unmerged, now, on, view, focus = null }: {
   if (live.length === 0) return <section className={cx(s.run, s.idle)}><div className={s.what}>No round running</div></section>;
   return (
     <div ref={root} className={s.runs} aria-live="polite">
-      {live.map((run) => <RunStrip key={run.round} run={run} now={now} mode={view.mode} hideComplete={view.hideComplete} on={on} />)}
+      {live.map((run) => <RunStrip key={run.round} run={run} now={now} mode={view.mode} hideComplete={view.hideComplete} on={on} passes={passes} />)}
     </div>
   );
 }

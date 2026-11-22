@@ -130,12 +130,15 @@
 
 /* An area's name: a plain label, the strip beside it carrying the phase. */
 .name {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--wzl-space-1);
   width: 100%;
   padding: 0;
   border: 0;
   background: none;
-  min-width: calc(var(--audit-lead-ch, 0) * 1ch);
+  /* The widest name, and room for MAX_PASS_DOTS dots after it. */
+  min-width: calc(var(--audit-lead-ch, 0) * 1ch + 30px);
   font: inherit;
   font-family: var(--wzl-font-ui);
   font-size: var(--wzl-font-size-sm);
@@ -144,6 +147,11 @@
   color: var(--audit-ink);
   cursor: pointer;
 }
+
+/* The name to the left, the area's pass dots against the right edge of the name column, as on its map cell. */
+.nameText { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.passDots { flex: none; display: inline-flex; gap: 2px; margin-inline-end: var(--wzl-space-1); }
+.passDots > i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: 0.85; }
 
 .name:hover,
 .name:focus-visible { outline: 2px solid var(--audit-ink); outline-offset: -2px; }

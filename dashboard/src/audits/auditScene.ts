@@ -1,7 +1,7 @@
 /** The audit map as a scene: a frame per package, a cell per area, kept in step with the map's data. */
 import { asNodeId, contrastRatio, createScene, nodeShapesOf, type NodeId, type RectPose, type Scene } from '@weasel-js/core';
 import { deepEqual } from '@weasel-js/registry';
-import { AUDIT_PAINTER, type AuditCellData, type AuditFrameData, type AuditNodeData } from './auditPainter';
+import { AUDIT_PAINTER, MAX_PASS_DOTS, type AuditCellData, type AuditFrameData, type AuditNodeData } from './auditPainter';
 import { glyphPathsOf } from './glyph';
 import { changedSincePass, heatScaleOf, labelIn, toneOf, wrapAtDots, type HeatScale } from './areaData';
 import { grayOf, heatColorOf, rampAt } from './heat';
@@ -99,7 +99,7 @@ function textWidth(s: string, font: string, size: number, weight = 400): number 
 const LINE = 15;
 
 /** Room the pass dots take at a cell's top right, which its label stops short of. */
-const dotsRoom = (passes: number) => (passes > 0 ? Math.min(passes, 4) * 6 + 4 : 0);
+const dotsRoom = (passes: number) => (passes > 0 ? Math.min(passes, MAX_PASS_DOTS) * 6 + 4 : 0);
 
 /** An area's label as the lines its cell has room for, broken after dots, the last cut short if it must be. */
 function labelLines(area: AuditArea, cell: MapCell, font: string): string[] {
