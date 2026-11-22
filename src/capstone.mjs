@@ -7,7 +7,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from '
 import { join } from 'node:path';
 import { attribute, changedBy, reachOf, workspacesIn } from './attribute.mjs';
 import { applyFix, gitIn } from './batch.mjs';
-import { failedWhereIn } from './gate.mjs';
+import { failedWhereIn, testsFailingIn } from './gate.mjs';
 import { checkedIn, repairJob, summaryOf } from './repair.mjs';
 import { isTestPath, verdictText } from './verify.mjs';
 import { stripAnsi } from './ansi.mjs';
@@ -97,10 +97,12 @@ export const repairCapstone = async ({ cfg, root, round, commit, batch, logPath,
   });
   const { byBranch, unattributed } = attribute(failing, changed, (file) => reachOf(batch.tree, file, workspaces));
   // A failed step names no file of its own; the config's `gate.blame` reads which paths its output points at.
+  const ownersOf = (paths) => [...changed].filter(([, files]) => [...files].some((f) => paths.some((p) => f === p || f.startsWith(p.endsWith('/') ? p : `${p}/`)))).map(([b]) => b);
   const unblamed = [];
   for (const step of steps) {
-    const paths = cfg.gate.blame?.(text, step) ?? [];
-    const owners = [...changed].filter(([, files]) => [...files].some((f) => paths.some((p) => f === p || f.startsWith(p.endsWith('/') ? p : `${p}/`)))).map(([b]) => b);
+    // A file that runs steps as tests (weasel's ci-checks runs CI's) names the step in each failing test's name.
+    const names = [step, ...testsFailingIn(text, cfg.gate, step)];
+    const owners = [...new Set(names.flatMap((name) => ownersOf(cfg.gate.blame?.(text, name) ?? [])))];
     if (!owners.length) unblamed.push(step);
     for (const b of owners) byBranch.set(b, [...(byBranch.get(b) ?? []), step]);
   }

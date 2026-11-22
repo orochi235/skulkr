@@ -152,6 +152,18 @@ describe('a red capstone', () => {
     expect(said).toContain('capstone: 1 failures; src 1');
   });
 
+  it("hands the config's blame each failing test's name where a failed step is a file of tests", async () => {
+    const r = round({ src: { 'src/a.ts': 'broken' }, docs: { 'docs/d.md': 'e' } });
+    const step = 'if grep -q broken src/a.ts; then echo "fleet-fail: gate scripts/ci.gate.ts :: ci steps > npm run lint -w src"; exit 1; fi';
+    const asked: [string, string[]][] = [];
+    const { said } = await land(r, async (id, files) => {
+      asked.push([id, files]);
+      return { ok: false };
+    }, { command: ['bash', '-c', step], blame: (_text: string, s: string) => (s === 'ci steps > npm run lint -w src' ? ['src'] : []) });
+    expect(asked).toEqual([['src', ['scripts/ci.gate.ts']]]);
+    expect(said).toContain('capstone: 1 failures; src 1');
+  });
+
   it('lands over failures the frozen commit has too, and stays red over one it does not', async () => {
     const old = await land(round({ src: { 'src/a.ts': 'broken' } }), undefined, {}, async (files) => files);
     expect(old.report).toMatch(/^main fast-forwarded to \w+; landed over 1 failures main already has \(src\/a\.test\.ts\)$/);

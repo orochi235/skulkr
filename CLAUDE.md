@@ -73,6 +73,9 @@ weasel cutover.
     fails naming no failure (README "capstone" and "merge" steps, 2026-11-22).
   - an early landing (README "Early landings", 2026-11-22): part of a round batched, gated and landed while the rest
     still fix, its areas' outcomes reading `landed early at <sha>`, and the round's report leading with how many.
+  - a failed step that is a file of tests, laid at branches by `gate.blame` reading each failing test's name, and
+    weasel's blame laying a failed package lint at what biome flags or the package (README "Verify and repair",
+    2026-11-22).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

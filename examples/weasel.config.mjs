@@ -10,12 +10,35 @@ import { sweep } from './weasel/sweep.mjs';
 const BROWSER_PROJECTS = ['browser*', 'forge-stories'];
 
 /**
+ * What a failed `npm run lint -w @weasel-js/<name>` (one of `ci-checks.gate.ts`'s tests, named for the step) blames: the
+ * files biome's report in vitest's failure summary marks with an error (`×`), else the package's directory; null for
+ * any other step.
+ */
+const blameLint = (lines, step) => {
+  const name = /\bnpm run lint -w @weasel-js\/([\w.-]+)$/.exec(step)?.[1];
+  if (!name) return null;
+  const dir = `packages/${name}`;
+  const plain = lines.map((l) => l.replace(/\x1b\[[0-9;]*m/g, ''));
+  const at = plain.findIndex((l) => /^\s*FAIL\b/.test(l) && l.trimEnd().endsWith(step));
+  const files = [];
+  for (let i = at + 1; at >= 0 && i < plain.length && !/^\s*FAIL\b|⎯⎯⎯/.test(plain[i]); i++) {
+    const head = /^(?:\w*Error: )?(\S+\.\w+)(?::\d+:\d+)? [\w/]+(?:\s+FIXABLE)?\s+━/.exec(plain[i]);
+    if (!head || !plain.slice(i + 1).find((l) => l.trim())?.trim().startsWith('×')) continue;
+    const at2 = head[1].lastIndexOf(`${dir}/`);
+    files.push(at2 >= 0 ? head[1].slice(at2) : `${dir}/${head[1]}`);
+  }
+  return files.length ? [...new Set(files)] : [dir];
+};
+
+/**
  * The packages a failed post-build step blames: its output, after its `fleet-fail:` line and up to the next step,
  * names each as `@weasel-js/<name>: …` (`check:unnameable`'s report) or on a line saying it failed (the build's
  * `[build] 31/65 FAIL … @weasel-js/<name>`), and a package's directory is its name.
  */
 export const blameStep = (text, step) => {
   const lines = text.split('\n');
+  const lint = blameLint(lines, step);
+  if (lint) return lint;
   const at = lines.findIndex((l) => l.startsWith('fleet-fail:') && l.endsWith(step));
   if (at < 0) return [];
   const end = lines.findIndex((l, i) => i > at && /\bci-run:|^fleet-fail:/.test(l));

@@ -124,6 +124,10 @@ const failLinesIn = (lines, gate) => lines.filter((l) => l.startsWith(gate.failP
 /** Where a `fleet-fail:` line failed: a test's line names its project, file and test; a step's names its command. */
 const whereOf = (l) => (l.includes(' :: ') ? l.split(' :: ')[0].split(' ').at(-1) : l.replace(/^\S+ /, ''));
 
+/** The tests a gate log's `fleet-fail:` lines name in test file `file`, each as the line gives it after ` :: `. */
+export const testsFailingIn = (text, gate, file) =>
+  (gate.failPrefix ? [...new Set(failLinesIn(stripAnsi(text).split('\n'), gate).filter((l) => l.includes(' :: ') && whereOf(l) === file).map((l) => l.split(' :: ').slice(1).join(' :: ')))] : []);
+
 /** Every file or step a gate log's `fleet-fail:` lines name, once each, across its runs. */
 export const failedWhereIn = (text, gate) =>
   (gate.failPrefix ? [...new Set(failLinesIn(stripAnsi(text).split('\n'), gate).map(whereOf))] : []);
