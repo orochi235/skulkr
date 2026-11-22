@@ -136,6 +136,18 @@ export interface Stat {
   readonly label: string;
 }
 
+/** The defects every pass over the area found; a pass several areas inherited counts by this one's share, so it counts
+ *  once over them. */
+export const foundIn = (area: AuditArea): number => area.passes.reduce((n, p) => n + p.distinct * (p.share ?? 1), 0);
+
+/** The defects its passes' fixers fixed, by share as `foundIn` counts, and how many passes reported it; null where no
+ *  pass has a fix report with verdicts. */
+export function fixedIn(area: AuditArea): { readonly fixed: number; readonly reported: number } | null {
+  const reported = area.passes.filter((p) => p.fixed !== undefined);
+  if (reported.length === 0) return null;
+  return { fixed: reported.reduce((n, p) => n + p.fixed! * (p.share ?? 1), 0), reported: reported.length };
+}
+
 /** The headline numbers over every area, or over the areas as of a past round (`areasAsOf`). Settling is not known
  *  of a past round, so it is counted over `now`, every area as it stands. */
 export function statsFor(areas: readonly AuditArea[], asOf: number | null = null, now: readonly AuditArea[] = areas): Stat[] {
@@ -146,8 +158,7 @@ export function statsFor(areas: readonly AuditArea[], asOf: number | null = null
   const staleLeft = audited.reduce((n, a) => n + (a.staleLines ? lastPassOf(a)?.left ?? 0 : 0), 0);
   const leftCorrected = audited.reduce((n, a) => { const p = lastPassOf(a); return n + (p ? correctedLeftOf(p) : 0); }, 0);
   const calibrated = correctionShows(left, audited.some((a) => lastPassOf(a)?.leftCorrected !== undefined) ? leftCorrected : undefined);
-  // A pass several areas inherited counts once over them, by each one's share.
-  const found = Math.round(areas.reduce((n, a) => n + a.passes.reduce((m, p) => m + p.distinct * (p.share ?? 1), 0), 0));
+  const found = Math.round(areas.reduce((n, a) => n + foundIn(a), 0));
   const settled = now.filter((a) => a.status === 'settled').length;
   return [
     { value: `${formatCount(audited.length)} / ${formatCount(areas.length)}`, label: asOf === null ? 'areas audited at least once' : `areas audited by round ${asOf}` },

@@ -2,6 +2,10 @@
 
 Open work on skulkr. Each entry says when it closes.
 
+- [ ] (P2) The dashboard dev server's file watcher misses edits, so :5214 keeps serving the old module until
+  `emilia restart skulkr/dashboard`: three times on 2026-11-22, twice on servers restarted minutes before the edit,
+  so it can be dead from startup. Not yet traced (vite 8.3.8, `dashboard/vite.config.ts`). Closes when an edit
+  reliably reaches the served module.
 - [ ] (P2) Finish cutting weasel over to skulkr (README.md "Moving weasel over"). The `skulkr` service already runs
   weasel's rounds from `examples/weasel.config.mjs` (2026-11-21); left are moving the config and its briefs into
   weasel and deleting `scripts/skulk/`. Closes when weasel's own `skulkr.config.mjs` drives its rounds and

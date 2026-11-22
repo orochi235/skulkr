@@ -3,7 +3,7 @@ import { Badge } from '@weasel-js/ui/components/Badge';
 import { DetailList, DetailRow } from '@weasel-js/ui/components/DetailList';
 import { SidebarPanel } from '@weasel-js/ui/components/SidebarPanel';
 import type { Grade } from '@weasel-js/theme';
-import { STATUS_LABEL, correctedEstOf, correctedLeftOf, correctedText, correctionShows, lastPassOf, stageLabelOf } from './areaData';
+import { STATUS_LABEL, correctedEstOf, fixedIn, formatCount, foundIn, correctedLeftOf, correctedText, correctionShows, lastPassOf, stageLabelOf } from './areaData';
 import type { AreaStatus, AuditArea, AuditPass, AuditRun } from './skulkrMap.types';
 import s from './AreaDetail.module.css';
 
@@ -77,6 +77,7 @@ function Venn({ a, both, b }: { a: ReactNode; both: ReactNode; b: ReactNode }) {
  *  round (`areasAsOf`), only whether it had been audited by then. */
 export function AreaDetail({ area, holder, asOf = null }: { area: AuditArea | undefined; holder: AuditRun | undefined; asOf?: number | null }) {
   const last = area && lastPassOf(area);
+  const fixed = area && fixedIn(area);
   const grade = area && asOf === null ? GRADE[area.status] : undefined;
   const badge = !area ? '' : asOf !== null ? `${area.status === 'unaudited' ? 'not audited' : 'audited'} by round ${asOf}`
     : holder ? `in round ${holder.round}` : STATUS_LABEL[area.status];
@@ -89,6 +90,8 @@ export function AreaDetail({ area, holder, asOf = null }: { area: AuditArea | un
           <DetailList values="figures" columns="auto">
             <DetailRow label="source files">{area.files}</DetailRow>
             <DetailRow label="passes">{area.passes.length}</DetailRow>
+            {area.passes.length > 0 && <DetailRow label="total found">{formatCount(Math.round(foundIn(area)))}</DetailRow>}
+            {fixed && <DetailRow label={fixed.reported < area.passes.length ? `total fixed, ${fixed.reported} of ${area.passes.length} passes` : 'total fixed'}>{formatCount(Math.round(fixed.fixed))}</DetailRow>}
             {area.queue !== null && <DetailRow label="queue position">{area.queue}</DetailRow>}
             {area.stage && <DetailRow label="this run">{stageLabelOf(area.stage)}</DetailRow>}
             {last && <DetailRow label={`left after round ${last.round}`}>{last.left.toFixed(1)}{correctionShows(last.left, last.leftCorrected) && ` (${correctedText(last.leftCorrected!)} corrected)`}</DetailRow>}

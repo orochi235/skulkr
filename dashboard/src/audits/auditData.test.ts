@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changedSincePass, correctionShows, heatScaleOverRounds, defectsVersionOf, heatScaleOf, labelIn, lastPassOf, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
+import { changedSincePass, correctionShows, fixedIn, foundIn, heatScaleOverRounds, defectsVersionOf, heatScaleOf, labelIn, lastPassOf, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
 import { continuousText, headlineOf, logTailsOf, parseJob, recentJobsOf, scrolledOf, spendOf, stepText } from './runData';
 import { stageCountsOf } from './phases';
 import { inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
@@ -391,5 +391,22 @@ describe('heatScaleOverRounds', () => {
     const areas = [area('a', 1, [40, 30]), area('b', 2, [35]), area('c', 1, [])];
     expect(heatScaleOf(areas).top).toBeLessThan(10);
     expect(heatScaleOverRounds(areas).top).toBeGreaterThan(30);
+  });
+});
+
+describe('foundIn and fixedIn', () => {
+  const pass = (round: number, distinct: number, more: { fixed?: number; share?: number } = {}) =>
+    ({ round, date: '', a: 0, b: 0, shared: 0, distinct, est: 0, left: 0, ...more });
+  const area = (passes: ReturnType<typeof pass>[]) =>
+    ({ id: 'a', group: 'g', files: 1, status: 'due' as const, queue: null, stage: null, passes });
+
+  it('sums every pass, an inherited pass by its share', () => {
+    expect(foundIn(area([pass(1, 6), pass(2, 4, { share: 0.5 })]))).toBe(8);
+    expect(foundIn(area([]))).toBe(0);
+  });
+
+  it('sums the fixes passes reported, and says how many reported', () => {
+    expect(fixedIn(area([pass(1, 6), pass(2, 4, { fixed: 4, share: 0.5 }), pass(3, 3, { fixed: 3 })]))).toEqual({ fixed: 5, reported: 2 });
+    expect(fixedIn(area([pass(1, 6)]))).toBeNull();
   });
 });
