@@ -15,6 +15,7 @@ import { correctedLeftOf } from './calibration.mjs';
 import { COVERED, areaLocksFor, areaStats, calibrationFor, chapman, drawnPassOf, incompleteByRound, lastByRoundIn, lastDrawnPassIn, passOf, passesIn, pickAreas } from './rounds.mjs';
 import { openFindingsIn } from './carryRecords.mjs';
 import { recutsIn } from './recuts.mjs';
+import { leftOutIn, retryable } from './leftOut.mjs';
 import { abandonedRounds, nightsByRound, recordsFor } from './recordFiles.mjs';
 import { continuousOf } from './continuousOf.mjs';
 import { readJson } from './json.mjs';
@@ -244,6 +245,7 @@ export const buildMap = (cfg, root, runner) => {
     ...(Object.keys(icons.glyphs).length ? { icons: icons.glyphs } : {}),
     rounds: [...rounds.values()].sort((x, y) => x.round - y.round).map((r) => ({ ...r, est: Math.round(r.est) })),
     recuts: recutsIn(cfg, git, root, areas),
+    leftOut: retryable(git, leftOutIn(cfg.state), cfg.git.main).map((e) => ({ area: cfg.names.idOf(e.branch), round: e.round, why: e.why })),
     calibration,
   };
 };

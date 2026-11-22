@@ -12,7 +12,7 @@ import { STEP_COLUMN_COUNT, laneStepsOf } from './stepsLane';
 import { gateRunsOf, inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
 import { NODE_SEP, headlineOf, lastLineOf, spendOf, startedText } from './runData';
 import { useDashPref } from './dashPrefs';
-import type { AuditLane, AuditRun } from './skulkrMap.types';
+import type { AuditLane, AuditLeftOut, AuditRun } from './skulkrMap.types';
 import s from './LiveRuns.module.css';
 
 const cx = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(' ');
@@ -187,7 +187,8 @@ function RunStrip({ run, now, mode, hideComplete, on, passes }: {
         <div className={s.spend}>{spendOf(run)}</div>
       </div>
       {run.lanes.length > 0 && <StageCounts run={run} />}
-      <LeftOut run={run} on={on} />
+      {/* Only its own round's: a branch an earlier round left out, retried here, is listed once, below every run. */}
+      <LeftOut entries={(run.leftOut ?? []).filter((e) => e.round === run.round)} label="left out" name={`Round ${run.round}, left out of the batch`} on={on} />
       {run.lanes.length > 0 && (
         <div className={s.lanes} data-mode={mode}>
           <Lanes run={run} now={now} mode={mode} hideComplete={hideComplete} on={on} passes={passes} />
@@ -219,8 +220,10 @@ function RunStrip({ run, now, mode, hideComplete, on, passes }: {
  *  in the rounds chart and the map. */
 const NO_PASSES: ReadonlyMap<string, number> = new Map();
 
-export function LiveRuns({ runs, unmerged, now, on, view, focus = null, passes = NO_PASSES }: {
+export function LiveRuns({ runs, unmerged, now, on, view, focus = null, passes = NO_PASSES, leftOut = [] }: {
   runs: readonly AuditRun[]; unmerged: ReadonlySet<number>; now: number; on: AreaHandlers;
+  /** Branches earlier batches left out that later ones still try (the map's `leftOut`). */
+  leftOut?: readonly AuditLeftOut[];
   /** How many passes each area has had, by id, for the dots on its lane as on its map cell. */
   passes?: ReadonlyMap<string, number>;
   /** How every round's lanes are drawn; the page holds it, and its controls, so one setting covers them all. */
@@ -234,10 +237,13 @@ export function LiveRuns({ runs, unmerged, now, on, view, focus = null, passes =
     root.current?.querySelector(`[data-lane="${CSS.escape(focus)}"]`)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   }, [focus]);
   const live = runs.filter((r) => r.running || unmerged.has(r.round));
-  if (live.length === 0) return <section className={cx(s.run, s.idle)}><div className={s.what}>No round running</div></section>;
+  const shown = new Set(live.map((r) => r.round));
+  const earlier = <LeftOut entries={leftOut.filter((e) => !shown.has(e.round))} label="still left out" name="Left out of earlier batches, still retried" on={on} />;
+  if (live.length === 0) return <section className={cx(s.run, s.idle)}><div className={s.what}>No round running</div>{earlier}</section>;
   return (
     <div ref={root} className={s.runs} aria-live="polite">
       {live.map((run) => <RunStrip key={run.round} run={run} now={now} mode={view.mode} hideComplete={view.hideComplete} on={on} passes={passes} />)}
+      {earlier}
     </div>
   );
 }

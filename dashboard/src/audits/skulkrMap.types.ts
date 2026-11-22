@@ -223,6 +223,9 @@ export interface SkulkrMap {
   /** Each recorded round whose partition added areas: those it added and those it took their files from, named as the
    *  partition now holds their files. Absent from maps built before 2026-11-22. */
   readonly recuts?: readonly AuditRecut[];
+  /** Every branch a batch left out that later batches still try, as `left-out.json` keeps them. Absent from maps built
+   *  before 2026-11-22. */
+  readonly leftOut?: readonly AuditLeftOut[];
   readonly calibration?: AuditCalibration;
 }
 

@@ -1,17 +1,17 @@
 import type { AreaHandlers } from './LiveRuns';
-import type { AuditRun } from './skulkrMap.types';
+import type { AuditLeftOut } from './skulkrMap.types';
 import s from './LeftOut.module.css';
 
-/** Every branch the run's batch left out, as the map lists them: its area, the round whose branch it is, and why. */
-export function LeftOut({ run, on }: { run: AuditRun; on: AreaHandlers }) {
-  if (!run.leftOut?.length) return null;
+/** Branches a batch left out: each one's area, the round whose branch it is, and why. */
+export function LeftOut({ entries, label, name, on }: { entries: readonly AuditLeftOut[]; label: string; name: string; on: AreaHandlers }) {
+  if (!entries.length) return null;
   return (
-    <table className={s.table} aria-label={`Round ${run.round}, left out of the batch`}>
+    <table className={s.table} aria-label={name}>
       <thead>
-        <tr><th className={s.l}>left out</th><th>round</th><th className={s.l}>why</th></tr>
+        <tr><th className={s.l}>{label}</th><th>round</th><th className={s.l}>why</th></tr>
       </thead>
       <tbody>
-        {run.leftOut.map((e) => (
+        {entries.map((e) => (
           <tr key={`${e.round}\n${e.area}`}>
             <td className={s.l}>
               <button
