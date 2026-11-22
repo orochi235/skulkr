@@ -7,6 +7,16 @@ import { framePadOf, iconBoxIn } from './mapLayout';
 /** The most pass dots an area wears on its map cell: one per pass, up to this many. */
 export const MAX_PASS_DOTS = 4;
 
+/** The room one pip (a pass dot, the open circle, the padlock) takes along a cell's top edge, and between rows. */
+const PIP = 6;
+
+/** How many pips a row holds in a cell `width` wide; pips past that wrap to a row below. */
+export const pipsPerRowIn = (width: number): number => Math.max(1, Math.floor((width - 4) / PIP));
+
+/** The pips a cell wears, right to left: the open circle while a pass is under way, the pass dots, then the padlock. */
+export const pipCountOf = (dots: number, pending: boolean, locked: boolean): number =>
+  (pending ? 1 : 0) + Math.min(dots, MAX_PASS_DOTS - (pending ? 1 : 0)) + (locked ? 1 : 0);
+
 export interface AuditCellData {
   readonly kind: 'audit-cell';
   readonly fill: PosedPaint;
@@ -120,20 +130,22 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
     const check = pathFromD(`M ${x} ${y + 4} L ${x + 3} ${y + 7} L ${x + 9} ${y}`);
     out.push({ kind: 'path', path: check, stroke: { paint: { color: d.ink, opacity: 0.8 }, width: 1.6 } });
   }
-  const at = (i: number) => p.x + p.width - 5 - i * 6;
-  if (d.locked && p.width >= 20 && p.height >= 12) {
-    const ring = d.pending ? 1 : 0;
-    const x = at(Math.min(d.dots, MAX_PASS_DOTS - ring) + ring) - 1, y = p.y + 1;
-    out.push({ kind: 'path', path: pathFromD(`M ${x - 2.5} ${y + 4} h 5 v 4 h -5 Z`), fill: { paint: { color: d.ink, opacity: 0.85 } } });
-    out.push({ kind: 'path', path: pathFromD(`M ${x - 1.5} ${y + 4} V ${y + 2.5} A 1.5 1.5 0 0 1 ${x + 1.5} ${y + 2.5} V ${y + 4}`), stroke: { paint: { color: d.ink, opacity: 0.85 }, width: 1 } });
-  }
-  if ((d.dots > 0 || d.pending) && p.width >= 14 && p.height >= 10) {
-    // Read left to right, oldest first: the open circle, when there is one, takes the rightmost place.
-    const ring = d.pending ? 1 : 0;
-    const filled = Math.min(d.dots, MAX_PASS_DOTS - ring);
-    if (ring) out.push({ kind: 'path', path: circlePath(at(0), p.y + 5, 1.6, 12), stroke: { paint: { color: d.ink, opacity: 0.85 }, width: 1 } });
-    for (let i = 0; i < filled; i++) {
-      out.push({ kind: 'path', path: circlePath(at(i + ring), p.y + 5, 2, 12), fill: { paint: { color: d.ink, opacity: 0.85 } } });
+  // Read left to right, oldest first: the open circle, when there is one, takes the rightmost place, and the padlock
+  // follows the dots. A row holds what the cell's width does; the rest wrap below, as long as the cell is tall enough.
+  const ring = d.pending ? 1 : 0;
+  const dotCount = Math.min(d.dots, MAX_PASS_DOTS - ring);
+  const pips = pipCountOf(d.dots, d.pending ?? false, d.locked ?? false);
+  const perRow = pipsPerRowIn(p.width);
+  const rows = Math.ceil(pips / perRow);
+  if (pips > 0 && p.width >= 10 && p.height >= 4 + rows * PIP) {
+    const at = (i: number) => ({ x: p.x + p.width - 5 - (i % perRow) * PIP, y: p.y + 5 + Math.floor(i / perRow) * PIP });
+    const ink = { color: d.ink, opacity: 0.85 };
+    if (ring) { const c = at(0); out.push({ kind: 'path', path: circlePath(c.x, c.y, 1.6, 12), stroke: { paint: ink, width: 1 } }); }
+    for (let i = 0; i < dotCount; i++) { const c = at(i + ring); out.push({ kind: 'path', path: circlePath(c.x, c.y, 2, 12), fill: { paint: ink } }); }
+    if (d.locked) {
+      const { x, y } = at(ring + dotCount);
+      out.push({ kind: 'path', path: pathFromD(`M ${x - 2.5} ${y - 0.5} h 5 v 3.5 h -5 Z`), fill: { paint: ink } });
+      out.push({ kind: 'path', path: pathFromD(`M ${x - 1.5} ${y - 0.5} V ${y - 1.5} A 1.5 1.5 0 0 1 ${x + 1.5} ${y - 1.5} V ${y - 0.5}`), stroke: { paint: ink, width: 1 } });
     }
   }
   const texts: DrawCommand[] = [];

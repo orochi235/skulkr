@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { asNodeId } from '@weasel-js/core';
 import { auditNodeSpecs, createAuditScene, frameIdOf, syncAuditScene, type AuditPalette } from './auditScene';
-import { AUDIT_PAINTER, type AuditCellData } from './auditPainter';
+import { AUDIT_PAINTER, pipCountOf, pipsPerRowIn, type AuditCellData } from './auditPainter';
 import { ICON, layoutMap } from './mapLayout';
 import { phasesOf } from './phases';
 import { rampAt } from './heat';
@@ -139,5 +139,15 @@ describe('area icons', () => {
     const scene = createAuditScene();
     syncAuditScene(scene, auditNodeSpecs(areas, layoutMap(areas, 900, 400), PALETTE, new Map(), null, Infinity, new Map(), GLYPHS));
     expect(paintOf(cellOf(scene, 'geom'), { x: 0, y: 0, width: ICON.size + 2 * ICON.margin - 1, height: 200 }).some(isIcon)).toBe(false);
+  });
+});
+
+describe('pips', () => {
+  it('wrap to a row below once a row holds what the cell is wide enough for', () => {
+    expect(pipsPerRowIn(40)).toBe(6);
+    expect(pipsPerRowIn(16)).toBe(2);
+    expect(pipsPerRowIn(6)).toBe(1);
+    expect(pipCountOf(4, false, true)).toBe(5);
+    expect(pipCountOf(9, true, false)).toBe(4);
   });
 });
