@@ -4,18 +4,15 @@ import { circlePath, pathFromD, type Path } from '@weasel-js/geom';
 import { glyphCommands, type GlyphPath } from './glyph';
 import { framePadOf, iconBoxIn } from './mapLayout';
 
-/** The most pass dots an area wears on its map cell: one per pass, up to this many. */
-export const MAX_PASS_DOTS = 4;
-
 /** The room one pip (a pass dot, the open circle, the padlock) takes along a cell's top edge, and between rows. */
 const PIP = 6;
 
 /** How many pips a row holds in a cell `width` wide; pips past that wrap to a row below. */
 export const pipsPerRowIn = (width: number): number => Math.max(1, Math.floor((width - 4) / PIP));
 
-/** The pips a cell wears, right to left: the open circle while a pass is under way, the pass dots, then the padlock. */
+/** The pips a cell wears, right to left: the open circle while a pass is under way, a dot per pass, then the padlock. */
 export const pipCountOf = (dots: number, pending: boolean, locked: boolean): number =>
-  (pending ? 1 : 0) + Math.min(dots, MAX_PASS_DOTS - (pending ? 1 : 0)) + (locked ? 1 : 0);
+  (pending ? 1 : 0) + dots + (locked ? 1 : 0);
 
 export interface AuditCellData {
   readonly kind: 'audit-cell';
@@ -38,7 +35,7 @@ export interface AuditCellData {
   readonly worn?: boolean;
   /** A check in its corner: no audit is due. */
   readonly settled?: boolean;
-  /** One per pass, up to four. */
+  /** One per pass. */
   readonly dots: number;
   /** A live run's pass over the area is under way: an open circle after the dots until its own dot replaces it. */
   readonly pending?: boolean;
@@ -144,7 +141,7 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
   // Read left to right, oldest first: the open circle, when there is one, takes the rightmost place, and the padlock
   // follows the dots. A row holds what the cell's width does; the rest wrap below, as long as the cell is tall enough.
   const ring = d.pending ? 1 : 0;
-  const dotCount = Math.min(d.dots, MAX_PASS_DOTS - ring);
+  const dotCount = d.dots;
   const pips = pipCountOf(d.dots, d.pending ?? false, d.locked ?? false);
   const perRow = pipsPerRowIn(p.width);
   const rows = Math.ceil(pips / perRow);
