@@ -5,13 +5,16 @@ import '@weasel-js/ui/style.css';
 import './app.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { WeaselProvider } from '@weasel-js/core';
+import { WeaselProvider, warmPrograms } from '@weasel-js/core';
 import { IconRegistryProvider } from '@weasel-js/icons/react';
 import { defineTheme } from '@weasel-js/theme';
 import { ThemeProvider } from '@weasel-js/theme/react';
 import { AuditsPage } from '@dash/audits/AuditsPage';
 import { ColorModeProvider } from '@dash/colorMode';
 import { ICONS } from '@dash/icons';
+
+// Before React renders and the snapshot loads, so the map's shaders compile meanwhile.
+warmPrograms();
 
 const theme = defineTheme({ name: 'skulkr-dashboard' });
 
