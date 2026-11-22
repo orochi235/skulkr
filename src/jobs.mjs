@@ -20,18 +20,18 @@ export const CHECKS_IN = `${JOB_IN}/checks.json`;
 export const STARTED = 'started';
 
 /** The agent the config names for `role`, run on `promptFile` after writing {@link STARTED}. */
-const agentLine = (cfg, role, promptFile, budgetUsd, progress) =>
-  `date -u +%FT%TZ > ${JOB_OUT}/${STARTED} && ${agentFor(cfg, role).line(cfg, role, { promptFile, budgetUsd, progress })}`;
+const agentLine = (cfg, role, promptFile, budgetUsd, progress, stdin = false) =>
+  `date -u +%FT%TZ > ${JOB_OUT}/${STARTED} && ${agentFor(cfg, role).line(cfg, role, { promptFile, budgetUsd, progress, stdin })}`;
 
 const fresh = `rm -rf ${JOB_OUT} && mkdir -p ${JOB_OUT}`;
 const prelude = (cfg) => (cfg.setup.prelude ? [cfg.setup.prelude] : []);
 
 /** A reviewer, counted through the files listed in `.skulkr/in/<area>/files.txt`. */
-export const reviewShell = (cfg, area, budgetUsd) =>
-  [...prelude(cfg), fresh, agentLine(cfg, 'review', `${JOB_IN}/${area}/review.md`, budgetUsd, q(`${JOB_IN}/${area}/files.txt`))].join(' && ');
+export const reviewShell = (cfg, area, budgetUsd, prompt = 'review.md', stdin = false) =>
+  [...prelude(cfg), fresh, agentLine(cfg, 'review', `${JOB_IN}/${area}/${prompt}`, budgetUsd, q(`${JOB_IN}/${area}/files.txt`), stdin)].join(' && ');
 
-export const matchShell = (cfg, area, budgetUsd) =>
-  [fresh, agentLine(cfg, 'match', `${JOB_IN}/${area}/match.md`, budgetUsd)].join(' && ');
+export const matchShell = (cfg, area, budgetUsd, prompt = 'match.md') =>
+  [fresh, agentLine(cfg, 'match', `${JOB_IN}/${area}/${prompt}`, budgetUsd)].join(' && ');
 
 /**
  * Files a job writes under its output when it stops before the model runs, each holding why: the synced tree is not

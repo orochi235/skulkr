@@ -84,7 +84,8 @@ const runContext = ({ cfg, runner, root, p, args, status, frozen, say, setStep }
       const v = git('config', `user.${k.toLowerCase()}`);
       return [[`GIT_AUTHOR_${k}`, v], [`GIT_COMMITTER_${k}`, v]];
     })),
-    total: args.fixOnly ? { review: 0, match: 0, fix: p.picked.length } : { review: p.picked.length * 2, match: p.picked.length, fix: p.picked.length },
+    trial: args.trial,
+    total: args.fixOnly ? { review: 0, match: 0, fix: p.picked.length } : { review: p.picked.length * (args.trial ? 4 : 2), match: p.picked.length * (args.trial ? 2 : 1), fix: p.picked.length },
     stopped: () => stopRequested(p.round, cfg.state),
     /** What area `id`'s jobs have cost so far, a reused job's included as its area's mean counts it. */
     spentOn: (id) => spent.get(id) ?? 0,
@@ -151,6 +152,7 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
   const args = { ...parseArgs(cfg, argv), places: Boolean(runner.places) };
   if (args.sweep && !cfg.sweep) throw new Error('--sweep: the config names no sweep');
   if (args.sweep && args.fixOnly) throw new Error('--sweep and --fix-only: a fix-only round runs no checks to fix');
+  if (args.trial !== undefined && args.trial !== 'preload') throw new Error(`--trial: the one trial is preload, not ${args.trial}`);
   if (!args.dry && !args.places && !args.nodes?.length && !cfg.nodes.list.length && !cfg.nodes.local) {
     throw new Error(`the config names no nodes for the ${typeof cfg.runner === 'string' ? cfg.runner : 'configured'} runner; set nodes.list or pass --nodes`);
   }

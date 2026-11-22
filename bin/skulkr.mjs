@@ -9,6 +9,7 @@
  *   skulkr partition [--ref R]  rewrites the partition file
  *   skulkr map [--out FILE]     the dashboard's JSON
  *   skulkr defects <area>       one area's defects, every round's, as JSON
+ *   skulkr trial                the preload trials' digest (`night --trial preload` runs one)
  *   skulkr service              the long-running service (requests on stdin): the config's project, or with
  *                              none named, every registered tenant
  *   skulkr config               the resolved config, as JSON
@@ -26,9 +27,10 @@ import { runNight } from '../src/night.mjs';
 import { partitionCommand } from '../src/partition.mjs';
 import { loadRunner } from '../src/runner/index.mjs';
 import { serve } from '../src/service.mjs';
+import { trialCommand } from '../src/trial.mjs';
 import { addTenant, readTenants, removeTenant, requireTenant, tenantsPath } from '../src/tenants.mjs';
 
-const USAGE = 'usage: skulkr <init|night|partition|map|defects|service|config|tenants|menu> [--config <file> | --tenant <name>] [--root <dir>] …';
+const USAGE = 'usage: skulkr <init|night|partition|map|defects|trial|service|config|tenants|menu> [--config <file> | --tenant <name>] [--root <dir>] …';
 
 /** `argv` less `--config`, `--tenant` and `--root` and their values, and those values. */
 const takeOptions = (argv) => {
@@ -121,6 +123,9 @@ const main = async () => {
       return 0;
     case 'defects':
       process.stdout.write(`${JSON.stringify(defectsFor(cfg, root(), rest[0] ?? ''))}\n`);
+      return 0;
+    case 'trial':
+      trialCommand(cfg);
       return 0;
     case 'service':
       await serve(cfg);

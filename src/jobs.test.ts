@@ -23,6 +23,14 @@ describe('job command lines', () => {
     expect(match).not.toContain('--effort');
   });
 
+  it("give a trial's preloaded prompt on stdin, too large for one argument", () => {
+    const cfg = weaselConfig();
+    const line = claudeOf(reviewShell(cfg, 'core', 8, 'review-preload.md', true));
+    expect(line).toContain("claude -p < '.skulkr/in/core/review-preload.md'");
+    expect(line).not.toContain('$(cat');
+    expect(claudeOf(reviewShell(cfg, 'core', 8))).toContain('claude -p "$(cat');
+  });
+
   it('ask for a five-minute cache for every role, and none where the config unsets it', () => {
     const cfg = resolveConfig({});
     expect(claudeOf(reviewShell(cfg, 'core', 8))).toContain('CLAUDE_CODE_PROMPT_CACHE_TTL=5m');

@@ -20,12 +20,33 @@ import { totals } from './usage.mjs';
 import { verifyOf } from './verify.mjs';
 
 const round1 = (n) => Number(n.toFixed(1));
+
+/** How long a pair's second reviewer waits after its first in a trial, so it reads the first's cached prompt. */
+const TRIAL_STAGGER_MS = 30_000;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Every one of `files` at the frozen tree `frozen`, each under its path, for a preload trial's prompt. */
+const preloadedFiles = (frozen, files) => [
+  "## The listed files' contents",
+  '',
+  'Every listed file follows as it stands at the frozen commit, so you need not open them to read them.',
+  ...files.map((f) => `\n### \`${f}\`\n\n\`\`\`\n${readIf(join(frozen, f))}\n\`\`\``),
+].join('\n');
+
+/** A preload trial's two pairs for one area, each side's counts and usage, at `<nightDir>/trial/<area>.json`. */
+const writeTrial = (ctx, area, arms) => {
+  const side = (r) => ({ findings: r.findings.length, read: r.read, minutes: round1(r.minutes ?? 0), node: r.node, usage: r.usage });
+  const arm = ([x, y, m]) => ({ A: side(x), B: side(y), m: m.pairs.length, match: m.usage });
+  const dir = join(ctx.nightDir, 'trial');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${area.id}.json`), `${JSON.stringify({ round: ctx.round, area: area.id, files: area.files.length, base: arm(arms.base), preload: arm(arms.preload) }, null, 1)}\n`);
+};
 const cents = (n) => Number(n.toFixed(2));
 
-const review = async (ctx, area, side) => {
+const review = async (ctx, area, side, { prompt = 'review.md', stdin = false } = {}) => {
   const to = jobDir(ctx.nightDir, area.id, side);
   const run = await dispatch(ctx, area, `review-${side}`, {
-    kind: 'review', expect: agentFor(ctx.cfg, 'review').reviewExpect(ctx.cfg), shell: reviewShell(ctx.cfg, area.id, ctx.budget.review), to,
+    kind: 'review', expect: agentFor(ctx.cfg, 'review').reviewExpect(ctx.cfg), shell: reviewShell(ctx.cfg, area.id, ctx.budget.review, prompt, stdin), to,
     task: ctx.cfg.names.task(ctx.round, area.id, side), logPath: join(to, '..', `${side}.log`),
     about: `Blind reviewer ${side} for audit round ${ctx.round}, area ${area.id}: reads its files and lists defects without fixing.`,
   });
@@ -37,13 +58,14 @@ const review = async (ctx, area, side) => {
   return { text, findings, read, ...run };
 };
 
-const match = async (ctx, area, a, b) => {
+const match = async (ctx, area, a, b, tag = '') => {
   if (!a.launched || !b.launched || a.findings.length === 0 || b.findings.length === 0) return { pairs: [], minutes: 0 };
-  writeFileSync(join(ctx.frozen, JOB_IN, area.id, 'match.md'), matchPrompt(fill(brief(ctx.cfg, 'matcher'), projectVars(ctx.cfg, 'matcher')), a.findings, b.findings));
-  const to = jobDir(ctx.nightDir, area.id, 'match');
-  const run = await dispatch(ctx, area, 'match', {
-    kind: 'review', expect: 'none', shell: matchShell(ctx.cfg, area.id, ctx.budget.match), to,
-    task: ctx.cfg.names.task(ctx.round, area.id, 'match'), logPath: join(to, '..', 'match.log'),
+  const step = `match${tag}`;
+  writeFileSync(join(ctx.frozen, JOB_IN, area.id, `${step}.md`), matchPrompt(fill(brief(ctx.cfg, 'matcher'), projectVars(ctx.cfg, 'matcher')), a.findings, b.findings));
+  const to = jobDir(ctx.nightDir, area.id, step);
+  const run = await dispatch(ctx, area, step, {
+    kind: 'review', expect: 'none', shell: matchShell(ctx.cfg, area.id, ctx.budget.match, `${step}.md`), to,
+    task: ctx.cfg.names.task(ctx.round, area.id, step), logPath: join(to, '..', `${step}.log`),
     about: `Pairs the two blind reviewers' findings for audit round ${ctx.round}, area ${area.id}.`,
   });
   let pairs = [];
@@ -52,7 +74,7 @@ const match = async (ctx, area, a, b) => {
   } catch (error) {
     ctx.say(`match ${area.id}: unreadable reply (${error.message}); counting no shared findings`);
   }
-  ctx.progress('match', `${area.id}: ${pairs.length} shared of ${a.findings.length} + ${b.findings.length}`, ctx.total.match);
+  ctx.progress('match', `${area.id}${tag}: ${pairs.length} shared of ${a.findings.length} + ${b.findings.length}`, ctx.total.match);
   return { pairs, ...run };
 };
 
@@ -143,13 +165,30 @@ export const runArea = async (ctx, area, { previous, changedSince, carried = [] 
   const vars = { ...projectVars(ctx.cfg, 'reviewer'), round: ctx.round, area: area.id, commit: ctx.commit, out: `${JOB_OUT}/findings.md`, files: reviewFileList(ctx.frozen, area.files, recentlyChanged(ctx.frozen, area.files)) };
   writeFileSync(join(inDir, 'review.md'), fill(brief(ctx.cfg, 'reviewer'), vars));
   writeFileSync(join(inDir, 'files.txt'), `${area.files.join('\n')}\n`);
-  const [a, b] = await Promise.all([review(ctx, area, 'A'), review(ctx, area, 'B')]);
+  // A preload trial runs a second pair beside the first, its prompt carrying the files, recorded only for comparison.
+  const trial = ctx.trial === 'preload';
+  if (trial) writeFileSync(join(inDir, 'review-preload.md'), `${fill(brief(ctx.cfg, 'reviewer'), vars)}\n\n${preloadedFiles(ctx.frozen, area.files)}`);
+  const later = (run) => (trial ? sleep(TRIAL_STAGGER_MS).then(run) : run());
+  const preload = { prompt: 'review-preload.md', stdin: true };
+  const [a, b, pa, pb] = await Promise.all([
+    review(ctx, area, 'A'), later(() => review(ctx, area, 'B')),
+    ...(trial ? [review(ctx, area, 'PA', preload), later(() => review(ctx, area, 'PB', preload))] : []),
+  ]);
+  if (trial) {
+    const [base, pm] = await Promise.all([match(ctx, area, a, b), match(ctx, area, pa, pb, '-P')]);
+    writeTrial(ctx, area, { base: [a, b, base], preload: [pa, pb, pm] });
+    return finishArea(ctx, area, { previous, changedSince, carried, a, b, matched: base });
+  }
   const dir = makeRecordDir(ctx, area);
   for (const [name, text] of [['A.md', a.text], ['B.md', b.text]]) {
     writeFileSync(join(dir, name), text);
     writeFileSync(join(inDir, name), text);
   }
-  const matched = await match(ctx, area, a, b);
+  return finishArea(ctx, area, { previous, changedSince, carried, a, b, matched: await match(ctx, area, a, b) });
+};
+
+/** The rest of an area once its pair has reviewed and matched: its record, the fix, and its summary. */
+const finishArea = async (ctx, area, { previous, changedSince, carried, a, b, matched }) => {
   const claims = (fs) => fs.map((f) => f.claim);
   writeFileSync(join(dir, 'match.json'), `${JSON.stringify({ pairs: matched.pairs, a: claims(a.findings), b: claims(b.findings) }, null, 1)}\n`);
   const [na, nb, m] = [a.findings.length, b.findings.length, matched.pairs.length];

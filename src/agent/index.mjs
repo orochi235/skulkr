@@ -3,7 +3,8 @@
  * by role). An agent answers:
  *
  * - `name`, and `resultFile`, what its job leaves under `.skulkr/out` for skulkr to read its reply and usage from;
- * - `line(cfg, role, { promptFile, budgetUsd, progress })`: the shell that runs it on `promptFile` as `role`
+ * - `line(cfg, role, { promptFile, budgetUsd, progress, stdin })`: the shell that runs it on `promptFile` as `role`,
+ *   `stdin` asking for the prompt on stdin rather than as an argument where the agent can
  *   (`review`, `match` or `fix`) within `budgetUsd`, writes `resultFile`, and writes its exit status to `exit`;
  *   `progress`, when given, is the progress filter's arguments, and the line streams through `progress.at`;
  * - `progress`: `{ source(), at }`, the filter's local path and where a job's tree holds it;

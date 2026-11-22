@@ -24,6 +24,7 @@ export const parseArgs = (cfg, argv) => {
     merge: !argv.includes('--no-merge'),
     sweep: argv.includes('--sweep'),
     anyway: argv.includes('--anyway'),
+    trial: value('--trial'),
     capUsd: number('--cap-usd', cfg.budget.capUsd),
     budget: {
       review: number('--budget-review', cfg.budget.review),

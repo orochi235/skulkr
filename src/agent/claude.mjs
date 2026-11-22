@@ -27,7 +27,7 @@ const roleFlags = (c, role) => {
  * comes home. With `progress` (the progress filter's arguments before the result path), it streams through the
  * filter, which prints onto progress lines and writes the same result envelope.
  */
-const line = (cfg, role, { promptFile, budgetUsd, progress }) => {
+const line = (cfg, role, { promptFile, budgetUsd, progress, stdin = false }) => {
   const c = cfg.claude;
   return [
     ...(c.configDir ? [`CLAUDE_CONFIG_DIR=${c.configDir}`] : []),
@@ -35,7 +35,8 @@ const line = (cfg, role, { promptFile, budgetUsd, progress }) => {
     // A reviewer's write rule is relative to the working directory, which a `cd` would otherwise move.
     ...(role === 'review' ? ['CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1'] : []),
     `perl -e 'alarm shift; exec @ARGV' ${c.timeoutMin * 60}`,
-    'claude -p "$(cat', `${q(promptFile)})"`,
+    // A prompt too large for one argument (a trial's preloaded files) goes in on stdin.
+    ...(stdin ? ['claude -p', `< ${q(promptFile)}`] : ['claude -p "$(cat', `${q(promptFile)})"`]),
     `--output-format ${progress ? 'stream-json --verbose' : 'json'} --strict-mcp-config`,
     ...(c.settingSources ? [`--setting-sources ${c.settingSources}`] : []),
     `--max-budget-usd ${budgetUsd}`, ...roleFlags(c, role),

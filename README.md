@@ -158,6 +158,7 @@ file is regenerated, and the ledger, when the config names one, gets a row.
 | `--nodes a,b` | | only these nodes |
 | `--dry` | | print the plan and stop |
 | `--no-merge` | | leave `main` alone even when the batch is green |
+| `--trial preload` | | beside each area's pair, run a second pair whose prompt carries the area's files, recorded only at `<night>/trial/<area>.json` for `skulkr trial` to compare: cost per review and overlap. The first pair alone feeds the fix and the record; each pair's B starts 30 seconds after its A |
 | `--anyway` | | start even though stranded rounds hold new ones back (see "Stranded rounds") |
 | `--sweep` | | run the configured sweep too |
 | `--fix-only [a,b]` | | a fix-only round for these areas, or every area with open findings; see "Carried findings" |
