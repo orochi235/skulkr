@@ -290,12 +290,24 @@ export const settlingOf = (passes) => {
  * (`branchOf`, the config's `names.branchOf`). Their passes are recorded only on that round's batch branch, so
  * `readPasses` cannot see them.
  */
-export const areasInFlight = (unmergedBranches, branchOf) =>
-  new Set(unmergedBranches.flatMap((b) => branchOf(b)?.id ?? []));
+export const areasInFlight = (unmergedBranches, branchOf) => new Set(areaLocksIn(unmergedBranches, branchOf).keys());
+
+/** The round holding each area `areasInFlight` names: the latest whose branch holds it. */
+export const areaLocksIn = (unmergedBranches, branchOf) => {
+  const out = new Map();
+  for (const b of unmergedBranches) {
+    const at = branchOf(b);
+    if (at && !(out.get(at.id) >= at.round)) out.set(at.id, at.round);
+  }
+  return out;
+};
+
+/** `areaLocksIn` over the branches `cfg`'s `main` has not merged, asked of `git`. */
+export const areaLocksFor = (cfg, git) =>
+  areaLocksIn(git('for-each-ref', `--no-merged=${cfg.git.main}`, '--format=%(refname:short)', 'refs/heads').split('\n'), cfg.names.branchOf);
 
 /** `areasInFlight` over the branches `cfg`'s `main` has not merged, asked of `git`: the one answer night and the map use. */
-export const areasInFlightFor = (cfg, git) =>
-  areasInFlight(git('for-each-ref', `--no-merged=${cfg.git.main}`, '--format=%(refname:short)', 'refs/heads').split('\n'), cfg.names.branchOf);
+export const areasInFlightFor = (cfg, git) => new Set(areaLocksFor(cfg, git).keys());
 
 /**
  * Where a due area ranks: what its last pass left, corrected (`correctedLeftOf`), in whole defects, and at least 1

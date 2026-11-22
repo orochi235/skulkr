@@ -367,6 +367,10 @@ stranded one, so each merges worse. While more rounds are stranded than `maxUnme
 `skulkr night` refuses to start one and names them (`--anyway` starts it regardless; `--dry` and `--resume` are not
 held), and continuous mode waits, its `next` saying why. Land, delete, or abandon the batch to let rounds start again.
 
+An area an earlier round's unmerged `audit<N>-<area>` branch holds stays out of the queue until that branch lands or is
+deleted. The map gives it `locked`, that round, unless a live run holds it, and the dashboard draws a padlock beside its
+pass dots.
+
 ## Continuous rounds
 
 A round's model work (reviews, matches, fixes) is cheap on fleet CPU and bound by spend; its gate is one suite-sized

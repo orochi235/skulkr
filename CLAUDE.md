@@ -67,6 +67,7 @@ weasel cutover.
   - the map's `recuts`, each recorded round's added and split areas, for the dashboard (2026-11-22).
   - a `held:` line in the dry plan, and a refused start, while an earlier round's batch is unmerged (README "Stranded
     rounds", 2026-11-22).
+  - the map's area `locked`, the round whose unmerged branch holds it, for the dashboard (2026-11-22).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

@@ -32,6 +32,8 @@ export interface AuditCellData {
   readonly dots: number;
   /** A live run's pass over the area is under way: an open circle after the dots until its own dot replaces it. */
   readonly pending?: boolean;
+  /** An earlier round's unmerged branch holds it: a padlock left of the dots. */
+  readonly locked?: boolean;
   /** A glow's color while something naming the area elsewhere on the page is hovered. */
   readonly glow?: string;
   /** The outline flashed on an area a round's recut made or split, fading as the page sets its opacity. */
@@ -118,11 +120,17 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
     const check = pathFromD(`M ${x} ${y + 4} L ${x + 3} ${y + 7} L ${x + 9} ${y}`);
     out.push({ kind: 'path', path: check, stroke: { paint: { color: d.ink, opacity: 0.8 }, width: 1.6 } });
   }
+  const at = (i: number) => p.x + p.width - 5 - i * 6;
+  if (d.locked && p.width >= 20 && p.height >= 12) {
+    const ring = d.pending ? 1 : 0;
+    const x = at(Math.min(d.dots, MAX_PASS_DOTS - ring) + ring) - 1, y = p.y + 1;
+    out.push({ kind: 'path', path: pathFromD(`M ${x - 2.5} ${y + 4} h 5 v 4 h -5 Z`), fill: { paint: { color: d.ink, opacity: 0.85 } } });
+    out.push({ kind: 'path', path: pathFromD(`M ${x - 1.5} ${y + 4} V ${y + 2.5} A 1.5 1.5 0 0 1 ${x + 1.5} ${y + 2.5} V ${y + 4}`), stroke: { paint: { color: d.ink, opacity: 0.85 }, width: 1 } });
+  }
   if ((d.dots > 0 || d.pending) && p.width >= 14 && p.height >= 10) {
     // Read left to right, oldest first: the open circle, when there is one, takes the rightmost place.
     const ring = d.pending ? 1 : 0;
     const filled = Math.min(d.dots, MAX_PASS_DOTS - ring);
-    const at = (i: number) => p.x + p.width - 5 - i * 6;
     if (ring) out.push({ kind: 'path', path: circlePath(at(0), p.y + 5, 1.6, 12), stroke: { paint: { color: d.ink, opacity: 0.85 }, width: 1 } });
     for (let i = 0; i < filled; i++) {
       out.push({ kind: 'path', path: circlePath(at(i + ring), p.y + 5, 2, 12), fill: { paint: { color: d.ink, opacity: 0.85 } } });

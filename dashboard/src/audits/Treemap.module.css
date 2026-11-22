@@ -75,6 +75,17 @@
   color: var(--audit-ink);
 }
 
+/* The padlock a cell wears while an earlier round's unmerged branch holds it. */
+.lock {
+  width: 10px;
+  height: 12px;
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+
+.lock path { fill: none; stroke: currentColor; stroke-width: 1.2; }
+.lock rect { fill: currentColor; }
+
 .live {
   background: transparent;
   border: 2.5px solid var(--audit-phase, var(--audit-live));

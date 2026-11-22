@@ -5,7 +5,7 @@ import { gitIn } from './batch.mjs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { weaselConfig } from '../test/weaselConfig.ts';
-import { areaStats, areasInFlight, areasInFlightFor, calibrationFor, chapman, drawnRoundOf, inheritPasses, lastByRoundIn, lastDrawnPassIn, lastPassIn, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf } from './rounds.mjs';
+import { areaLocksIn, areaStats, areasInFlight, areasInFlightFor, calibrationFor, chapman, drawnRoundOf, inheritPasses, lastByRoundIn, lastDrawnPassIn, lastPassIn, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf } from './rounds.mjs';
 import { diskRecords } from './recordFiles.mjs';
 
 const dirs: string[] = [];
@@ -61,6 +61,11 @@ describe('pickAreas', () => {
     expect([...inFlight].sort()).toEqual(['b', 'core.animation']);
     const picked = pickAreas({ areas: ['a', 'b', 'c'].map((id) => area(id)), passes: new Map(), touched: never, count: 3, inFlight }).picked;
     expect(picked).toEqual(['a', 'c']);
+  });
+
+  it('names the latest round holding each locked area', () => {
+    const locks = areaLocksIn(['audit37-b', 'audit39-b', 'audit38-c', 'batch/2026-11-18-audit37'], weaselConfig().names.branchOf);
+    expect(Object.fromEntries(locks)).toEqual({ b: 39, c: 38 });
   });
 
   it("asks git for the branches main has not merged, under the config's names", () => {

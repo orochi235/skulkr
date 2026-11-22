@@ -163,6 +163,10 @@ function NowLegend({ halves, places, onInput, onChange }: {
     <>
       <span><i className={`${s.key} ${s.worn}`} />changed since its pass</span>
       <span><i className={`${s.key} ${s.settled}`} />settled</span>
+      <span>
+        <svg className={s.lock} viewBox="0 0 8 9" aria-hidden="true"><path d="M2 4V2.5a2 2 0 0 1 4 0V4" /><rect x="1" y="4" width="6" height="4.5" /></svg>
+        held by an unmerged round
+      </span>
       <span className={s.phases}>
         in a live run:
         <span className={s.phaseRamp}>
