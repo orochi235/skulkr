@@ -83,7 +83,7 @@ export const printPlan = (cfg, p, args, say) => {
     say(`    ${area.files.slice(0, 4).join(' ')}${area.files.length > 4 ? ' …' : ''}`);
   }
   if (cfg.sweep) say(args.sweep ? `${sweepName(cfg)}: one job at the frozen commit beside the reviews, and a fixer for what it finds` : `${sweepName(cfg)}: off (it runs only with --sweep)`);
-  say(`jobs: ${p.picked.length * 2} reviews, up to ${p.picked.length} matches and ${p.picked.length} fixes; then ${cfg.names.batch(localDate(), p.round)}`);
+  say(`jobs: ${p.picked.length * (args.trial ? 4 : 2)} reviews, up to ${p.picked.length * (args.trial ? 2 : 1)} matches and ${p.picked.length} fixes; then ${cfg.names.batch(localDate(), p.round)}`);
   for (const r of p.running) say(`round ${r.round} is running (pid ${r.pid}, step ${r.step}); its areas are left out above`);
 };
 
