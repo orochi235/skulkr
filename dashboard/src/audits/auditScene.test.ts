@@ -144,7 +144,9 @@ describe('area icons', () => {
 
 describe('pips', () => {
   it('wrap to a row below once a row holds what the cell is wide enough for', () => {
-    expect(pipsPerRowIn(40)).toBe(6);
+    expect(pipsPerRowIn(40)).toBe(5);
+    expect(pipsPerRowIn(34)).toBe(5);
+    expect(pipsPerRowIn(33)).toBe(4);
     expect(pipsPerRowIn(16)).toBe(2);
     expect(pipsPerRowIn(6)).toBe(1);
     expect(pipCountOf(4, false, true)).toBe(5);

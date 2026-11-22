@@ -7,8 +7,11 @@ import { framePadOf, iconBoxIn } from './mapLayout';
 /** The room one pip (a pass dot, the open circle, the padlock) takes along a cell's top edge, and between rows. */
 const PIP = 6;
 
-/** How many pips a row holds in a cell `width` wide; pips past that wrap to a row below. */
-export const pipsPerRowIn = (width: number): number => Math.max(1, Math.floor((width - 4) / PIP));
+/** The most pips a row holds, as a lane's pass dots run in fives. */
+const PIPS_PER_ROW = 5;
+
+/** How many pips a row holds in a cell `width` wide, up to PIPS_PER_ROW; pips past that wrap to a row below. */
+export const pipsPerRowIn = (width: number): number => Math.max(1, Math.min(PIPS_PER_ROW, Math.floor((width - 4) / PIP)));
 
 /** The pips a cell wears, right to left: the open circle while a pass is under way, a dot per pass, then the padlock. */
 export const pipCountOf = (dots: number, pending: boolean, locked: boolean): number =>
