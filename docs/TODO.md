@@ -14,3 +14,8 @@ Open work on skulkr. Each entry says when it closes.
   usage record is complete while the file beside `.onto-fetch-cache.json` is 0 bytes. Something truncates it later,
   perhaps a second fetch into the same job directory; not yet traced. It costs money: `cameHome` treats an empty
   envelope as not home, so `--resume` pays for those jobs again. Closes when the writer is found and fixed.
+- [ ] (P3) A "next round" section in the dashboard's prefs that starts a round with the settings the service's `start`
+  request takes (`areas`, `only`, `nodes`, `capUsd`, `budget` `{review, match, fix}`; README "The service"), asked for
+  2026-11-22. Model, effort and timeout live only in the config, so they stay out unless `start` learns them. No cap on
+  a reviewer's findings: Chapman's estimate reads the overlap of two complete lists, so a truncated list breaks it.
+  Closes when the dashboard can start a round with those settings.
