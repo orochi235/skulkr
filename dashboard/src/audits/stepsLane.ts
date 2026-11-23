@@ -1,7 +1,7 @@
 /** The steps view of a lane: one column per step, filled by how far it has got. */
 import type { SpanStripSpan } from '@weasel-js/ui/components/SpanStrip';
 import { MIN, SPAN_STATE, ms, patchFillOf, tallyOf, withInk, withUnfixed } from './laneSpans';
-import { TYPICAL_MINUTES, partColor, stepOf, type AuditPhase, type Part } from './phases';
+import { TYPICAL_MINUTES, checkingOf, partColor, stepOf, type AuditPhase, type Part } from './phases';
 import { NODE_SEP, stepText } from './runData';
 import type { AuditLane, LaneStep, LaneStepKey } from './skulkrMap.types';
 
@@ -22,8 +22,6 @@ const STEP_COLUMNS: readonly { step: LaneStepKey; part: Part; phase: AuditPhase;
  *  repair job of the controller's takes it over. */
 const CHECKS_COLUMN = { start: 4, width: 0.5 } as const;
 
-/** Whether a fixer has made every commit it set out to and is still running: its checks. */
-const checkingOf = (fix: LaneStep): boolean => fix.state === 'running' && !!fix.total && (fix.done ?? 0) >= fix.total;
 
 /** The fixer's checks: lit while it runs them, carrying the node doing it, and filled once it ends. */
 function checksSpan(fix: LaneStep): SpanStripSpan {

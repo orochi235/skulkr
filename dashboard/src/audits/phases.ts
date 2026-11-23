@@ -30,6 +30,15 @@ const WAITING: LaneStep = { state: 'waiting' };
 /** A lane's step by key; a lane not yet checked has no repair step, which reads as waiting. */
 export const stepOf = (lane: AuditLane, key: LaneStepKey): LaneStep => lane.steps[key] ?? WAITING;
 
+/** Where a round's title counts an area: its phase, with a running fix split by the column the steps view lights for
+ *  it, its fixer's own checks past its last commit, or the controller's verify or repair after them. */
+export type Stage = AuditPhase | 'checks' | 'repair';
+const STAGES: readonly Stage[] = ['review', 'reviewed', 'match', 'fix', 'checks', 'repair', 'patch', 'conflict'];
+export const STAGE_LABEL: Readonly<Record<Stage, string>> = { ...PHASE_LABEL, checks: 'checks', repair: 'verify' };
+
+/** Whether a fixer has made every commit it set out to and is still running: its checks. */
+export const checkingOf = (fix: LaneStep): boolean => fix.state === 'running' && !!fix.total && (fix.done ?? 0) >= fix.total;
+
 /** The phase's color, as the stylesheet defines it. */
 export const phaseColor = (phase: AuditPhase): string => `var(--audit-phase-${phase})`;
 
@@ -41,7 +50,7 @@ export const phaseInkOf = (phase: AuditPhase, fill: number | undefined): string 
   (phase === 'patch' && (fill === undefined || fill > 0) ? 'var(--audit-phase-patch-ink)' : undefined);
 
 /** The class that sets `--audit-phase` to the phase's color, for an element that wears it. */
-export const phaseClass = (phase: AuditPhase): string => getOwn(palette, `phase-${phase}`) ?? '';
+export const phaseClass = (phase: Stage): string => getOwn(palette, `phase-${phase}`) ?? '';
 
 export interface PartState {
   readonly part: Part;
@@ -92,14 +101,22 @@ export function partPhase(p: PartState): AuditPhase {
 
 /** A round's areas counted by phase: how many are done of all of them, then how many sit in each phase that has any,
  *  in pipeline order, a conflict last. */
-export function stageCountsOf(lanes: readonly AuditLane[]): { done: number; total: number; stages: { phase: AuditPhase; n: number }[] } {
-  const by = new Map<AuditPhase, number>();
+export function stageCountsOf(lanes: readonly AuditLane[]): { done: number; total: number; stages: { phase: Stage; n: number }[] } {
+  const by = new Map<Stage, number>();
   for (const lane of lanes) {
-    const phase = livePhaseOf(lane);
+    const phase = stageOf(lane);
     by.set(phase, (by.get(phase) ?? 0) + 1);
   }
-  const stages = [...PIPELINE, 'conflict' as const].flatMap((phase) => (by.get(phase) ? [{ phase, n: by.get(phase)! }] : []));
+  const stages = STAGES.flatMap((phase) => (by.get(phase) ? [{ phase, n: by.get(phase)! }] : []));
   return { done: by.get('done') ?? 0, total: lanes.length, stages };
+}
+
+/** An area's stage for the round's title: its live phase, a running fix told apart by `Stage`. */
+function stageOf(lane: AuditLane): Stage {
+  const phase = livePhaseOf(lane);
+  if (phase !== 'fix') return phase;
+  if (lane.steps.repair && lane.steps.repair.state === 'running') return 'repair';
+  return checkingOf(lane.steps.fix) ? 'checks' : 'fix';
 }
 
 /** Whether the round's pass over an area is done: it is through, or its fixer has finished, no repair is under way, and

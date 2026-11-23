@@ -7,7 +7,7 @@ import { clockRuler } from './clock';
 import { GateFailures } from './GateFailures';
 import { LeftOut } from './LeftOut';
 import { laneViewOf, runClockOf, type LaneView } from './clockLane';
-import { passDone, PHASE_LABEL, phaseClass, stageCountsOf, BRIGHT_FILLS } from './phases';
+import { passDone, STAGE_LABEL, phaseClass, stageCountsOf, BRIGHT_FILLS } from './phases';
 import { STEP_COLUMN_COUNT, laneStepsOf } from './stepsLane';
 import { gateRunsOf, inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
 import { NODE_SEP, headlineOf, lastLineOf, spendOf, startedText } from './runData';
@@ -176,7 +176,7 @@ function StageCounts({ run }: { run: AuditRun }) {
     <div className={s.counts} aria-label={`Round ${run.round} areas by stage`}>
       <span className={cx(s.count, s.doneCount)}>{done} of {total} done</span>
       {stages.map(({ phase, n }) => (
-        <span key={phase} className={cx(s.count, phaseClass(phase))}><i className={s.dot} aria-hidden="true" />{n} {PHASE_LABEL[phase]}</span>
+        <span key={phase} className={cx(s.count, phaseClass(phase))}><i className={s.dot} aria-hidden="true" />{n} {STAGE_LABEL[phase]}</span>
       ))}
     </div>
   );

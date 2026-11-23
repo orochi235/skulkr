@@ -126,6 +126,16 @@ describe('laneViewOf', () => {
     expect(stageCountsOf([fixing, fixed, leftOut])).toMatchObject({ done: 1, total: 3 });
   });
 
+  it("counts a fixer past its last commit as checks and a running verify or repair as verify, as the steps view lights them", () => {
+    const fixLane = (fix: LaneStep, repair?: LaneStep): AuditLane => ({ id: 'x', steps: { ...lane({ A: done({ findings: 1 }), B: done({ findings: 1 }), match: matched(1, 1, 0), fix }).steps, ...(repair ? { repair } : {}) } });
+    const lanes = [
+      fixLane({ ...running(at(6)), done: 3, total: 8 }),
+      fixLane({ ...running(at(6)), done: 8, total: 8 }),
+      fixLane(done({ minutes: 9, commits: 2 }), running(at(25))),
+    ];
+    expect(stageCountsOf(lanes).stages).toEqual([{ phase: 'fix', n: 1 }, { phase: 'checks', n: 1 }, { phase: 'repair', n: 1 }]);
+  });
+
   it('colors a failed part as a conflict and says why', () => {
     const view = laneViewOf(lane({ A: done({ findings: 1 }), B: done({ findings: 1 }), match: matched(1, 1, 1), fix: done({ minutes: 9, commits: 2 }), patch: { state: 'failed', why: 'conflicts' } }), NOW, START);
     expect(view.phase).toBe('conflict');
