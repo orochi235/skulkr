@@ -66,6 +66,8 @@ export const readRun = (found, running, jobs = [], state, { names = NAMES, sweep
     step: running ? run.step : 'done',
     ...(running && run.behind ? { behind: run.behind } : {}),
     costUsd: run.costUsd ?? 0,
+    usdPerArea: run.usdPerArea ?? null,
+    usdPerFile: run.usdPerFile ?? null,
     capUsd: run.capUsd ?? null,
     report: run.report ?? null,
     areas: areaIds,

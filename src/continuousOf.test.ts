@@ -33,7 +33,7 @@ describe('continuousOf', () => {
     writeContinuous(state, { on: true, until: at('07:00', 17).toISOString() });
     const now = continuousOf(cfg, { now: at('23:50'), fleet });
     // Round 40 started before the night's 07:00; per area, rounds 40 and 41 cost $20.
-    expect(now.budget).toMatchObject({ nightUsd: 100, spentUsd: 42, leftUsd: 58, estimateUsd: 80 });
+    expect(now.budget).toMatchObject({ nightUsd: 100, spentUsd: 42, leftUsd: 58, estimateUsd: 80, estimateUsdPerArea: 20 });
     expect(now.next).toMatchObject({ start: false, why: expect.stringContaining('the night\'s budget') });
     expect(now.queues).toEqual({ model: null, fleet });
     expect(continuousOf(cfg, { now: at('23:50'), fleet, pending: 1 }).next).toMatchObject({ why: 'a round is starting' });

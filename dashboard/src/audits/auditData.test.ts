@@ -79,6 +79,7 @@ describe('lanes', () => {
     expect(continuousText({ until: '', next: 'starts now', nightUsd: 200, spentUsd: 57.4, leftUsd: 142.6 })).toBe('continuous · $143 of $200 left tonight');
     expect(spendOf(live)).toBe('$12.50 of $80');
     expect(spendOf({ ...live, capUsd: null })).toBe('$12.50');
+    expect(spendOf({ ...live, usdPerArea: 3.13, usdPerFile: 0.25 })).toBe('$12.50 of $80 · $3.13/area · $0.250/file');
   });
 });
 

@@ -148,6 +148,9 @@ export interface AuditRun {
   /** What a run waiting for the merge lock or the fleet waits behind: `round 51`, `weasel round 51`. */
   readonly behind?: string;
   readonly costUsd: number;
+  /** The round's spend over the areas that spent, and over their files; null until one has. */
+  readonly usdPerArea: number | null;
+  readonly usdPerFile: number | null;
   readonly capUsd: number | null;
   readonly report: string | null;
   readonly areas: readonly string[];

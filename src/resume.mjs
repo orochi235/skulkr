@@ -66,7 +66,7 @@ export const resume = async (cfg, root, args, say) => {
       running, open: openFindingsIn(cfg, git, root, records, [...byId.values()]), ...(landedEarly ? { landedEarly } : {}),
     };
     const status = {
-      round, commit, started: prior.started, resumed: new Date().toISOString(), step: 'freeze', areas: ids, nightDir: prior.nightDir,
+      round, commit, started: prior.started, resumed: new Date().toISOString(), step: 'freeze', areas: ids, files: Object.fromEntries(p.picked.map((a) => [a.id, a.files.length])), nightDir: prior.nightDir,
       weightedTokens: prior.weightedTokens ?? 0, costUsd: prior.costUsd ?? 0, capUsd: args.capUsd, args,
       ...(landedEarly ? { landed: prior.landed } : {}),
     };

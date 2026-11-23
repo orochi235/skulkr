@@ -12,11 +12,13 @@ export const serviceName = (env = process.env) => env.SKULKR_SERVICE ?? 'skulkr'
 export const dashboardUrl = (env = process.env) => env.SKULKR_DASHBOARD_URL ?? 'http://localhost:5214/';
 
 const money = (usd) => `$${(usd ?? 0).toFixed(2)}`;
+/** `· $5.16/area · $0.162/file`, or nothing before an area has spent. */
+const perUnit = (run) => (run.usdPerArea == null ? '' : ` · ${money(run.usdPerArea)}/area · $${(run.usdPerFile ?? 0).toFixed(3)}/file`);
 const clock = (iso) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-/** One live round's line: `weasel · round 65 · review · $50.45 of $160 · 16 areas`. */
+/** One live round's line: `weasel · round 65 · review · $50.45 of $160 · $5.16/area · $0.162/file · 16 areas`. */
 const runText = (tenant, run) =>
-  `${tenant} · round ${run.round} · ${run.step} · ${money(run.costUsd)} of $${run.capUsd} · ${run.areas?.length ?? 0} areas`;
+  `${tenant} · round ${run.round} · ${run.step} · ${money(run.costUsd)} of $${run.capUsd}${perUnit(run)} · ${run.areas?.length ?? 0} areas`;
 
 /** A finished round's verdict, the first word of its report (`green`, `red`, …), or `ended` without one. */
 const verdictOf = (report) => /^(\w+)/.exec(report ?? '')?.[1] ?? 'ended';
@@ -40,7 +42,7 @@ export const menuOf = (answers, now = Date.now(), dashboard = dashboardUrl()) =>
     }
     if (status.last?.round !== undefined) {
       const ended = status.last.ended ? ` · ended ${clock(status.last.ended)}` : '';
-      last.push({ text: `${tenant} · round ${status.last.round} · ${verdictOf(status.last.report)} · ${money(status.last.costUsd)}${ended}`, report: status.last.report ?? '' });
+      last.push({ text: `${tenant} · round ${status.last.round} · ${verdictOf(status.last.report)} · ${money(status.last.costUsd)}${perUnit(status.last)}${ended}`, report: status.last.report ?? '' });
     }
   }
   const live = rows.length;

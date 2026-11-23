@@ -15,6 +15,12 @@ describe('menuOf', () => {
     expect(menu.last[0]!.text).toMatch(/^weasel · round 64 · red · \$128\.96 · ended /);
   });
 
+  it('adds the cost per area and per file once an area has spent', () => {
+    const menu = menuOf([{ tenant: 'weasel', status: { runs: [{ ...live, usdPerArea: 5.16, usdPerFile: 0.162 }], last: { ...last, usdPerArea: 9.21, usdPerFile: 0.319 } } }]);
+    expect(menu.rows[0]!.text).toBe('weasel · round 65 · review · $50.45 of $160 · $5.16/area · $0.162/file · 16 areas');
+    expect(menu.last[0]!.text).toMatch(/^weasel · round 64 · red · \$128\.96 · \$9\.21\/area · \$0\.319\/file · ended /);
+  });
+
   it('asks the service and links the dashboard the environment names, else the defaults', () => {
     expect([serviceName({}), serviceName({ SKULKR_SERVICE: 'skulkr-weasel' })]).toEqual(['skulkr', 'skulkr-weasel']);
     expect([dashboardUrl({}), dashboardUrl({ SKULKR_DASHBOARD_URL: 'http://studio:5300/' })]).toEqual(['http://localhost:5214/', 'http://studio:5300/']);

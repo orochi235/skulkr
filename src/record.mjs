@@ -1,4 +1,5 @@
 /** The round's written record: `<record.dir>/round-<N>/README.md` and its row in the config's ledger, if it has one. */
+import { unitCostOf } from './unitCost.mjs';
 import { usd } from './usage.mjs';
 
 const num = (n, width = 5) => (n === undefined ? '-' : n.toFixed(1)).padStart(width);
@@ -12,20 +13,23 @@ export const roundReadme = (cfg, { round, commit, date, areas, sweep, outcomes }
     const fate = outcomes[s.id] ?? '';
     const prev = s.previous ? `${num(s.previous.unfound)} (r${s.previous.round})` : '-';
     const fresh = s.newCode ? `${s.newCode.findings} in ${s.newCode.changedFiles} changed` : '-';
-    return `| \`${s.id}\` | ${s.files.length} | ${s.read.A}/${s.read.B} | ${s.a} | ${s.b} | ${s.m} | ${s.distinct} | ${num(s.chapman)} | ${num(s.unfound)} | ${prev} | ${fresh} | ${s.patches} | ${s.questions} | ${mtok(s.jobs.weightedTokens)} | ${usd(s.jobs.costUsd)} | ${fate}${ceiling(s)}${unrun(s)} |`;
+    return `| \`${s.id}\` | ${s.files.length} | ${s.read.A}/${s.read.B} | ${s.a} | ${s.b} | ${s.m} | ${s.distinct} | ${num(s.chapman)} | ${num(s.unfound)} | ${prev} | ${fresh} | ${s.patches} | ${s.questions} | ${mtok(s.jobs.weightedTokens)} | ${usd(s.jobs.costUsd)} | ${s.files.length ? `$${(s.jobs.costUsd / s.files.length).toFixed(3)}` : '-'} | ${fate}${ceiling(s)}${unrun(s)} |`;
   });
   const total = (k) => areas.reduce((sum, s) => sum + s[k], 0);
+  const costUsd = areas.reduce((s, a) => s + a.jobs.costUsd, 0);
+  const unit = unitCostOf({ costUsd, spent: areas.map((a) => [a.id, a.jobs.costUsd]), files: Object.fromEntries(areas.map((a) => [a.id, a.files.length])) });
+  const perUnit = unit.usdPerArea === null ? '' : ` (${usd(unit.usdPerArea)} per area, $${unit.usdPerFile.toFixed(3)} per file)`;
   return [
     `# Audit round ${round}`,
     '',
     ...cfg.record.intro.map((line) => line.replaceAll('{{commit}}', commit).replaceAll('{{date}}', date)),
     '',
-    '| Area | Files | Read A/B | A | B | Shared | Distinct | Est. | Left | Last left | New code | Commits | Questions | Weighted tokens | Cost | Branch |',
-    '|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|',
+    '| Area | Files | Read A/B | A | B | Shared | Distinct | Est. | Left | Last left | New code | Commits | Questions | Weighted tokens | Cost | Per file | Branch |',
+    '|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|',
     ...rows,
     '',
     `Totals: ${total('distinct')} distinct findings, ${total('patches')} fix commits, ${total('questions')} questions, `
-      + `${mtok(areas.reduce((s, a) => s + a.jobs.weightedTokens, 0))} weighted tokens, ${usd(areas.reduce((s, a) => s + a.jobs.costUsd, 0))}.`,
+      + `${mtok(areas.reduce((s, a) => s + a.jobs.weightedTokens, 0))} weighted tokens, ${usd(costUsd)}${perUnit}.`,
     '',
     ...(sweep && cfg.sweep ? sweepSection(cfg.sweep, sweep, outcomes[cfg.sweep.id]) : []),
   ].join('\n');

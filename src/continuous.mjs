@@ -39,9 +39,9 @@ const RECENT = 5;
 export const roundEstimate = ({ finished, areasPerRound, areaGuessUsd }) => {
   const recent = finished.filter((s) => (s.areas?.length ?? 0) > 0 && (s.costUsd ?? 0) > 0)
     .sort((a, b) => (a.ended < b.ended ? -1 : 1)).slice(-RECENT);
-  if (recent.length === 0) return { usd: areasPerRound * areaGuessUsd, from: 'guess' };
+  if (recent.length === 0) return { usd: areasPerRound * areaGuessUsd, perAreaUsd: areaGuessUsd, from: 'guess' };
   const perArea = recent.reduce((s, r) => s + r.costUsd, 0) / recent.reduce((s, r) => s + r.areas.length, 0);
-  return { usd: perArea * areasPerRound, from: `${recent.length} recent round${recent.length === 1 ? '' : 's'}` };
+  return { usd: perArea * areasPerRound, perAreaUsd: perArea, from: `${recent.length} recent round${recent.length === 1 ? '' : 's'}` };
 };
 
 /**

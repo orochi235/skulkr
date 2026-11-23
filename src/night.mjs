@@ -22,6 +22,7 @@ import { runUntilFree } from './jobs.mjs';
 import { createSlots } from './slots.mjs';
 import { watchEarly } from './early.mjs';
 import { batchAndTest, patchAreas, patchSweep } from './land.mjs';
+import { unitCostOf } from './unitCost.mjs';
 import { begin, localDate, plan, printPlan } from './plan.mjs';
 import { resume } from './resume.mjs';
 import { changedSince, lastPassIn, scaledOf } from './rounds.mjs';
@@ -108,6 +109,7 @@ const runContext = ({ cfg, runner, root, p, args, status, frozen, say, setStep }
         status.weightedTokens += record.weightedTokens;
         status.costUsd += record.costUsd;
       }
+      Object.assign(status, unitCostOf({ costUsd: status.costUsd, spent, files: status.files ?? {} }));
       setStep(status.step, { behind: status.behind });
     },
     acquire: async (role) => {
@@ -255,8 +257,8 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     if (frozen) removeWorktree(root, frozen);
     writeSummary(p.round, {
       round: p.round, commit: p.commit, started: status.started, ended: new Date().toISOString(), nightDir: status.nightDir, report, planned: status.areas,
-      weightedTokens: status.weightedTokens, costUsd: status.costUsd, capUsd: args.capUsd, sweep: sweepSummary(cfg, sweep, outcomes), ...(status.landed ? { landed: status.landed } : {}),
-      areas: results.map((s) => ({ id: s.id, ...(s.fixOnly ? { fixOnly: true } : {}), ...(s.carried ? { carried: s.carried } : {}), a: s.a, b: s.b, m: s.m, distinct: s.distinct, chapman: s.chapman, patches: s.patches, outcome: outcomes[s.id], ...(s.incomplete?.length ? { incomplete: s.incomplete } : {}), ...(s.verify ? { verify: s.verify } : {}), minutes: s.jobs.minutes, weightedTokens: s.jobs.weightedTokens, costUsd: s.jobs.costUsd, budgetHit: s.budgetHit })),
+      weightedTokens: status.weightedTokens, costUsd: status.costUsd, ...unitCostOf({ costUsd: status.costUsd, spent: results.map((s) => [s.id, s.jobs.costUsd]), files: status.files ?? {} }), capUsd: args.capUsd, sweep: sweepSummary(cfg, sweep, outcomes), ...(status.landed ? { landed: status.landed } : {}),
+      areas: results.map((s) => ({ id: s.id, ...(s.fixOnly ? { fixOnly: true } : {}), ...(s.carried ? { carried: s.carried } : {}), a: s.a, b: s.b, m: s.m, distinct: s.distinct, chapman: s.chapman, patches: s.patches, outcome: outcomes[s.id], ...(status.files?.[s.id] !== undefined ? { files: status.files[s.id] } : {}), ...(s.incomplete?.length ? { incomplete: s.incomplete } : {}), ...(s.verify ? { verify: s.verify } : {}), minutes: s.jobs.minutes, weightedTokens: s.jobs.weightedTokens, costUsd: s.jobs.costUsd, budgetHit: s.budgetHit })),
     }, cfg.state);
     clearStatus(p.round, cfg.state);
   }

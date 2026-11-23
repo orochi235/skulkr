@@ -39,7 +39,7 @@ export const continuousOf = (cfg, { now = new Date(), pending = 0, readOnly = fa
     mode, next,
     budget: {
       nightUsd, spentUsd: cents(spentUsd), leftUsd: nightUsd === null ? null : cents(Math.max(0, nightUsd - spentUsd)),
-      estimateUsd: cents(estimate.usd), estimateFrom: estimate.from, since: night.from.toISOString(),
+      estimateUsd: cents(estimate.usd), estimateUsdPerArea: cents(estimate.perAreaUsd), estimateFrom: estimate.from, since: night.from.toISOString(),
     },
     queues: queuesOf({ runs: live, fleet: fleet ?? readFleet() }),
   };

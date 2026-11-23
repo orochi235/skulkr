@@ -105,7 +105,7 @@ export const begin = async (cfg, root, args, say) => {
     const started = new Date();
     const nightDir = join(cfg.state, 'nights', `${started.toISOString().replace(/[:.]/g, '-')}-round${p.round}`);
     mkdirSync(nightDir, { recursive: true });
-    const status = { round: p.round, commit: p.commit, started: started.toISOString(), step: 'freeze', areas: p.picked.map((a) => a.id), nightDir, weightedTokens: 0, costUsd: 0, capUsd: args.capUsd, args };
+    const status = { round: p.round, commit: p.commit, started: started.toISOString(), step: 'freeze', areas: p.picked.map((a) => a.id), files: Object.fromEntries(p.picked.map((a) => [a.id, a.files.length])), nightDir, weightedTokens: 0, costUsd: 0, capUsd: args.capUsd, args };
     writeStatus(p.round, status, cfg.state);
     return { p, status };
   } finally {

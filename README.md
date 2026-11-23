@@ -149,7 +149,7 @@ Each step prints one line as it completes (`review 3/16 …`).
 
 The record, in `<record.dir>/round-<N>/`: per area `files.txt`, `A.md`, `B.md`, `match.json`, `fix.md` and
 `area.json` (counts, estimate, the previous pass's estimate this one tests, findings in files changed since, fix
-commits, tokens and cost); `usage.jsonl`, one record per job; and `README.md`, the round's table. The partition
+commits, tokens and cost); `usage.jsonl`, one record per job; and `README.md`, the round's table, with each area's cost per file and the round's per area and per file. The partition
 file is regenerated from the batch's tree, so it holds what landed on `main` while the round ran, and the ledger, when
 the config names one, gets a row.
 
@@ -387,7 +387,7 @@ requests, one JSON object a line on stdin, each echoing its `id`:
 | Request | Reply |
 |---|---|
 | `{"ping":true}` | `pong`, skulkr's commit (`build`), and the tenants hosted; with `tenant`, that project checkout's commit |
-| `{"status":true}` | `runs`: every live run's round, step, areas, flags, dollars used against its cap, and `behind`, what a waiting one waits for; `last`: the summary of the run that ended last; `continuous`: the mode, what the next round waits on (`next`), and `nightUsd`, `spentUsd`, `leftUsd`, and `estimateUsd`; `queues`: the round in its model steps (`model`) and the fleet queue's holder and waiters (`fleet`) |
+| `{"status":true}` | `runs`: every live run's round, step, areas, flags, dollars used against its cap and per area and per file (`usdPerArea`, `usdPerFile`), and `behind`, what a waiting one waits for; `last`: the summary of the run that ended last; `continuous`: the mode, what the next round waits on (`next`), and `nightUsd`, `spentUsd`, `leftUsd`, `estimateUsd`, and `estimateUsdPerArea`; `queues`: the round in its model steps (`model`) and the fleet queue's holder and waiters (`fleet`) |
 | `{"plan":true}` | what a run started now would pick |
 | `{"start":true}` | starts a run now, beside any already running; takes `areas`, `only`, `nodes`, `capUsd`, `budget` (`{review, match, fix}`), `merge: false`, `sweep: true`, `fixOnly` (`true` or a list of areas), and `resume` (a round number); answers `started: false` and `error` when its run could not be spawned |
 | `{"start":true,"continuous":true}` | turns continuous mode on until the night's `stopAt`, and starts its first round if the queues and budget allow; takes no other field. `"continuous":false` turns it off |

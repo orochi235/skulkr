@@ -71,7 +71,8 @@ export function continuousText(continuous: AuditContinuous | undefined): string 
 
 export function spendOf(run: AuditRun): string {
   const cost = `$${run.costUsd.toFixed(2)}`;
-  return run.capUsd ? `${cost} of $${run.capUsd}` : cost;
+  const spend = run.capUsd ? `${cost} of $${run.capUsd}` : cost;
+  return run.usdPerArea == null ? spend : `${spend} · $${run.usdPerArea.toFixed(2)}/area · $${(run.usdPerFile ?? 0).toFixed(3)}/file`;
 }
 
 export function lastLineOf(run: AuditRun): string {

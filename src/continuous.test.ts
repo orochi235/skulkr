@@ -46,13 +46,13 @@ describe('the budget', () => {
   });
 
   it('estimates a round from recent rounds\' cost per area, else from the guess', () => {
-    expect(roundEstimate({ finished: [], areasPerRound: 16, areaGuessUsd: 10 })).toEqual({ usd: 160, from: 'guess' });
+    expect(roundEstimate({ finished: [], areasPerRound: 16, areaGuessUsd: 10 })).toEqual({ usd: 160, perAreaUsd: 10, from: 'guess' });
     const finished = [
       { ended: '2026-11-15', costUsd: 999, areas: [1] },
       ...[1, 2, 3, 4, 5].map((d) => ({ ended: `2026-11-${15 + d}`, costUsd: 24, areas: [1, 2, 3, 4] })),
       { ended: '2026-11-21', costUsd: 0, areas: [] },
     ];
-    expect(roundEstimate({ finished, areasPerRound: 16, areaGuessUsd: 10 })).toEqual({ usd: 96, from: '5 recent rounds' });
+    expect(roundEstimate({ finished, areasPerRound: 16, areaGuessUsd: 10 })).toEqual({ usd: 96, perAreaUsd: 6, from: '5 recent rounds' });
   });
 });
 

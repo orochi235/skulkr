@@ -57,6 +57,9 @@ weasel cutover.
     (2026-11-21).
   - an area whose branch the capstone dropped, no longer held out of the queue once its round lands, since the branch is
     deleted then (2026-11-21).
+  - a round's cost per area and per file (`usdPerArea`, `usdPerFile`) on its status, summary, map run, menu line
+    and dashboard spend, each summary area's `files`, the record's per-file column and totals, and status's
+    `estimateUsdPerArea` (2026-11-23).
   - the map's gate progress, outcomes and failures, read from the night's newest gate log rather than the first listed
     (2026-11-21).
   - an open finding listed under the area now holding its cited paths, not the id of the round that found it, and one
