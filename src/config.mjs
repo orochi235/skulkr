@@ -101,6 +101,19 @@ export const DEFAULTS = {
      * run, one a line; `command` then runs in a job of its own on a GUI node. `timeoutMin` bounds each run.
      */
     verify: null,
+    /**
+     * A command that fixes what it can in the files a fixer's or repair's commits changed (`{files}`), run before
+     * they are handed back; what it changes is committed as one commit with `message`. Null for none.
+     */
+    fixup: null,
+    /**
+     * The checks a batch must pass before its gate joins the fleet queue, or null to leave them to the gate (README
+     * "Preflight"). `command` runs on the batch's tip, and on `main`'s tip over a red result's failures, each in a job
+     * of the round's gate lane; `{tests}` is the test files to run beside the checks (the last red gate's failures),
+     * empty when none. Its output marks each failure with a `gate.failPrefix` line, as the gate's does. `gateArgs` go
+     * after the gate's command when it passed; `timeoutMin` bounds it (default 20).
+     */
+    preflight: null,
   },
   /** Project rules added to the default briefs (a string of Markdown), per brief. */
   rules: { reviewer: '', fixer: '' },

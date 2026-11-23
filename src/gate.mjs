@@ -120,7 +120,7 @@ export const gateFailuresOf = (nightDir, gate) => {
   return gateFailuresIn(readFileSync(join(nightDir, file), 'utf8'), gate);
 };
 
-const failLinesIn = (lines, gate) => lines.filter((l) => l.startsWith(gate.failPrefix)).map((l) => l.slice(gate.failPrefix.length).trim());
+export const failLinesIn = (lines, gate) => lines.filter((l) => l.startsWith(gate.failPrefix)).map((l) => l.slice(gate.failPrefix.length).trim());
 /** Where a `fleet-fail:` line failed: a test's line names its project, file and test; a step's names its command. */
 const whereOf = (l) => (l.includes(' :: ') ? l.split(' :: ')[0].split(' ').at(-1) : l.replace(/^\S+ /, ''));
 

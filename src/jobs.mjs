@@ -65,7 +65,7 @@ export const installLines = (cfg) => {
  * Readies a node tree for a job that commits: the synced tree committed as it stands (it must hash to the frozen
  * commit's tree), `BASE` set to that commit, and an install when the lockfile changed since the tree's last one.
  */
-const treeLines = (cfg) => [
+export const treeLines = (cfg) => [
   'grep -qx ".skulkr/" .git/info/exclude 2>/dev/null || echo ".skulkr/" >> .git/info/exclude',
   'git add -A',
   'git -c user.name=skulkr -c user.email=skulkr@localhost commit -q --no-verify --allow-empty -m "skulkr: frozen tree"',
@@ -82,12 +82,30 @@ const applyLines = (area) => [
     + `echo "the area's patches did not apply" > ${JOB_OUT}/verify.log; echo 1 > ${JOB_OUT}/verify.exit; exit 0; fi`,
 ];
 
+/**
+ * The config's `checks.fixup` over the files changed since `$BASE`, on the commits alone (what the model left
+ * uncommitted is dropped, as verify drops it), its changes committed as one commit; its output goes to `fixup.log`.
+ */
+export const fixupLines = (fixup) => {
+  if (!fixup?.command) return [];
+  return [
+    'git reset -q --hard HEAD && git clean -qfd -e .skulkr/',
+    'FIXUP_FILES=$(git diff --name-only --diff-filter=d "$BASE..HEAD" | tr \'\\n\' \' \' | sed \'s/ *$//\')',
+    'export FIXUP_FILES',
+    'if [ -n "$FIXUP_FILES" ]; then',
+    `  bash -c ${q(fixup.command.replaceAll('{files}', '$FIXUP_FILES'))} > ${JOB_OUT}/fixup.log 2>&1`,
+    `  git add -u && git -c user.name=skulkr -c user.email=skulkr@localhost commit -q --no-verify -m ${q(fixup.message ?? 'apply the fixup command\'s fixes')} >> ${JOB_OUT}/fixup.log 2>&1`,
+    'fi',
+  ];
+};
+
 /** A model job's hand-back: its commits since `BASE` as one mbox and what it left uncommitted, then the verify step. */
 const handBackLines = (cfg) => {
   const verify = verifyOf(cfg);
   return [
-    `git format-patch --stdout "$BASE..HEAD" > ${JOB_OUT}/fix.mbox`,
     `git status --porcelain > ${JOB_OUT}/uncommitted.txt`,
+    ...fixupLines(cfg.checks.fixup),
+    `git format-patch --stdout "$BASE..HEAD" > ${JOB_OUT}/fix.mbox`,
     ...(verify ? verifyLines(verify) : []),
     'exit 0',
   ];

@@ -46,18 +46,47 @@ const TEST_PATH = /([\w@./-]+\.(?:test|spec)\.[cm]?[jt]sx?)\b/;
 /** Whether `path` is a test file's path, rather than a step's name or another file. */
 export const isTestPath = (path) => TEST_PATH.exec(path)?.[1] === path;
 
-/** vitest's file-level counts in `text`: its last `Test Files  1 failed | 2 passed (3)` line, or undefined. */
+/**
+ * vitest's file-level counts in `text`, summed over every `Test Files  1 failed | 2 passed (3)` line, one per vitest
+ * run the command made; undefined with none.
+ */
 export const fileCountsOf = (text) => {
-  const line = stripAnsi(text).split('\n').filter((l) => /^\s*Test Files\s/.test(l)).at(-1);
-  if (!line) return undefined;
-  const n = (word) => Number(new RegExp(`(\\d+) ${word}`).exec(line)?.[1] ?? 0);
-  const total = Number(/\((\d+)\)\s*$/.exec(line)?.[1] ?? n('failed') + n('passed'));
-  return { failed: n('failed'), passed: n('passed'), total };
+  const lines = stripAnsi(text).split('\n').filter((l) => /^\s*Test Files\s/.test(l));
+  if (!lines.length) return undefined;
+  const one = (line) => {
+    const n = (word) => Number(new RegExp(`(\\d+) ${word}`).exec(line)?.[1] ?? 0);
+    const total = Number(/\((\d+)\)\s*$/.exec(line)?.[1] ?? n('failed') + n('passed'));
+    return { failed: n('failed'), passed: n('passed'), total };
+  };
+  return lines.map(one).reduce((a, b) => ({ failed: a.failed + b.failed, passed: a.passed + b.passed, total: a.total + b.total }));
 };
 
-/** The test files `text` reports failing: each path on a `FAIL` line, once. */
-export const failedFilesIn = (text) =>
-  [...new Set(stripAnsi(text).split('\n').filter((l) => /\bFAIL\b/.test(l)).flatMap((l) => TEST_PATH.exec(l)?.[1] ?? []))];
+/** A script's path as the first token after `FAIL` gives it: a file vitest runs, whatever it is named. */
+const SCRIPT_PATH = /^[\w@./-]+\.[cm]?[jt]sx?$/;
+
+/**
+ * Each failing file `text` reports, with the tests failing in it, from vitest's `FAIL <project> <file> > <test>`
+ * lines: the file is a test file's path or else the first script path after `FAIL`, and a file failing whole names
+ * no test. Answers `Map<file, Set<test>>`.
+ */
+export const failedTestsIn = (text) => {
+  const out = new Map();
+  for (const line of stripAnsi(text).split('\n')) {
+    const at = /\bFAIL\b/.exec(line);
+    if (!at) continue;
+    const rest = line.slice(at.index + 4);
+    const cut = rest.indexOf(' > ');
+    const file = TEST_PATH.exec(line)?.[1] ?? (cut < 0 ? rest : rest.slice(0, cut)).trim().split(/\s+/).find((t) => SCRIPT_PATH.test(t));
+    if (!file) continue;
+    const tests = out.get(file) ?? new Set();
+    if (cut >= 0) tests.add(rest.slice(cut + 3).trim());
+    out.set(file, tests);
+  }
+  return out;
+};
+
+/** The files `text` reports failing (`failedTestsIn`), once each. */
+export const failedFilesIn = (text) => [...failedTestsIn(text).keys()];
 
 /** Whether `text` holds vitest's report of errors outside any test file (`Unhandled Errors`, ` Errors  2 errors`). */
 export const unhandledIn = (text) => /Unhandled Errors?\b|^\s*Errors\s+\d+ errors?\b/m.test(stripAnsi(text));

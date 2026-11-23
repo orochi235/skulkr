@@ -166,10 +166,10 @@ export const commitRecord = (cfg, tree, { round, commit, date, nightDir, areas, 
  * Runs the config's gate on the batch: its command with `{ref}` as the batch branch, from the main checkout or the
  * batch's worktree as `gate.cwd` says, its output to `logPath`. Answers its exit status.
  */
-export const runGate = (cfg, { root, batch, logPath }) =>
+export const runGate = (cfg, { root, batch, logPath, extra = [] }) =>
   new Promise((done) => {
     const log = createWriteStream(logPath, { flags: 'a' });
-    const [cmd, ...args] = cfg.gate.command.map((a) => a.replaceAll('{ref}', batch.name));
+    const [cmd, ...args] = [...cfg.gate.command.map((a) => a.replaceAll('{ref}', batch.name)), ...extra];
     const child = spawn(cmd, args, { cwd: cfg.gate.cwd === 'root' ? root : batch.tree, stdio: ['ignore', 'pipe', 'pipe'] });
     child.stdout.pipe(log, { end: false });
     child.stderr.pipe(log, { end: false });

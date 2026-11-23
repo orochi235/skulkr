@@ -80,6 +80,12 @@ weasel cutover.
     longer lags one landing behind `main` (README "A run", 2026-11-22).
   - reviewers' prompts carrying their area's files (`review.preload`, the default), and each pair's B starting 30
     seconds after its A (README "A run", 2026-11-22).
+  - the gate overhaul (README "Preflight", 2026-11-22): weasel's verify running ci.yml's checks after its tests, with
+    its counts summed over both runs and a file of checks set aside only for the checks the frozen tree fails too; the
+    linters' safe fixes committed before a fixer's or repair's hand-back; the preflight on the batch's tip and the gate
+    told `--no-checks` after it passes; a red result's failures run on `main`'s tip, what `main` fails too set aside
+    from the capstone and landed over, and the report's `main red at` clause; and no gate rerun after a capstone cycle
+    whose repairs committed nothing while `main` stood still.
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

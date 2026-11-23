@@ -121,6 +121,24 @@ describe('verifyAndRepair', () => {
     expect(h.jobs).toHaveLength(1);
   });
 
+  it('sets a file of checks aside only for the checks the frozen tree fails too', async () => {
+    const check = (name: string) => ` FAIL  gate  scripts/ci-checks.gate.ts > the checks > npm run ${name}`;
+    const branch = (names: string[]) => ({
+      'verify.exit': '1', 'verify.files': 'a/store.ts',
+      'verify.log': `${names.map(check).join('\n')}\n Test Files  1 failed | 2 passed (3)`,
+    });
+    const frozen = { 'verify.exit': '1', 'verify.log': `${check('lint -w @weasel-js/labkit')}\n Test Files  1 failed (1)` };
+    const h = harness({ command: 'run {files}' }, { verify: [frozen], repair: [{ ...PASSING, 'fix.mbox': mbox(3) }] });
+    write(h.fixDir, { ...branch(['lint -w @weasel-js/labkit']), 'fix.mbox': mbox(2) });
+    const same = await verifyAndRepair(h.ctx, h.area, { mbox: join(h.fixDir, 'fix.mbox') }, h.fixDir);
+    expect(same).toMatchObject({ ok: true, repairs: [], verify: { baseline: ['scripts/ci-checks.gate.ts'] } });
+    const other = join(h.ctx.nightDir, 'jobs', 'b', 'fix');
+    write(other, { ...branch(['lint -w @weasel-js/labkit', 'typecheck']), 'fix.mbox': mbox(1) });
+    const more = await verifyAndRepair(h.ctx, { id: 'b' }, { mbox: join(other, 'fix.mbox') }, other);
+    expect(more.repairs).toHaveLength(1);
+    expect(h.said[1]).toBe('verify b: failed: 1 of 3 test files failed (scripts/ci-checks.gate.ts)');
+  });
+
   it("names a frozen-tree check by its files and GUI flag, whatever the order or which area asks", () => {
     expect(baselineKey(['b.test.ts', 'a.test.ts'], false)).toBe(baselineKey(['a.test.ts', 'b.test.ts'], false));
     expect(baselineKey(['a.test.ts'], false)).not.toBe(baselineKey(['b.test.ts'], false));

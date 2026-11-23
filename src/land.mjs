@@ -4,11 +4,14 @@
  * The gate run through the fast-forward holds the merge lock, so runs land one at a time, and the gate itself holds
  * the fleet queue's lease (`fleet.mjs`), so one gate runs at a time across every tenant.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { applyFix, commitRecord, fastForwardMain, gitIn, makeBatch, pushMain, removeWorktree } from './batch.mjs';
 import { capstoneText, repairCapstone } from './capstone.mjs';
+import { failedWhereIn } from './gate.mjs';
 import { alreadyFailing, failuresIn, gateOnFleet } from './gateRun.mjs';
+import { mainRedText, testChecked } from './preflight.mjs';
+import { isTestPath } from './verify.mjs';
 import { leftOutIn, leftOutWhy, recordLeftOut, retryable } from './leftOut.mjs';
 import { waitForLease } from './lease.mjs';
 import { mergeLock } from './runs.mjs';
@@ -88,15 +91,17 @@ const mergeCycles = (a, b) => {
 /**
  * Merges the branches into the batch, records the round there, runs the gate on its tip, and merges if green. A red
  * gate gets one capstone repair cycle where `repair` is given (`capstone.mjs`): its failures go to the branches that
- * caused them, each repair starting only while `mayRepair` allows (`repairCapstone`), the batch is rebuilt from the repaired ones, and the gate runs once more. Still red, it lands anyway
- * where `baseline(files)` says every failure left is a test file that fails on the frozen commit too: `main` has
- * those failures already, so landing leaves it no worse. A branch left out because it would not merge is recorded
+ * caused them, each repair starting only while `mayRepair` allows (`repairCapstone`), the batch is rebuilt from the
+ * repaired ones, and the gate runs once more. `checks` (`checksFor`) runs the preflight before each gate and checks a
+ * red result's failures on `main`'s tip, and what `main` fails too is no branch's to repair (README "Preflight"). Still
+ * red, it lands anyway where every failure left is one `main` has (without `checks`, where `baseline(files)` says each
+ * is a test file failing on the frozen commit too): landing leaves `main` no worse. A branch left out because it would not merge is recorded
  * (`leftOut.mjs`), and the next round's batch tries it again after its own branches. `onLanded({ tip, areas })` hears
  * that `main` fast-forwarded to `tip` with the round's `areas` in it. `early` makes it an early landing (README "Early
  * landings"): no record, no retry of earlier rounds' branches, and a branch that will not merge, or a batch still red,
  * leaves its branches for the round's own batch rather than out of it.
  */
-export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, mayRepair = /** @type {(started: number) => string} */ (() => ''), baseline, early = false, onLanded = /** @type {(landed: { tip: string, areas: string[] }) => void} */ (() => {}) }) => {
+export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, mayRepair = /** @type {(started: number) => string} */ (() => ''), baseline, checks = /** @type {any} */ (undefined), early = false, onLanded = /** @type {(landed: { tip: string, areas: string[] }) => void} */ (() => {}) }) => {
   const idOf = cfg.names.idOf;
   const fixCommits = new Map(results.map((a) => [a.id, a.fixCommits]));
   const main = cfg.git.main;
@@ -157,18 +162,28 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     let cycles = 0;
     /** How many failures the gate before the last repair cycle named. */
     let before = Infinity;
+    /** The test files the last red result failed, which the next preflight runs first. */
+    let rerun = [];
     for (;;) {
-      tested = await gateOnFleet({ cfg, root, batch, nightDir, merge, say, setStep, round, tip: recorded, rebuild: build, tag: `${early ? EARLY.replace('-', '.') : ''}${cycles === 0 ? '' : cycles === 1 ? '.capstone' : `.capstone${cycles}`}` });
+      const tag = `${early ? EARLY.replace('-', '.') : ''}${cycles === 0 ? '' : cycles === 1 ? '.capstone' : `.capstone${cycles}`}`;
+      tested = await testChecked({
+        cfg, checks, batch, tip: recorded, rerun, tag, say,
+        gate: (extra) => gateOnFleet({ cfg, root, batch, nightDir, merge, say, setStep, round, tip: recorded, rebuild: build, tag, extra }),
+      });
       batch = tested.batch ?? batch;
-      if (!tested.report || !repair) break;
+      if (tested.onMain?.keys.length) say(`main: ${mainRedText(cfg, root, tested.onMain, readFileSync(tested.log, 'utf8'))}`);
+      if (!tested.report) break;
+      const own = tested.own ?? tested.log;
+      rerun = failedWhereIn(readFileSync(tested.log, 'utf8'), cfg.gate).filter(isTestPath);
       // One repair cycle per round, and another after it only while each leaves fewer failures than the one before.
-      const failures = failuresIn(tested.log, cfg.gate);
+      const failures = failuresIn(own, cfg.gate);
+      if (!failures || !repair) break;
       if (cycles > 0 && !(failures < before)) break;
       if (cycles > 0) say(`capstone: ${failures} failures, down from ${before}; repairing again`);
       before = failures;
       cycles += 1;
       setStep('repair');
-      const now = await repairCapstone({ cfg, root, round, commit, batch, logPath: tested.log, repair, say, mayRepair, attempt: cycles });
+      const now = await repairCapstone({ cfg, root, round, commit, batch, logPath: own, repair, say, mayRepair, attempt: cycles });
       cycle = mergeCycles(cycle, now);
       for (const id of now.repaired.map(idOf)) fixCommits.set(id, results.find((a) => a.id === id)?.fixCommits);
       for (const branch of [...now.dropped, ...now.skipped]) {
@@ -178,7 +193,12 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
         outcomes[idOf(branch)] = `\`${branch}\`, left out: ${now.skipped.includes(branch) ? 'its capstone repair never started, for the dollar cap or a stop request' : 'its capstone failures still failed after a repair'}`;
       }
       const out = [...now.dropped, ...now.skipped, ...now.unrepairable];
-      if (!now.repaired.length && !out.length) break;
+      // Unless main moved since, a cycle whose repairs committed nothing and left nothing out would test the same tree.
+      const moved = git('merge-base', main, tested.tip ?? recorded) !== git('rev-parse', main);
+      if (!now.changed.length && !out.length && !moved) {
+        if (now.repaired.length) say(`capstone: ${now.repaired.length} repairs passed with no commit and ${main} has not moved; not testing the same tree again`);
+        break;
+      }
       landing = landing.filter((b) => !out.includes(b));
       ({ batch, tip: recorded } = build());
       say(`capstone: rebuilt ${batch.name} with ${now.repaired.length} repaired and ${out.length} left out; testing again`);
@@ -186,9 +206,14 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     const retested = cycle && (cycle.repaired.length || cycle.dropped.length || cycle.skipped.length || cycle.unrepairable.length) ? !tested.report : undefined;
     let tried = earlier.size ? `; retried ${earlier.size} branches left out of earlier rounds, ${retried.merged} merged and ${retried.out} still left out` : '';
     if (cycle) tried += `; ${capstoneText(cycle, idOf, retested)}`;
-    const over = tested.report && baseline ? await alreadyFailing(cfg, tested.log, baseline) : null;
+    if (tested.onMain?.keys.length) tried += `; ${mainRedText(cfg, root, tested.onMain, readFileSync(tested.log, 'utf8'))}`;
+    // With checks, what main fails too was set aside already, so a red result with nothing left of its own lands over
+    // it; without, a red gate lands where every failure is a test file failing on the frozen commit too.
+    const over = !tested.report ? null
+      : checks ? (failuresIn(tested.own ?? tested.log, cfg.gate) === 0 && tested.onMain ? tested.onMain.where : null)
+        : baseline ? await alreadyFailing(cfg, tested.log, baseline) : null;
     if (over) {
-      say(`gate: every failure left (${over.length}) fails on ${commit.slice(0, 10)} too; landing over them`);
+      say(`gate: every failure left (${over.length}) fails on ${checks ? `${main}'s tip` : commit.slice(0, 10)} too; landing over them`);
       tried += `; landed over ${over.length} failures ${cfg.git.main} already has (${over.slice(0, 3).join(', ')}${over.length > 3 ? ', …' : ''})`;
     } else if (tested.report && early) {
       removeWorktree(root, batch.tree);

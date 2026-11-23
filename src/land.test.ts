@@ -31,7 +31,7 @@ const area = (id: string) => ({
 });
 
 /** A project on `main` whose `shared.txt` main has changed since `frozen`, with a state dir and a green gate. */
-const project = (gate = ['true']) => {
+const project = (gate = ['true'], gateExtra: object = {}) => {
   const root = temp('skulkr-land-');
   const git = gitIn(root);
   git('init', '-q', '-b', 'main');
@@ -49,7 +49,7 @@ const project = (gate = ['true']) => {
   put('.gitignore', '.worktrees/\n');
   const frozen = git('rev-parse', 'HEAD');
   put('shared.txt', 'main');
-  const cfg = resolveConfig({ state: temp('skulkr-state-'), record: { dir: 'audit-log' }, gate: { command: gate } });
+  const cfg = resolveConfig({ state: temp('skulkr-state-'), record: { dir: 'audit-log' }, gate: { command: gate, ...gateExtra } });
   /** `audit<round>-<id>` from `from`, writing `file`. */
   const branch = (round: number, id: string, file: string, from = frozen) => {
     const name = cfg.names.area(round, id);
@@ -58,14 +58,14 @@ const project = (gate = ['true']) => {
     git('checkout', '-q', 'main');
     return name;
   };
-  const night = async (round: number, branches: string[], early = false) => {
+  const night = async (round: number, branches: string[], early = false, more: object = {}) => {
     const said: string[] = [];
     const outcomes: Record<string, string> = {};
     const results = branches.map((b) => area(b.replace(cfg.names.area(round, ''), '')));
     const landed: { tip: string; areas: string[] }[] = [];
     const report = await batchAndTest({
       cfg, root, git, round, commit: frozen, date: '2026-11-21', nightDir: temp('skulkr-night-'), branches, results,
-      sweep: undefined, outcomes, merge: true, say: (l: string) => said.push(l), setStep: () => {}, repair: undefined, baseline: undefined, early,
+      sweep: undefined, outcomes, merge: true, say: (l: string) => said.push(l), setStep: () => {}, repair: undefined, baseline: undefined, early, ...more,
       onLanded: (l: { tip: string; areas: string[] }) => landed.push(l),
     });
     return { report, outcomes, said, landed };
@@ -122,6 +122,68 @@ describe('batchAndTest', () => {
     const three = await night(3, [gone]);
     expect(three.outcomes.gone).toMatch(new RegExp(`^\`${gone}\`, left out: merge failed: .*${gone}`));
     expect(three.outcomes.gone).not.toMatch(/conflict/);
+  });
+});
+
+describe('batchAndTest with checks', () => {
+  /** A gate that appends its arguments to the file `runs` and fails `a.test.ts`'s test `t` when `fail`. */
+  let runs = '';
+  beforeEach(() => {
+    runs = join(temp('skulkr-runs-'), 'runs');
+  });
+  const gate = (fail: boolean) => ['sh', '-c', `echo "$*" >> ${runs}; ${fail ? 'echo "fleet-fail: core a.test.ts :: t"; exit 1' : 'exit 0'}`, 'gate'];
+  const runsIn = () => {
+    try {
+      return readFileSync(runs, 'utf8').replace(/\n$/, '').split('\n');
+    } catch {
+      return [];
+    }
+  };
+  const checks = (preflight: object, shared: string[] | null) => ({
+    preflight: async () => preflight,
+    onMain: async () => (shared ? { tip: 'main', keys: shared, where: shared.map((k) => k.split(' ')[1]) } : null),
+    gateArgs: ['--no-checks'],
+  });
+
+  it("tells the gate the checks ran, and lands over a red gate whose every failure main's tip has too", async () => {
+    const { branch, night } = project(gate(true), { failPrefix: 'fleet-fail:' });
+    const a = branch(3, 'a', 'a.txt');
+    const three = await night(3, [a], false, { checks: checks({ ok: true }, ['core a.test.ts :: t']) });
+    expect(runsIn()).toEqual(['--no-checks']);
+    expect(three.report).toMatch(/^main fast-forwarded/);
+    expect(three.report).toMatch(/main red at main: 1 failures it has too \(a\.test\.ts\)/);
+    expect(three.said).toContain("gate: every failure left (1) fails on main's tip too; landing over them");
+  });
+
+  it('stops at a preflight that fails for the batch, never running the gate', async () => {
+    const { git, branch, night } = project(gate(false), { failPrefix: 'fleet-fail:' });
+    const log = join(temp('skulkr-pre-'), 'pre.log');
+    writeFileSync(log, 'fleet-fail: gate scripts/ci-checks.gate.ts :: npm run lint\n');
+    const before = git('rev-parse', 'main');
+    const a = branch(3, 'a', 'a.txt');
+    const three = await night(3, [a], false, { checks: checks({ ok: false, unrun: false, log }, null) });
+    expect(runsIn()).toEqual([]);
+    expect(three.report).toMatch(/^red: the preflight failed on batch\//);
+    expect(git('rev-parse', 'main')).toBe(before);
+  });
+
+  it('runs the checks in the gate where the preflight gave no verdict', async () => {
+    const { branch, night } = project(gate(false), { failPrefix: 'fleet-fail:' });
+    const a = branch(3, 'a', 'a.txt');
+    const three = await night(3, [a], false, { checks: checks({ ok: false, unrun: true }, null) });
+    expect(runsIn()).toEqual(['']);
+    expect(three.report).toMatch(/^main fast-forwarded/);
+  });
+
+  it('tests no tree twice when every repair passed without a commit and main has not moved', async () => {
+    const { branch, night } = project(gate(true), { failPrefix: 'fleet-fail:' });
+    const a = branch(3, 'a', 'a.test.ts');
+    const repaired: string[] = [];
+    const three = await night(3, [a], false, { repair: async (id: string) => (repaired.push(id), { ok: true, added: 0 }) });
+    expect(repaired).toEqual(['a']);
+    expect(runsIn()).toHaveLength(1);
+    expect(three.said).toContain('capstone: 1 repairs passed with no commit and main has not moved; not testing the same tree again');
+    expect(three.report).toMatch(/^red: /);
   });
 });
 

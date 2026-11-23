@@ -35,7 +35,8 @@ export const excerptFor = (text, files, after = files.some((f) => !isTestPath(f)
 /**
  * A repair of one area's branch for a red capstone, through `ctx`'s jobs: given the failing files and the log's
  * lines about them, it checks those files beside the area's own, and on a pass patches the branch again. `mboxOf`
- * answers the commits of a branch that is not an area's, the sweep's. Answers `{ ok, commits?, verify }`.
+ * answers the commits of a branch that is not an area's, the sweep's. Answers `{ ok, commits?, added?, verify }`, `added`
+ * the commits the repair made.
  */
 export const capstoneRepairer = (ctx, { root, results, mboxOf = () => undefined }) => async (id, files, log, attempt = 1) => {
   // The first cycle's names are kept; a later cycle's job and verdict get their own.
@@ -61,7 +62,7 @@ export const capstoneRepairer = (ctx, { root, results, mboxOf = () => undefined 
   }
   if (summary) Object.assign(summary, { fixCommits: applied.commits, patches: applied.commits.length });
   ctx.say(`patch ${id}: ${applied.commits.length} commits on ${applied.branch}`);
-  return { ok: true, commits: applied.commits, verify };
+  return { ok: true, commits: applied.commits, added: run.added, verify };
 };
 
 /**
@@ -78,7 +79,7 @@ export const repairRefusal = ({ stopped, used, started, fix, cap }) => {
  * One repair cycle for a red capstone whose log is at `logPath`, on the batch `batch` built from the frozen commit
  * `commit`. `repair(id, files, log)` repairs one of this round's area branches, each started only while
  * `mayRepair(started)` answers '' (else why not), `started` the repairs started before it. Answers what was tried:
- * `repaired` and `dropped` branches, `skipped`, those whose repair never started, `unrepairable`, earlier rounds'
+ * `repaired` and `dropped` branches, `changed`, the repaired ones a repair committed to, `skipped`, those whose repair never started, `unrepairable`, earlier rounds'
  * branches failures were laid at, `byBranch`, the failing files laid at each, and `unattributed`, the failures no
  * branch reaches.
  */
@@ -132,6 +133,8 @@ export const repairCapstone = async ({ cfg, root, round, commit, batch, logPath,
   }));
   return {
     repaired: tried.filter((t) => t.ok).map((t) => t.branch),
+    // A repair that passed without a commit leaves its branch as it was: testing the batch again would test the same tree.
+    changed: tried.filter((t) => t.ok && (t.added ?? 1) > 0).map((t) => t.branch),
     dropped: tried.filter((t) => !t.ok && !t.earlier && !t.skipped).map((t) => t.branch),
     skipped: tried.filter((t) => t.skipped).map((t) => t.branch),
     unrepairable: tried.filter((t) => t.earlier).map((t) => t.branch),

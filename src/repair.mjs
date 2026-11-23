@@ -10,7 +10,7 @@ import { brief, fill, projectVars } from './brief.mjs';
 import { JOB_IN } from './config.mjs';
 import { dispatch } from './dispatch.mjs';
 import { AREA_MBOX, baselineShell, jobDir, repairShell, stoppedBeforeModel, timeoutOf, verifyShell } from './jobs.mjs';
-import { failureExcerpt, needsGui, verdictIn, verdictText, verifyOf } from './verify.mjs';
+import { failedTestsIn, failureExcerpt, needsGui, verdictIn, verdictText, verifyOf } from './verify.mjs';
 
 export const MAX_REPAIRS = 2;
 
@@ -44,7 +44,9 @@ const verifyJob = async (ctx, area, mbox, { gui, label, extra }) => {
 export const baselineKey = (files, gui) => createHash('sha256').update(`${gui ? 'gui' : 'plain'}\n${[...files].sort().join('\n')}`).digest('hex').slice(0, 10);
 
 /**
- * Which of `verdict`'s failing test files fail on the frozen tree without any area's commits. Each file is checked
+ * Which of `verdict`'s failing files fail on the frozen tree without any area's commits, the same way: each test
+ * `verdict.log` names failing in the file fails there too, so a file of checks is set aside only for the checks the
+ * tree already fails. Each file is checked
  * once a round, in a job of `area`'s that runs the same part of the verify step, and the answer kept on `ctx` for
  * every area after it: a failure the tree already has is no area's to repair.
  */
@@ -67,10 +69,18 @@ export const baselineFailures = async (ctx, area, verdict) => {
       return { unrun: true };
     });
     // A baseline run that gave no file-level answer, or none at all, clears nothing: those files stay the area's.
-    for (const file of unknown) known.set(key(file), ran.then((v) => !v.unrun && v.counts !== undefined && v.failedFiles.includes(file)));
+    // Otherwise each file it failed answers the tests failing in it there.
+    const testsOf = (v, file) => (!v.unrun && v.counts !== undefined && v.failedFiles.includes(file) ? failedTestsIn(v.log).get(file) ?? new Set() : null);
+    for (const file of unknown) known.set(key(file), ran.then((v) => testsOf(v, file)));
   }
-  const fails = await Promise.all(files.map((file) => known.get(key(file))));
-  return files.filter((_, i) => fails[i]);
+  const mine = failedTestsIn(verdict.log ?? '');
+  const there = await Promise.all(files.map((file) => known.get(key(file))));
+  // A file failing whole on either side names no test to compare, so it compares as a file.
+  const same = (file, old) => {
+    const now = mine.get(file);
+    return old !== null && (!now?.size || !old.size || [...now].every((t) => old.has(t)));
+  };
+  return files.filter((file, i) => same(file, there[i]));
 };
 
 /**

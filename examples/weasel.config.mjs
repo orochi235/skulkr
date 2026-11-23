@@ -47,6 +47,19 @@ export const blameStep = (text, step) => {
   return [...new Set(section.flatMap((l) => named(l).map((m) => `packages/${m[1]}`)))];
 };
 
+/** ci.yml's checks as vitest tests, three at once (the `gate` project's `maxConcurrency`). */
+const CHECKS = 'npx vitest run --project=gate scripts/ci-checks.gate.ts';
+
+/** The changed files `{files}` lists matching `re`, one a line, with `strip` cut from each. */
+const pick = (re, strip = '') => `$(printf '%s\\n' {files} | grep -E '${re}'${strip ? ` | sed 's#^${strip}##'` : ''})`;
+const FIXUP = [
+  `L=${pick(String.raw`^packages/labkit/.*\.(tsx?|jsx?|mjs|css|json)$`, 'packages/labkit/')}`,
+  '[ -z "$L" ] || (cd packages/labkit && npx biome check --write --no-errors-on-unmatched $L)',
+  `E=${pick(String.raw`^(packages|apps|tests)/.*\.(tsx?|jsx?|mjs)$`)}`,
+  '[ -z "$E" ] || npx eslint --fix $E',
+  'true',
+].join('; ');
+
 const NVM = 'export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"; . "$NVM_DIR/nvm.sh" >/dev/null; nvm use >/dev/null';
 
 export default {
@@ -113,16 +126,28 @@ export default {
       lintOf: String.raw`^packages\/([^/]+)\/`,
       final: String.raw`\bnpm run(?: -s)? checks:gate\b`,
     },
-    // The changesets' check (half a second, and a failed one used to surface only in the batch's gate), then every
-    // test file whose imports reach what the fixer changed, under the root config's projects: all but the checks
-    // (`gate`) and the projects that need a browser, which run on a GUI node.
+    // Every test file whose imports reach what the fixer changed, under the root config's projects: all but the checks
+    // (`gate`) and the projects that need a browser, which run on a GUI node. Then the checks themselves, ci.yml's
+    // typecheck, lint, `check:*` and `audit:*` (`scripts/ci-checks.gate.ts`, a vitest file whose tests are the
+    // steps), so the fleet gate runs only tests (2026-11-22).
     verify: {
-      command: `npm run -s check:changesets && npx vitest related --run --maxWorkers=4 ${['!gate', ...BROWSER_PROJECTS.map((p) => `!${p}`)].map((p) => `--project='${p}'`).join(' ')} {files}`,
+      command: `npx vitest related --run --maxWorkers=4 ${['!gate', ...BROWSER_PROJECTS.map((p) => `!${p}`)].map((p) => `--project='${p}'`).join(' ')} {files}; s=$?; ${CHECKS} || s=1; exit $s`,
       gui: {
         probe: `npx vitest list --filesOnly ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {related}`,
         command: `npx vitest related --run --maxWorkers=2 ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {files}`,
       },
       timeoutMin: 30,
+    },
+    // Lint's safe fixes committed before a fixer's work is handed back, so a fixable finding (an import order) is fixed
+    // rather than failed: biome from labkit, the one package it lints, on labkit's files; eslint on the rest.
+    fixup: { command: FIXUP, message: 'apply the linters\' safe fixes' },
+    // The checks once on the batch's tip, and on main's tip over a red result's failures, beside the last red gate's
+    // test files outside the browser projects; the reporter prints the gate's `fleet-fail:` lines. The gate is then
+    // told the checks ran (`test:fleet --no-checks`).
+    preflight: {
+      command: `npx vitest run --maxWorkers=4 --reporter=default --reporter=./scripts/vitest-fleet-fail.mjs ${BROWSER_PROJECTS.map((p) => `--project='!${p}'`).join(' ')} scripts/ci-checks.gate.ts {tests}`,
+      gateArgs: ['--no-checks'],
+      timeoutMin: 20,
     },
   },
 

@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { TIMED_OUT, failedFilesIn, failureExcerpt, fileCountsOf, isTestPath, needsGui, verdictOf, verifyLine, verifyLines } from './verify.mjs';
+import { TIMED_OUT, failedFilesIn, failedTestsIn, failureExcerpt, fileCountsOf, isTestPath, needsGui, verdictOf, verifyLine, verifyLines } from './verify.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -47,11 +47,24 @@ describe('verdictOf', () => {
   });
 });
 
-describe('fileCountsOf and failedFilesIn', () => {
-  it('read the last summary, and each failing file once', () => {
+describe('fileCountsOf, failedFilesIn and failedTestsIn', () => {
+  it("sum every vitest run's summary, and name each failing file once", () => {
     const log = ' Test Files  1 failed (1)\n FAIL  a/x.test.ts > one\n FAIL  a/x.test.ts > two\n FAIL  b/y.pbt.test.ts > p\n Test Files  2 failed | 5 passed (7)';
-    expect(fileCountsOf(log)).toEqual({ failed: 2, passed: 5, total: 7 });
+    expect(fileCountsOf(log)).toEqual({ failed: 3, passed: 5, total: 8 });
     expect(failedFilesIn(log)).toEqual(['a/x.test.ts', 'b/y.pbt.test.ts']);
+  });
+
+  it('read a file of checks by its path after FAIL, with the checks failing in it', () => {
+    const log = [
+      ' FAIL  gate  scripts/ci-checks.gate.ts > the checks ci.yml runs as steps > npm run lint -w @weasel-js/labkit',
+      ' FAIL  core  a/x.test.ts [ a/x.test.ts ]',
+      'pass 3/30 npm run typecheck',
+      'FAIL 4/30 npm run check:token-reads (2.0 s)',
+    ].join('\n');
+    const got = failedTestsIn(log);
+    expect([...got.keys()]).toEqual(['scripts/ci-checks.gate.ts', 'a/x.test.ts']);
+    expect([...got.get('scripts/ci-checks.gate.ts')!]).toEqual(['the checks ci.yml runs as steps > npm run lint -w @weasel-js/labkit']);
+    expect(got.get('a/x.test.ts')!.size).toBe(0);
   });
 });
 

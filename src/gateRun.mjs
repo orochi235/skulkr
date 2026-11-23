@@ -43,8 +43,8 @@ const crashedIn = (log, gate) => {
 /** Tests the batch with the config's gate, merging a moved `main` in first and between passes. Where that merge
  *  conflicts, `rebuild` makes the batch again on the new `main`, leaving out the branches that now conflict, and the
  *  round goes on with the rest. Answers the batch and the tip to land, or, red, the batch, its gate log, and `{ report }`;
- *  `tag` marks the gate's logs apart from an earlier test of the round's batch. */
-const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild, tag = '' }) => {
+ *  `tag` marks the gate's logs apart from an earlier test of the round's batch; `extra` goes after the gate's command. */
+const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild, tag = '', extra = [] }) => {
   const logName = `${batch.name.replace(/\//g, '-')}${tag}`;
   const main = cfg.git.main;
   const gate = cfg.gate.name;
@@ -66,13 +66,13 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
   for (let pass = 1; ; pass++) {
     const suffix = pass === 1 ? '' : `.${pass}`;
     let log = freshLog(nightDir, `${logName}${suffix}`, cfg.gate.logSuffix);
-    let status = await runGate(cfg, { root, batch, logPath: log });
+    let status = await runGate(cfg, { root, batch, logPath: log, extra });
     say(`gate: ${gate} ${status === 0 ? 'passed' : `failed (${status}); its log is ${log}`}`);
     // A failed gate whose log names no failure crashed or was killed, which says nothing of the batch: run it once more.
     if (status !== 0 && crashedIn(log, cfg.gate)) {
       say(`gate: ${gate} named no failure, as a crashed run does; running it once more`);
       log = freshLog(nightDir, `${logName}${suffix}.rerun`, cfg.gate.logSuffix);
-      status = await runGate(cfg, { root, batch, logPath: log });
+      status = await runGate(cfg, { root, batch, logPath: log, extra });
       say(`gate: ${gate} ${status === 0 ? 'passed' : `failed (${status}); its log is ${log}`}`);
     }
     if (status !== 0) return { batch, tip, log, report: `red: ${batch.name} and its branches kept; worktree ${batch.tree}; logs in ${nightDir}` };

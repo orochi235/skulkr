@@ -1,11 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ontoArgs } from './runner/onto.mjs';
 import { resolveConfig } from './config.mjs';
-import { STARTED, fixShell, installLines, matchShell, repairShell, reviewShell, stoppedBeforeModel, timeoutOf, verifyShell } from './jobs.mjs';
+import { STARTED, fixShell, fixupLines, installLines, matchShell, repairShell, reviewShell, stoppedBeforeModel, timeoutOf, verifyShell } from './jobs.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';
 
 const claudeOf = (shell: string) => shell.split(/ && |\n/).find((part) => part.includes('claude -p'))!;
@@ -137,5 +137,29 @@ describe('installLines', () => {
   it('go on to the model after an install that passes, and mark the lockfile installed', () => {
     expect(runIn({ lockfile: 'package-lock.json', command: 'mkdir -p node_modules', marker: 'node_modules/.skulkr-lock' }))
       .toEqual({ model: true, stopped: '', log: true, marker: true });
+  });
+});
+
+describe('fixupLines', () => {
+  it("commit what the fixup changes in the commits' files, and nothing the model left uncommitted", () => {
+    const dir = mkdtempSync(join(tmpdir(), 'skulkr-fixup-'));
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' }).trim();
+    try {
+      git('init', '-q', '-b', 'main');
+      git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'base');
+      const base = git('rev-parse', 'HEAD');
+      writeFileSync(join(dir, 'a.ts'), 'x\n');
+      writeFileSync(join(dir, 'b.ts'), 'x\n');
+      git('add', 'a.ts');
+      git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'fix');
+      const lines = fixupLines({ command: "perl -pi -e 's/x/y/' {files}", message: 'apply fixes' });
+      execFileSync('bash', ['-c', ['mkdir -p .skulkr/out', `BASE=${base}`, ...lines].join('\n')], { cwd: dir });
+      expect(git('log', '--format=%s', `${base}..HEAD`)).toBe('apply fixes\nfix');
+      expect(git('show', 'HEAD:a.ts')).toBe('y');
+      expect(existsSync(join(dir, 'b.ts'))).toBe(false);
+      expect(fixupLines(null)).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
