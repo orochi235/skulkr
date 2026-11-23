@@ -3,7 +3,7 @@
  * result's failures (README "Preflight"). Each runs as a job of the round's gate lane, from a local tree at the commit
  * it checks; its output marks failures with the gate's `failPrefix` lines, so a red preflight reads as a red gate.
  */
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { stripAnsi } from './ansi.mjs';
 import { addWorktree, gitIn, removeWorktree } from './batch.mjs';
@@ -18,48 +18,76 @@ import { TIMED_OUT, isTestPath } from './verify.mjs';
 export const preflightOf = (cfg) => (cfg.checks?.preflight?.command ? cfg.checks.preflight : undefined);
 
 /**
- * A node job running the preflight on the synced tree, readied as a fixer's is (`treeLines`: it must hash to
- * `$FROZEN_TREE`), over `$PREFLIGHT_TESTS`; it writes `verify.log` and `verify.exit` under the job's output, as a verify job does.
+ * A node job running the preflight (its GUI part with `gui`) on the synced tree, readied as a fixer's is
+ * (`treeLines`: it must hash to `$FROZEN_TREE`), over `$PREFLIGHT_TESTS`; it writes `verify.log` and `verify.exit`
+ * under the job's output, as a verify job does.
  */
-export const preflightShell = (cfg) => {
+export const preflightShell = (cfg, { gui = false } = {}) => {
   const pre = preflightOf(cfg);
+  const command = gui ? pre.gui.command : pre.command;
   return [
     'set -e', ...(cfg.setup.prelude ? [cfg.setup.prelude] : []), `rm -rf ${JOB_OUT} && mkdir -p ${JOB_OUT}`, ...treeLines(cfg),
     'set +e',
     'export PREFLIGHT_TESTS',
-    `perl -e 'alarm shift; exec @ARGV' ${(pre.timeoutMin ?? 20) * 60} bash -c ${q(pre.command.replaceAll('{tests}', '$PREFLIGHT_TESTS'))} > ${JOB_OUT}/verify.log 2>&1; echo $? > ${JOB_OUT}/verify.exit`,
+    `perl -e 'alarm shift; exec @ARGV' ${(pre.timeoutMin ?? 20) * 60} bash -c ${q(command.replaceAll('{tests}', '$PREFLIGHT_TESTS'))} > ${JOB_OUT}/verify.log 2>&1; echo $? > ${JOB_OUT}/verify.exit`,
     'exit 0',
   ].join('\n');
 };
 
 /**
- * The preflight on `commit` checked out at `tree` (a local worktree), with `tests` beside it, as job `label` of the
- * gate lane. Answers `{ ok, unrun, log }`: `log` the path of its output copied to `nightDir`, `unrun` when it gave no
- * verdict (it never ran, timed out, or failed naming no failure), which says nothing of the commit.
+ * The test files a red log's failure lines name, split by where they run: `gui`, those whose line's project (its first
+ * word) the preflight's `gui.project` matches, and `plain` the rest. Without a GUI part every file is plain.
  */
-export const runPreflight = async (ctx, { tree, commit, tests = [], label }) => {
+export const testsToRerun = (text, cfg) => {
+  const re = preflightOf(cfg)?.gui?.project ? new RegExp(preflightOf(cfg).gui.project) : null;
+  const plain = new Set();
+  const gui = new Set();
+  for (const key of failureKeysIn(text, cfg.gate)) {
+    if (!key.includes(' :: ')) continue;
+    const [project, file] = key.split(' :: ')[0].split(' ');
+    if (!file || !isTestPath(file)) continue;
+    (re?.test(project) ? gui : plain).add(file);
+  }
+  return { plain: [...plain], gui: [...gui] };
+};
+
+/** One part of the preflight as job `label`: answers `{ exit, text }`, `exit` NaN where it left none. */
+const runPart = async (ctx, { tree, commit, tests, label, gui }) => {
   const { cfg, root, nightDir } = ctx;
   const git = gitIn(root);
   const to = jobDir(nightDir, 'gate', label);
   const job = { ...ctx, frozen: tree, base: git('merge-base', commit, `${cfg.git.remote}/${cfg.git.main}`) };
   try {
     await dispatch(job, { id: 'gate' }, 'verify', {
-      kind: 'test', expect: 'none', shell: preflightShell(cfg), to, logPath: `${to}.log`,
+      kind: 'test', expect: 'none', gui, shell: preflightShell(cfg, { gui }), to, logPath: `${to}.log`,
       env: { FROZEN_TREE: git('rev-parse', `${commit}^{tree}`), PREFLIGHT_TESTS: tests.join(' ') },
       task: cfg.names.task(ctx.round, 'gate', 'verify'), timeoutMin: (preflightOf(cfg).timeoutMin ?? 20) + 15,
-      about: `Runs the checks on audit round ${ctx.round}'s batch, or ${cfg.git.main}'s tip, before the fleet gate.`,
+      about: `Runs ${gui ? 'the browser tests the last red gate failed' : 'the checks'} on audit round ${ctx.round}'s batch, or ${cfg.git.main}'s tip, before the fleet gate.`,
     });
   } catch (error) {
     ctx.say(`preflight ${label}: did not run (${error.message ?? error})`);
-    return { ok: false, unrun: true, log: undefined };
+    return { exit: Number.NaN, text: '' };
   }
-  const exit = Number.parseInt(readIf(join(to, 'verify.exit')).trim(), 10);
+  return { exit: Number.parseInt(readIf(join(to, 'verify.exit')).trim(), 10), text: readIf(join(to, 'verify.log')) };
+};
+
+/**
+ * The preflight on `commit` checked out at `tree` (a local worktree), as job `label` of the gate lane: the checks with
+ * `tests.plain` beside them, and, at once on a GUI node, the config's GUI part over `tests.gui`. Answers
+ * `{ ok, unrun, log }`: `log` the path of both parts' output in `nightDir`, `unrun` when a part gave no verdict (it
+ * never ran, timed out, or failed naming no failure), which says nothing of the commit.
+ */
+export const runPreflight = async (ctx, { tree, commit, tests = { plain: [], gui: [] }, label }) => {
+  const { cfg, nightDir } = ctx;
+  const gui = preflightOf(cfg).gui?.command ? tests.gui : [];
+  const parts = await Promise.all([
+    runPart(ctx, { tree, commit, tests: tests.plain, label, gui: false }),
+    ...(gui.length ? [runPart(ctx, { tree, commit, tests: gui, label: `${label}-gui`, gui: true })] : []),
+  ]);
   const log = join(nightDir, `${label}.preflight.log`);
-  if (existsSync(join(to, 'verify.log'))) copyFileSync(join(to, 'verify.log'), log);
-  else writeFileSync(log, '');
-  const named = failedWhereIn(readFileSync(log, 'utf8'), cfg.gate).length > 0;
-  const unrun = !Number.isInteger(exit) || exit === TIMED_OUT || (exit !== 0 && !named);
-  return { ok: exit === 0, unrun, log };
+  writeFileSync(log, parts.map((p) => p.text).join('\n'));
+  const unrun = parts.some((p) => !Number.isInteger(p.exit) || p.exit === TIMED_OUT || (p.exit !== 0 && !failedWhereIn(p.text, cfg.gate).length));
+  return { ok: parts.every((p) => p.exit === 0), unrun, log };
 };
 
 /** Each failure a gate log's text names, as its `failPrefix` line gives it: a test's line or a step's, once each. */
@@ -76,7 +104,7 @@ export const failingOnMain = async (ctx, logPath) => {
   const keys = failureKeysIn(text, cfg.gate);
   if (!keys.length) return null;
   const tip = gitIn(root)('rev-parse', cfg.git.main);
-  const tests = failedWhereIn(text, cfg.gate).filter(isTestPath);
+  const tests = testsToRerun(text, cfg);
   const tree = addWorktree(root, `${cfg.naming.prefix}${ctx.round}-main-check`, tip);
   try {
     const ran = await runPreflight(ctx, { tree, commit: tip, tests, label: `main-${tip.slice(0, 10)}` });
@@ -131,13 +159,13 @@ export const mainRedText = (cfg, root, onMain, logText) => {
  * gate's result, red with `{ report, log }`, plus `own`, the log less what `main` fails too, and `onMain`, what it
  * does; a preflight whose every failure `main` has goes on to the gate, and its `onMain` stays on the result.
  */
-export const testChecked = async ({ cfg, checks, batch, tip, rerun = [], tag, gate, say }) => {
+export const testChecked = async ({ cfg, checks, batch, tip, rerun = { plain: [], gui: [] }, tag, gate, say }) => {
   if (!checks) return gate([]);
   const pre = await checks.preflight({ tree: batch.tree, commit: tip, tests: rerun, label: `preflight${tag}-${tip.slice(0, 10)}` });
   let extra = [];
   let preMain = null;
   if (pre.ok) {
-    say(`preflight: passed on ${tip.slice(0, 10)}${rerun.length ? `, with ${rerun.length} test files the last red result failed` : ''}`);
+    say(`preflight: passed on ${tip.slice(0, 10)}${rerun.plain.length + rerun.gui.length ? `, with ${rerun.plain.length + rerun.gui.length} test files the last red result failed` : ''}`);
     extra = checks.gateArgs;
   } else if (pre.unrun) say('preflight: gave no verdict, so the gate runs the checks');
   else {

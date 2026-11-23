@@ -8,10 +8,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { applyFix, commitRecord, fastForwardMain, gitIn, makeBatch, pushMain, removeWorktree } from './batch.mjs';
 import { capstoneText, repairCapstone } from './capstone.mjs';
-import { failedWhereIn } from './gate.mjs';
 import { alreadyFailing, failuresIn, gateOnFleet } from './gateRun.mjs';
-import { mainRedText, testChecked } from './preflight.mjs';
-import { isTestPath } from './verify.mjs';
+import { mainRedText, testChecked, testsToRerun } from './preflight.mjs';
 import { leftOutIn, leftOutWhy, recordLeftOut, retryable } from './leftOut.mjs';
 import { waitForLease } from './lease.mjs';
 import { mergeLock } from './runs.mjs';
@@ -163,7 +161,7 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     /** How many failures the gate before the last repair cycle named. */
     let before = Infinity;
     /** The test files the last red result failed, which the next preflight runs first. */
-    let rerun = [];
+    let rerun = { plain: [], gui: [] };
     for (;;) {
       const tag = `${early ? EARLY.replace('-', '.') : ''}${cycles === 0 ? '' : cycles === 1 ? '.capstone' : `.capstone${cycles}`}`;
       tested = await testChecked({
@@ -174,7 +172,7 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
       if (tested.onMain?.keys.length) say(`main: ${mainRedText(cfg, root, tested.onMain, readFileSync(tested.log, 'utf8'))}`);
       if (!tested.report) break;
       const own = tested.own ?? tested.log;
-      rerun = failedWhereIn(readFileSync(tested.log, 'utf8'), cfg.gate).filter(isTestPath);
+      rerun = testsToRerun(readFileSync(tested.log, 'utf8'), cfg);
       // One repair cycle per round, and another after it only while each leaves fewer failures than the one before.
       const failures = failuresIn(own, cfg.gate);
       if (!failures || !repair) break;

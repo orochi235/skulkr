@@ -142,10 +142,15 @@ export default {
     // rather than failed: biome from labkit, the one package it lints, on labkit's files; eslint on the rest.
     fixup: { command: FIXUP, message: 'apply the linters\' safe fixes' },
     // The checks once on the batch's tip, and on main's tip over a red result's failures, beside the last red gate's
-    // test files outside the browser projects; the reporter prints the gate's `fleet-fail:` lines. The gate is then
+    // test files outside the browser projects (and its browser ones in a GUI job beside it); the reporter prints the gate's `fleet-fail:` lines. The gate is then
     // told the checks ran (`test:fleet --no-checks`).
     preflight: {
       command: `npx vitest run --maxWorkers=4 --reporter=default --reporter=./scripts/vitest-fleet-fail.mjs ${BROWSER_PROJECTS.map((p) => `--project='!${p}'`).join(' ')} scripts/ci-checks.gate.ts {tests}`,
+      // The last red gate's browser tests, at once on a GUI node.
+      gui: {
+        command: `npx vitest run --maxWorkers=2 --reporter=default --reporter=./scripts/vitest-fleet-fail.mjs ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {tests}`,
+        project: '^(browser|forge-stories)',
+      },
       gateArgs: ['--no-checks'],
       timeoutMin: 20,
     },

@@ -111,7 +111,8 @@ export const DEFAULTS = {
      * "Preflight"). `command` runs on the batch's tip, and on `main`'s tip over a red result's failures, each in a job
      * of the round's gate lane; `{tests}` is the test files to run beside the checks (the last red gate's failures),
      * empty when none. Its output marks each failure with a `gate.failPrefix` line, as the gate's does. `gateArgs` go
-     * after the gate's command when it passed; `timeoutMin` bounds it (default 20).
+     * after the gate's command when it passed; `timeoutMin` bounds it (default 20). `gui`, `{ command, project }`, runs at
+     * once on a GUI node over the test files whose failure line's project (its first word) `project` matches.
      */
     preflight: null,
   },

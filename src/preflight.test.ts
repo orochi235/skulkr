@@ -1,10 +1,10 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { gitIn } from './batch.mjs';
 import { resolveConfig } from './config.mjs';
-import { failureKeysIn, mainRedText, preflightShell, testChecked, withoutKeys } from './preflight.mjs';
+import { failureKeysIn, mainRedText, preflightShell, runPreflight, testChecked, testsToRerun, withoutKeys } from './preflight.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -95,5 +95,52 @@ describe('preflightShell', () => {
     const shell = preflightShell(cfg);
     expect(shell).toContain('$FROZEN_TREE');
     expect(shell).toContain("bash -c 'npm run checks $PREFLIGHT_TESTS' > .skulkr/out/verify.log 2>&1; echo $? > .skulkr/out/verify.exit");
+  });
+});
+
+describe('testsToRerun', () => {
+  it("splits a red log's failing test files by the project on their line", () => {
+    const gui = resolveConfig({ gate: { failPrefix: 'fleet-fail:' }, checks: { preflight: { command: 'c', gui: { command: 'g', project: '^browser' } } } });
+    const log = [
+      'fleet-fail: browser:chromium a/L.browser.test.tsx :: closes',
+      'fleet-fail: core a/x.test.ts :: adds',
+      'fleet-fail: gate scripts/ci-checks.gate.ts :: npm run lint',
+      'fleet-fail: postbuild check:unnameable',
+    ].join('\n');
+    expect(testsToRerun(log, gui)).toEqual({ plain: ['a/x.test.ts'], gui: ['a/L.browser.test.tsx'] });
+    expect(testsToRerun(log, cfg)).toEqual({ plain: ['a/L.browser.test.tsx', 'a/x.test.ts'], gui: [] });
+  });
+});
+
+describe('runPreflight', () => {
+  it('runs its GUI part beside the checks, not after them, and reads both', async () => {
+    const root = temp();
+    const git = gitIn(root);
+    git('init', '-q', '-b', 'main');
+    git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'base');
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    const gui = resolveConfig({ gate: { failPrefix: 'fleet-fail:' }, checks: { preflight: { command: 'c {tests}', gui: { command: 'g {tests}', project: '^browser' } } } });
+    const running: string[] = [];
+    let together = 0;
+    const ctx = {
+      cfg: gui, root, round: 7, nightDir: temp(), say: () => {}, refuse: () => {}, usage: () => {},
+      acquire: async () => ({ node: 'n', release: () => {} }),
+      runner: {
+        run: async (job: { to: string; gui?: boolean }) => {
+          running.push(job.to);
+          together = Math.max(together, running.length);
+          await new Promise((r) => setTimeout(r, 20));
+          running.splice(running.indexOf(job.to), 1);
+          mkdirSync(job.to, { recursive: true });
+          writeFileSync(join(job.to, 'verify.exit'), job.gui ? '1' : '0');
+          writeFileSync(join(job.to, 'verify.log'), job.gui ? 'fleet-fail: browser:chromium a/L.browser.test.tsx :: closes\n' : 'ok\n');
+          return { status: 0 };
+        },
+      },
+    };
+    const got = await runPreflight(ctx, { tree: root, commit: git('rev-parse', 'HEAD'), tests: { plain: [], gui: ['a/L.browser.test.tsx'] }, label: 'pre' });
+    expect(together).toBe(2);
+    expect(got).toMatchObject({ ok: false, unrun: false });
+    expect(readFileSync(got.log, 'utf8')).toContain('a/L.browser.test.tsx :: closes');
   });
 });

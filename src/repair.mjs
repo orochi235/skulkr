@@ -183,13 +183,15 @@ export const summaryOf = (v) => ({
 });
 
 /**
- * Which of `files`, test files a red gate named, fail on the frozen tree too: the verify step's plain part first, then
- * its GUI part for the rest, each in a job of the round's `gate` lane.
+ * Which of `files`, test files a red gate named, fail on the frozen tree too: the verify step's plain and GUI parts at
+ * once, each in a job of the round's `gate` lane.
  */
 export const gateBaseline = (ctx) => async (files) => {
   const gate = { id: 'gate' };
-  const plain = await baselineFailures(ctx, gate, { failedFiles: files, gui: false });
-  const rest = files.filter((f) => !plain.includes(f));
-  const gui = rest.length && verifyOf(ctx.cfg)?.gui ? await baselineFailures(ctx, gate, { failedFiles: rest, gui: true }) : [];
-  return [...plain, ...gui];
+  // A file runs in one part only, so the GUI part need not wait for the plain one's answer.
+  const [plain, gui] = await Promise.all([
+    baselineFailures(ctx, gate, { failedFiles: files, gui: false }),
+    verifyOf(ctx.cfg)?.gui ? baselineFailures(ctx, gate, { failedFiles: files, gui: true }) : [],
+  ]);
+  return [...new Set([...plain, ...gui])];
 };
