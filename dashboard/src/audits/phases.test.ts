@@ -55,18 +55,28 @@ describe('laneViewOf', () => {
     }), NOW, START);
     expect(view.phase).toBe('fix');
     expect(view.spans.map((s) => [s.id, ((s.start ?? 0) - START) / MIN, s.ms / MIN, s.state])).toEqual([
-      ['review', 2, 4, 'done'], ['match', 6, TYPICAL_MINUTES.match, 'done'], ['fix', 18, 12, 'active'], ['patch', 30, TYPICAL_MINUTES.patch, 'pending'],
+      ['A', 2, 3, 'done'], ['B', 5, 1, 'done'], ['match', 6, TYPICAL_MINUTES.match, 'done'], ['fix', 18, 12, 'active'], ['patch', 30, TYPICAL_MINUTES.patch, 'pending'],
     ]);
     expect(view.elapsed).toBe('12 min');
-    expect(view.spans.map((s) => s.label)).toEqual(['5+2 found · 4.0 min', '2 shared, 3 unique', 'studio · 12 min', '5 found']);
-    expect(view.spans[2]!.color).toBe(phaseColor('fix'));
-    expect(view.spans[0]!.color).toBe(phaseColor('reviewed'));
+    expect(view.spans.map((s) => s.label)).toEqual(['A 5 found · 3.0 min', 'B 2 found · 4.0 min', '2 shared, 3 unique', 'studio · 12 min', '5 found']);
+    expect(view.spans.map((s) => s.color).slice(0, 3)).toEqual([phaseColor('review'), phaseColor('reviewed'), phaseColor('match')]);
   });
 
   it("starts a lane with no record of when it ran at the round's start, and a part not begun no earlier than now", () => {
     const view = laneViewOf(lane({ A: done({ minutes: 3, findings: 1 }), B: done({ minutes: 5 }) }), NOW, START);
-    expect(view.spans.map((s) => ((s.start ?? 0) - START) / MIN)).toEqual([0, 30, 30 + TYPICAL_MINUTES.match, 30 + TYPICAL_MINUTES.match + TYPICAL_MINUTES.fix]);
-    expect(view.spans.map((s) => s.fill)).toEqual([undefined, 0, 0, 0]);
+    expect(view.spans.map((s) => ((s.start ?? 0) - START) / MIN)).toEqual([0, 3, 30, 30 + TYPICAL_MINUTES.match, 30 + TYPICAL_MINUTES.match + TYPICAL_MINUTES.fix]);
+    expect(view.spans.map((s) => s.fill)).toEqual([undefined, undefined, 0, 0, 0]);
+  });
+
+  it('runs B from where A ends, its typical minutes ahead while it runs, and dims it while it waits for a slot', () => {
+    const both = laneViewOf(lane({ A: running(at(26)), B: running(at(27)) }), NOW, START);
+    expect(both.spans.slice(0, 2).map((s) => [s.id, ((s.start ?? 0) - START) / MIN, s.ms / MIN, s.state])).toEqual([
+      ['A', 26, 4, 'active'], ['B', 30, TYPICAL_MINUTES.review - 3, 'active'],
+    ]);
+    const waiting = laneViewOf(lane({ A: done({ minutes: 2, started: at(20), ended: at(22) }) }), NOW, START);
+    expect(waiting.spans.slice(0, 2).map((s) => [s.id, ((s.start ?? 0) - START) / MIN, s.fill, s.label])).toEqual([
+      ['A', 20, undefined, 'A 0 found · 2.0 min'], ['B', 30, 0, ''],
+    ]);
   });
 
   it('captions and shades the patch with the fixer\'s tally of what it fixed', () => {
@@ -194,8 +204,8 @@ describe('the repair step', () => {
     const repairing: AuditLane = { id: 'x', steps: { ...lane(fixed).steps, repair: running(at(25)) } };
     expect(passDone(repairing)).toBe(false);
     expect(phaseOf(repairing)).toBe('fix');
-    expect(laneViewOf(repairing, NOW, START).spans.map((s) => s.id)).toEqual(['review', 'match', 'fix', 'repair', 'patch']);
-    expect(laneViewOf(lane(fixed), NOW, START).spans.map((s) => s.id)).toEqual(['review', 'match', 'fix', 'patch']);
+    expect(laneViewOf(repairing, NOW, START).spans.map((s) => s.id)).toEqual(['A', 'B', 'match', 'fix', 'repair', 'patch']);
+    expect(laneViewOf(lane(fixed), NOW, START).spans.map((s) => s.id)).toEqual(['A', 'B', 'match', 'fix', 'patch']);
     expect(passDone(lane(fixed))).toBe(true);
   });
 });
