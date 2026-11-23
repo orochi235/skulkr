@@ -48,8 +48,8 @@ export function headlineOf(run: AuditRun): string {
 export function startedText(iso: string, now: number): string {
   const at = new Date(iso);
   const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  if (at.toDateString() === new Date(now).toDateString()) return `started ${time}`;
-  return `started ${at.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
+  if (at.toDateString() === new Date(now).toDateString()) return time;
+  return `${at.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
 }
 
 /** How long a run has gone, to now while it runs and to its end once over, as `hh:mm elapsed`; null where its start or
