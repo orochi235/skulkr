@@ -3,6 +3,7 @@ import { budgetNight, modeOf, nextContinuous, queuesOf, roundEstimate, spentSinc
 import { readFleet } from './fleet.mjs';
 import { strandedHoldFor, strandedRoundsFor } from './stranded.mjs';
 import { finishedRuns, lastWords, liveRuns, readContinuous, readIdle } from './runs.mjs';
+import { capFor } from './args.mjs';
 
 /** Why a new round waits on stranded batches (`strandedHoldFor`), or null; null too where the checkout can't be read. */
 const heldFor = (cfg) => {
@@ -31,7 +32,7 @@ export const continuousOf = (cfg, { now = new Date(), pending = 0, readOnly = fa
   const nightUsd = cfg.budget.nightUsd ?? null;
   const mode = modeOf({ now, schedule: cfg.schedule, nightUsd, override: readContinuous(cfg.state) });
   const next = nextContinuous({
-    now, mode, readOnly, runs: live, pending, spentUsd, estimateUsd: estimate.usd, nightUsd, capUsd: cfg.budget.capUsd, idleUntil: readIdle(cfg.state)?.until,
+    now, mode, readOnly, runs: live, pending, spentUsd, estimateUsd: estimate.usd, nightUsd, capUsd: capFor(cfg.budget, cfg.areasPerRound), idleUntil: readIdle(cfg.state)?.until,
     held: mode.on && !readOnly ? heldFor(cfg) : null,
   });
   return {

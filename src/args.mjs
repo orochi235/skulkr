@@ -1,6 +1,9 @@
 /** `skulkr night`'s flags, read against the config's defaults. README.md, "A run", lists them. */
 import { fixOnlyArg } from './fixOnly.mjs';
 
+/** A run's dollar cap when none is given: `budget.areaCapUsd` for each of its `areas`, or else `budget.capUsd`. */
+export const capFor = (budget, areas) => (budget.areaCapUsd == null ? budget.capUsd : budget.areaCapUsd * areas);
+
 export const parseArgs = (cfg, argv) => {
   const value = (flag) => {
     const i = argv.indexOf(flag);
@@ -14,9 +17,10 @@ export const parseArgs = (cfg, argv) => {
     return n;
   };
   const fixOnly = argv.indexOf('--fix-only');
+  const areas = number('--areas', cfg.areasPerRound);
   return {
     fixOnly: fixOnly < 0 ? undefined : fixOnlyArg(argv[fixOnly + 1]?.startsWith('--') ? '' : argv[fixOnly + 1] ?? ''),
-    areas: number('--areas', cfg.areasPerRound),
+    areas,
     only: value('--only')?.split(',').filter(Boolean),
     nodes: value('--nodes')?.split(',').filter(Boolean),
     dry: argv.includes('--dry'),
@@ -25,7 +29,7 @@ export const parseArgs = (cfg, argv) => {
     sweep: argv.includes('--sweep'),
     anyway: argv.includes('--anyway'),
     trial: value('--trial'),
-    capUsd: number('--cap-usd', cfg.budget.capUsd),
+    capUsd: number('--cap-usd', capFor(cfg.budget, areas)),
     budget: {
       review: number('--budget-review', cfg.budget.review),
       match: number('--budget-match', cfg.budget.match),

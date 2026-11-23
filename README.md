@@ -109,7 +109,7 @@ export default {
 
   areasPerRound: 16,
   maxUnmergedRounds: 0,               // stranded rounds allowed before a new one waits (see "Stranded rounds")
-  budget: { review: 8, match: 1, fix: 15, capUsd: 160, areaGuessUsd: 10, nightUsd: undefined }, // list-price dollars
+  budget: { review: 8, match: 1, fix: 15, capUsd: 160, areaCapUsd: undefined, areaGuessUsd: 10, nightUsd: undefined }, // list-price dollars; areaCapUsd, when set, caps a run at that much per area in place of capUsd
   schedule: { startAt: '23:00', stopAt: '07:00', continuous: false }, // the service's start; when a run stops dispatching
   state: undefined,                   // default ~/.local/state/skulkr/<name>
   sweep: null,                        // an extra check beside the reviews; see "A sweep"
@@ -165,7 +165,7 @@ the config names one, gets a row.
 | `--sweep` | | run the configured sweep too |
 | `--fix-only [a,b]` | | a fix-only round for these areas, or every area with open findings; see "Carried findings" |
 | `--resume N` | | pick round N back up, reusing every job whose result came home; it stops starting areas at the first `schedule.stopAt` after the resume. Under the plan lock, it leaves out the areas a live run holds. A round lands once: when its status or `summary.json` names a `landed` tip (set once `main` fast-forwards, with the areas it carried) that `main` still holds, it resumes nothing and says the round already landed |
-| `--cap-usd N` | `budget.capUsd` | list-price dollars the run may spend |
+| `--cap-usd N` | `budget.areaCapUsd` × `--areas`, else `budget.capUsd` | list-price dollars the run may spend |
 | `--budget-review`, `--budget-match`, `--budget-fix` | `budget.*` | each job's `--max-budget-usd` |
 
 **Which areas.** Never-audited areas go first, in partition order. Then the due ones, by the defects their last
@@ -440,7 +440,7 @@ The night, for the budget, runs from one `stopAt` to the next, so a round starte
 the coming night. Its spend is every round started in it, from `status.json` while live and `summary.json` after, or
 the last `status.json` of one that died without a summary (run directories from the last day are never pruned). The estimate is `areasPerRound` times the mean cost per
 finished area of the last five rounds, or `areasPerRound × budget.areaGuessUsd` before any. Each continuous round
-runs with `--cap-usd` set to the night's budget left or `budget.capUsd`, whichever is less. A continuous round that
+runs with `--cap-usd` set to the night's budget left or its own cap (`budget.areaCapUsd` × `areasPerRound`, else `budget.capUsd`), whichever is less. A continuous round that
 claims nothing, fails, or cannot start ends the chain for the night, noted in `<state>/continuous-idle.json` so a
 restart does not resume it; a request turning continuous mode on clears it. `stopAt` still stops every run dispatching, as before.
 

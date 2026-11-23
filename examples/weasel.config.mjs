@@ -113,10 +113,11 @@ export default {
       lintOf: String.raw`^packages\/([^/]+)\/`,
       final: String.raw`\bnpm run(?: -s)? checks:gate\b`,
     },
-    // Every test file whose imports reach what the fixer changed, under the root config's projects: all but the
-    // checks (`gate`) and the projects that need a browser, which run on a GUI node.
+    // The changesets' check (half a second, and a failed one used to surface only in the batch's gate), then every
+    // test file whose imports reach what the fixer changed, under the root config's projects: all but the checks
+    // (`gate`) and the projects that need a browser, which run on a GUI node.
     verify: {
-      command: `npx vitest related --run --maxWorkers=4 ${['!gate', ...BROWSER_PROJECTS.map((p) => `!${p}`)].map((p) => `--project='${p}'`).join(' ')} {files}`,
+      command: `npm run -s check:changesets && npx vitest related --run --maxWorkers=4 ${['!gate', ...BROWSER_PROJECTS.map((p) => `!${p}`)].map((p) => `--project='${p}'`).join(' ')} {files}`,
       gui: {
         probe: `npx vitest list --filesOnly ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {related}`,
         command: `npx vitest related --run --maxWorkers=2 ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {files}`,
@@ -158,7 +159,7 @@ export default {
   },
 
   areasPerRound: 8,
-  budget: { review: 8, match: 1, fix: 15, capUsd: 160, areaGuessUsd: 10 },
+  budget: { review: 8, match: 1, fix: 15, areaCapUsd: 10, areaGuessUsd: 10 },
   schedule: { startAt: '23:00', stopAt: '07:00' },
 
   sweep,

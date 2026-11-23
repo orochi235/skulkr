@@ -214,10 +214,11 @@ export const DEFAULTS = {
   /** How many rounds may sit with their batch unmerged (`stranded.mjs`) before a new round waits; `--anyway` starts one regardless. */
   maxUnmergedRounds: 0,
   /**
-   * List-price dollars: each job's `--max-budget-usd` by role, a run's `capUsd`, the guess at an area's cost, and
-   * `nightUsd`, what continuous mode may spend from one `stopAt` to the next (unset: no continuous mode).
+   * List-price dollars: each job's `--max-budget-usd` by role, a run's `capUsd`, or `areaCapUsd` for each area it takes
+   * in its place, the guess at an area's cost, and `nightUsd`, what continuous mode may spend from one `stopAt` to the
+   * next (unset: no continuous mode).
    */
-  budget: { review: 8, match: 1, fix: 15, capUsd: 160, areaGuessUsd: 10, nightUsd: undefined },
+  budget: { review: 8, match: 1, fix: 15, capUsd: 160, areaCapUsd: undefined, areaGuessUsd: 10, nightUsd: undefined },
   /**
    * Local clock times: the service starts a run at `startAt`; a run stops dispatching at the first `stopAt`.
    * `continuous` keeps rounds coming between them, under `budget.nightUsd` (README "Continuous rounds").
