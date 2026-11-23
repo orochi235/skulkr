@@ -15,10 +15,8 @@ include ci.yml's checks (about 2 minutes each, measured on this machine by `chec
 
 ## Open
 
-- **Round 73 ended red, stranded** (`batch/2026-11-22-audit73`, worktree `~/src/weasel/.worktrees/batch-2026-11-22-audit73`).
-  Its last gate failed only `packages/labkit/src/loupe/lens/LabLoupe.browser.test.tsx`, laid at `labkit.part1`, which
-  touches no loupe file; weasel `main` changed the loupe after the round froze (`c6211023d2`). Fix and land it
-  (memory: never ask).
+- weasel's `main` is 89 commits ahead of `origin/main`, round 73's landing (`6bbe10b467`, landed by hand on 2026-11-22 after a
+  green `test:batch`) among them; unpushed until the user asks.
 - Proposed, not decided (2026-11-22): a weasel pre-commit hook running the linters' safe fixes on staged files, since
   other sessions commit straight to weasel's `main` without a full run.
 - A failed postbuild step (weasel's `test:fleet:postbuild`) is still found only by the fleet gate, and never checked on
