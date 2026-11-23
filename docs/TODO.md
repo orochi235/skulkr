@@ -18,13 +18,6 @@ Open work on skulkr. Each entry says when it closes.
 - [ ] (P3) The dashboard doesn't show an early landing (README "Early landings"): the run's `status.early` step
   reaches neither the map nor a lane, so only its gate progress shows. Closes when a run's lane shows its early
   landing's step.
-- [ ] (P2) The dashboard dev server's file watcher misses edits, so :5214 keeps serving the old module until
-  `emilia restart skulkr/dashboard`. Not vite, wake or alpo: with both plugins off it still misses, and a bare Node
-  `fs.watch` on any directory (every Node from 24 to 26, in and out of the sandbox) gets no events while one on a
-  single file does. Directory watches go through FSEvents, and `fseventsd` was at 100% CPU and 14 GB after 21 days up
-  (2026-11-22). Fix: `sudo killall fseventsd` (launchd restarts it), then restart the dev server. Closes when an edit
-  reaches the served module without a restart; if `fseventsd` wedges again, find what floods it (`sudo fs_usage -f
-  filesys`).
 - [ ] (P2) Finish cutting weasel over to skulkr (README.md "Moving weasel over"). The `skulkr` service already runs
   weasel's rounds from `examples/weasel.config.mjs` (2026-11-21); left are moving the config and its briefs into
   weasel and deleting `scripts/skulk/`. Closes when weasel's own `skulkr.config.mjs` drives its rounds and
