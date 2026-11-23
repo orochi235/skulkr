@@ -32,7 +32,7 @@ export const DASH_PREFS = pref.group('Dashboard', {
   }),
   lanes: pref.group('Lanes', {
     hideComplete: pref.boolean('Hide complete', false, { description: 'Hide a lane once its pass is done.' }),
-    mode: pref.enum('View', 'clock', ['clock', 'steps'], { description: "On the run's clock, or as a grid of steps." }),
+    mode: pref.enum('View', 'steps', ['steps', 'clock'], { description: "As a grid of steps, or on the run's clock." }),
   }),
 });
 

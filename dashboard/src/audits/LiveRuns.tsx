@@ -100,7 +100,7 @@ function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanS
 }
 
 export type LaneMode = 'clock' | 'steps';
-const MODES = [{ value: 'clock', label: 'Clock' }, { value: 'steps', label: 'Steps' }] as const;
+const MODES = [{ value: 'steps', label: 'Steps' }, { value: 'clock', label: 'Clock' }] as const;
 
 
 /** How every round's lanes are drawn: on the clock or as steps, and whether finished lanes hide. */

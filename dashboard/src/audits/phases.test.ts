@@ -152,12 +152,13 @@ describe('laneStepsOf', () => {
     expect(spans[2]!.label).toBe('');
   });
 
-  it('runs A and B in one column, A over B, and every later step a column after, across both', () => {
+  it('runs A, then B, then every later step a column after, on one stripe', () => {
     const spans = laneStepsOf(lane({}), NOW);
-    expect(spans.map((s) => [s.id, s.start, s.track ?? 0, s.trackSpan ?? 1])).toEqual([
-      ['A', 0, 0, 1], ['B', 0, 1, 1], ['match', 1, 0, 2], ['fix', 2, 0, 2], ['checks', 3, 0, 2], ['patch', 3.5, 0, 2],
+    expect(spans.map((s) => [s.id, s.start, s.track, s.trackSpan])).toEqual([
+      ['A', 0, undefined, undefined], ['B', 1, undefined, undefined], ['match', 2, undefined, undefined], ['fix', 3, undefined, undefined],
+      ['checks', 4, undefined, undefined], ['patch', 4.5, undefined, undefined],
     ]);
-    expect(STEP_COLUMN_COUNT).toBeCloseTo(4.1);
+    expect(STEP_COLUMN_COUNT).toBeCloseTo(5.1);
   });
 
   it('stops a running step short of full until it finishes', () => {
@@ -183,7 +184,7 @@ describe('the repair step', () => {
 
   it('takes over the checks column once a verify or repair job of its own runs, leaving no column between', () => {
     const withRepair = laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, repair: running(at(25)) } }, NOW);
-    expect(withRepair.map((s) => [s.id, s.start])).toEqual([['A', 0], ['B', 0], ['match', 1], ['fix', 2], ['repair', 3], ['patch', 3.5]]);
+    expect(withRepair.map((s) => [s.id, s.start])).toEqual([['A', 0], ['B', 1], ['match', 2], ['fix', 3], ['repair', 4], ['patch', 4.5]]);
     expect(laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, repair: { state: 'waiting' } } }, NOW).map((s) => s.id)).toContain('checks');
   });
 

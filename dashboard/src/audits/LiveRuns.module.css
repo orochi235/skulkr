@@ -111,9 +111,7 @@
   text-overflow: ellipsis;
 }
 
-/* The steps view stacks A over B in one row, and the all-areas row its two fleet runs, so those rows are tall enough
-   for two stripes of small text. */
-.lanes[data-mode='steps'],
+/* The all-areas row stacks its two fleet runs, so it is tall enough for two stripes of small text. */
 .lanes .shared { --span-strip-height: 28px; }
 
 .lanes {

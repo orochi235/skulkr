@@ -5,22 +5,22 @@ import { TYPICAL_MINUTES, partColor, stepOf, type AuditPhase, type Part } from '
 import { NODE_SEP, stepText } from './runData';
 import type { AuditLane, LaneStep, LaneStepKey } from './skulkrMap.types';
 
-/** The steps view's columns: the two blind reviews run side by side, A over B, in the first, and every later step
- *  covers both stripes. */
-const STEP_COLUMNS: readonly { step: LaneStepKey; part: Part; phase: AuditPhase; start: number; width: number; track?: number; trackSpan?: number }[] = [
+/** The steps view's columns, one stripe: the two blind reviews one after the other, as B starts once A's prompt is
+ *  cached and often once a slot frees, then every later step. */
+const STEP_COLUMNS: readonly { step: LaneStepKey; part: Part; phase: AuditPhase; start: number; width: number }[] = [
   { step: 'A', part: 'review', phase: 'review', start: 0, width: 1 },
-  { step: 'B', part: 'review', phase: 'reviewed', start: 0, width: 1, track: 1 },
-  { step: 'match', part: 'match', phase: 'match', start: 1, width: 1, trackSpan: 2 },
-  { step: 'fix', part: 'fix', phase: 'fix', start: 2, width: 1, trackSpan: 2 },
+  { step: 'B', part: 'review', phase: 'reviewed', start: 1, width: 1 },
+  { step: 'match', part: 'match', phase: 'match', start: 2, width: 1 },
+  { step: 'fix', part: 'fix', phase: 'fix', start: 3, width: 1 },
   // The fix's checking: its fixer's own checks, then a verify or repair job of the controller's, in one column.
-  { step: 'repair', part: 'repair', phase: 'fix', start: 3, width: 0.5, trackSpan: 2 },
+  { step: 'repair', part: 'repair', phase: 'fix', start: 4, width: 0.5 },
   // Applying a patch takes no time to speak of; its column is wide enough for its tally.
-  { step: 'patch', part: 'patch', phase: 'patch', start: 3.5, width: 0.6, trackSpan: 2 },
+  { step: 'patch', part: 'patch', phase: 'patch', start: 4.5, width: 0.6 },
 ];
 
 /** The column after the fix's own: lit while its fixer runs its checks past its last commit, until a verify or
  *  repair job of the controller's takes it over. */
-const CHECKS_COLUMN = { start: 3, width: 0.5 } as const;
+const CHECKS_COLUMN = { start: 4, width: 0.5 } as const;
 
 /** Whether a fixer has made every commit it set out to and is still running: its checks. */
 const checkingOf = (fix: LaneStep): boolean => fix.state === 'running' && !!fix.total && (fix.done ?? 0) >= fix.total;
@@ -30,12 +30,12 @@ function checksSpan(fix: LaneStep): SpanStripSpan {
   const checking = checkingOf(fix);
   const state = fix.state === 'done' ? 'done' : fix.state === 'failed' ? 'failed' : checking ? 'active' : 'pending';
   return {
-    id: 'checks', start: CHECKS_COLUMN.start, ms: CHECKS_COLUMN.width, trackSpan: 2, title: 'the fixer\'s checks',
+    id: 'checks', start: CHECKS_COLUMN.start, ms: CHECKS_COLUMN.width, title: 'the fixer\'s checks',
     label: checking ? fix.node ?? '' : '', state, fill: state === 'pending' ? 0 : 1, color: 'var(--audit-checks)',
   };
 }
 
-/** The fix span while its fixer runs its checks: no longer active, its node moved onto the checks track. */
+/** The fix span while its fixer runs its checks: no longer active, its node moved onto the checks column. */
 const fixWhileChecking = (span: SpanStripSpan, fix: LaneStep): SpanStripSpan =>
   (checkingOf(fix) ? { ...span, state: 'done', label: span.label.slice(span.label.indexOf(NODE_SEP) + NODE_SEP.length) } : span);
 
@@ -54,17 +54,17 @@ const RUNNING_FILL_CAP = 0.9;
  * typical minutes, short of full until it finishes.
  */
 export function laneStepsOf(lane: AuditLane, now: number): SpanStripSpan[] {
-  return STEP_COLUMNS.filter((c) => c.step !== 'repair' || repairing(lane)).map(({ step, part, phase, start, width, track, trackSpan }): SpanStripSpan => {
+  return STEP_COLUMNS.filter((c) => c.step !== 'repair' || repairing(lane)).map(({ step, part, phase, start, width }): SpanStripSpan => {
     const s = stepOf(lane, step);
     const since = s.state === 'running' ? ms(s.since) : null;
     const fill = s.state === 'done' || s.state === 'failed' ? 1
       : step === 'patch' ? patchFillOf(lane)
-      // Its count runs to full: the checks after its last commit light a track of their own.
+      // Its count runs to full: the checks after its last commit light a column of their own.
       : s.state === 'running' && s.total ? Math.min(1, (s.done ?? 0) / s.total)
       : since !== null ? Math.min(RUNNING_FILL_CAP, (now - since) / (TYPICAL_MINUTES[part] * MIN))
       : 0;
     return {
-      id: step, start, ms: width, track, trackSpan, fill, state: SPAN_STATE[s.state], title: `${step}: ${stepText(step, s, now)}`,
+      id: step, start, ms: width, fill, state: SPAN_STATE[s.state], title: `${step}: ${stepText(step, s, now)}`,
       label: step === 'patch' && s.state !== 'failed' ? tallyOf(lane) : s.state === 'waiting' ? '' : stepText(step, s, now),
       color: partColor(part, s.state === 'failed' ? 'conflict' : phase),
     };
