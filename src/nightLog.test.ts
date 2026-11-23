@@ -135,4 +135,25 @@ describe('nightLanes repair step', () => {
     const log = [fix, 'verify a: passed (3 test files)', 'repair a capstone on studio: 1 commits, 5.0 min; verify passed'];
     expect(nightLanes(log.join('\n'), ['a'])[0]!.steps.repair).toMatchObject({ state: 'done', attempts: 1, outcome: 'passed' });
   });
+
+  it('runs again once the capstone lays a gate failure at a lane its verify had passed', () => {
+    const patched = [fix, 'verify a: passed (3 test files)', 'patch a: 2 commits on audit9-a', 'patch b.c: 1 commits on audit9-b.c'];
+    const laid = [...patched, 'capstone: 2 failures; a 1, b.c 1; 1 unattributed'];
+    const running = [{ task: 'audit9-a-repair', node: 'msb-uai', started: '2026-11-23T22:49:00Z' }];
+    const lanes = nightLanes(laid.join('\n'), ['a', 'b.c'], running);
+    expect(lanes[0]!.steps.repair).toMatchObject({ state: 'running', node: 'msb-uai', since: '2026-11-23T22:49:00Z' });
+    expect(lanes[1]!.steps.repair).toMatchObject({ state: 'running' });
+    expect(nightLanes([...patched, 'capstone: 1 failures; none laid at a branch; 1 unattributed'].join('\n'), ['a'])[0]!.steps.repair).toMatchObject({ state: 'done' });
+    const after = [...laid, 'repair a capstone on msb-uai: 1 commits, 6.0 min; verify passed', 'repair b.c capstone on studio: 0 commits, 3.0 min; verify failed: exited 1'];
+    const [a, bc] = nightLanes(after.join('\n'), ['a', 'b.c']);
+    expect(a!.steps.repair).toMatchObject({ state: 'done', attempts: 1, outcome: 'passed' });
+    expect(bc!.steps.repair).toMatchObject({ state: 'failed', why: 'capstone repair failed its verify' });
+  });
+
+  it('fails a capstone repair that did not start, crashed, or did not apply', () => {
+    const laid = 'capstone: 3 failures; a 1, b 1, c 1';
+    const log = [laid, 'repair a capstone: not started, over the $40 cap', 'repair b capstone failed: Error: boom', 'repair c capstone on studio: 1 commits, 2.0 min; verify passed', 'patch c: the capstone repair did not apply: conflict'];
+    const whys = nightLanes(log.join('\n'), ['a', 'b', 'c']).map((l) => l.steps.repair?.why);
+    expect(whys).toEqual(['capstone repair not started: over the $40 cap', 'capstone repair crashed', 'capstone repair did not apply']);
+  });
 });

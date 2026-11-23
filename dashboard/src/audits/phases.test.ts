@@ -219,4 +219,11 @@ describe('the repair step', () => {
     expect(laneViewOf(lane(fixed), NOW, START).spans.map((s) => s.id)).toEqual(['A', 'B', 'match', 'fix', 'patch']);
     expect(passDone(lane(fixed))).toBe(true);
   });
+
+  it("reopens a patched area while the capstone repairs its branch", () => {
+    const capstone: AuditLane = { id: 'x', steps: { ...lane(fixed).steps, patch: done({ commits: 2 }), repair: running(at(25)) } };
+    expect(isFinished(capstone)).toBe(true);
+    expect([phaseOf(capstone), passDone(capstone)]).toEqual(['fix', false]);
+    expect(stageCountsOf([capstone])).toMatchObject({ done: 0, stages: [{ phase: 'repair', n: 1 }] });
+  });
 });

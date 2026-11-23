@@ -86,6 +86,8 @@ weasel cutover.
     told `--no-checks` after it passes; a red result's failures run on `main`'s tip, what `main` fails too set aside
     from the capstone and landed over, and the report's `main red at` clause; and no gate rerun after a capstone cycle
     whose repairs committed nothing while `main` stood still.
+  - a map lane's `repair` step running again once a `capstone:` line lays a failure at its area, and failed when that
+    repair fails its verify, does not start, crashes, or does not apply (2026-11-23).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

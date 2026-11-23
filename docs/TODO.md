@@ -5,15 +5,9 @@ Open work on skulkr. Each entry says when it closes.
 - [ ] (P1) Review the whole state flow end to end (asked for 2026-11-23): every state an area, lane, batch, and round
   can be in, which log line or job moves it, and what the map and dashboard show for each. The pieces were built
   one step at a time (verify, repair, early landings, capstone cycles, left-out retries), and the dashboard has
-  drifted from what is running; the capstone-repair entry below is one case. Closes when the states and their
-  transitions are written down in one place, and each mismatch between that and the map or dashboard is fixed or
-  filed.
-- [ ] (P2) An area whose capstone repair is running shows as finished on the dashboard. `nightLanes`
-  (`src/nightLog.mjs`) marks a running `repair` job on its lane only when the lane's repair step is waiting or
-  running, and verify had already set that step done; the `capstone: N failures; <area> 1, …` line is not read at
-  all. Round 79 (2026-11-23): core and forge.vite read as complete while their `repair-capstone` jobs ran, after the
-  early gate failed `check:unnameable` on `AnchorStateBase` and `StoryLoader`. Closes when a lane with a capstone
-  repair under way shows it running, and the repair's outcome after.
+  drifted from what is running (it showed areas done while the capstone repaired them, fixed 2026-11-23). Closes
+  when the states and their transitions are written down in one place, and each mismatch between that and the map
+  or dashboard is fixed or filed.
 - [ ] (P3) A fixer that adds or changes a public type can't learn it broke `check:unnameable` until the gate, because
   the check runs only after a full build: round 78's `ReplacedProps` (ui.components.Select) and round 79's
   `AnchorStateBase` (core) and `StoryLoader` (forge.vite) each cost a capstone cycle. Closes when weasel's fixer

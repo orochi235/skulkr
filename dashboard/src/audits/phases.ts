@@ -69,6 +69,8 @@ function partState(lane: AuditLane, part: Part): PartState {
 
 export const partsOf = (lane: AuditLane): PartState[] => PARTS.filter((part) => part !== 'repair' || lane.steps.repair).map((part) => partState(lane, part));
 
+const repairing = (lane: AuditLane): boolean => lane.steps.repair?.state === 'running';
+
 /** Whether an area is through: patched, fixed with no commits to patch, or reviewed or matched with nothing to fix. */
 export function isFinished(lane: AuditLane): boolean {
   const { A, B, match, fix, patch } = lane.steps;
@@ -84,7 +86,7 @@ export function isFinished(lane: AuditLane): boolean {
 export function phaseOf(lane: AuditLane): AuditPhase {
   const parts = partsOf(lane);
   if (parts.some((p) => p.state === 'failed')) return 'conflict';
-  if (isFinished(lane)) return 'done';
+  if (isFinished(lane) && !repairing(lane)) return 'done';
   const part = parts.find((p) => p.state === 'running') ?? parts.find((p) => p.state === 'waiting');
   return part ? partPhase(part) : 'done';
 }
@@ -115,14 +117,14 @@ export function stageCountsOf(lanes: readonly AuditLane[]): { done: number; tota
 function stageOf(lane: AuditLane): Stage {
   const phase = livePhaseOf(lane);
   if (phase !== 'fix') return phase;
-  if (lane.steps.repair && lane.steps.repair.state === 'running') return 'repair';
+  if (repairing(lane)) return 'repair';
   return checkingOf(lane.steps.fix) ? 'checks' : 'fix';
 }
 
-/** Whether the round's pass over an area is done: it is through, or its fixer has finished, no repair is under way, and
+/** Whether the round's pass over an area is done: no repair is under way, a capstone's included, and it is through or
  *  only its patch, which lands with the round's batch, is left. */
 export const passDone = (lane: AuditLane): boolean =>
-  isFinished(lane) || (lane.steps.fix.state === 'done' && lane.steps.repair?.state !== 'running');
+  !repairing(lane) && (isFinished(lane) || lane.steps.fix.state === 'done');
 
 /** A live area's phase as the map, the stage counts and "Hide complete" all read it: a conflict once a step fails, as
  *  its lane says, else `done` once its pass is (`passDone`). */

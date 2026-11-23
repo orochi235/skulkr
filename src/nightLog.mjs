@@ -23,12 +23,23 @@ const repairStep = (steps, line) => {
   else if (/^verify \S+: timed out/.test(line)) Object.assign(step, { state: 'done', outcome: 'timed out' });
   else if ((m = /^verify \S+: still failing after (\d+) repairs/.exec(line))) Object.assign(step, { state: 'failed', outcome: 'failed', why: `still failing after ${m[1]} repairs` });
   else if (/^verify \S+: failed/.test(line)) Object.assign(step, { state: 'running', outcome: 'failed' });
-  else if ((m = /^repair \S+ \S+ on (\S+): (\d+) commits, ([\d.]+) min; verify (passed)?/.exec(line))) {
+  else if ((m = /^repair \S+ (\S+) on (\S+): (\d+) commits, ([\d.]+) min; verify (passed)?/.exec(line))) {
+    // A capstone repair gets one try a cycle: one that fails its verify drops the branch from the batch.
+    const failed = m[1].startsWith('capstone') ? { state: 'failed', outcome: 'failed', why: 'capstone repair failed its verify' } : { state: 'running', outcome: 'failed' };
     Object.assign(step, {
-      attempts: (step.attempts ?? 0) + 1, node: m[1], minutes: Number(((step.minutes ?? 0) + Number(m[3])).toFixed(1)),
-      ...(m[4] ? { state: 'done', outcome: 'passed' } : { state: 'running', outcome: 'failed' }),
+      attempts: (step.attempts ?? 0) + 1, node: m[2], minutes: Number(((step.minutes ?? 0) + Number(m[4])).toFixed(1)),
+      ...(m[5] ? { state: 'done', outcome: 'passed' } : failed),
     });
-  }
+  } else if ((m = /^repair \S+ capstone: not started, (.+)$/.exec(line))) Object.assign(step, { state: 'failed', outcome: 'failed', why: `capstone repair not started: ${m[1]}` });
+  else if (/^repair \S+ capstone failed:/.test(line)) Object.assign(step, { state: 'failed', outcome: 'failed', why: 'capstone repair crashed' });
+};
+
+/** The areas a `capstone: N failures; <area> <n>, …` line lays the gate's failures at (`capstone.mjs`), each about to
+ *  be repaired. */
+const capstoneLaid = (line) => {
+  const m = /^capstone: \d+ failures; (.+?)(?:; \d+ unattributed)?$/.exec(line);
+  if (!m || m[1] === 'none laid at a branch') return [];
+  return m[1].split(', ').flatMap((part) => /^(\S+) \d+$/.exec(part)?.[1] ?? []);
 };
 
 /**
@@ -69,9 +80,12 @@ const readLog = (log, names) => {
       stages.set(m[1], 'patched');
       if ((done = /^patch \S+: (\d+) commits on /.exec(line))) Object.assign(at(m[1]).patch, { state: 'done', commits: Number(done[1]) });
       else if (/^patch \S+: did not apply/.test(line)) Object.assign(at(m[1]).patch, { state: 'failed', why: 'did not apply' });
+      else if (/^patch \S+: the capstone repair did not apply/.test(line)) Object.assign((at(m[1]).repair ??= { attempts: 0 }), { state: 'failed', outcome: 'failed', why: 'capstone repair did not apply' });
       else if ((done = /^patch \S+: left out: (.+)$/.exec(line))) Object.assign(at(m[1]).patch, { state: 'failed', why: done[1] });
     } else if ((m = /^(?:verify|repair) ([^\s:]+)/.exec(line))) {
       repairStep(at(m[1]), line);
+    } else if (line.startsWith('capstone: ')) {
+      for (const id of capstoneLaid(line)) Object.assign((at(id).repair ??= { attempts: 0 }), { state: 'running', outcome: 'failed' });
     } else if ((m = names.leftOut(line)) && !m.earlier) {
       stages.set(m.area, 'conflict');
       Object.assign(at(m.area).patch, { state: 'failed', why: `${m.why}; left out of the batch` });
