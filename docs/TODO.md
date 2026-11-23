@@ -24,6 +24,11 @@ Open work on skulkr. Each entry says when it closes.
   tests related to its files, so a consumer's build is never exercised before the gate. Closes when an unattributed
   failure is bisected over the batch's branches (rebuild without each, or rerun the failing step per branch) and the
   repair goes to the branch that turns it red.
+- [ ] (P2) A running fixer is opaque (raised 2026-11-23): all it shows is a commit count out of its findings
+  (`progress.mjs`), until `claude.json` and `fix.mbox` come home when it ends. Its job directory has no record of
+  which finding it is on, what it has read or changed, or which checks it has run and how they went. Neither the
+  dashboard nor a `skulkr` command can show any of that while it runs. Closes when someone watching a running fixer
+  can see that, and why it is taking as long as it is. The progress entry below is part of this.
 - [ ] (P2) Fix steps on the dashboard don't show progress reliably, and keep showing an error after it has
   presumably been fixed (reported 2026-11-22, not yet traced): work out where each comes from (the fixer's progress
   counter in `progress.mjs`, the map's run and lane state) and how a fixed error should clear. Closes when a fix
