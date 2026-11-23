@@ -33,3 +33,11 @@ describe('blameStep', () => {
     expect(blameStep(text, 'npm run check:unnameable')).toEqual(['packages/geom']);
   });
 });
+
+describe('the fixer verify', () => {
+  it("checks the changed packages' types last, built first, failing the verify but not stopping the tests", async () => {
+    const { default: cfg } = await import('./weasel.config.mjs');
+    const command: string = cfg.checks.verify.command;
+    expect(command).toMatch(/; npm run -s check:unnameable -- --build \{files\} \|\| s=1; exit \$s$/);
+  });
+});

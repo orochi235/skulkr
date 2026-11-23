@@ -8,10 +8,6 @@ Open work on skulkr. Each entry says when it closes.
   drifted from what is running (it showed areas done while the capstone repaired them, fixed 2026-11-23). Closes
   when the states and their transitions are written down in one place, and each mismatch between that and the map
   or dashboard is fixed or filed.
-- [ ] (P3) A fixer that adds or changes a public type can't learn it broke `check:unnameable` until the gate, because
-  the check runs only after a full build: round 78's `ReplacedProps` (ui.components.Select) and round 79's
-  `AnchorStateBase` (core) and `StoryLoader` (forge.vite) each cost a capstone cycle. Closes when weasel's fixer
-  verify runs the check for the packages a branch touched, or that is ruled out as too slow.
 - [ ] (P3) Compare fixers' cost and effectiveness with the same fixes made in an interactive Claude Code session,
   which carries the user's account-level rules a fixer never gets (fixers run with `--setting-sources project,local`,
   mostly on nodes without the user's config; decided 2026-11-22 not to send that prompt to them). Fixer side, already

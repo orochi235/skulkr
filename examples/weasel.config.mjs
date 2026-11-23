@@ -129,9 +129,10 @@ export default {
     // Every test file whose imports reach what the fixer changed, under the root config's projects: all but the checks
     // (`gate`) and the projects that need a browser, which run on a GUI node. Then the checks themselves, ci.yml's
     // typecheck, lint, `check:*` and `audit:*` (`scripts/ci-checks.gate.ts`, a vitest file whose tests are the
-    // steps), so the fleet gate runs only tests (2026-11-22).
+    // steps), so the fleet gate runs only tests (2026-11-22). Last, `check:unnameable` on the packages the changes are
+    // in, built first: it reads `dist`, so it otherwise first ran at the gate's full build (2026-11-23).
     verify: {
-      command: `npx vitest related --run --maxWorkers=4 ${['!gate', ...BROWSER_PROJECTS.map((p) => `!${p}`)].map((p) => `--project='${p}'`).join(' ')} {files}; s=$?; ${CHECKS} || s=1; exit $s`,
+      command: `npx vitest related --run --maxWorkers=4 ${['!gate', ...BROWSER_PROJECTS.map((p) => `!${p}`)].map((p) => `--project='${p}'`).join(' ')} {files}; s=$?; ${CHECKS} || s=1; npm run -s check:unnameable -- --build {files} || s=1; exit $s`,
       gui: {
         probe: `npx vitest list --filesOnly ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {related}`,
         command: `npx vitest related --run --maxWorkers=2 ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {files}`,
