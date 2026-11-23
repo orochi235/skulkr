@@ -140,6 +140,11 @@ export interface Stat {
  *  once over them. */
 export const foundIn = (area: AuditArea): number => area.passes.reduce((n, p) => n + p.distinct * (p.share ?? 1), 0);
 
+/** What Chapman's estimates say its passes held, summed as `foundIn` sums what they found, to set beside it: raw, and
+ *  corrected by calibration. Each pass's `est` is already scaled by its share. */
+export const chapmanIn = (area: AuditArea): { readonly est: number; readonly corrected: number } =>
+  area.passes.reduce((t, p) => ({ est: t.est + p.est, corrected: t.corrected + correctedEstOf(p) }), { est: 0, corrected: 0 });
+
 /** The defects its passes' fixers fixed, by share as `foundIn` counts, and how many passes reported it; null where no
  *  pass has a fix report with verdicts. */
 export function fixedIn(area: AuditArea): { readonly fixed: number; readonly reported: number } | null {

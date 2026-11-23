@@ -3,7 +3,7 @@ import { Badge } from '@weasel-js/ui/components/Badge';
 import { DetailList, DetailRow } from '@weasel-js/ui/components/DetailList';
 import { SidebarPanel } from '@weasel-js/ui/components/SidebarPanel';
 import type { Grade } from '@weasel-js/theme';
-import { STATUS_LABEL, correctedEstOf, fixedIn, formatCount, foundIn, correctedLeftOf, correctedText, correctionShows, lastPassOf, stageLabelOf } from './areaData';
+import { STATUS_LABEL, chapmanIn, correctedEstOf, fixedIn, formatCount, foundIn, correctedLeftOf, correctedText, correctionShows, lastPassOf, stageLabelOf } from './areaData';
 import type { AreaStatus, AuditArea, AuditPass, AuditRun } from './skulkrMap.types';
 import s from './AreaDetail.module.css';
 
@@ -78,6 +78,7 @@ function Venn({ a, both, b }: { a: ReactNode; both: ReactNode; b: ReactNode }) {
 export function AreaDetail({ area, holder, asOf = null }: { area: AuditArea | undefined; holder: AuditRun | undefined; asOf?: number | null }) {
   const last = area && lastPassOf(area);
   const fixed = area && fixedIn(area);
+  const chapman = area && area.passes.length > 0 ? chapmanIn(area) : null;
   const grade = area && asOf === null ? GRADE[area.status] : undefined;
   const badge = !area ? '' : asOf !== null ? `${area.status === 'unaudited' ? 'not audited' : 'audited'} by round ${asOf}`
     : holder ? `in round ${holder.round}` : STATUS_LABEL[area.status];
@@ -91,6 +92,7 @@ export function AreaDetail({ area, holder, asOf = null }: { area: AuditArea | un
             <DetailRow label="source files">{area.files}</DetailRow>
             <DetailRow label="passes">{area.passes.length}</DetailRow>
             {area.passes.length > 0 && <DetailRow label="total found">{formatCount(Math.round(foundIn(area)))}</DetailRow>}
+            {chapman && <DetailRow label="total by Chapman's estimate">{formatCount(Math.round(chapman.est))}{correctionShows(chapman.est, chapman.corrected) && ` (${correctedText(chapman.corrected)} corrected)`}</DetailRow>}
             {fixed && <DetailRow label={fixed.reported < area.passes.length ? `total fixed, ${fixed.reported} of ${area.passes.length} passes` : 'total fixed'}>{formatCount(Math.round(fixed.fixed))}</DetailRow>}
             {area.queue !== null && <DetailRow label="queue position">{area.queue}</DetailRow>}
             {area.stage && <DetailRow label="this run">{stageLabelOf(area.stage)}</DetailRow>}
