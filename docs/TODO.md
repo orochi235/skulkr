@@ -11,6 +11,13 @@ Open work on skulkr. Each entry says when it closes.
   dispatched; (2) the session's cost, summed from its transcript's per-reply `usage` (`~/.claude*/projects/<cwd>/
   <session>.jsonl`); (3) its outcome put through the same verify, and the two diffs scored side by side. Closes when
   one area has been fixed both ways and the comparison reads from a command.
+- [ ] (P2) A red gate step whose output names only files no branch changed goes unattributed, so the capstone
+  repair has nothing to hand a fixer and the round stays red. Round 78 (2026-11-23): icons-plugin's fixer made
+  `weaselIcons.esbuild` refuse a minified library build, which broke `packages/headless`'s page build in
+  `npm run build`; the log blamed only headless, so the batch sat red until fixed by hand. A fixer's verify runs only
+  tests related to its files, so a consumer's build is never exercised before the gate. Closes when an unattributed
+  failure is bisected over the batch's branches (rebuild without each, or rerun the failing step per branch) and the
+  repair goes to the branch that turns it red.
 - [ ] (P2) Fix steps on the dashboard don't show progress reliably, and keep showing an error after it has
   presumably been fixed (reported 2026-11-22, not yet traced): work out where each comes from (the fixer's progress
   counter in `progress.mjs`, the map's run and lane state) and how a fixed error should clear. Closes when a fix
