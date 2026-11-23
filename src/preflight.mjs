@@ -77,7 +77,7 @@ const runPart = async (ctx, { tree, commit, tests, label, gui }) => {
  * `{ ok, unrun, log }`: `log` the path of both parts' output in `nightDir`, `unrun` when a part gave no verdict (it
  * never ran, timed out, or failed naming no failure), which says nothing of the commit.
  */
-export const runPreflight = async (ctx, { tree, commit, tests = { plain: [], gui: [] }, label }) => {
+export const runPreflight = async (ctx, { tree, commit, tests = /** @type {{ plain: string[], gui: string[] }} */ ({ plain: [], gui: [] }), label }) => {
   const { cfg, nightDir } = ctx;
   const gui = preflightOf(cfg).gui?.command ? tests.gui : [];
   const parts = await Promise.all([
@@ -159,7 +159,7 @@ export const mainRedText = (cfg, root, onMain, logText) => {
  * gate's result, red with `{ report, log }`, plus `own`, the log less what `main` fails too, and `onMain`, what it
  * does; a preflight whose every failure `main` has goes on to the gate, and its `onMain` stays on the result.
  */
-export const testChecked = async ({ cfg, checks, batch, tip, rerun = { plain: [], gui: [] }, tag, gate, say }) => {
+export const testChecked = async ({ cfg, checks, batch, tip, rerun = /** @type {{ plain: string[], gui: string[] }} */ ({ plain: [], gui: [] }), tag, gate, say }) => {
   if (!checks) return gate([]);
   const pre = await checks.preflight({ tree: batch.tree, commit: tip, tests: rerun, label: `preflight${tag}-${tip.slice(0, 10)}` });
   let extra = [];
