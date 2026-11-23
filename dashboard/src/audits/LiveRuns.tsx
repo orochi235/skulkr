@@ -10,7 +10,7 @@ import { laneViewOf, runClockOf, type LaneView } from './clockLane';
 import { passDone, STAGE_LABEL, phaseClass, stageCountsOf, BRIGHT_FILLS } from './phases';
 import { STEP_COLUMN_COUNT, laneStepsOf } from './stepsLane';
 import { gateRunsOf, inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
-import { NODE_SEP, headlineOf, lastLineOf, spendOf, startedText } from './runData';
+import { NODE_SEP, elapsedText, headlineOf, lastLineOf, spendOf, startedText } from './runData';
 import { useDashPref } from './dashPrefs';
 import type { AuditLane, AuditLeftOut, AuditRun } from './skulkrMap.types';
 import s from './LiveRuns.module.css';
@@ -193,7 +193,7 @@ function RunStrip({ run, now, mode, hideComplete, on, passes }: {
         <div className={s.pulse} aria-hidden="true" />
         <div className={s.what}>
           <span>{headlineOf(run)}</span>
-          {run.started && <span className={s.started}>{startedText(run.started, now)}</span>}
+          {run.started && <span className={s.started}>{[startedText(run.started, now), elapsedText(run, now)].filter(Boolean).join(' • ')}</span>}
         </div>
         {run.lanes.length > 0 ? <StageCounts run={run} /> : <span />}
         <div className={s.line} title={lastLineOf(run)}><InlineMarkdown text={lastLineOf(run)} /></div>

@@ -52,6 +52,17 @@ export function startedText(iso: string, now: number): string {
   return `started ${at.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
 }
 
+/** How long a run has gone, to now while it runs and to its end once over, as `hh:mm elapsed`; null where its start or
+ *  end does not parse. */
+export function elapsedText(run: Pick<AuditRun, 'started' | 'ended' | 'running'>, now: number): string | null {
+  const from = run.started ? Date.parse(run.started) : NaN;
+  const to = run.running ? now : run.ended ? Date.parse(run.ended) : NaN;
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
+  const minutes = Math.max(0, Math.floor((to - from) / 60_000));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)} elapsed`;
+}
+
 /** The lanes header's word on continuous mode: on, and the night's budget left; null while it is off. */
 export function continuousText(continuous: AuditContinuous | undefined): string | null {
   if (!continuous) return null;

@@ -82,6 +82,7 @@
 .started {
   margin-inline-start: var(--wzl-space-2);
   font-weight: var(--wzl-font-weight-normal);
+  font-variant-numeric: tabular-nums;
   color: var(--audit-muted);
 }
 

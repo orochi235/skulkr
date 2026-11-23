@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { changedSincePass, chapmanIn, correctionShows, fixedIn, foundIn, queuedFixesIn, heatScaleOverRounds, defectsVersionOf, heatScaleOf, labelIn, lastPassOf, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
-import { continuousText, headlineOf, logTailsOf, parseJob, recentJobsOf, scrolledOf, spendOf, stepText } from './runData';
+import { continuousText, elapsedText, headlineOf, logTailsOf, parseJob, recentJobsOf, scrolledOf, spendOf, stepText } from './runData';
 import { stageCountsOf } from './phases';
 import { inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
 import { ticksFor } from './RoundsChart';
@@ -430,5 +430,14 @@ describe('queuedFixesIn', () => {
     expect(queuedFixesIn([run(true, lanes), run(false, [lane({ state: 'done', fixed: 9 })])])).toBe(6);
     expect(statsFor(map.areas, null, map.areas, [run(true, lanes)])[3]).toEqual({ value: '6', label: 'fixed, waiting to merge' });
     expect(statsFor(map.areas, 3).map((t) => t.label)).not.toContain('fixed, waiting to merge');
+  });
+});
+
+describe('elapsedText', () => {
+  const started = '2026-11-22T22:10:00.000Z';
+  it('runs to now while a run is live, and to its end once over, in hours and minutes', () => {
+    expect(elapsedText({ started, ended: null, running: true }, Date.parse('2026-11-22T22:44:59.000Z'))).toBe('00:34 elapsed');
+    expect(elapsedText({ started, ended: '2026-11-23T01:05:00.000Z', running: false }, Date.now())).toBe('02:55 elapsed');
+    expect(elapsedText({ ended: null, running: true }, Date.now())).toBeNull();
   });
 });
