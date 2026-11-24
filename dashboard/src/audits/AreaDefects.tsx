@@ -21,6 +21,7 @@ const LABEL: Readonly<Partial<Record<AuditDefect['verdict'], string>>> = { 'not 
 /** Who listed a defect, both reviewers as `∩`; a carried one, an earlier round's that no fixer had acted on, with a clock turned back. */
 function Source({ from }: { from: string }) {
   if (from === 'A+B') return <span className={s.from} title="both reviewers">∩</span>;
+  if (from === 'extra') return <span className={s.from} title="one the fixer found itself, beyond the reviewers' lists">★</span>;
   if (from !== 'carried') return <span className={s.from}>{from}</span>;
   return (
     <span className={s.from} title="an earlier round's finding no fixer had acted on, handed to this round's fixer">

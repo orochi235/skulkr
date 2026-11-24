@@ -10,10 +10,11 @@ afterEach(() => {
 });
 
 describe('AreaDefects', () => {
-  it("shows who listed each defect only in a round not yet recorded, both reviewers as ∩ and a carried one with a clock", async () => {
+  it("shows who listed each defect only in a round not yet recorded, both reviewers as ∩, the fixer's own as ★, and a carried one with a clock", async () => {
     const items = [
       { claim: 'old claim', from: 'carried', verdict: 'not a defect', note: '' },
       { claim: 'new claim', from: 'A+B', verdict: 'fixed', note: '' },
+      { claim: 'found by the fixer', from: 'extra', verdict: 'fixed', note: '' },
     ];
     const rounds = [{ round: 71, recorded: false, fixed: true, items }, { round: 70, recorded: true, fixed: true, items }];
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(rounds))));
@@ -26,6 +27,8 @@ describe('AreaDefects', () => {
     expect(carried.title).toMatch(/earlier round/);
     expect(carried.querySelector('svg')).toBeTruthy();
     expect(screen.getAllByText('∩')).toHaveLength(1);
+    expect(screen.getByText('★').title).toMatch(/fixer found itself/);
+    expect(screen.queryByText('extra')).toBeNull();
     expect(screen.getAllByText("won't fix")).toHaveLength(2);
     expect(screen.queryByText('not a defect')).toBeNull();
   });
