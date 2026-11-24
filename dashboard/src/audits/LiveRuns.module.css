@@ -67,6 +67,7 @@
 }
 
 .count { white-space: nowrap; }
+.agentCount { color: var(--audit-ink); font-variant-numeric: tabular-nums; }
 .doneCount { font-size: var(--wzl-font-size-md); font-weight: var(--wzl-font-weight-bold); color: var(--audit-ink); }
 
 .dot {
@@ -149,9 +150,9 @@
 
 /* The name to the left, the area's pass dots against the right edge of the name column, as on its map cell. */
 .nameText { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.passDots { flex: none; display: inline-flex; align-items: center; gap: 5px; margin-inline-end: var(--wzl-space-1); }
+.passDots { flex: none; display: inline-flex; flex-direction: row-reverse; align-items: center; gap: 5px; margin-inline-end: var(--wzl-space-1); }
 .dotColumn { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-.dotGroup { display: inline-flex; gap: 2px; }
+.dotGroup { display: inline-flex; flex-direction: row-reverse; gap: 2px; }
 .dotGroup > i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: 0.85; }
 .dotGroup > i.open { background: none; box-shadow: inset 0 0 0 1px currentColor; }
 
@@ -187,3 +188,5 @@
   30% { color: color-mix(in srgb, #fff 20%, #000); animation-timing-function: linear; }
   75% { color: color-mix(in srgb, #fff 20%, #000); animation-timing-function: cubic-bezier(0.6, 0, 0.65, 0.8); }
 }
+/* The page icon standing for "files" in a lane's first step, set off from the digits before and the words after. */
+.page { flex: none; vertical-align: -1px; margin-inline: 1px 2px; }

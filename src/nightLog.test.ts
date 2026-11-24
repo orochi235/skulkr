@@ -166,7 +166,7 @@ describe('nightLanes repair step', () => {
 
   it('shows a GUI verify job running before any verdict', () => {
     const running = [{ task: 'audit9-a-verify', node: 'msb-uai', started: '2026-11-20T23:00:00Z' }];
-    expect(nightLanes(fix, ['a'], running)[0]!.steps.repair).toEqual({ state: 'running', node: 'msb-uai', since: '2026-11-20T23:00:00Z' });
+    expect(nightLanes(fix, ['a'], running)[0]!.steps.repair).toEqual({ state: 'running', node: 'msb-uai', since: '2026-11-20T23:00:00Z', job: 'verify' });
   });
 
   it('counts a capstone repair as one more attempt', () => {

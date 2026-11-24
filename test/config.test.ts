@@ -56,8 +56,8 @@ describe('runners', () => {
 
   it('defaults to the local runner, its one node, and slots for one machine; a fleet runner keeps 6 each', () => {
     expect(resolveConfig({}).runner).toBe('local');
-    expect(resolveConfig({}).nodes).toMatchObject({ list: ['local'], reviewSlots: 3, fixSlots: 2 });
-    expect(resolveConfig({ nodes: { fixSlots: 1 } }).nodes).toMatchObject({ reviewSlots: 3, fixSlots: 1 });
+    expect(resolveConfig({}).nodes).toMatchObject({ list: ['local'], reviewSlots: 6, fixSlots: 2 });
+    expect(resolveConfig({ nodes: { fixSlots: 1 } }).nodes).toMatchObject({ reviewSlots: 6, fixSlots: 1 });
     expect(resolveConfig({ runner: 'onto' }).nodes).toMatchObject({ list: [], reviewSlots: 6, fixSlots: 6 });
     expect(resolveConfig({ runner: 'onto', nodes: { list: ['a', 'b'] } }).concurrency).toEqual({ review: 12, fix: 12 });
     expect(weaselConfig().concurrency).toEqual({ review: 18, fix: 18 });
@@ -83,8 +83,8 @@ describe('local mode', () => {
     const cfg = resolveConfig({ runner: 'onto', concurrency: { review: 18 }, nodes: { list: ['studio'], fixSlots: 6 }, claude: { configDir: '~/.other' } }, { local: true, env });
     expect(cfg.local.on).toBe(true);
     expect(cfg.runner).toBe('local');
-    expect(cfg.nodes).toMatchObject({ list: ['local'], local: null, reviewSlots: 3, fixSlots: 2 });
-    expect(cfg.concurrency).toEqual({ review: 3, fix: 2 });
+    expect(cfg.nodes).toMatchObject({ list: ['local'], local: null, reviewSlots: 6, fixSlots: 2 });
+    expect(cfg.concurrency).toEqual({ review: 6, fix: 2 });
     expect(cfg.git).toMatchObject({ remote: 'origin', push: false });
     expect(cfg.claude.configDir).toBe('/acct/starting');
     expect(cfg.claude.denied).toEqual(['WebFetch', 'WebSearch']);

@@ -13,9 +13,15 @@ const PIPS_PER_ROW = 5;
 /** How many pips a row holds in a cell `width` wide, up to PIPS_PER_ROW; pips past that wrap to a row below. */
 export const pipsPerRowIn = (width: number): number => Math.max(1, Math.min(PIPS_PER_ROW, Math.floor((width - 4) / PIP)));
 
-/** The pips a cell wears, right to left: the open circle while a pass is under way, a dot per pass, then the padlock. */
-export const pipCountOf = (dots: number, pending: boolean, locked: boolean): number =>
-  (pending ? 1 : 0) + dots + (locked ? 1 : 0);
+/** How `passes` passes are tallied: a filled pip for each five, then an open one for each pass left over. */
+export const passPipsOf = (passes: number): { readonly fives: number; readonly ones: number } =>
+  ({ fives: Math.floor(passes / 5), ones: passes % 5 });
+
+/** The pips a cell wears, right to left: its passes' (`passPipsOf`), then the padlock. */
+export const pipCountOf = (passes: number, locked: boolean): number => {
+  const { fives, ones } = passPipsOf(passes);
+  return fives + ones + (locked ? 1 : 0);
+};
 
 export interface AuditCellData {
   readonly kind: 'audit-cell';
@@ -38,10 +44,8 @@ export interface AuditCellData {
   readonly worn?: boolean;
   /** A check in its corner: no audit is due. */
   readonly settled?: boolean;
-  /** One per pass. */
+  /** Its passes, drawn as `passPipsOf` tallies them. */
   readonly dots: number;
-  /** A live run's pass over the area is under way: an open circle after the dots until its own dot replaces it. */
-  readonly pending?: boolean;
   /** An earlier round's unmerged branch holds it: a padlock left of the dots. */
   readonly locked?: boolean;
   /** A glow's color while something naming the area elsewhere on the page is hovered. */
@@ -141,20 +145,24 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
     const check = pathFromD(`M ${x} ${y + 4} L ${x + 3} ${y + 7} L ${x + 9} ${y}`);
     out.push({ kind: 'path', path: check, stroke: { paint: { color: d.ink, opacity: 0.8 }, width: 1.6 } });
   }
-  // Read left to right, oldest first: the open circle, when there is one, takes the rightmost place, and the padlock
-  // follows the dots. A row holds what the cell's width does; the rest wrap below, as long as the cell is tall enough.
-  const ring = d.pending ? 1 : 0;
-  const dotCount = d.dots;
-  const pips = pipCountOf(d.dots, d.pending ?? false, d.locked ?? false);
+  // Drawn right to left: filled fives, then open ones, then the padlock. A row holds what the cell's width does; the rest
+  // wrap below, as long as the cell is tall enough.
+  const { fives, ones } = passPipsOf(d.dots);
+  const dotCount = fives + ones;
+  const pips = pipCountOf(d.dots, d.locked ?? false);
   const perRow = pipsPerRowIn(p.width);
   const rows = Math.ceil(pips / perRow);
   if (pips > 0 && p.width >= 10 && p.height >= 4 + rows * PIP) {
     const at = (i: number) => ({ x: p.x + p.width - 5 - (i % perRow) * PIP, y: p.y + 5 + Math.floor(i / perRow) * PIP });
     const ink = { color: d.ink, opacity: 0.85 };
-    if (ring) { const c = at(0); out.push({ kind: 'path', path: circlePath(c.x, c.y, 1.6, 12), stroke: { paint: ink, width: 1 } }); }
-    for (let i = 0; i < dotCount; i++) { const c = at(i + ring); out.push({ kind: 'path', path: circlePath(c.x, c.y, 2, 12), fill: { paint: ink } }); }
+    for (let i = 0; i < dotCount; i++) {
+      const c = at(i);
+      out.push(i < fives
+        ? { kind: 'path', path: circlePath(c.x, c.y, 2, 12), fill: { paint: ink } }
+        : { kind: 'path', path: circlePath(c.x, c.y, 1.6, 12), stroke: { paint: ink, width: 1 } });
+    }
     if (d.locked) {
-      const { x, y } = at(ring + dotCount);
+      const { x, y } = at(dotCount);
       // The shackle stops short of the body, so the two read apart at this size.
       out.push({ kind: 'path', path: pathFromD(`M ${x - 2.5} ${y - 0.3} h 5 v 3.5 h -5 Z`), fill: { paint: ink } });
       out.push({ kind: 'path', path: pathFromD(`M ${x - 1.4} ${y - 1.1} V ${y - 2} A 1.4 1.4 0 0 1 ${x + 1.4} ${y - 2} V ${y - 1.1}`), stroke: { paint: ink, width: 0.9 } });

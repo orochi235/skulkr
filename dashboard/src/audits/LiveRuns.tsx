@@ -7,8 +7,11 @@ import { clockRuler } from './clock';
 import { GateFailures } from './GateFailures';
 import { LeftOut } from './LeftOut';
 import { laneViewOf, runClockOf, type LaneView } from './clockLane';
-import { passDone, STAGE_LABEL, phaseClass, stageCountsOf, BRIGHT_FILLS } from './phases';
-import { STEP_COLUMN_COUNT, laneStepsOf } from './stepsLane';
+import { agentsRunningIn, passDone, STAGE_LABEL, phaseClass, stageCountsOf, BRIGHT_FILLS } from './phases';
+import { Icon } from '@weasel-js/ui/components/Icon';
+import { icon } from '@dash/icons.gen';
+import { STEP_COLUMN_COUNT, filesText, laneStepsOf } from './stepsLane';
+import { passPipsOf } from './auditPainter';
 import { gateRunsOf, inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
 import { NODE_SEP, elapsedText, headlineOf, lastLineOf, spendOf, startedText } from './runData';
 import { useDashPref } from './dashPrefs';
@@ -40,7 +43,7 @@ const failedGateRuns = (run: AuditRun) => gateRunsOf(run).flatMap((g) => {
   return failures ? [{ id: g.id, label: g.label, failures }] : [];
 });
 
-/** Dots per group in a lane's pass count, set apart like tally marks so a count reads at a glance. */
+/** Pips per group in a lane's pass count, set apart so a count reads at a glance. */
 const DOT_GROUP = 5;
 /** Groups stacked in a column before the next column starts: two rows of dots fit the lane's line. */
 const GROUP_ROWS = 2;
@@ -51,12 +54,13 @@ const dotColumnsFor = (total: number): number[][] => {
   return Array.from({ length: Math.ceil(groups.length / GROUP_ROWS) }, (_, c) => groups.slice(c * GROUP_ROWS, (c + 1) * GROUP_ROWS));
 };
 
-/** An area's passes as dots, one each, in groups of DOT_GROUP stacked GROUP_ROWS high, at the end of its lane's name;
- *  while this round's pass is under way, an open circle stands in for its dot. */
-function PassDots({ passes, pending }: { passes: number; pending: boolean }) {
-  const total = passes + (pending ? 1 : 0);
+/** An area's passes as `passPipsOf` tallies them, right to left, filled fives then open ones, in groups of DOT_GROUP stacked
+ *  GROUP_ROWS high, at the end of its lane's name. */
+function PassDots({ passes }: { passes: number }) {
+  const { fives, ones } = passPipsOf(passes);
+  const total = fives + ones;
   if (total <= 0) return null;
-  const title = `${passes} ${passes === 1 ? 'pass' : 'passes'}${pending ? ', one under way' : ''}`;
+  const title = `${passes} ${passes === 1 ? 'pass' : 'passes'}`;
   let at = 0;
   return (
     <span className={s.passDots} title={title}>
@@ -64,7 +68,7 @@ function PassDots({ passes, pending }: { passes: number; pending: boolean }) {
         <span key={c} className={s.dotColumn}>
           {column.map((count, g) => (
             <span key={g} className={s.dotGroup}>
-              {Array.from({ length: count }, (_, i) => <i key={i} className={at++ >= passes ? s.open : undefined} />)}
+              {Array.from({ length: count }, (_, i) => <i key={i} className={at++ >= fives ? s.open : undefined} />)}
             </span>
           ))}
         </span>
@@ -73,12 +77,21 @@ function PassDots({ passes, pending }: { passes: number; pending: boolean }) {
   );
 }
 
-/** The room `passes` dots take in their columns, with the gap before them; the widths are PassDots' CSS. */
+/** The room `passes` passes' pips take in their columns, with the gap before them; the widths are PassDots' CSS. */
 export const dotsWidthFor = (passes: number): number => {
-  if (passes <= 0) return 0;
-  const columns = dotColumnsFor(passes).map((column) => column[0]!);
+  const { fives, ones } = passPipsOf(passes);
+  if (fives + ones <= 0) return 0;
+  const columns = dotColumnsFor(fives + ones).map((column) => column[0]!);
   return columns.reduce((w, n) => w + n * 4 + (n - 1) * 2, 0) + (columns.length - 1) * 5 + 4 + 8;
 };
+
+/** The steps view's first segment with the page icon standing for the word "files"; its label keeps the word. */
+function withFileIcon(spans: SpanStripSpan[], files: number | undefined): SpanStripSpan[] {
+  if (files === undefined) return spans;
+  return spans.map((span) => (span.id === 'A' && span.label.startsWith(filesText(files))
+    ? { ...span, content: <>{files}<Icon name={icon('ui:page')} size={11} className={s.page} />{span.label.slice(filesText(files).length)}</> }
+    : span));
+}
 
 /** An area's lane as a stack row: its name, and `spans`, its steps in the view chosen. */
 function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanStripSpan[], passes: number): SpanStripsRow {
@@ -93,7 +106,7 @@ function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanS
         onPointerEnter={() => on.onLight(lane.id)} onPointerLeave={() => on.onLight(null)} onFocus={() => on.onLight(lane.id)} onBlur={() => on.onLight(null)}
       >
         <span className={s.nameText}>{lane.id}</span>
-        <PassDots passes={passes} pending={!passDone(lane)} />
+        <PassDots passes={passes} />
       </button>
     ),
   };
@@ -132,15 +145,15 @@ const SHARED_WINDOW = { from: 0, to: 2 };
 
 /** The run's areas, on the run's clock or as a grid of steps; a finished one stays, filled, until the run ends, unless
  *  the viewer hides those whose pass is done, as the map shows them. */
-function Lanes({ run, now, mode, hideComplete, on, passes }: {
-  run: AuditRun; now: number; mode: LaneMode; hideComplete: boolean; on: AreaHandlers; passes: ReadonlyMap<string, number>;
+function Lanes({ run, now, mode, hideComplete, on, passes, files }: {
+  run: AuditRun; now: number; mode: LaneMode; hideComplete: boolean; on: AreaHandlers; passes: ReadonlyMap<string, number>; files: ReadonlyMap<string, number>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const clock = runClockOf(run, now);
   const lanes = run.lanes.map((lane) => ({ lane, view: laneViewOf(lane, now, clock.from) })).filter(({ lane }) => !hideComplete || !passDone(lane));
   const widest = Math.max(0, ...run.lanes.map((l) => l.id.length));
   useLayoutEffect(() => { ref.current?.style.setProperty('--audit-lead-ch', String(widest)); }, [widest]);
-  const dotsPx = dotsWidthFor(Math.max(0, ...run.lanes.map((l) => (passes.get(l.id) ?? 0) + (passDone(l) ? 0 : 1))));
+  const dotsPx = dotsWidthFor(Math.max(0, ...run.lanes.map((l) => passes.get(l.id) ?? 0)));
   useLayoutEffect(() => { ref.current?.style.setProperty('--audit-dots-px', `${dotsPx}px`); }, [dotsPx]);
   // A label's element is remade whenever its text changes, restarting its pulse; one shared start keeps every pulse in step.
   useLayoutEffect(() => {
@@ -149,7 +162,7 @@ function Lanes({ run, now, mode, hideComplete, on, passes }: {
     }
   });
   if (lanes.length === 0) return null;
-  const rows = lanes.map(({ lane, view }) => laneRow(lane, view, on, mode === 'steps' ? laneStepsOf(lane, now) : view.spans, passes.get(lane.id) ?? 0));
+  const rows = lanes.map(({ lane, view }) => laneRow(lane, view, on, mode === 'steps' ? withFileIcon(laneStepsOf(lane, now, files.get(lane.id)), files.get(lane.id)) : view.spans, passes.get(lane.id) ?? 0));
   // Anywhere on a lane picks and lights its area, as its name does; the name stays the keyboard's way in.
   const areaAt = (target: EventTarget) => {
     const row = target instanceof Element ? target.closest('[role="listitem"]') : null;
@@ -172,9 +185,11 @@ function Lanes({ run, now, mode, hideComplete, on, passes }: {
 /** How many of a round's areas are done, and how many sit in each stage, in the legend's colors. */
 function StageCounts({ run }: { run: AuditRun }) {
   const { done, total, stages } = stageCountsOf(run.lanes);
+  const agents = agentsRunningIn(run.lanes);
   return (
     <div className={s.counts} aria-label={`Round ${run.round} areas by stage`}>
       <span className={cx(s.count, s.doneCount)}>{done} of {total} done</span>
+      <span className={cx(s.count, s.agentCount)} title="model agents running now: reviewers, matchers, fixers and repairs">{agents} {agents === 1 ? 'agent' : 'agents'}</span>
       {stages.map(({ phase, n }) => (
         <span key={phase} className={cx(s.count, phaseClass(phase))}><i className={s.dot} aria-hidden="true" />{n} {STAGE_LABEL[phase]}</span>
       ))}
@@ -184,8 +199,8 @@ function StageCounts({ run }: { run: AuditRun }) {
 
 /** One run's strip: what it is doing and what it has spent, its last line, what its batch left out, and a lane per
  *  area in flight. */
-function RunStrip({ run, now, mode, hideComplete, on, passes }: {
-  run: AuditRun; now: number; mode: LaneMode; hideComplete: boolean; on: AreaHandlers; passes: ReadonlyMap<string, number>;
+function RunStrip({ run, now, mode, hideComplete, on, passes, files }: {
+  run: AuditRun; now: number; mode: LaneMode; hideComplete: boolean; on: AreaHandlers; passes: ReadonlyMap<string, number>; files: ReadonlyMap<string, number>;
 }) {
   return (
     <section className={cx(s.run, !run.running && s.idle)} aria-label={`Round ${run.round}`}>
@@ -203,7 +218,7 @@ function RunStrip({ run, now, mode, hideComplete, on, passes }: {
       <LeftOut entries={(run.leftOut ?? []).filter((e) => e.round === run.round)} label="left out" name={`Round ${run.round}, left out of the batch`} on={on} />
       {run.lanes.length > 0 && (
         <div className={s.lanes} data-mode={mode}>
-          <Lanes run={run} now={now} mode={mode} hideComplete={hideComplete} on={on} passes={passes} />
+          <Lanes run={run} now={now} mode={mode} hideComplete={hideComplete} on={on} passes={passes} files={files} />
           {(inSharedSteps(run) || run.lanes.every(passDone)) && (
             <SpanStrips
               aria-label={`Round ${run.round}, every area`} window={SHARED_WINDOW}
@@ -232,12 +247,14 @@ function RunStrip({ run, now, mode, hideComplete, on, passes }: {
  *  in the rounds chart and the map. */
 const NO_PASSES: ReadonlyMap<string, number> = new Map();
 
-export function LiveRuns({ runs, unmerged, now, on, view, focus = null, passes = NO_PASSES, leftOut = [] }: {
+export function LiveRuns({ runs, unmerged, now, on, view, focus = null, passes = NO_PASSES, files = NO_PASSES, leftOut = [] }: {
   runs: readonly AuditRun[]; unmerged: ReadonlySet<number>; now: number; on: AreaHandlers;
   /** Branches earlier batches left out that later ones still try (the map's `leftOut`). */
   leftOut?: readonly AuditLeftOut[];
   /** How many passes each area has had, by id, for the dots on its lane as on its map cell. */
   passes?: ReadonlyMap<string, number>;
+  /** How many source files each area holds, by id, for the first step of its lane in the steps view. */
+  files?: ReadonlyMap<string, number>;
   /** How every round's lanes are drawn; the page holds it, and its controls, so one setting covers them all. */
   view: LaneSettings;
   /** The area picked elsewhere on the page: its lane, where one shows, is brought into view. */
@@ -254,7 +271,7 @@ export function LiveRuns({ runs, unmerged, now, on, view, focus = null, passes =
   if (live.length === 0) return <section className={cx(s.run, s.idle)}><div className={s.what}>No round running</div>{earlier}</section>;
   return (
     <div ref={root} className={s.runs} aria-live="polite">
-      {live.map((run) => <RunStrip key={run.round} run={run} now={now} mode={view.mode} hideComplete={view.hideComplete} on={on} passes={passes} />)}
+      {live.map((run) => <RunStrip key={run.round} run={run} now={now} mode={view.mode} hideComplete={view.hideComplete} on={on} passes={passes} files={files} />)}
       {earlier}
     </div>
   );

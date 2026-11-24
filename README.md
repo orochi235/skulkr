@@ -93,11 +93,11 @@ export default {
 
   runner: 'local',                    // or 'onto', a module path exporting createRunner(cfg), or a runner object
   localFix: { enabled: false, slots: 2 }, // fixers and repairs on this machine, as the starting account ("Local fixers")
-  local: { enabled: false, override: {} }, // every job on this machine, nothing pushed ("Local mode")
+  local: { enabled: false, agents: 6, override: {} }, // every job on this machine, nothing pushed ("Local mode")
   nodes: {
     list: [],                         // nodes jobs are offered to; the local runner's is ['local']; unused under onto
     local: null,                      // or { name, from: '00:00', until: '09:00', fixers: false }: a node usable only in a window
-    reviewSlots: 3, fixSlots: 2,      // jobs at once per node; 6 each for a fleet runner
+    reviewSlots: 6, fixSlots: 2,      // jobs at once per node; 6 each for a fleet runner; local reviews default to local.agents
   },
   concurrency: { review: 18, fix: 18 }, // jobs at once across the fleet, under a runner that places them (onto)
   claude: {
@@ -236,7 +236,11 @@ dispatch a node refuses moves to another node and keeps that one out for `nodes.
 A job that failed before its model started is launched up to three times; one whose model started (it writes
 `started` first) and left no `exit` was cut off mid-run and is never launched again, since it was paid for.
 `<state>/limits.json` (`{ "review": n, "fix": n }`) changes the slots per node, or under a placing runner the jobs at
-once, and with them how many areas a run keeps going at once, for runs already going.
+once, and with them how many areas a run keeps going at once, for runs already going. An area keeps its place until
+it finishes, except under the local runner, where it gives its place up once its pair has reviewed and matched, so the
+next areas review while this one's fixer and verify run, and the fix slots alone bound the fixers (2026-11-24). The local
+runner's 6 review slots keep three areas reviewing at once, since a reviewer waits on the model rather than the machine;
+its 2 fix slots stay low because a fixer's verify runs the project's tests (2026-11-24).
 
 ## Verify and repair
 
@@ -413,6 +417,7 @@ the account that started the run. Every job (reviews, matches, fixes, repairs) a
 | Account | the `CLAUDE_CONFIG_DIR` the run was started under, else `claude.configDir`, else the CLI's default account |
 | `main` | fast-forwarded locally, never pushed (`git.push` is off) |
 | Model jobs | refused `WebFetch` and `WebSearch`, beside each role's own refusals |
+| Agents | under the local runner, at most `local.agents` model jobs (default 6) at once, whatever their role, each also holding its role's slot; `"agents"` in `limits.json` changes it for runs already going. A verify job runs no model and holds none (2026-11-24) |
 | The run's environment | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` (no telemetry, error reports, or updates) and `npm_config_offline=true` (`npm ci` and `npx` use only npm's cache, and fail rather than download), inherited by every job and command the run starts |
 
 skulkr cannot see what a project's own commands do. A gate or preflight that sends work to a fleet still does, so

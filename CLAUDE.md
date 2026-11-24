@@ -48,6 +48,9 @@ weasel cutover.
     only a `##` section with a `where:` line counts as a finding, and a `## Files Read:` heading lists files read;
     `area.json`'s `questions` counts question verdicts, not the word;
     a matcher reply with braces in its prose still yields its pairs.
+    From 2026-11-24, a fixer's verdict line reads as one with no sha after `fixed`, opening with its verdict
+    (`fixed <sha> — claim (A)`), or with a claim that opens with a verdict's word; a source like `(A+B; …)` counts;
+    and a line that only names a sha, opening the report, is no defect.
   - a branch the batch leaves out: its outcome names the conflicting paths or git's message, a merge that meets a
     lock is retried, and later rounds' batches try it again (README "batch" step, 2026-11-21).
   - `turns`, each job's model turns, on its `usage.jsonl` record (2026-11-21).
@@ -103,6 +106,12 @@ weasel cutover.
     conflict when the log says a conflict repair merged it, or git says it is in `main` or its round's batch.
   - the run's heartbeat lines (`job …`), a fixer's `skulkr:` lines in its log, a relaunched job's log marker, and a
     running fix step's `checks`, `tests` and `now` on the map (README "Watching a run", 2026-11-24).
+  - the fix job's `skulkr: verifying the fixer's commits` line before its verify, and, under the local runner only, an
+    area giving up its place once it has reviewed and matched (README "Limits", 2026-11-24).
+  - under the local runner only: `local.agents` model jobs at once across roles, and review slots defaulting to it
+    (README "Local mode"); the map's running `repair` step naming its `job`, verify or repair (2026-11-24).
+  - a run waiting for a place asking the area limit again every 30 seconds, so a raised `limits.json` reaches it
+    before an area finishes (2026-11-24).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

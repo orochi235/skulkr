@@ -103,15 +103,13 @@ const LINE = 15;
 /** Room the pass dots take at a cell's top right, which its label stops short of. */
 const dotsRoom = (pips: number, width: number) => (pips > 0 ? Math.min(pips, pipsPerRowIn(width)) * 6 + 4 : 0);
 
-/** Whether a live run's pass over `area` is under way: it holds the area and has not yet added that pass's dot. */
-const passPending = (area: AuditArea) => area.status === 'tonight' && !area.passes.some((p) => p.provisional);
 
 /** An area's label as the lines its cell has room for, broken after dots, the last cut short if it must be. */
 function labelLines(area: AuditArea, cell: MapCell, font: string): string[] {
   const room = cell.height - 6 - (area.queue !== null ? 17 : 0);
   const label = labelIn(area.id, cell.parent);
   const perChar = textWidth(label, font, 12) / Math.max(1, label.length);
-  return wrapAtDots(label, Math.floor((cell.width - 8 - dotsRoom(pipCountOf(area.passes.length, passPending(area), area.locked !== undefined), cell.width)) / perChar), Math.max(1, Math.floor(room / LINE)));
+  return wrapAtDots(label, Math.floor((cell.width - 8 - dotsRoom(pipCountOf(area.passes.length, area.locked !== undefined), cell.width)) / perChar), Math.max(1, Math.floor(room / LINE)));
 }
 
 function cellData(
@@ -146,7 +144,6 @@ function cellData(
     ...(showsQueue ? { queue: area.queue! } : {}),
     ...(tone === 'settled' ? { settled: true } : {}),
     dots: area.passes.length,
-    ...(passPending(area) ? { pending: true } : {}),
     ...(area.locked !== undefined ? { locked: true } : {}),
     ...(lit ? { glow: palette.live } : {}),
     pulse: 1,

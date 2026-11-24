@@ -113,7 +113,8 @@ const handBackLines = (cfg, local) => {
     `git status --porcelain > ${JOB_OUT}/uncommitted.txt`,
     ...fixupLines(cfg.checks.fixup),
     `git format-patch --stdout "$BASE..HEAD" > ${JOB_OUT}/fix.mbox`,
-    ...(verify ? verifyLines(verify) : []),
+    // The progress reader's `now`: the fixer is done, and what runs now is skulkr's verify.
+    ...(verify ? ['echo "skulkr: verifying the fixer\'s commits"', ...verifyLines(verify)] : []),
     'exit 0',
   ];
 };

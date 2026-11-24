@@ -162,7 +162,8 @@ export const DEFAULTS = {
    * `override` replaces, key by key at the top level, the config's settings that reach off the machine (a gate that
    * runs on a fleet); it is read only in local mode.
    */
-  local: { enabled: false, override: {} },
+  /** `agents`: model jobs (reviews, matches, fixers, repairs) at once under the local runner, across every role. */
+  local: { enabled: false, agents: 6, override: {} },
   /**
    * Jobs at once across every node, by role, under a runner that places jobs itself (onto). Unset: the per-node
    * slots times the nodes listed, or one node's slots when none are.
@@ -281,14 +282,17 @@ export const DEFAULTS = {
   icons: null,
 };
 
-/** The local runner's slots when the config names none: one machine runs every job and every fixer's checks. */
-export const LOCAL_SLOTS = { reviewSlots: 3, fixSlots: 2 };
+/**
+ * The local runner's slots when the config names none: one machine runs every job and every fixer's checks. A reviewer
+ * waits on the model, not the machine, so its slots are the config's `local.agents`; fixers run checks, so two at once.
+ */
+export const LOCAL_SLOTS = { reviewSlots: 6, fixSlots: 2 };
 const FLEET_SLOTS = { reviewSlots: 6, fixSlots: 6 };
 
 /** The node list and slots, filled in for the runner when the config leaves them unset. */
-const nodesFor = (nodes, runner) => {
+const nodesFor = (nodes, runner, agents) => {
   const local = runner === 'local';
-  const slots = local ? LOCAL_SLOTS : FLEET_SLOTS;
+  const slots = local ? { ...LOCAL_SLOTS, reviewSlots: agents ?? LOCAL_SLOTS.reviewSlots } : FLEET_SLOTS;
   return {
     ...nodes,
     list: nodes.list.length || !local ? nodes.list : ['local'],
@@ -386,8 +390,8 @@ export const resolveConfig = (user = {}, { file, root, local = false, env = proc
     name,
     file,
     local: { ...c.local, on },
-    nodes: nodesFor(c.nodes, c.runner),
-    concurrency: concurrencyFor(c.concurrency, nodesFor(c.nodes, c.runner)),
+    nodes: nodesFor(c.nodes, c.runner, c.local?.agents),
+    concurrency: concurrencyFor(c.concurrency, nodesFor(c.nodes, c.runner, c.local?.agents)),
     root: root ?? (c.root ? resolve(base, expandHome(c.root)) : undefined),
     state: c.state ? resolve(base, expandHome(c.state)) : join(homedir(), '.local', 'state', 'skulkr', name),
     partition: {

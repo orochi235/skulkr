@@ -113,6 +113,21 @@ export function stageCountsOf(lanes: readonly AuditLane[]): { done: number; tota
   return { done: by.get('done') ?? 0, total: lanes.length, stages };
 }
 
+/** What a fix job prints once its model has finished and its hand-back verify starts (`src/jobs.mjs`). */
+const HAND_BACK_VERIFY = "verifying the fixer's commits";
+
+/** How many model agents a round's lanes have running: its reviewers, matchers, fixers until their hand-back verify,
+ *  and repairs; a verify job runs the project's checks, not a model. */
+export function agentsRunningIn(lanes: readonly AuditLane[]): number {
+  let n = 0;
+  for (const { steps } of lanes) {
+    for (const step of ['A', 'B', 'match'] as const) if (steps[step].state === 'running') n += 1;
+    if (steps.fix.state === 'running' && steps.fix.now?.text !== HAND_BACK_VERIFY) n += 1;
+    if (steps.repair?.state === 'running' && steps.repair.job === 'repair') n += 1;
+  }
+  return n;
+}
+
 /** An area's stage for the round's title: its live phase, a running fix told apart by `Stage`. */
 function stageOf(lane: AuditLane): Stage {
   const phase = livePhaseOf(lane);

@@ -90,6 +90,8 @@ export const dispatch = async (ctx, area, role, spec) => {
   let firstRefused;
   for (let launches = 1; ; launches++) {
     const slot = await ctx.acquire(poolFor(ctx, role));
+    // Under the local runner a model job also holds one of the machine's agents, whatever its role.
+    const agentSlot = model && ctx.cfg.runner === 'local' ? await ctx.acquire('agent') : null;
     const t0 = Date.now();
     // What an earlier launch left would otherwise read as this one's answer if this one never runs.
     if (model) for (const f of [STARTED, 'exit', agentFor(ctx.cfg, role).resultFile, 'fix.mbox']) rmSync(join(spec.to, f), { force: true });
@@ -97,6 +99,7 @@ export const dispatch = async (ctx, area, role, spec) => {
     try {
       result = await runJob({ ...spec, cfg: ctx.cfg, runner: ctx.runner, frozen: ctx.frozen, base: ctx.base, slot });
     } finally {
+      agentSlot?.release();
       slot.release();
     }
     let gaveUp = false;

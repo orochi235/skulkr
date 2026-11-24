@@ -29,6 +29,38 @@ describe('startAreas', () => {
     expect(h.said).toEqual(['not starting b: stop requested', 'not starting c: stop requested']);
   });
 
+  it('starts the next area once one has reviewed where asked to, and only once it has finished where not', async () => {
+    const order = async (releaseReviewed: boolean) => {
+      const events: string[] = [];
+      const start = async (area: { id: string }, { reviewed }: { reviewed: () => void }) => {
+        events.push(`start ${area.id}`);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        reviewed();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        events.push(`end ${area.id}`);
+        return { id: area.id, jobs: { costUsd: 0 } };
+      };
+      await startAreas({ ...harness(), start, picked: picked.slice(0, 2), deadline: later, results: [], maxAreas: () => 1, releaseReviewed });
+      return events;
+    };
+    expect(await order(true)).toEqual(['start a', 'start b', 'end a', 'end b']);
+    expect(await order(false)).toEqual(['start a', 'end a', 'start b', 'end b']);
+  });
+
+  it('starts the next area once the limit is raised, without waiting for one to finish', async () => {
+    let limit = 1;
+    const events: string[] = [];
+    const start = async (area: { id: string }) => {
+      events.push(`start ${area.id}`);
+      if (area.id === 'a') setTimeout(() => { limit = 2; }, 15);
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      events.push(`end ${area.id}`);
+      return { id: area.id, jobs: { costUsd: 0 } };
+    };
+    await startAreas({ ...harness(), start, picked: picked.slice(0, 2), deadline: later, results: [], maxAreas: () => limit, recheckMs: 10 });
+    expect(events).toEqual(['start a', 'start b', 'end a', 'end b']);
+  });
+
   it('starts no area past the deadline or the dollar cap', async () => {
     const past = harness();
     await startAreas({ ...past, picked, deadline: new Date(0), results: [], maxAreas: () => 3 });

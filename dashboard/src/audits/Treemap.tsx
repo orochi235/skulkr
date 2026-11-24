@@ -169,7 +169,7 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
           audited, estimated defects left after <span className={s.asOfText}>{asOf === null ? 'the last pass' : `round ${asOf}`}:</span>
           <HeatLegend heat={heat} />
         </span>
-        <span>· a dot per pass</span>
+        <span>· passes: ● five, ○ one</span>
         <Checkbox className={s.loupeToggle} isSelected={loupe} onChange={setLoupe}>loupe (F2)</Checkbox>
         {/* Kept in place, faded and out of reach, for a past round, so the legend and the map above it never move. */}
         <span className={asOf === null ? s.nowKeys : `${s.nowKeys} ${s.nowOff}`} inert={asOf !== null} aria-hidden={asOf !== null || undefined}>

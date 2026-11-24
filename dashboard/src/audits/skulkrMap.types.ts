@@ -118,6 +118,8 @@ export interface LaneStep {
   readonly resolved?: string;
   /** A repair step's repair jobs so far, and how its last verify ended. */
   readonly attempts?: number;
+  /** A running repair step's job: the controller's verify of the fixer's commits, or a repair. */
+  readonly job?: 'verify' | 'repair';
   readonly outcome?: 'passed' | 'failed' | 'timed out';
   /** When a done step began and ended, from onto's record of the job that ran it. */
   readonly started?: string;

@@ -161,9 +161,10 @@ export const jobsPart = (minutes, nodes, fixed, records) => {
 
 /**
  * The whole area. `previous` is its last pass, if any, `changedSince` the files of the area that changed after it,
- * and `carried` its open findings from earlier rounds. Answers the area's summary, which becomes its `area.json`.
+ * and `carried` its open findings from earlier rounds; `reviewed()` is called once its pair has reviewed and matched.
+ * Answers the area's summary, which becomes its `area.json`.
  */
-export const runArea = async (ctx, area, { previous, changedSince, carried = [] }) => {
+export const runArea = async (ctx, area, { previous, changedSince, carried = [], reviewed = () => {} }) => {
   const inDir = stageIn(ctx, area);
   const vars = { ...projectVars(ctx.cfg, 'reviewer'), round: ctx.round, area: area.id, commit: ctx.commit, out: `${JOB_OUT}/findings.md`, files: reviewFileList(ctx.frozen, area.files, recentlyChanged(ctx.frozen, area.files)) };
   writeFileSync(join(inDir, 'review.md'), fill(brief(ctx.cfg, 'reviewer'), vars));
@@ -181,6 +182,7 @@ export const runArea = async (ctx, area, { previous, changedSince, carried = [] 
   const base = pairOf(review(ctx, area, 'A', own), later(() => review(ctx, area, 'B', own)), '');
   const compare = trial ? pairOf(review(ctx, area, 'TA', other), later(() => review(ctx, area, 'TB', other)), '-T') : null;
   const [a, b, matched] = await base;
+  reviewed();
   const dir = makeRecordDir(ctx, area);
   for (const [name, text] of [['A.md', a.text], ['B.md', b.text]]) {
     writeFileSync(join(dir, name), text);

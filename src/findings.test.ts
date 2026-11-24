@@ -95,6 +95,35 @@ describe('fixTallyOf', () => {
 });
 
 describe('reportItems', () => {
+  it('reads a fixed line with no sha, and not an opening line that only names one', () => {
+    const report = [
+      'Fixed 3811cbf6d9 and the rest are below. The shas changed when I folded follow-ups:',
+      '',
+      '- A leak (A): fixed 3811cbf6d9 — the owner frees it.',
+      '- A race (B): fixed (`git log --oneline -1 -- x.md`) — it locks first.',
+      '- A typo (A): fixed — spelled right now.',
+    ].join('\n');
+    expect(reportItems(report)).toEqual([
+      { claim: 'A leak', from: 'A', verdict: 'fixed', note: 'the owner frees it.' },
+      { claim: 'A race', from: 'B', verdict: 'fixed', note: 'it locks first.' },
+      { claim: 'A typo', from: 'A', verdict: 'fixed', note: 'spelled right now.' },
+    ]);
+  });
+
+  it('reads a line that opens with its verdict, or whose claim opens with a verdict word', () => {
+    const why = 'the handler sits inside the try, so the throw is caught, and a test of exactly this passed before any fix';
+    const report = [
+      'fixed 940a2b58c1 — ComboBox reports Escape as a commit (A+B; B\'s copy is a duplicate)',
+      `not a defect (${why}) | a failed edit escapes the revert loop (B)`,
+      'declined add leaves a stale selection (B): fixed 64933acb11; the selection half also needed b8cce52467',
+    ].join('\n');
+    expect(reportItems(report)).toEqual([
+      { claim: 'ComboBox reports Escape as a commit', from: 'A+B', verdict: 'fixed', note: '' },
+      { claim: 'a failed edit escapes the revert loop', from: 'B', verdict: 'not a defect', note: why },
+      { claim: 'declined add leaves a stale selection', from: 'B', verdict: 'fixed', note: 'the selection half also needed b8cce52467' },
+    ]);
+  });
+
   it('counts question verdicts, not the word', () => {
     const report = 'A leak (A): question: which owner frees it?\nA race (B): fixed 1a2b3c4d. No question remains.\n\nChecks: the question of flakes';
     expect(questionsIn(report)).toBe(1);

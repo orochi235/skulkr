@@ -12,15 +12,51 @@ const STEP_COLUMNS: readonly { step: LaneStepKey; part: Part; phase: AuditPhase;
   { step: 'B', part: 'review', phase: 'reviewed', start: 1, width: 1 },
   { step: 'match', part: 'match', phase: 'match', start: 2, width: 1 },
   { step: 'fix', part: 'fix', phase: 'fix', start: 3, width: 1 },
-  // The fix's checking: its fixer's own checks, then a verify or repair job of the controller's, in one column.
-  { step: 'repair', part: 'repair', phase: 'fix', start: 4, width: 0.5 },
   // Applying a patch takes no time to speak of; its column is wide enough for its tally.
-  { step: 'patch', part: 'patch', phase: 'patch', start: 4.5, width: 0.6 },
+  { step: 'patch', part: 'patch', phase: 'patch', start: 5.5, width: 0.6 },
 ];
 
-/** The column after the fix's own: lit while its fixer runs its checks past its last commit, until a verify or
- *  repair job of the controller's takes it over. */
+/** The columns after the fix's own: its fixer's checks past its last commit, then the controller's verify job, then
+ *  its repair jobs, drawn from the lane's one `repair` step by which job it says runs. */
 const CHECKS_COLUMN = { start: 4, width: 0.5 } as const;
+const VERIFY_COLUMN = { start: 4.5, width: 0.5 } as const;
+const REPAIR_COLUMN = { start: 5, width: 0.5 } as const;
+
+/** How far a running verify or repair has got: its minutes so far into a repair's typical minutes, short of full. */
+const runningFillOf = (r: LaneStep, now: number): number =>
+  Math.min(RUNNING_FILL_CAP, Math.max(0, (now - (ms(r.since) ?? now)) / (TYPICAL_MINUTES.repair * MIN)));
+
+const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
+
+/** The controller's verify of the fixer's commits: running while its job does, failed until a repair passes. */
+function verifySpan(r: LaneStep | undefined, now: number): SpanStripSpan {
+  const base = { id: 'verify', start: VERIFY_COLUMN.start, ms: VERIFY_COLUMN.width, color: partColor('repair', 'fix') };
+  if (!r || r.state === 'waiting') return { ...base, state: 'pending', fill: 0, label: '', title: 'verify: waiting' };
+  if (r.state === 'running' && r.job === 'verify') {
+    const text = stepText('repair', r, now);
+    return { ...base, state: 'active', fill: runningFillOf(r, now), label: text, title: [`verify: ${text}`, r.now?.text ?? ''].filter(Boolean).join('\n') };
+  }
+  const passed = r.state === 'done';
+  const label = passed ? (r.outcome === 'timed out' ? 'timed out' : 'passed') : r.state === 'failed' ? r.why ?? 'failed' : 'failed';
+  return { ...base, state: passed ? 'done' : 'failed', fill: 1, label, title: `verify: ${label}`, color: passed ? base.color : partColor('repair', 'conflict') };
+}
+
+/** The repair jobs a failed verify started, empty until one does. */
+function repairSpan(r: LaneStep | undefined, now: number): SpanStripSpan {
+  const base = { id: 'repair', start: REPAIR_COLUMN.start, ms: REPAIR_COLUMN.width, color: partColor('repair', 'fix') };
+  if (r?.state === 'running' && r.job === 'repair') {
+    const text = stepText('repair', r, now);
+    return { ...base, state: 'active', fill: runningFillOf(r, now), label: text, title: [`repair: ${text}`, r.now?.text ?? ''].filter(Boolean).join('\n') };
+  }
+  const tried = r?.attempts ?? 0;
+  if (!r || tried === 0) {
+    const due = r?.state === 'running' || r?.state === 'failed';
+    return { ...base, state: 'pending', fill: 0, label: due && r?.state === 'running' ? 'waiting' : '', title: due ? 'repair: waiting' : 'no repair' };
+  }
+  const label = r.state === 'failed' ? r.why ?? 'failed' : plural(tried, 'repair');
+  const state = r.state === 'done' ? 'done' : r.state === 'failed' ? 'failed' : 'pending';
+  return { ...base, state, fill: state === 'pending' ? 0 : 1, label, title: `repair: ${label}`, color: state === 'failed' ? partColor('repair', 'conflict') : base.color };
+}
 
 
 /** A running fixer's checks as words, `6/7 · 2 failing`, or '' where none are counted. */
@@ -49,8 +85,8 @@ function withDone(span: SpanStripSpan): SpanStripSpan {
 /** How wide the steps view's window is, in columns. */
 export const STEP_COLUMN_COUNT = Math.max(...STEP_COLUMNS.map((c) => c.start + c.width));
 
-/** Whether the controller has taken over a lane's checking column with a verify or repair job of its own. */
-const repairing = (lane: AuditLane): boolean => !!lane.steps.repair && lane.steps.repair.state !== 'waiting';
+/** How the steps view's first segment names an area's files, ahead of its step's own words. */
+export const filesText = (files: number): string => `${files} ${files === 1 ? 'file' : 'files'}`;
 
 /** How full a running step is drawn at most, until it finishes. */
 const RUNNING_FILL_CAP = 0.9;
@@ -58,10 +94,10 @@ const RUNNING_FILL_CAP = 0.9;
 /**
  * An area's lane as the steps view draws it: a column of one length per step, filled by its state, a running one by its
  * own count where onto reports one (a fixer's commits of its findings), else as far as its minutes so far go into its
- * typical minutes, short of full until it finishes.
+ * typical minutes, short of full until it finishes. Its first segment leads with the area's `files`, when given.
  */
-export function laneStepsOf(lane: AuditLane, now: number): SpanStripSpan[] {
-  return STEP_COLUMNS.filter((c) => c.step !== 'repair' || repairing(lane)).map(({ step, part, phase, start, width }): SpanStripSpan => {
+export function laneStepsOf(lane: AuditLane, now: number, files?: number): SpanStripSpan[] {
+  return STEP_COLUMNS.map(({ step, part, phase, start, width }): SpanStripSpan => {
     const s = stepOf(lane, step);
     const since = s.state === 'running' ? ms(s.since) : null;
     const fill = s.state === 'done' || s.state === 'failed' ? 1
@@ -72,9 +108,11 @@ export function laneStepsOf(lane: AuditLane, now: number): SpanStripSpan[] {
       : 0;
     return {
       id: step, start, ms: width, fill, state: SPAN_STATE[s.state], title: [`${step}: ${stepText(step, s, now)}`, s.state === 'running' ? s.now?.text ?? '' : ''].filter(Boolean).join('\n'),
-      label: step === 'patch' && s.state !== 'failed' ? tallyOf(lane) : s.state === 'waiting' ? '' : stepText(step, s, now),
+      label: step === 'patch' && s.state !== 'failed' ? tallyOf(lane)
+        : step === 'A' && files !== undefined ? [filesText(files), s.state === 'waiting' ? '' : stepText(step, s, now)].filter(Boolean).join(' · ')
+        : s.state === 'waiting' ? '' : stepText(step, s, now),
       color: partColor(part, s.state === 'failed' ? 'conflict' : phase),
     };
-  }).flatMap((span) => (span.id === 'patch' && span.state !== 'failed' ? withUnfixed(span, lane) : span.id === 'fix' ? [fixWhileChecking(span, lane.steps.fix), ...(repairing(lane) ? [] : [checksSpan(lane.steps.fix)])] : [span]))
+  }).flatMap((span) => (span.id === 'patch' && span.state !== 'failed' ? withUnfixed(span, lane) : span.id === 'fix' ? [fixWhileChecking(span, lane.steps.fix), checksSpan(lane.steps.fix), verifySpan(lane.steps.repair, now), repairSpan(lane.steps.repair, now)] : [span]))
     .map((span) => withDone(withInk(span)));
 }

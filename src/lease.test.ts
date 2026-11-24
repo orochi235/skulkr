@@ -165,6 +165,19 @@ describe('placed slots', () => {
   });
 });
 
+describe('agent slots', () => {
+  it("lease the config's local.agents on this machine, across roles, raised by limits.json's agents", () => {
+    const dir = state();
+    const slots = createSlots({ ...weaselConfig(dir), local: { enabled: true, agents: 2 } }, ['local']);
+    expect(slots.take('agent')).toMatchObject({ node: 'local', tree: 'agent-1' });
+    expect(slots.take('agent')?.tree).toBe('agent-2');
+    expect(slots.take('agent')).toBeUndefined();
+    expect(slots.take('review')).toBeDefined();
+    writeFileSync(join(dir, 'limits.json'), JSON.stringify({ agents: 3 }));
+    expect(slots.take('agent')?.tree).toBe('agent-3');
+  });
+});
+
 describe('slotsPerNode', () => {
   it('reads limits.json at every lease, so a change reaches runs already going', () => {
     const dir = state();

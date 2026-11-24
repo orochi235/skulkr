@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CLOCK_AHEAD_MINUTES, laneViewOf, runClockOf } from './clockLane';
-import { TYPICAL_MINUTES, isFinished, passDone, phaseColor, phaseOf, phasesOf, stageCountsOf, withLivePasses } from './phases';
+import { TYPICAL_MINUTES, agentsRunningIn, isFinished, passDone, phaseColor, phaseOf, phasesOf, stageCountsOf, withLivePasses } from './phases';
 import { STEP_COLUMN_COUNT, laneStepsOf } from './stepsLane';
 import fixture from './fixture.map.json';
 import type { AuditLane, AuditRun, LaneStep, LaneStepName, SkulkrMap } from './skulkrMap.types';
@@ -81,6 +81,12 @@ describe('laneViewOf', () => {
     ]);
   });
 
+  it("leads the steps view's first segment with the area's files", () => {
+    const first = (steps: Partial<Record<LaneStepName, LaneStep>>) => laneStepsOf(lane(steps), NOW, 27).find((s) => s.id === 'A')?.label;
+    expect(first({})).toBe('27 files');
+    expect(first({ A: done({ findings: 3, minutes: 2 }) })).toBe('27 files · 3 found · 2.0 min');
+  });
+
   it('captions and shades the patch with the fixer\'s tally of what it fixed', () => {
     const fixed = { A: done({ findings: 3 }), B: done({ findings: 2 }), match: matched(3, 2, 1), fix: done({ minutes: 9, commits: 6, fixed: 3, of: 4, extra: 1 }) };
     const patchOf = (spans: { id: string }[]) => spans.find((s) => s.id === 'patch') as { label: string; ms: number; fill?: number } | undefined;
@@ -158,9 +164,9 @@ describe('runClockOf', () => {
 describe('laneStepsOf', () => {
   it('gives every step one equal column, filled by its state, a running one by its share of the typical time', () => {
     const spans = laneStepsOf(lane({ A: done({ findings: 5, minutes: 3 }), B: running(at(27.5)), match: W }), NOW);
-    expect(spans.map((s) => [s.id, s.ms, s.fill])).toEqual([['A', 1, 1], ['B', 1, 0.5], ['match', 1, 0], ['fix', 1, 0], ['checks', 0.5, 0], ['patch', 0.6, 0]]);
+    expect(spans.map((s) => [s.id, s.ms, s.fill])).toEqual([['A', 1, 1], ['B', 1, 0.5], ['match', 1, 0], ['fix', 1, 0], ['checks', 0.5, 0], ['verify', 0.5, 0], ['repair', 0.5, 0], ['patch', 0.6, 0]]);
     // The finished review is dark gray; the rest wear their phases.
-    expect(spans.filter((s) => s.id !== 'checks').map((s) => s.color)).toEqual(['var(--audit-stage-done)', ...['reviewed', 'match', 'fix', 'patch'].map((p) => phaseColor(p as never))]);
+    expect(spans.filter((s) => !['checks', 'verify', 'repair'].includes(s.id)).map((s) => s.color)).toEqual(['var(--audit-stage-done)', ...['reviewed', 'match', 'fix', 'patch'].map((p) => phaseColor(p as never))]);
     expect(spans[0]!.ink).toBe('var(--audit-stage-done-ink)');
     expect(spans[1]!.label).toBe('studio · 2.5 min');
     expect(spans[2]!.label).toBe('');
@@ -170,9 +176,9 @@ describe('laneStepsOf', () => {
     const spans = laneStepsOf(lane({}), NOW);
     expect(spans.map((s) => [s.id, s.start, s.track, s.trackSpan])).toEqual([
       ['A', 0, undefined, undefined], ['B', 1, undefined, undefined], ['match', 2, undefined, undefined], ['fix', 3, undefined, undefined],
-      ['checks', 4, undefined, undefined], ['patch', 4.5, undefined, undefined],
+      ['checks', 4, undefined, undefined], ['verify', 4.5, undefined, undefined], ['repair', 5, undefined, undefined], ['patch', 5.5, undefined, undefined],
     ]);
-    expect(STEP_COLUMN_COUNT).toBeCloseTo(5.1);
+    expect(STEP_COLUMN_COUNT).toBeCloseTo(6.1);
   });
 
   it('stops a running step short of full until it finishes', () => {
@@ -196,23 +202,39 @@ describe('laneStepsOf', () => {
 describe('the repair step', () => {
   const fixed = { A: done({ findings: 2 }), B: done({ findings: 1 }), match: matched(2, 1, 1), fix: done({ commits: 2, minutes: 12 }) };
 
-  it('takes over the checks column once a verify or repair job of its own runs, leaving no column between', () => {
-    const withRepair = laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, repair: running(at(25)) } }, NOW);
-    expect(withRepair.map((s) => [s.id, s.start])).toEqual([['A', 0], ['B', 1], ['match', 2], ['fix', 3], ['repair', 4], ['patch', 4.5]]);
-    expect(laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, repair: { state: 'waiting' } } }, NOW).map((s) => s.id)).toContain('checks');
+  it('gives the fixer\'s checks, the verify and the repair a column each, always in place', () => {
+    const ids = (repair?: LaneStep) => laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, ...(repair ? { repair } : {}) } }, NOW).map((s) => [s.id, s.start]);
+    const columns = [['A', 0], ['B', 1], ['match', 2], ['fix', 3], ['checks', 4], ['verify', 4.5], ['repair', 5], ['patch', 5.5]];
+    expect(ids()).toEqual(columns);
+    expect(ids({ ...running(at(25)), job: 'repair' })).toEqual(columns);
   });
 
-  it('draws the verify and repair in magenta in both views, and a failed one as a conflict', () => {
-    const repairing: AuditLane = { id: 'x', steps: { ...lane(fixed).steps, repair: running(at(25)) } };
-    expect(laneStepsOf(repairing, NOW).find((s) => s.id === 'repair')!.color).toBe('var(--audit-repair)');
-    expect(laneViewOf(repairing, NOW, START).spans.find((s) => s.id === 'repair')!.color).toBe('var(--audit-repair)');
+  it('lights the column of the job running, verify or repair, in magenta, and a failed one as a conflict', () => {
+    const spans = (repair: LaneStep) => laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, repair } }, NOW);
+    const verifying = spans({ ...running(at(25)), job: 'verify' });
+    expect(verifying.find((s) => s.id === 'verify')).toMatchObject({ state: 'active', color: 'var(--audit-repair)' });
+    expect(verifying.find((s) => s.id === 'repair')!.state).toBe('pending');
+    const repairing = spans({ ...running(at(25)), job: 'repair', attempts: 0 });
+    expect(repairing.find((s) => s.id === 'verify')).toMatchObject({ state: 'failed', color: phaseColor('conflict') });
+    expect(repairing.find((s) => s.id === 'repair')!.state).toBe('active');
+    expect(laneViewOf({ id: 'x', steps: { ...lane(fixed).steps, repair: running(at(25)) } }, NOW, START).spans.find((s) => s.id === 'repair')!.color).toBe('var(--audit-repair)');
   });
 
-  it('says how many repairs ran and how its verify ended, in its own column', () => {
-    const steps = (repair: LaneStep) => laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, repair } }, NOW).find((s) => s.id === 'repair')!;
-    expect(steps(done({ attempts: 0, outcome: 'passed' })).label).toBe('verified');
-    expect(steps(done({ attempts: 2, outcome: 'passed' })).label).toBe('2 repairs · passed');
-    expect(steps({ state: 'failed', attempts: 2, why: 'still failing after 2 repairs' })).toMatchObject({ label: 'still failing after 2 repairs', state: 'failed', color: phaseColor('conflict') });
+  it('says how its verify ended and how many repairs ran, each in its own column', () => {
+    const of = (repair: LaneStep, id: string) => laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, repair } }, NOW).find((s) => s.id === id)!;
+    expect(of(done({ attempts: 0, outcome: 'passed' }), 'verify').label).toBe('passed');
+    expect(of(done({ attempts: 0, outcome: 'passed' }), 'repair').label).toBe('');
+    expect(of(done({ attempts: 2, outcome: 'passed' }), 'repair').label).toBe('2 repairs');
+    expect(of({ state: 'failed', attempts: 2, why: 'still failing after 2 repairs' }, 'repair')).toMatchObject({ label: 'still failing after 2 repairs', state: 'failed', color: phaseColor('conflict') });
+  });
+
+  it('counts the model agents running: reviewers, matchers, fixers short of their hand-back verify, and repairs', () => {
+    const fixing = lane({ A: done({ findings: 1 }), B: done({ findings: 1 }), match: matched(1, 1, 0), fix: running(at(25)) });
+    const handingBack = lane({ A: done({ findings: 1 }), B: done({ findings: 1 }), match: matched(1, 1, 0), fix: { ...running(at(25)), now: { text: "verifying the fixer's commits", at: at(30) } } });
+    const reviewing = lane({ A: running(at(25)), B: running(at(26)) });
+    const verifying: AuditLane = { id: 'x', steps: { ...lane(fixed).steps, repair: { ...running(at(25)), job: 'verify' } } };
+    const repairing: AuditLane = { id: 'x', steps: { ...lane(fixed).steps, repair: { ...running(at(25)), job: 'repair' } } };
+    expect(agentsRunningIn([fixing, handingBack, reviewing, verifying, repairing])).toBe(4);
   });
 
   it('holds the pass open while a repair runs, and takes a stretch of the clock only once the fix is checked', () => {

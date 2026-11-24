@@ -11,11 +11,11 @@ export const LOCAL_NODE = 'local';
 
 /**
  * Slots per node for `role`, read again at every lease from `<state>/limits.json` (`{ "review": n, "fix": n,
- * "localFix": n }`) when it names one, so a change reaches runs already going; else the config's.
+ * "localFix": n, "agents": n }`) when it names one, so a change reaches runs already going; else the config's.
  */
 export const slotsPerNode = (cfg, role, totals) => {
-  const key = role === 'localFix' ? 'localFix' : role === 'fix' ? 'fix' : 'review';
-  const fallback = key === 'localFix' ? cfg.localFix.slots : totals ? totals[key] : key === 'fix' ? cfg.nodes.fixSlots : cfg.nodes.reviewSlots;
+  const key = role === 'agent' ? 'agents' : role === 'localFix' ? 'localFix' : role === 'fix' ? 'fix' : 'review';
+  const fallback = key === 'agents' ? cfg.local?.agents ?? 6 : key === 'localFix' ? cfg.localFix.slots : totals ? totals[key] : key === 'fix' ? cfg.nodes.fixSlots : cfg.nodes.reviewSlots;
   try {
     const n = JSON.parse(readFileSync(join(cfg.state, 'limits.json'), 'utf8'))[key];
     return Number.isInteger(n) && n > 0 ? n : fallback;
@@ -40,10 +40,10 @@ export const createSlots = (cfg, pinned, { about = {}, places = false } = {}) =>
   const state = cfg.state;
   const noFix = noFixers(cfg);
   const take = (role, { now = new Date(), exclude = new Set() } = {}) => {
-    // A local fixer's slot is this machine's, whatever the runner places, and names it as the job's node.
-    const local = role === 'localFix';
+    // A local fixer's slot, and an agent's, is this machine's, whatever the runner places, and names it as the job's node.
+    const local = role === 'localFix' || role === 'agent';
     const perNode = placed && !local ? slotsPerNode(cfg, role, cfg.concurrency) : slotsPerNode(cfg, role);
-    const prefix = local ? `${cfg.names.trees.fix}local-` : role === 'fix' ? cfg.names.trees.fix : cfg.names.trees.review;
+    const prefix = role === 'agent' ? 'agent-' : local ? `${cfg.names.trees.fix}local-` : role === 'fix' ? cfg.names.trees.fix : cfg.names.trees.review;
     // Fewest live leases of this role first, so jobs spread across nodes instead of filling the first.
     const busy = (node) => {
       const dir = join(state, 'slots', node);

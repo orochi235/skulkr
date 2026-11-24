@@ -107,18 +107,20 @@ export const matchPrompt = (brief, a, b) => {
 /** A verdict whose note says it answers a finding another line already did. */
 const DUPLICATE = /^\(?duplicate\b/i;
 
+/** `claim (A): fixed`, with no sha after it, as a fixer that folded its commits together writes. */
+const FIXED_BARE = /(?<=\((?:A\+B|A|B|sweep|carried)\)\s*:\s*)fixed\b/i;
 const TALLY = /^tally: (\d+) of (\d+) fixed, (\d+) extra fixed\s*$/im;
-const VERDICT = new RegExp(`${FIXED_MARK.source}|\\bnot a defect\\b|\\bquestion\\b|\\bduplicate of\\b|\\bnot fixed\\b|\\bdeclined\\b`, 'i');
+const VERDICT = new RegExp(`${FIXED_MARK.source}|${FIXED_BARE.source}|\\bnot a defect\\b|\\bquestion\\b|\\bduplicate of\\b|\\bnot fixed\\b|\\bdeclined\\b`, 'i');
 const EXTRAS = /^\W*(?:any )?extra\b/i;
 const CHECKS = /^\W*checks\b/i;
-const SOURCE = /\((A\+B|A|B|sweep|carried)\)|,\s*(A\+B|A|B|sweep|carried)\s*:/;
+const SOURCE = /\((A\+B|A|B|sweep|carried)(?:;[^)]*)?\)|,\s*(A\+B|A|B|sweep|carried)\s*:/;
 const SHAS = /^(?:fixed (?:in )?)?`?[0-9a-f]{7,}`?(?:(?:,| and) `?[0-9a-f]{7,}`?)*[-\w]*/i;
 
 /** A report's text with markdown emphasis and list marks off. */
 const plain = (text) => text.replace(/^\s*[-*]\s+/, '').replace(/\*\*/g, '').trim();
 
 /** What a verdict paragraph says of its finding: fixed, not a defect, a question, or a duplicate. */
-const verdictOf = (text) => (FIXED_MARK.test(text) ? 'fixed'
+const verdictOf = (text) => (FIXED_MARK.test(text) || FIXED_BARE.test(text) ? 'fixed'
   : /\bnot a defect\b/i.test(text) ? 'not a defect'
   : /\bduplicate of\b/i.test(text) ? 'duplicate'
   : /\bquestion\b/i.test(text) ? 'question'
@@ -134,17 +136,23 @@ const itemOf = (para, extra) => {
   const source = SOURCE.exec(text);
   const from = extra ? 'extra' : source ? source[1] ?? source[2] : '';
   const verdict = verdictOf(text);
-  const piped = /^([^|]{0,80})\|\s*(.*)$/s.exec(text);
+  // `fixed <sha> | claim (A)`, or `fixed <sha> — claim (A)`, or `not a defect (why…) | claim (B)`.
+  const piped = /^([^|]{0,80})\|\s*(.*)$/s.exec(text)
+    ?? (text.search(VERDICT) === 0 ? /^([^|—]*?)\s*[|—]\s*(.*)$/s.exec(text) : null);
   let claim; let note;
-  if (piped && VERDICT.test(piped[1])) {
+  if (piped && VERDICT.test(piped[1]) && !SOURCE.test(piped[1])) {
     const rest = piped[2];
     const at = source ? rest.indexOf(source[0]) : -1;
     claim = at === -1 ? rest.split(/(?<=\.)\s/)[0] : rest.slice(0, at);
     note = at === -1 ? rest.slice(claim.length) : rest.slice(at + source[0].length);
+    const why = piped[1].replace(SHAS, '').replace(/^\s*not a defect\s*/i, '').trim().replace(/^\((.*)\)$/s, '$1');
+    if (why && !VERDICT.test(why)) note = `${why} ${note}`;
   } else {
-    const at = text.search(VERDICT);
+    // A claim may itself open with a verdict's word ("declined track-click add…"), so its source ends it.
+    const after = source ? text.slice(source.index + source[0].length).search(VERDICT) : -1;
+    const at = after === -1 ? text.search(VERDICT) : source.index + source[0].length + after;
     claim = text.slice(0, at === -1 ? text.length : at);
-    note = at === -1 ? '' : text.slice(at).replace(SHAS, '');
+    note = at === -1 ? '' : text.slice(at).replace(SHAS, '').replace(/^fixed\b\s*(?:\([^)]*\))?/i, '');
   }
   claim = claim.replace(SOURCE, '').replace(/[\s:,.;—-]+$/, '').trim();
   note = note.replace(/^[\s.:;,)—-]+/, '').replace(/^not a defect\b[\s.:;,—-]*/i, '').trim();
@@ -153,14 +161,14 @@ const itemOf = (para, extra) => {
 
 /**
  * Every defect a fixer's report answers, in its order: those it was handed, then the extras it found, the checks left
- * out. A paragraph is a defect when it gives a verdict.
+ * out. A paragraph is a defect when it gives a verdict about a claim: one that only opens the report with a sha is not.
  */
 export const reportItems = (report) => {
   const paras = report.split(/\n\s*\n|\n(?=\S)/).map((p) => p.trim()).filter(Boolean);
   const checks = paras.findIndex((p) => CHECKS.test(p));
   const body = checks === -1 ? paras : paras.slice(0, checks);
   const cut = body.findIndex((p) => EXTRAS.test(p));
-  return body.flatMap((p, i) => (VERDICT.test(p) && !/^tally: /i.test(p) && !EXTRAS.test(p) ? [itemOf(p, cut !== -1 && i > cut)] : []));
+  return body.flatMap((p, i) => (VERDICT.test(p) && !/^tally: /i.test(p) && !EXTRAS.test(p) ? [itemOf(p, cut !== -1 && i > cut)] : [])).filter((item) => item.claim);
 };
 
 /** How many findings a fixer's report answers with a question ({@link reportItems}). */

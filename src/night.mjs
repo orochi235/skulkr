@@ -58,11 +58,14 @@ export const pruneNights = (cfg) => {
 /** Each picked area's reviews, matcher and fixer, started as `startAreas` admits them; resolves when all finish. */
 const reviewAreas = ({ ctx, git, picked, passes, open, args, status, deadline, results }) => startAreas({
   ctx, picked, args, status, deadline, results, maxAreas: () => areasAtOnce(ctx.cfg, args, 'review', 2),
-  start: (area) => {
+  // On one machine the review slots make one area at a time, so an area that held its place through its fixer and
+  // verify ran the round end to end, area by area.
+  releaseReviewed: ctx.cfg.runner === 'local',
+  start: (area, { reviewed }) => {
     const last = lastPassIn(passes.get(area.id));
     const previous = last && { ...last, ...scaledOf(last) };
     const carried = open?.get(area.id) ?? [];
-    return runArea(ctx, area, { previous, carried, changedSince: changedSince(ctx.cfg, git, ctx.root, area.files, previous?.commit, previous?.fixCommits ?? []) });
+    return runArea(ctx, area, { previous, carried, reviewed, changedSince: changedSince(ctx.cfg, git, ctx.root, area.files, previous?.commit, previous?.fixCommits ?? []) });
   },
 });
 

@@ -149,8 +149,9 @@ describe('pips', () => {
     expect(pipsPerRowIn(33)).toBe(4);
     expect(pipsPerRowIn(16)).toBe(2);
     expect(pipsPerRowIn(6)).toBe(1);
-    expect(pipCountOf(4, false, true)).toBe(5);
-    expect(pipCountOf(9, true, false)).toBe(10);
+    expect(pipCountOf(4, true)).toBe(5);
+    expect(pipCountOf(9, false)).toBe(5);
+    expect(pipCountOf(10, true)).toBe(3);
   });
 });
 

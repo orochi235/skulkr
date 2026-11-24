@@ -143,7 +143,8 @@ export const nightLanes = (log, areas, jobs = [], reports = new Map(), names = N
   const finished = new Map();
   for (const job of jobs) {
     const m = names.step.exec(job.task ?? '');
-    // A verify job and a repair job are both the lane's repair step.
+    // A verify job and a repair job are both the lane's repair step, which says which of them runs.
+    const kind = m?.[2];
     if (m && (m[2] === 'verify' || m[2] === 'repair')) {
       m[2] = 'repair';
       if (!job.finished && lanes.has(m[1])) lanes.get(m[1]).repair ??= { state: 'waiting' };
@@ -155,7 +156,8 @@ export const nightLanes = (log, areas, jobs = [], reports = new Map(), names = N
       finished.set(key, [...(finished.get(key) ?? []), job]);
     } else if (step.state === 'waiting' || (m[2] === 'repair' && step.state === 'running')) {
       const { done, total, checks, tests, now } = job.progress ?? {};
-      Object.assign(step, { state: 'running', node: job.node, since: job.started, ...(Number.isFinite(total) ? { done, total } : {}),
+      Object.assign(step, { state: 'running', node: job.node, since: job.started, ...(m[2] === 'repair' ? { job: kind } : {}),
+        ...(Number.isFinite(total) ? { done, total } : {}),
         ...(checks ? { checks } : {}), ...(tests ? { tests } : {}), ...(now ? { now } : {}) });
     }
   }
