@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nightLanes, nightLeftOut, nightStages } from './nightLog.mjs';
+import { nightLanes, nightLeftOut, nightStages, settleMerged } from './nightLog.mjs';
 
 describe('nightStages and nightLanes from one reading', () => {
   it('counts any review line toward a stage, but marks a step done only from its whole form', () => {
@@ -55,6 +55,23 @@ describe('nightLeftOut', () => {
   });
 });
 
+describe('settleMerged', () => {
+  const log = ['patch a: 2 commits on audit80-a', 'patch b: 1 commits on audit80-b', 'batch: audit80-a left out: merge conflict in a.ts', 'batch: audit79-c (round 79) left out: merge conflict in c.ts'].join('\n');
+  const run = { round: 80, stages: Object.fromEntries(nightStages(log)), leftOut: nightLeftOut(log, 80), lanes: nightLanes(log, ['a', 'b']) };
+
+  it('takes a branch merged outside skulkr, into its batch or main, off its conflict', () => {
+    const settled = settleMerged(run, (round: number, area: string) => round === 80 && area === 'a');
+    expect(settled.stages).toEqual({ a: 'patched', b: 'patched' });
+    expect(settled.leftOut).toEqual([{ area: 'c', round: 79, why: 'merge conflict in c.ts' }]);
+    expect(settled.lanes[0]!.steps.patch).toEqual({ state: 'done', commits: 2, resolved: 'merged outside skulkr' });
+    expect(settleMerged(run, () => true).leftOut).toEqual([]);
+  });
+
+  it('leaves a run whose conflicted branches are not merged as it was', () => {
+    expect(settleMerged(run, () => false)).toBe(run);
+  });
+});
+
 describe('nightLanes', () => {
   it('counts a match done, nothing shared, when one reviewer found nothing', () => {
     const log = 'review 1/4 p A on studio: 1 findings, 12/12 files read, 3.0 min\nreview 2/4 p B on teitou: 0 findings, 12/12 files read, 5.3 min';
@@ -100,6 +117,19 @@ describe('nightLanes', () => {
     const [a, b] = nightLanes(log, ['a', 'b']);
     expect(a!.steps.patch).toEqual({ state: 'failed', why: 'merge conflict in a.ts; left out of the batch' });
     expect(b!.steps.patch).toEqual({ state: 'waiting' });
+  });
+
+  it('takes a branch a conflict repair merged off its conflict, its patch done and saying how', () => {
+    const left = ['patch a: 2 commits on audit40-a', 'batch: audit40-a left out: merge conflict in a.ts; its conflict repair failed'];
+    const log = [...left, 'repair a conflict on studio: 1 commits, 4.0 min; verify passed', 'batch: audit40-a merged after a conflict repair of a.ts'].join('\n');
+    const [a] = nightLanes(log, ['a']);
+    expect(a!.steps.patch).toEqual({ state: 'done', commits: 2, resolved: 'merged after a conflict repair' });
+    expect(a!.steps.repair).toMatchObject({ state: 'done', attempts: 1, outcome: 'passed' });
+    expect(nightStages(log).get('a')).toBe('patched');
+    expect(nightLeftOut(log, 40)).toEqual([]);
+    expect(nightLeftOut(left.join('\n'), 40)).toEqual([{ area: 'a', round: 40, why: 'merge conflict in a.ts; its conflict repair failed' }]);
+    const failed = [...left, 'repair a conflict on studio: 1 commits, 4.0 min; verify failed: exited 1'].join('\n');
+    expect(nightLanes(failed, ['a'])[0]!.steps.repair).toMatchObject({ state: 'failed', why: 'conflict repair failed its verify' });
   });
 
   it("fails a patch that did not apply", () => {

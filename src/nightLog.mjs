@@ -24,14 +24,25 @@ const repairStep = (steps, line) => {
   else if ((m = /^verify \S+: still failing after (\d+) repairs/.exec(line))) Object.assign(step, { state: 'failed', outcome: 'failed', why: `still failing after ${m[1]} repairs` });
   else if (/^verify \S+: failed/.test(line)) Object.assign(step, { state: 'running', outcome: 'failed' });
   else if ((m = /^repair \S+ (\S+) on (\S+): (\d+) commits, ([\d.]+) min; verify (passed)?/.exec(line))) {
-    // A capstone repair gets one try a cycle: one that fails its verify drops the branch from the batch.
-    const failed = m[1].startsWith('capstone') ? { state: 'failed', outcome: 'failed', why: 'capstone repair failed its verify' } : { state: 'running', outcome: 'failed' };
+    // A capstone or conflict repair gets one try: one that fails its verify drops the branch from the batch.
+    const once = m[1].startsWith('capstone') ? 'capstone' : m[1] === 'conflict' ? 'conflict' : null;
+    const failed = once ? { state: 'failed', outcome: 'failed', why: `${once} repair failed its verify` } : { state: 'running', outcome: 'failed' };
     Object.assign(step, {
       attempts: (step.attempts ?? 0) + 1, node: m[2], minutes: Number(((step.minutes ?? 0) + Number(m[4])).toFixed(1)),
       ...(m[5] ? { state: 'done', outcome: 'passed' } : failed),
     });
   } else if ((m = /^repair \S+ capstone: not started, (.+)$/.exec(line))) Object.assign(step, { state: 'failed', outcome: 'failed', why: `capstone repair not started: ${m[1]}` });
   else if (/^repair \S+ capstone failed:/.test(line)) Object.assign(step, { state: 'failed', outcome: 'failed', why: 'capstone repair crashed' });
+};
+
+/** What a lane's patch step says of a branch merged after its conflict: by a conflict repair, or outside skulkr. */
+export const RESOLVED_BY_REPAIR = 'merged after a conflict repair';
+export const RESOLVED_OUTSIDE = 'merged outside skulkr';
+
+/** `patch` (a lane's patch step) as done, its branch merged despite the conflict that failed it, `resolved` saying how. */
+const resolvePatch = (patch, resolved) => {
+  delete patch.why;
+  return Object.assign(patch, { state: 'done', resolved });
 };
 
 /** The areas a `capstone: N failures; <area> <n>, …` line lays the gate's failures at (`capstone.mjs`), each about to
@@ -86,6 +97,10 @@ const readLog = (log, names) => {
       repairStep(at(m[1]), line);
     } else if (line.startsWith('capstone: ')) {
       for (const id of capstoneLaid(line)) Object.assign((at(id).repair ??= { attempts: 0 }), { state: 'running', outcome: 'failed' });
+    } else if ((m = names.resolved(line))) {
+      // A conflict repair merged the branch a build of the batch had left out.
+      if (stages.get(m.area) === 'conflict') stages.set(m.area, 'patched');
+      if (steps.has(m.area)) resolvePatch(at(m.area).patch, RESOLVED_BY_REPAIR);
     } else if ((m = names.leftOut(line)) && !m.earlier) {
       stages.set(m.area, 'conflict');
       Object.assign(at(m.area).patch, { state: 'failed', why: `${m.why}; left out of the batch` });
@@ -158,7 +173,36 @@ export const nightLanes = (log, areas, jobs = [], reports = new Map(), names = N
  * Every branch a night's log says its batch left out: `{ area, round, why }`, `round` the branch's own, earlier than
  * `round` for a branch an earlier round left out and this one retried.
  */
-export const nightLeftOut = (log, round, names = NAMES) => log.split('\n').flatMap((line) => {
-  const m = names.leftOut(line);
-  return m ? [{ area: m.area, round: m.earlier ?? round, why: m.why }] : [];
-});
+export const nightLeftOut = (log, round, names = NAMES) => {
+  let out = [];
+  for (const line of log.split('\n')) {
+    const m = names.leftOut(line);
+    if (m) out.push({ area: m.area, round: m.earlier ?? round, why: m.why });
+    const r = !m && names.resolved(line);
+    // A later build's conflict repair merged it.
+    if (r) out = out.filter((e) => e.area !== r.area || e.round !== r.round);
+  }
+  return out;
+};
+
+/**
+ * `run` (`readRun`'s) with the branches `merged(round, area)` says are in its batch or `main` taken off its conflicts:
+ * resolved outside skulkr, by hand after a red round, they are no longer left out, and their lanes' patch steps done.
+ */
+export const settleMerged = (run, merged) => {
+  const conflicted = new Set([
+    ...Object.entries(run.stages ?? {}).filter(([, s]) => s === 'conflict').map(([id]) => id),
+    ...(run.leftOut ?? []).filter((e) => e.round === run.round).map((e) => e.area),
+  ]);
+  const settled = new Set([...conflicted].filter((id) => merged(run.round, id)));
+  const leftOut = (run.leftOut ?? []).filter((e) => !(e.round === run.round ? settled.has(e.area) : merged(e.round, e.area)));
+  if (!settled.size && leftOut.length === (run.leftOut ?? []).length) return run;
+  return {
+    ...run,
+    leftOut,
+    stages: Object.fromEntries(Object.entries(run.stages ?? {}).map(([id, s]) => [id, settled.has(id) && s === 'conflict' ? 'patched' : s])),
+    lanes: (run.lanes ?? []).map((l) => (settled.has(l.id) && l.steps.patch.state === 'failed'
+      ? { ...l, steps: { ...l.steps, patch: resolvePatch({ ...l.steps.patch }, RESOLVED_OUTSIDE) } }
+      : l)),
+  };
+};

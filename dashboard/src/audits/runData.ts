@@ -29,7 +29,7 @@ export function stepText(step: LaneStepKey, s: LaneStep, now: number): string {
   if (step === 'match') return matchText(s.shared ?? 0, s.a ?? 0, s.b ?? 0);
   if (step === 'fix') return `${plural(s.commits ?? 0, 'commit')} · ${minutesText(s.minutes ?? 0)}`;
   if (step === 'repair') return s.outcome === 'timed out' ? 'timed out' : s.attempts ? `${plural(s.attempts, 'repair')} · passed` : 'verified';
-  return `${s.commits ?? 0} applied`;
+  return `${s.commits ?? 0} applied${s.resolved ? ` · ${s.resolved}` : ''}`;
 }
 
 /** What a running round's headline calls a step where it waits its turn. */

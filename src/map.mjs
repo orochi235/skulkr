@@ -7,7 +7,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gitIn } from './batch.mjs';
 import { resolveConfig } from './config.mjs';
-import { nightLanes, nightLeftOut, nightStages } from './nightLog.mjs';
+import { nightLanes, nightLeftOut, nightStages, settleMerged } from './nightLog.mjs';
 import { fleetOf } from './gate.mjs';
 import { areaIcons, iconsFor } from './icons.mjs';
 import { partitionAt } from './partition.mjs';
@@ -79,6 +79,29 @@ export const readRun = (found, running, jobs = [], state, { names = NAMES, sweep
     lastLine: lines.at(-1) ?? null,
     lines: lines.slice(-40),
     ...fleetOf(run, running, jobs, gate, names),
+  };
+};
+
+/**
+ * Whether round `round`'s branch for `area` is in `main` or one of that round's batch branches, as one a red round left
+ * out and someone merged by hand is: `(round, area) => boolean`, false where the branch is gone.
+ */
+export const mergedIn = (cfg, git) => {
+  let refs;
+  const has = (...args) => {
+    try {
+      git(...args);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  return (round, area) => {
+    const branch = cfg.names.area(round, area);
+    if (!has('rev-parse', '--verify', '--quiet', `refs/heads/${branch}`)) return false;
+    refs ??= git('for-each-ref', '--format=%(refname:short)', 'refs/heads/').split('\n').filter(Boolean);
+    const into = [cfg.git.main, ...refs.filter((r) => cfg.names.batchRoundOf(r) === round)];
+    return into.some((to) => has('merge-base', '--is-ancestor', branch, to));
   };
 };
 
@@ -168,8 +191,9 @@ export const buildMap = (cfg, root, runner) => {
   const locks = areaLocksFor(cfg, git);
   const { picked, settled } = pickAreas({ areas, passes, covered, staleLines, calibration, touched, count: Infinity, inFlight: new Set(locks.keys()) });
   const settledSet = new Set(settled);
+  const merged = mergedIn(cfg, git);
   const runs = readRuns(cfg.state, null, { listJobs: (since) => runner.jobs(since), listProgress: () => runner.progress?.() ?? new Map(), names: cfg.names, sweepId: cfg.sweep?.id, gate: cfg.gate, fixAgent: agentFor(cfg, 'fix') })
-    .map((r) => ({ ...r, lanes: r.lanes.map((l) => (l.pass ? { ...l, pass: corrected(l.pass) } : l)) }));
+    .map((r) => settleMerged({ ...r, lanes: r.lanes.map((l) => (l.pass ? { ...l, pass: corrected(l.pass) } : l)) }, merged));
   /** The live run holding each area. */
   const holder = new Map(runs.filter((r) => r.running).flatMap((r) => r.areas.map((id) => [id, r])));
   // A live run's areas are being audited, not waiting, so the queue counts from 1 past them.
@@ -249,7 +273,9 @@ export const buildMap = (cfg, root, runner) => {
     ...(Object.keys(icons.glyphs).length ? { icons: icons.glyphs } : {}),
     rounds: [...rounds.values()].sort((x, y) => x.round - y.round).map((r) => ({ ...r, est: Math.round(r.est) })),
     recuts: recutsIn(cfg, git, root, areas),
-    leftOut: retryable(git, leftOutIn(cfg.state), cfg.git.main).map((e) => ({ area: cfg.names.idOf(e.branch), round: e.round, why: e.why })),
+    // One merged into its round's batch by hand is no longer out, though a later batch would still retry it.
+    leftOut: retryable(git, leftOutIn(cfg.state), cfg.git.main).map((e) => ({ area: cfg.names.idOf(e.branch), round: e.round, why: e.why }))
+      .filter((e) => !merged(e.round, e.area)),
     calibration,
   };
 };

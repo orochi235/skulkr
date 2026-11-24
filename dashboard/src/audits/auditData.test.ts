@@ -23,6 +23,7 @@ describe('lanes', () => {
     expect(stepText('B', live.lanes[1]!.steps.B, now)).toBe('studio · <1 min');
     expect(stepText('fix', { state: 'done', commits: 1, minutes: 7.6 }, now)).toBe('1 commit · 7.6 min');
     expect(stepText('patch', { state: 'failed', why: 'conflicts; left out of the batch' }, now)).toBe('conflicts; left out of the batch');
+    expect(stepText('patch', { state: 'done', commits: 2, resolved: 'merged after a conflict repair' }, now)).toBe('2 applied · merged after a conflict repair');
   });
 
   it('draws the gate runs the map names, one stripe each under the batch', () => {

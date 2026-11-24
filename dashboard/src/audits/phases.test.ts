@@ -36,6 +36,8 @@ describe('phaseOf', () => {
     const through = { A: done({ findings: 2 }), B: done({ findings: 1 }), match: matched(2, 1, 1), fix: done({ commits: 2 }) };
     expect(phaseOf(lane({ ...through, patch: { state: 'failed', why: 'conflicts' } }))).toBe('conflict');
     expect(phaseOf(lane({ ...through, patch: done() }))).toBe('done');
+    // A conflict merged later, by a conflict repair or by hand, is done like any patch.
+    expect(phaseOf(lane({ ...through, patch: done({ commits: 2, resolved: 'merged outside skulkr' }) }))).toBe('done');
     expect(phaseOf(lane({ A: done({ findings: 1 }), B: done(), match: matched(1, 0, 1) }))).toBe('done');
     expect(isFinished(lane({ A: done({ findings: 1 }), B: done(), match: matched(1, 0, 0) }))).toBe(false);
     expect(isFinished(lane({ A: done({ findings: 0 }), B: done({ findings: 0 }) }))).toBe(true);

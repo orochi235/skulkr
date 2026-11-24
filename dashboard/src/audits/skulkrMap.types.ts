@@ -102,6 +102,9 @@ export interface LaneStep {
   /** Of `of`, how many the fixer found were no defect. */
   readonly dismissed?: number;
   readonly why?: string;
+  /** A done patch step whose branch conflicted with the batch and was merged anyway: how (`merged after a conflict
+   *  repair`, `merged outside skulkr`). */
+  readonly resolved?: string;
   /** A repair step's repair jobs so far, and how its last verify ended. */
   readonly attempts?: number;
   readonly outcome?: 'passed' | 'failed' | 'timed out';

@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { fleetOf, fleetProgressOf, gateFailuresOf, gateNodesOf, gateOutcomesOf, gateRunsOf, nightRoundOf, nightsOf, readRuns, rerunOf, withPasses } from './map.mjs';
+import { fleetOf, fleetProgressOf, gateFailuresOf, gateNodesOf, gateOutcomesOf, gateRunsOf, mergedIn, nightRoundOf, nightsOf, readRuns, rerunOf, withPasses } from './map.mjs';
+import { gitIn } from './batch.mjs';
 import { progressOfTop } from './runner/onto.mjs';
 import { resolveConfig } from './config.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';
@@ -20,6 +21,28 @@ describe('withPasses', () => {
     const [a, b] = withPasses([matched, { id: 'b', steps: { A: W, B: W, match: W, fix: W, patch: W } }], { round: 47, started: '2026-11-20T14:11:24.920Z' });
     expect(a!.pass).toEqual({ round: 47, date: '2026-11-20', a: 7, b: 4, shared: 1, distinct: 10, est: 19, left: 9 });
     expect(b).not.toHaveProperty('pass');
+  });
+});
+
+describe('mergedIn', () => {
+  it("answers whether an area branch is in main or its round's batch, as one merged by hand after a red round is", () => {
+    const root = mkdtempSync(join(tmpdir(), 'skulkr-map-'));
+    dirs.push(root);
+    const git = gitIn(root);
+    git('init', '-q', '-b', 'main');
+    git('config', 'user.email', 'skulkr@example.invalid');
+    git('config', 'user.name', 'skulkr');
+    git('commit', '-q', '--allow-empty', '-m', 'base');
+    for (const b of ['audit80-a', 'audit80-b', 'audit80-c']) {
+      git('checkout', '-q', '-b', b, 'main');
+      git('commit', '-q', '--allow-empty', '-m', b);
+    }
+    git('checkout', '-q', '-b', 'batch/2026-11-23-audit80', 'main');
+    git('merge', '-q', '--no-ff', '--no-edit', 'audit80-a');
+    git('checkout', '-q', 'main');
+    git('merge', '-q', '--ff-only', 'audit80-c');
+    const merged = mergedIn(resolveConfig({}), git);
+    expect([merged(80, 'a'), merged(80, 'b'), merged(80, 'c'), merged(80, 'gone'), merged(81, 'a')]).toEqual([true, false, true, false, false]);
   });
 });
 
