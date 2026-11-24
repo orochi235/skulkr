@@ -191,4 +191,5 @@
 /* The page icon standing for "files" in a lane's first step, set off from the digits before and the words after. */
 .page { flex: none; vertical-align: -1px; margin-inline: 1px 2px; }
 /* onto's pass and fail marks, ✓ and ✗: drawn by a font that has them, as the page's own fonts do not. */
-.mark { font-family: 'Zapf Dingbats', 'Apple Symbols', sans-serif; font-weight: normal; }
+/* Each in a box as wide as Zapf Dingbats draws ✓, the wider, centered, so a column of verdicts lines up whichever mark it shows. */
+.mark { display: inline-block; width: 0.76em; text-align: center; font-family: 'Zapf Dingbats', 'Apple Symbols', sans-serif; font-weight: normal; }
