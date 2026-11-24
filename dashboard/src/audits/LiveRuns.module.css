@@ -190,3 +190,5 @@
 }
 /* The page icon standing for "files" in a lane's first step, set off from the digits before and the words after. */
 .page { flex: none; vertical-align: -1px; margin-inline: 1px 2px; }
+/* onto's pass and fail marks, ✓ and ✗: drawn by a font that has them, as the page's own fonts do not. */
+.mark { font-family: 'Zapf Dingbats', 'Apple Symbols', sans-serif; font-weight: normal; }

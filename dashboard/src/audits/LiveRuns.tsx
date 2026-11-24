@@ -1,5 +1,5 @@
 import { InlineMarkdown } from '@weasel-js/ui/components/InlineMarkdown';
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Checkbox } from '@weasel-js/ui/components/Checkbox';
 import { SegmentedBar } from '@weasel-js/ui/components/Segmented';
 import { SpanStrips, type SpanStripSpan, type SpanStripsRow } from '@weasel-js/ui/components/SpanStrip';
@@ -13,7 +13,7 @@ import { icon } from '@dash/icons.gen';
 import { STEP_COLUMN_COUNT, filesText, laneStepsOf } from './stepsLane';
 import { passPipsOf } from './auditPainter';
 import { gateRunsOf, inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
-import { NODE_SEP, elapsedText, headlineOf, lastLineOf, spendOf, startedText } from './runData';
+import { FAIL, NODE_SEP, PASS, elapsedText, headlineOf, lastLineOf, spendOf, startedText } from './runData';
 import { useDashPref } from './dashPrefs';
 import type { AuditLane, AuditLeftOut, AuditRun } from './skulkrMap.types';
 import s from './LiveRuns.module.css';
@@ -26,18 +26,27 @@ export interface AreaHandlers {
   readonly onLight: (id: string | null) => void;
 }
 
-/** A running span with its node's name marked, so the name alone pulses: the label up to its separator, or all of it
- *  where it has none. A lane's first step, given its area's `files`, leads with their count and the page icon in place
- *  of the word; its label keeps the word for the tooltip and screen readers. */
+/** `text` with each pass or fail mark in a font that draws onto's own, since the page's fonts lack both. */
+function withMarks(text: string): ReactNode {
+  if (!MARKS.test(text)) return text;
+  return text.split(MARK_SPLIT).map((part, i) => (part === PASS || part === FAIL ? <span key={i} className={s.mark}>{part}</span> : part));
+}
+const MARKS = new RegExp(`[${PASS}${FAIL}]`);
+const MARK_SPLIT = new RegExp(`([${PASS}${FAIL}])`);
+
+/** A span's caption as the lane draws it: a running one with its node's name marked, so the name alone pulses (the
+ *  label up to its separator, or all of it where it has none); a lane's first step, given its area's `files`, leading
+ *  with their count and the page icon in place of the word; and any pass or fail mark in its own font. The label keeps
+ *  the words for the tooltip and screen readers. */
 function withNode(span: SpanStripSpan, files?: number): SpanStripSpan {
   const lead = span.id === 'A' && files !== undefined && span.label.startsWith(filesText(files)) ? filesText(files) : '';
   const rest = span.label.slice(lead.length).replace(/^ · /, '');
   const mark = lead ? <>{files}<Icon name={icon('ui:page')} size={11} className={s.page} />{rest ? ' · ' : ''}</> : null;
   const at = rest.indexOf(NODE_SEP);
-  if (span.state !== 'active' || rest === '' || at === 0) return mark ? { ...span, content: <>{mark}{rest}</> } : span;
+  if (span.state !== 'active' || rest === '' || at === 0) return mark || MARKS.test(rest) ? { ...span, content: <>{mark}{withMarks(rest)}</> } : span;
   const end = at === -1 ? rest.length : at;
   const node = span.color && BRIGHT_FILLS.has(span.color) ? `${s.node} ${s.onBright}` : s.node;
-  return { ...span, content: <>{mark}<span className={node}>{rest.slice(0, end)}</span>{rest.slice(end)}</> };
+  return { ...span, content: <>{mark}<span className={node}>{rest.slice(0, end)}</span>{withMarks(rest.slice(end))}</> };
 }
 
 /** The capstone's runs that have failed, each with what it failed, in the shared lane's order. */
