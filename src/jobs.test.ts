@@ -102,7 +102,14 @@ describe('verify and repair job lines', () => {
     expect(at(shell, 'git format-patch')).toBeLessThan(at(shell, 'vitest related --run --maxWorkers=4'));
     expect(shell).toContain("--project='\\''!browser*'\\''");
     expect(shell).toContain('vitest list --filesOnly');
-    expect(fixShell(resolveConfig({}), 'core', 15, 3)).not.toContain('VERIFY_FILES');
+    expect(fixShell(resolveConfig({}), 'core', 15, 3)).not.toContain('VERIFY_FILES=$(');
+  });
+
+  it('write the on-fleet script before a local fixer starts, for its brief to run its checks on the fleet with', () => {
+    const local = fixShell(resolveConfig({ name: 'proj' }), 'core', 15, 3);
+    expect(at(local, "cat > .skulkr/in/on-fleet <<'SKULKR_ON_FLEET'")).toBeLessThan(at(local, 'claude -p'));
+    expect(local).toContain('--task "proj-$name-');
+    expect(fixShell(resolveConfig({ name: 'proj', local: { fleetChecks: false } }), 'core', 15, 3)).not.toContain('on-fleet');
   });
 
   it("give a repair the area's commits before the model, and verify every commit since the frozen tree", () => {

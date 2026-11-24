@@ -204,6 +204,7 @@ describe('verifyLines on the fleet', () => {
     expect(r.log).toBe('onto do: job exited 3 on studio');
     expect(r.args).toContain('--repo git@example.com:me/project.git');
     expect(r.args).toMatch(/--task proj-verify-[0-9a-f]{10} /);
+    expect(r.args).toContain('--kind test');
     expect(r.args).toContain('--env VERIFY_FILES=a.ts');
     expect(r.remote).toBe('git@example.com:me/project.git');
   });
@@ -211,7 +212,7 @@ describe('verifyLines on the fleet', () => {
   it('runs the command here where onto fails before its job runs', () => {
     const r = run('echo "onto do: no node has room"; exit 1');
     expect(r.exit).toBe('4');
-    expect(r.log).toBe('ran here: a.ts');
+    expect(r.log.split('\n')).toEqual(['onto do: no node has room', 'skulkr: the fleet did not take verify; running it here', 'ran here: a.ts']);
   });
 });
 

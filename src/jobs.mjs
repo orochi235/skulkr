@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { CHECKS_PROOF, JOB_IN, JOB_OUT } from './config.mjs';
 import { sleep } from './after.mjs';
 import { q, readIf } from './text.mjs';
-import { verifyLines, verifyOf } from './verify.mjs';
+import { checksOnFleet as verifiesOnFleet, onFleetLines, verifyLines, verifyOf } from './verify.mjs';
 import { agentFor } from './agent/index.mjs';
 
 export const BUSY_WAIT_MS = 30_000;
@@ -105,9 +105,6 @@ export const fixupLines = (fixup) => {
  */
 const localCfg = (cfg, local) => (local ? { ...cfg, claude: { ...cfg.claude, configDir: local.account } } : cfg);
 
-/** The project's name where a verify runs on the onto fleet (under the local runner, unless `local.fleetChecks` is
- *  false), else false. */
-const verifiesOnFleet = (cfg) => cfg.runner === 'local' && cfg.local?.fleetChecks !== false && cfg.name;
 
 /** A model job's hand-back: its commits since `BASE` as one mbox and what it left uncommitted, then the verify step
  *  unless the job runs locally. */
@@ -131,7 +128,7 @@ const handBackLines = (cfg, local) => {
  */
 export const fixShell = (cfg, area, budgetUsd, findings, local = null) =>
   [
-    'set -e', ...prelude(cfg), fresh, ...treeLines(cfg), 'set +e',
+    'set -e', ...prelude(cfg), fresh, ...treeLines(cfg), ...(verifiesOnFleet(cfg) ? onFleetLines(verifiesOnFleet(cfg)) : []), 'set +e',
     agentLine(localCfg(cfg, local), 'fix', `${JOB_IN}/${area}/fix.md`, budgetUsd, `--commits ${findings} --checks ${CHECKS_IN} --proof ${JOB_OUT}/${CHECKS_PROOF}`),
     ...handBackLines(cfg, local),
   ].join('\n');

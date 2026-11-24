@@ -5,7 +5,7 @@
  * verdict is the command's exit status and the runner's file-level counts.
  */
 import { join } from 'node:path';
-import { CHECKS_PROOF, JOB_OUT } from './config.mjs';
+import { CHECKS_PROOF, JOB_IN, JOB_OUT } from './config.mjs';
 import { stripAnsi } from './ansi.mjs';
 import { q, readIf } from './text.mjs';
 
@@ -52,23 +52,48 @@ const localRun = (command, minutes) =>
 /** What onto prints when the job it placed ended, as against onto itself failing to place or sync it. */
 const ONTO_RAN = '^onto do: job (exited|timed out|was killed)';
 
+/** The project's name where a check runs on the onto fleet (under the local runner, unless `local.fleetChecks` is
+ *  false), else false. */
+export const checksOnFleet = (cfg) => cfg.runner === 'local' && cfg.local?.fleetChecks !== false && cfg.name;
+
+/** What a brief puts before a check's command to run it on the fleet where {@link checksOnFleet}, else nothing. */
+export const onFleetPrefix = (cfg, kind, minutes, name) => (checksOnFleet(cfg) ? `${ON_FLEET} ${kind} ${minutes} ${name} -- ` : '');
+
+/** Where a local runner's job keeps {@link onFleetScript}. */
+export const ON_FLEET = `${JOB_IN}/on-fleet`;
+
 /**
- * `command` on the onto fleet, from a local runner's tree: under its project's `origin` URL, added to the tree as the
- * `fleet` remote since onto syncs only to a remote the tree names, so commits never pushed reach the node all the
- * same; its task is named for `project`. Where `onto` is missing, the project has no remote URL, or onto fails before the job runs, it runs here.
+ * A script that runs its arguments on the onto fleet from a local runner's tree, `on-fleet <kind> <minutes> <name>
+ * [--gui] -- <command…>`: under the project's `origin` URL, added to the tree as its `fleet` remote since onto syncs
+ * only to a remote the tree names, so commits never pushed reach the node all the same; its task named
+ * `<project>-<name>-<sha>`, and `VERIFY_*` passed along. Where `onto` is missing, `origin` is no URL, or onto fails
+ * before its job runs, it runs the command here.
  */
-export const fleetRunLines = (command, minutes, { gui = false, project = 'skulkr' } = {}) => [
-  '  FLEET_URL=$(git -C "$(git remote get-url origin)" remote get-url origin 2>/dev/null); case "$FLEET_URL" in /*) FLEET_URL= ;; esac',
-  '  if [ -n "$FLEET_URL" ] && command -v onto >/dev/null; then',
-  '    git remote get-url fleet >/dev/null 2>&1 || git remote add fleet "$FLEET_URL"',
-  `    onto do --kind test --task "${project}-verify-$(git rev-parse --short=10 HEAD)${gui ? '-gui' : ''}" --expect ${minutes}m --timeout ${minutes}m --about ${q(`skulkr: verify a fix's commits${gui ? ' (browser tests)' : ''} off the machine running the round`)} --repo "$FLEET_URL" --env VERIFY_FILES="$VERIFY_FILES" --env VERIFY_RELATED="$VERIFY_RELATED" --env VERIFY_PROVEN="$VERIFY_PROVEN"${gui ? ' --gui' : ''} -- bash -c ${q(command)} > ${JOB_OUT}/verify.log 2>&1; echo $? > ${JOB_OUT}/verify.exit`,
-  `    if [ "$(cat ${JOB_OUT}/verify.exit)" != 0 ] && ! grep -qE ${q(ONTO_RAN)} ${JOB_OUT}/verify.log; then`,
-  `      mv ${JOB_OUT}/verify.log ${JOB_OUT}/verify-fleet.log; echo "skulkr: the fleet did not take the verify; running it here"`,
-  `      ${localRun(command, minutes)}`,
-  '    fi',
-  '  else',
-  `    ${localRun(command, minutes)}`,
-  '  fi',
+export const onFleetScript = (project) => `#!/bin/bash
+kind=$1 minutes=$2 name=$3; shift 3
+gui=; [ "$1" = --gui ] && { gui=--gui; shift; }
+[ "$1" = -- ] && shift
+url=$(git -C "$(git remote get-url origin)" remote get-url origin 2>/dev/null); case "$url" in /*) url= ;; esac
+if [ -n "$url" ] && command -v onto >/dev/null; then
+  git remote get-url fleet >/dev/null 2>&1 || git remote add fleet "$url"
+  out=$(mktemp)
+  onto do --kind "$kind" --task "${project}-$name-$(git rev-parse --short=10 HEAD)" --expect "\${minutes}m" --timeout "\${minutes}m" \\
+    --about "skulkr: ${project} $name, off the machine running the round" --repo "$url" $gui \\
+    --env VERIFY_FILES="$VERIFY_FILES" --env VERIFY_RELATED="$VERIFY_RELATED" --env VERIFY_PROVEN="$VERIFY_PROVEN" -- "$@" 2>&1 | tee "$out"
+  s=\${PIPESTATUS[0]}
+  if [ "$s" = 0 ] || grep -qE ${q(ONTO_RAN)} "$out"; then rm -f "$out"; exit "$s"; fi
+  rm -f "$out"; echo "skulkr: the fleet did not take $name; running it here"
+fi
+exec "$@"
+`;
+
+/** Shell lines that write {@link onFleetScript} for `project` into the job's tree. */
+export const onFleetLines = (project) => [`mkdir -p ${JOB_IN} && cat > ${ON_FLEET} <<'SKULKR_ON_FLEET'`, ...onFleetScript(project).trimEnd().split('\n'), 'SKULKR_ON_FLEET', `chmod +x ${ON_FLEET}`];
+
+/** `command` on the fleet through {@link onFleetScript}, its output in `verify.log` and its exit in `verify.exit`. */
+const fleetRunLines = (command, minutes, { gui = false, project = 'skulkr' } = {}) => [
+  ...onFleetLines(project),
+  `  perl -e 'alarm shift; exec @ARGV' ${(minutes + 15) * 60} ${ON_FLEET} test ${minutes} verify${gui ? '-gui --gui' : ''} -- bash -c ${q(command)} > ${JOB_OUT}/verify.log 2>&1; echo $? > ${JOB_OUT}/verify.exit`,
 ];
 
 /** A test file's path in a line of runner output. */

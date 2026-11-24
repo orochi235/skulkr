@@ -50,11 +50,11 @@ code may have changed since: check each still applies before anything else, and 
 - Each test file you touched, one at a time: `npx vitest run --maxWorkers=1 <file>` from the tree root (a
   `*.browser.test.*` file cannot run here — list it as unrun). After you exit, the controller runs every test
   file related to your commits itself, browser ones on a GUI node, and hands any failure back to be repaired.
-- `npm run checks:gate`, run here directly: every check the batch's gate runs, the root `npm run typecheck`
+- `{{onFleet}}npm run checks:gate`, exactly as written: every check the batch's gate runs, the root `npm run typecheck`
   and every `check:*` among them, in about three minutes. Fix each failure and rerun it until all pass;
   a check you skip here fails the whole batch later.
 - `npm run lint -w <pkg>` for every package you changed: the package's whole lint script, not eslint alone.
-- No fleet runs and no merging: the controller batches every area and runs the fleet once.
+- No other fleet runs and no merging: the controller batches every area and runs the fleet once.
 - Leave the tree clean: everything you mean to keep committed, nothing else changed.
 
 ## Report (your final reply, nothing else)
