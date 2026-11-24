@@ -1,11 +1,11 @@
 /**
  * A red capstone's one repair cycle: each failing file of the gate's log is laid at the area branches that changed it
- * or code it imports (`attribute.mjs`), each such branch gets a repair job given its failures, and the branches whose
+ * or code it imports (`attribute.mjs`), else at the one branch that changed a path its failure's message names, each such branch gets a repair job given its failures, and the branches whose
  * repair passes its verify step are patched again for the batch to be rebuilt; the rest are left out of it.
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { attribute, changedBy, reachOf, workspacesIn } from './attribute.mjs';
+import { attribute, changedBy, namedOwner, reachOf, workspacesIn } from './attribute.mjs';
 import { applyFix, gitIn } from './batch.mjs';
 import { failedWhereIn, testsFailingIn } from './gate.mjs';
 import { checkedIn, repairJob, summaryOf } from './repair.mjs';
@@ -30,6 +30,26 @@ export const excerptFor = (text, files, after = files.some((f) => !isTestPath(f)
     }
   });
   return [...keep].sort((a, b) => a - b).map((i) => lines[i]).join('\n');
+};
+
+/** Where a vitest failure ends: its block's closing rule, the next failure, or a test file's result line. */
+const BLOCK_END = /^\s*⎯|\bFAIL\b|^fleet-fail:|^onto: |^\s*[✓❯×↓]\s.*\(\d+ tests?\b/;
+/** How many lines a failure's message is read for. */
+const BLOCK_LINES = 200;
+
+/**
+ * What the gate log says of `file`'s failures, verbatim: the message on each `onto: fail` line naming it, and each
+ * vitest `FAIL` block naming it, its assertion and stack, up to the block's end.
+ */
+export const failureTextFor = (text, file) => {
+  const lines = stripAnsi(text).split('\n');
+  const out = [];
+  lines.forEach((line, i) => {
+    if (line.startsWith('onto: fail ') && line.includes(file)) out.push(line.split('\t').slice(1).join('\t'));
+    if (!/\bFAIL\b/.test(line) || !line.includes(file)) return;
+    for (let j = i + 1; j < Math.min(lines.length, i + 1 + BLOCK_LINES) && !BLOCK_END.test(lines[j]); j++) out.push(lines[j]);
+  });
+  return out.join('\n');
 };
 
 /**
@@ -96,7 +116,14 @@ export const repairCapstone = async ({ cfg, root, round, commit, batch, logPath,
       return [];
     }
   });
-  const { byBranch, unattributed } = attribute(failing, changed, (file) => reachOf(batch.tree, file, workspaces));
+  const attributed = attribute(failing, changed, (file) => reachOf(batch.tree, file, workspaces));
+  const { byBranch } = attributed;
+  // A test scanning the whole repository reaches no branch's files by import, but its message names the file it flags.
+  const unattributed = attributed.unattributed.filter((file) => {
+    const owner = namedOwner(failureTextFor(text, file), changed);
+    if (owner) byBranch.set(owner, [...(byBranch.get(owner) ?? []), file]);
+    return !owner;
+  });
   // A failed step names no file of its own; the config's `gate.blame` reads which paths its output points at.
   const ownersOf = (paths) => [...changed].filter(([, files]) => [...files].some((f) => paths.some((p) => f === p || f.startsWith(p.endsWith('/') ? p : `${p}/`)))).map(([b]) => b);
   const unblamed = [];

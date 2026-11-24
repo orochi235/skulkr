@@ -95,6 +95,8 @@ weasel cutover.
     (2026-11-23).
   - local fixers (README "Local fixers", 2026-11-23): off by default, so weasel's runs are unchanged; the onto runner's
     job listing and progress now include the local runner's.
+  - a capstone failure no branch reaches by path or import laid at the one branch that changed a path its failure's
+    message names (README "Verify and repair", 2026-11-23).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

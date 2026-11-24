@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { gitIn } from './batch.mjs';
-import { excerptFor, repairRefusal } from './capstone.mjs';
+import { excerptFor, failureTextFor, repairRefusal } from './capstone.mjs';
 import { resolveConfig } from './config.mjs';
 import { batchAndTest } from './land.mjs';
 import { leftOutIn } from './leftOut.mjs';
@@ -164,6 +164,36 @@ describe('a red capstone', () => {
     expect(said).toContain('capstone: 1 failures; src 1');
   });
 
+  it("lays a whole-repo scan's failure at the one branch that changed a path its message names", async () => {
+    const r = round({ draw: { 'src/loupe.ts': '16' }, docs: { 'docs/d.md': 'e' } });
+    // As weasel's gate prints it: a scanning test, in a file no branch reaches, listing the files it flags.
+    const scan = [
+      'if grep -q 16 src/loupe.ts; then',
+      "printf 'onto: fail src/scan.test.ts > scans > find nothing\\texpected [ …(1) ] to deeply equal []\\n'",
+      'echo "fleet-fail: core src/scan.test.ts :: scans > find nothing"',
+      'echo " ✓  core  docs/d.md (1 test) 2ms"',
+      'echo " FAIL  core  src/scan.test.ts > scans > find nothing"',
+      'echo "+   src/loupe.ts: 16,"',
+      'echo "⎯⎯⎯⎯[1/1]⎯"',
+      'echo " ✓  core  docs/d.md (1 test) 2ms"',
+      'exit 1; fi',
+    ].join('\n');
+    const asked: [string, string[]][] = [];
+    const { said } = await land(r, async (id, files) => {
+      asked.push([id, files]);
+      return { ok: false };
+    }, { command: ['bash', '-c', scan] });
+    expect(said).toContain('capstone: 1 failures; draw 1');
+    expect(asked).toEqual([['draw', ['src/scan.test.ts']]]);
+  });
+
+  it("leaves a scan's failure unattributed when the paths its message names were changed by two branches", async () => {
+    const r = round({ one: { 'src/x.ts': 'x' }, two: { 'src/y.ts': 'y' } });
+    const scan = 'echo "fleet-fail: core src/scan.test.ts :: scans"; echo " FAIL  core  src/scan.test.ts > scans"; echo "src/x.ts src/y.ts"; exit 1';
+    const { said } = await land(r, async () => ({ ok: false }), { command: ['bash', '-c', scan] });
+    expect(said).toContain('capstone: 1 failures; none laid at a branch; 1 unattributed');
+  });
+
   it('lands over failures the frozen commit has too, and stays red over one it does not', async () => {
     const old = await land(round({ src: { 'src/a.ts': 'broken' } }), undefined, {}, async (files) => files);
     expect(old.report).toMatch(/^main fast-forwarded to \w+; landed over 1 failures main already has \(src\/a\.test\.ts\)$/);
@@ -258,5 +288,20 @@ describe('excerptFor', () => {
   it("keeps each line naming a file and what follows it, up to another file's failure", () => {
     const log = ['noise', ' FAIL  a.test.ts > one', 'Error: x', ' FAIL  b.test.ts > two', 'Error: y'].join('\n');
     expect(excerptFor(log, ['a.test.ts'])).toBe(' FAIL  a.test.ts > one\nError: x');
+  });
+});
+
+describe('failureTextFor', () => {
+  it("reads a failure's onto message and its FAIL block up to the block's rule, not the result lines around it", () => {
+    const log = [
+      'onto: fail p/scan.test.ts > scans\texpected [ …(4) ] to deeply equal []',
+      ' ✓  ui  p/near.test.ts (2 tests) 1ms',
+      ' \u001b[41mFAIL\u001b[49m  ui  p/scan.test.ts > scans',
+      '+   "apps/draw/src/LoupeProvider.tsx: 16",',
+      ' ❯ p/scan.test.ts:136:19',
+      '⎯⎯⎯⎯[1/1]⎯',
+      ' ✓  ui  p/other.test.ts (1 test) 1ms',
+    ].join('\n');
+    expect(failureTextFor(log, 'p/scan.test.ts')).toBe('expected [ …(4) ] to deeply equal []\n+   "apps/draw/src/LoupeProvider.tsx: 16",\n ❯ p/scan.test.ts:136:19');
   });
 });

@@ -78,6 +78,18 @@ export const reachOf = (tree, file, workspaces, { limit = 5000 } = {}) => {
   return { files, packages };
 };
 
+const NAMED_PATH = /(?:[\w@.+-]+\/)+[\w@.+-]+\.\w+/g;
+
+/**
+ * The one branch whose commits changed a repository path named in `text`, a failure's message, or null when none
+ * did or more than one did: a test that scans the repository fails in a file of its own, naming the files it found.
+ */
+export const namedOwner = (text, changed) => {
+  const named = new Set(text.match(NAMED_PATH) ?? []);
+  const owners = [...changed].filter(([, files]) => [...files].some((f) => named.has(f))).map(([b]) => b);
+  return owners.length === 1 ? owners[0] : null;
+};
+
 /**
  * Each failing file's branches: those that changed it, else those that changed a file it reaches, else those that
  * changed a file in a workspace package it reaches. Answers `{ byBranch, unattributed }`: the failing files by branch,
