@@ -19,10 +19,9 @@
   font-weight: var(--wzl-font-weight-bold);
 }
 
-/* One dense row per defect; the claim column takes what the verdict and source leave. */
+/* One dense row per defect: the verdict and source as narrow as their contents, the claim the rest. */
 .table {
   width: 100%;
-  table-layout: fixed;
   border-collapse: collapse;
   font-size: var(--wzl-font-size-sm);
 }
@@ -36,8 +35,8 @@
   border-bottom: 1px solid var(--audit-rule);
 }
 
-.table th:nth-child(1) { width: 92px; }
-.table th:nth-child(2) { width: 64px; }
+/* A width of 1% shrinks a column to its contents; the claim's 0 max-width keeps its one line from widening the table. */
+.table th:nth-child(-n + 2) { width: 1%; white-space: nowrap; }
 
 .table td {
   padding: 2px var(--wzl-space-1);
@@ -48,7 +47,7 @@
 .verdict,
 .source { white-space: nowrap; }
 
-.claimCell { min-width: 0; }
+.claimCell { width: 100%; max-width: 0; }
 
 /* The claim's wrapper, a button where there is more to read than the row shows. */
 .more {
