@@ -415,7 +415,8 @@ export const resolveConfig = (user = {}, { file, root, local = false, env = proc
     names: {
       area: (round, area) => `${prefix}${round}-${area}`,
       batch: (date, round) => fillBatch(batchPattern, date, round),
-      task: (round, area, step) => `${prefix}${round}-${area}-${step}`,
+      /** A runner job's task name, led by the project's name so a fleet listing says whose job it is. */
+      task: (round, area, step) => `${name}-${prefix}${round}-${area}-${step}`,
       frozen: (round) => `${prefix}${round}-frozen-night`,
       am: (round, area) => `${prefix}${round}-am-${area}`,
       batchTree: (date, round) => fillBatch(batchPattern, date, round).replaceAll('/', '-'),
@@ -434,11 +435,11 @@ export const resolveConfig = (user = {}, { file, root, local = false, env = proc
       /** A round number in any branch named for one: `audit30-ui`, `batch/…-audit31`. */
       roundIn: new RegExp(`(?:^|[/-])${pre}(\\d+)(?:-|$)`),
       /** A job of round `round` (any round when omitted), by its task name. */
-      jobOf: (round = '\\d+') => new RegExp(`^(?:${pre}|skulkr)${round}-`),
+      jobOf: (round = '\\d+') => new RegExp(`^(?:${escape(name)}-)?(?:${pre}|skulkr)${round}-`),
       /** A runner job of round `round`'s batch gate, by its task name. */
       batchJobOf: (round) => new RegExp(`${batchSource(batchPattern.replaceAll('/', '-'), round)}(?:-|$)`),
       /** A step's task name → `[area, step]`. */
-      step: new RegExp(`^(?:${pre}|skulkr)\\d+-(.+)-(A|B|match|fix|repair|verify)$`),
+      step: new RegExp(`^(?:${escape(name)}-)?(?:${pre}|skulkr)\\d+-(.+)-(A|B|match|fix|repair|verify)$`),
       /**
        * A night log's line for a branch the batch left out → `{ area, why, earlier }`, `earlier` the round of a branch an
        * earlier round left out, retried here; null for any other line. Reads the old `… conflicts; left out` form too.

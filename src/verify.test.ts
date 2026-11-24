@@ -192,7 +192,7 @@ describe('verifyLines on the fleet', () => {
     const bin = mkdtempSync(join(tmpdir(), 'skulkr-fake-onto-'));
     dirs.push(bin);
     if (script !== null) writeFileSync(join(bin, 'onto'), `#!/bin/bash\necho "$@" > ${join(bin, 'args')}\n${script}\n`, { mode: 0o755 });
-    const lines = verifyLines({ command: 'echo "ran here: {files}"; exit 4' }, { fleet: true, probe: null });
+    const lines = verifyLines({ command: 'echo "ran here: {files}"; exit 4' }, { fleet: 'proj', probe: null });
     execFileSync('bash', ['-c', ['mkdir -p .skulkr/out', 'set +e', ...lines].join('\n')], { cwd: dir, env: { ...process.env, BASE: base, PATH: `${bin}:/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin` } });
     const out = (f: string) => readFileSync(join(dir, '.skulkr/out', f), 'utf8').trim();
     return { exit: out('verify.exit'), log: out('verify.log'), args: existsSync(join(bin, 'args')) ? readFileSync(join(bin, 'args'), 'utf8') : '', remote: git(dir, 'remote', 'get-url', 'fleet') };
@@ -203,6 +203,7 @@ describe('verifyLines on the fleet', () => {
     expect(r.exit).toBe('3');
     expect(r.log).toBe('onto do: job exited 3 on studio');
     expect(r.args).toContain('--repo git@example.com:me/project.git');
+    expect(r.args).toMatch(/--task proj-verify-[0-9a-f]{10} /);
     expect(r.args).toContain('--env VERIFY_FILES=a.ts');
     expect(r.remote).toBe('git@example.com:me/project.git');
   });

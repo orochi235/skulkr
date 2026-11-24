@@ -32,7 +32,7 @@ const context = (trial: boolean, held = '', config: object = {}) => {
     say: () => {}, progress: () => {}, usage: () => {}, refuse: () => {}, stopped: () => false, earlierNights: [],
     acquire: async () => ({ node: 'studio', release: () => {} }),
     runner: { run: async (job: { to: string; task: string; shell: string }) => {
-      const step = job.task.replace('audit7-a-', '');
+      const step = job.task.replace(/^.*audit7-a-/, '');
       prompts[step] = /review-preload\.md/.test(job.shell) ? 'preloaded' : 'plain';
       if (step === held) await gate;
       order.push(step);

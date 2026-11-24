@@ -72,7 +72,7 @@ describe('verifyAndRepair', () => {
     expect(got.verify).toMatchObject({ ok: false, failedFiles: ['a/store.pbt.test.ts'] });
     expect(h.said.at(-1)).toBe('verify a: still failing after 2 repairs; left out of the batch');
     // The file was checked on the frozen tree once, for the fixer's verdict; both repairs' verdicts reuse the answer.
-    expect(h.jobs.filter((j) => j.task === 'audit7-a-verify')).toHaveLength(1);
+    expect(h.jobs.filter((j) => j.task === 'project-audit7-a-verify')).toHaveLength(1);
   });
 
   it('pays for no repair when the verify step never ran', async () => {
@@ -93,7 +93,7 @@ describe('verifyAndRepair', () => {
     write(h.fixDir, { ...PASSING, 'fix.mbox': mbox(1), 'gui.exit': '0', 'gui.txt': '[browser] a/Bar.browser.test.tsx' });
     const got = await verifyAndRepair(h.ctx, h.area, { mbox: join(h.fixDir, 'fix.mbox') }, h.fixDir);
     expect(h.jobs.map((j) => [j.task, j.kind, Boolean(j.gui)])).toEqual([
-      ['audit7-a-verify', 'test', true], ['audit7-a-verify', 'test', true], ['audit7-a-repair', 'fix', false], ['audit7-a-verify', 'test', true],
+      ['project-audit7-a-verify', 'test', true], ['project-audit7-a-verify', 'test', true], ['project-audit7-a-repair', 'fix', false], ['project-audit7-a-verify', 'test', true],
     ]);
     expect(got).toMatchObject({ ok: true, verify: { ok: true, gui: true } });
   });
@@ -102,7 +102,7 @@ describe('verifyAndRepair', () => {
     const h = harness({ command: 'run {files}' }, { verify: [{ 'verify.exit': '142', 'verify.log': '', 'verify.files': 'a/x.ts' }] });
     write(h.fixDir, { 'fix.mbox': mbox(1) });
     const got = await verifyAndRepair(h.ctx, h.area, { mbox: join(h.fixDir, 'fix.mbox') }, h.fixDir);
-    expect(h.jobs.map((j) => j.task)).toEqual(['audit7-a-verify']);
+    expect(h.jobs.map((j) => j.task)).toEqual(['project-audit7-a-verify']);
     expect(got).toMatchObject({ ok: false, repairs: [], verify: { ok: false, timedOut: true } });
   });
 
@@ -111,7 +111,7 @@ describe('verifyAndRepair', () => {
     write(h.fixDir, { ...FAILING, 'fix.mbox': mbox(2) });
     const got = await verifyAndRepair(h.ctx, h.area, { mbox: join(h.fixDir, 'fix.mbox') }, h.fixDir);
     expect(got).toMatchObject({ ok: true, repairs: [], verify: { ok: true, baseline: ['a/store.pbt.test.ts'] } });
-    expect(h.jobs.map((j) => [j.task, j.env?.VERIFY_EXTRA])).toEqual([['audit7-a-verify', 'a/store.pbt.test.ts']]);
+    expect(h.jobs.map((j) => [j.task, j.env?.VERIFY_EXTRA])).toEqual([['project-audit7-a-verify', 'a/store.pbt.test.ts']]);
     expect(h.jobs[0]!.to).toBe(join(h.ctx.nightDir, 'jobs', 'a', `verify-baseline-${baselineKey(['a/store.pbt.test.ts'], false)}`));
     expect(h.said).toEqual(['verify a: passed (3 test files); 1 failing on the frozen tree too, set aside (a/store.pbt.test.ts)']);
     const other = join(h.ctx.nightDir, 'jobs', 'b', 'fix');

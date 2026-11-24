@@ -105,8 +105,9 @@ export const fixupLines = (fixup) => {
  */
 const localCfg = (cfg, local) => (local ? { ...cfg, claude: { ...cfg.claude, configDir: local.account } } : cfg);
 
-/** Whether a verify runs on the onto fleet: under the local runner, unless `local.fleetChecks` is false. */
-const verifiesOnFleet = (cfg) => cfg.runner === 'local' && cfg.local?.fleetChecks !== false;
+/** The project's name where a verify runs on the onto fleet (under the local runner, unless `local.fleetChecks` is
+ *  false), else false. */
+const verifiesOnFleet = (cfg) => cfg.runner === 'local' && cfg.local?.fleetChecks !== false && cfg.name;
 
 /** A model job's hand-back: its commits since `BASE` as one mbox and what it left uncommitted, then the verify step
  *  unless the job runs locally. */

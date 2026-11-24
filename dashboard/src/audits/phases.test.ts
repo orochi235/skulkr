@@ -253,6 +253,7 @@ describe('the repair step', () => {
     expect(of(done({ attempts: 0, outcome: 'passed' }), 'verify').label).toBe('passed');
     expect(of(done({ attempts: 0, outcome: 'passed' }), 'repair').label).toBe('');
     expect(of(done({ attempts: 2, outcome: 'passed' }), 'repair').label).toBe('2 repairs');
+    expect(of(done({ attempts: 2, outcome: 'passed' }), 'verify').label).toBe('failed');
     expect(of({ state: 'failed', attempts: 2, why: 'still failing after 2 repairs' }, 'repair')).toMatchObject({ label: 'still failing after 2 repairs', state: 'failed', color: phaseColor('conflict') });
   });
 

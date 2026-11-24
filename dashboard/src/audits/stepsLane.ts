@@ -44,6 +44,8 @@ function verifySpan(r: LaneStep | undefined, now: number, fix: LaneStep): SpanSt
     const text = stepText('repair', r, now);
     return { ...base, state: 'active', fill: runningFillOf(r, now), label: text, title: [`verify: ${text}`, r.now?.text ?? ''].filter(Boolean).join('\n') };
   }
+  // Once a repair has run, the verify it followed failed; how it ended after is the repair column's to say.
+  if ((r.attempts ?? 0) > 0) return { ...base, state: 'done', fill: 1, label: 'failed', title: 'verify: failed, so a repair ran' };
   const passed = r.state === 'done';
   const label = passed ? (r.outcome === 'timed out' ? 'timed out' : 'passed') : r.state === 'failed' ? r.why ?? 'failed' : 'failed';
   return { ...base, state: passed ? 'done' : 'failed', fill: 1, label, title: `verify: ${label}`, color: passed ? base.color : partColor('repair', 'conflict') };
