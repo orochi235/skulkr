@@ -27,8 +27,10 @@ const repairStep = (steps, line) => {
     // A capstone or conflict repair gets one try: one that fails its verify drops the branch from the batch.
     const once = m[1].startsWith('capstone') ? 'capstone' : m[1] === 'conflict' ? 'conflict' : null;
     const failed = once ? { state: 'failed', outcome: 'failed', why: `${once} repair failed its verify` } : { state: 'running', outcome: 'failed' };
+    // A resumed round logs a reused repair's line again, so a numbered attempt counts once.
+    const nth = /^(\d+)\/\d+$/.exec(m[1]);
     Object.assign(step, {
-      attempts: (step.attempts ?? 0) + 1, node: m[2], minutes: Number(((step.minutes ?? 0) + Number(m[4])).toFixed(1)),
+      attempts: nth ? Math.max(step.attempts ?? 0, Number(nth[1])) : (step.attempts ?? 0) + 1, node: m[2], minutes: Number(((step.minutes ?? 0) + Number(m[4])).toFixed(1)),
       ...(m[5] ? { state: 'done', outcome: 'passed' } : failed),
     });
   } else if ((m = /^repair \S+ capstone: not started, (.+)$/.exec(line))) Object.assign(step, { state: 'failed', outcome: 'failed', why: `capstone repair not started: ${m[1]}` });

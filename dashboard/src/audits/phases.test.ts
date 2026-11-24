@@ -134,6 +134,10 @@ describe('laneViewOf', () => {
     expect(stageCountsOf([fixing, fixed, leftOut])).toMatchObject({ done: 1, total: 3 });
   });
 
+  it('counts an area whose reviews have not started as waiting, not in review', () => {
+    expect(stageCountsOf([lane({}), lane({ A: running(at(25)) })]).stages).toEqual([{ phase: 'waiting', n: 1 }, { phase: 'review', n: 1 }]);
+  });
+
   it("counts a fixer past its last commit as checks and a running verify or repair as verify, as the steps view lights them", () => {
     const fixLane = (fix: LaneStep, repair?: LaneStep): AuditLane => ({ id: 'x', steps: { ...lane({ A: done({ findings: 1 }), B: done({ findings: 1 }), match: matched(1, 1, 0), fix }).steps, ...(repair ? { repair } : {}) } });
     const lanes = [
@@ -213,7 +217,7 @@ describe('the repair step', () => {
     const spans = (repair: LaneStep) => laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, repair } }, NOW);
     const verifying = spans({ ...running(at(25)), job: 'verify' });
     expect(verifying.find((s) => s.id === 'verify')).toMatchObject({ state: 'active', color: 'var(--audit-repair)' });
-    expect(verifying.find((s) => s.id === 'repair')!.state).toBe('pending');
+    expect(verifying.find((s) => s.id === 'repair')).toMatchObject({ state: 'pending', label: '' });
     const repairing = spans({ ...running(at(25)), job: 'repair', attempts: 0 });
     expect(repairing.find((s) => s.id === 'verify')).toMatchObject({ state: 'failed', color: phaseColor('conflict') });
     expect(repairing.find((s) => s.id === 'repair')!.state).toBe('active');

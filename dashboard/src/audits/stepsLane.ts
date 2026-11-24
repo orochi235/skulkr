@@ -50,8 +50,9 @@ function repairSpan(r: LaneStep | undefined, now: number): SpanStripSpan {
   }
   const tried = r?.attempts ?? 0;
   if (!r || tried === 0) {
-    const due = r?.state === 'running' || r?.state === 'failed';
-    return { ...base, state: 'pending', fill: 0, label: due && r?.state === 'running' ? 'waiting' : '', title: due ? 'repair: waiting' : 'no repair' };
+    // Waiting only once a verify has failed and no repair has started; not while the verify itself runs.
+    const due = r?.state === 'running' && r.job !== 'verify' && r.outcome === 'failed';
+    return { ...base, state: 'pending', fill: 0, label: due ? 'waiting' : '', title: due ? 'repair: waiting' : 'no repair' };
   }
   const label = r.state === 'failed' ? r.why ?? 'failed' : plural(tried, 'repair');
   const state = r.state === 'done' ? 'done' : r.state === 'failed' ? 'failed' : 'pending';

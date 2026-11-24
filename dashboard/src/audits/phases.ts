@@ -32,9 +32,9 @@ export const stepOf = (lane: AuditLane, key: LaneStepKey): LaneStep => lane.step
 
 /** Where a round's title counts an area: its phase, with a running fix split by the column the steps view lights for
  *  it, its fixer's own checks past its last commit, or the controller's verify or repair after them. */
-export type Stage = AuditPhase | 'checks' | 'repair';
-const STAGES: readonly Stage[] = ['review', 'reviewed', 'match', 'fix', 'checks', 'repair', 'patch', 'conflict'];
-export const STAGE_LABEL: Readonly<Record<Stage, string>> = { ...PHASE_LABEL, checks: 'checks', repair: 'verify' };
+export type Stage = AuditPhase | 'checks' | 'repair' | 'waiting';
+const STAGES: readonly Stage[] = ['waiting', 'review', 'reviewed', 'match', 'fix', 'checks', 'repair', 'patch', 'conflict'];
+export const STAGE_LABEL: Readonly<Record<Stage, string>> = { ...PHASE_LABEL, checks: 'checks', repair: 'verify', waiting: 'waiting' };
 
 /** Whether a fixer has made every commit it set out to and is still running: its checks. */
 export const checkingOf = (fix: LaneStep): boolean => fix.state === 'running' && !!fix.total && (fix.done ?? 0) >= fix.total;
@@ -130,6 +130,8 @@ export function agentsRunningIn(lanes: readonly AuditLane[]): number {
 
 /** An area's stage for the round's title: its live phase, a running fix told apart by `Stage`. */
 function stageOf(lane: AuditLane): Stage {
+  // An area admitted but not yet started: none of its steps has run.
+  if (Object.values(lane.steps).every((step) => step.state === 'waiting')) return 'waiting';
   const phase = livePhaseOf(lane);
   if (phase !== 'fix') return phase;
   if (repairing(lane)) return 'repair';

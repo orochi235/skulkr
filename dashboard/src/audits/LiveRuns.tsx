@@ -27,14 +27,17 @@ export interface AreaHandlers {
 }
 
 /** A running span with its node's name marked, so the name alone pulses: the label up to its separator, or all of it
- *  where it has none. */
-function withNode(span: SpanStripSpan): SpanStripSpan {
-  if (span.state !== 'active' || span.label === '') return span;
-  const at = span.label.indexOf(NODE_SEP);
-  if (at === 0) return span;
-  const end = at === -1 ? span.label.length : at;
+ *  where it has none. A lane's first step, given its area's `files`, leads with their count and the page icon in place
+ *  of the word; its label keeps the word for the tooltip and screen readers. */
+function withNode(span: SpanStripSpan, files?: number): SpanStripSpan {
+  const lead = span.id === 'A' && files !== undefined && span.label.startsWith(filesText(files)) ? filesText(files) : '';
+  const rest = span.label.slice(lead.length).replace(/^ · /, '');
+  const mark = lead ? <>{files}<Icon name={icon('ui:page')} size={11} className={s.page} />{rest ? ' · ' : ''}</> : null;
+  const at = rest.indexOf(NODE_SEP);
+  if (span.state !== 'active' || rest === '' || at === 0) return mark ? { ...span, content: <>{mark}{rest}</> } : span;
+  const end = at === -1 ? rest.length : at;
   const node = span.color && BRIGHT_FILLS.has(span.color) ? `${s.node} ${s.onBright}` : s.node;
-  return { ...span, content: <><span className={node}>{span.label.slice(0, end)}</span>{span.label.slice(end)}</> };
+  return { ...span, content: <>{mark}<span className={node}>{rest.slice(0, end)}</span>{rest.slice(end)}</> };
 }
 
 /** The capstone's runs that have failed, each with what it failed, in the shared lane's order. */
@@ -85,19 +88,11 @@ export const dotsWidthFor = (passes: number): number => {
   return columns.reduce((w, n) => w + n * 4 + (n - 1) * 2, 0) + (columns.length - 1) * 5 + 4 + 8;
 };
 
-/** The steps view's first segment with the page icon standing for the word "files"; its label keeps the word. */
-function withFileIcon(spans: SpanStripSpan[], files: number | undefined): SpanStripSpan[] {
-  if (files === undefined) return spans;
-  return spans.map((span) => (span.id === 'A' && span.label.startsWith(filesText(files))
-    ? { ...span, content: <>{files}<Icon name={icon('ui:page')} size={11} className={s.page} />{span.label.slice(filesText(files).length)}</> }
-    : span));
-}
-
 /** An area's lane as a stack row: its name, and `spans`, its steps in the view chosen. */
-function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanStripSpan[], passes: number): SpanStripsRow {
+function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanStripSpan[], passes: number, files?: number): SpanStripsRow {
   return {
     id: lane.id,
-    spans: spans.map(withNode),
+    spans: spans.map((span) => withNode(span, files)),
     'aria-label': lane.id,
     valueText: view.elapsed ? `${view.phase}, ${view.elapsed} in` : view.phase,
     lead: (
@@ -162,7 +157,7 @@ function Lanes({ run, now, mode, hideComplete, on, passes, files }: {
     }
   });
   if (lanes.length === 0) return null;
-  const rows = lanes.map(({ lane, view }) => laneRow(lane, view, on, mode === 'steps' ? withFileIcon(laneStepsOf(lane, now, files.get(lane.id)), files.get(lane.id)) : view.spans, passes.get(lane.id) ?? 0));
+  const rows = lanes.map(({ lane, view }) => laneRow(lane, view, on, mode === 'steps' ? laneStepsOf(lane, now, files.get(lane.id)) : view.spans, passes.get(lane.id) ?? 0, mode === 'steps' ? files.get(lane.id) : undefined));
   // Anywhere on a lane picks and lights its area, as its name does; the name stays the keyboard's way in.
   const areaAt = (target: EventTarget) => {
     const row = target instanceof Element ? target.closest('[role="listitem"]') : null;

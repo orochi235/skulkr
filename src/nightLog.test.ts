@@ -169,6 +169,12 @@ describe('nightLanes repair step', () => {
     expect(nightLanes(fix, ['a'], running)[0]!.steps.repair).toEqual({ state: 'running', node: 'msb-uai', since: '2026-11-20T23:00:00Z', job: 'verify' });
   });
 
+  it("counts a numbered repair once, though a resumed round logs its reused line again", () => {
+    const line = 'repair a 1/2 on local: 1 commits, 22.0 min; verify passed';
+    const log = [fix, 'verify a: failed: 1 of 9 test files failed (x.test.ts)', line, 'verify a: failed: 1 of 9 test files failed (x.test.ts)', line.replace('local: 1 commits, 22.0', 'earlier: 1 commits, 0.0')];
+    expect(nightLanes(log.join('\n'), ['a'])[0]!.steps.repair).toMatchObject({ state: 'done', attempts: 1 });
+  });
+
   it('counts a capstone repair as one more attempt', () => {
     const log = [fix, 'verify a: passed (3 test files)', 'repair a capstone on studio: 1 commits, 5.0 min; verify passed'];
     expect(nightLanes(log.join('\n'), ['a'])[0]!.steps.repair).toMatchObject({ state: 'done', attempts: 1, outcome: 'passed' });
