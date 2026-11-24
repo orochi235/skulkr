@@ -10,17 +10,24 @@ afterEach(() => {
 });
 
 describe('AreaDefects', () => {
-  it('marks a carried defect with a clock turned back, and names its other sources as they are', async () => {
-    const rounds = [{ round: 70, recorded: true, fixed: true, items: [
+  it("shows who listed each defect only in a round not yet recorded, both reviewers as ∩ and a carried one with a clock", async () => {
+    const items = [
       { claim: 'old claim', from: 'carried', verdict: 'not a defect', note: '' },
       { claim: 'new claim', from: 'A+B', verdict: 'fixed', note: '' },
-    ] }];
+    ];
+    const rounds = [{ round: 71, recorded: false, fixed: true, items }, { round: 70, recorded: true, fixed: true, items }];
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(rounds))));
     renderWithIcons(<WeaselProvider><AreaDefects urlOf={() => '/defects'} id="core.ops" version="1" /></WeaselProvider>);
-    const carried = (await screen.findByText('carried')).closest('span')!;
+    const heads = (name: string) => [...screen.getByRole('table', { name }).querySelectorAll('th')].map((th) => th.textContent);
+    await screen.findByRole('table', { name: "Round 71's defects" });
+    expect(heads("Round 71's defects")).toEqual(['verdict', 'from', 'claim']);
+    expect(heads("Round 70's defects")).toEqual(['verdict', 'claim']);
+    const carried = screen.getByText('carried').closest('span')!;
     expect(carried.title).toMatch(/earlier round/);
     expect(carried.querySelector('svg')).toBeTruthy();
-    expect(screen.getByText('A+B').querySelector('svg')).toBeNull();
+    expect(screen.getAllByText('∩')).toHaveLength(1);
+    expect(screen.getAllByText("won't fix")).toHaveLength(2);
+    expect(screen.queryByText('not a defect')).toBeNull();
   });
 
   it("lists each round's defects as rows, and makes only a claim with more to read a button", async () => {
