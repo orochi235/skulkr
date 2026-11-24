@@ -12,6 +12,7 @@ import { localFixLine, localFixOf, localLine, parseArgs } from './args.mjs';
 import { strandedHoldFor, strandedRoundsFor } from './stranded.mjs';
 import { capstoneRepairer, repairRefusal } from './capstone.mjs';
 import { gateBaseline } from './repair.mjs';
+import { conflictRepairer } from './conflict.mjs';
 import { checksFor } from './preflight.mjs';
 import { gateAhead } from './fleet.mjs';
 import { areasAtOnce, startAreas } from './admit.mjs';
@@ -213,7 +214,8 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     const baseline = verifyOf(cfg) ? gateBaseline(ctx) : undefined;
     const checks = checksFor(ctx);
     const mayRepair = (started) => repairRefusal({ stopped: ctx.stopped(), used: status.costUsd, started, fix: args.budget.fix, cap: args.capUsd });
-    const landing = { cfg, root, git, round: p.round, commit: p.commit, date: ctx.date, nightDir: status.nightDir, outcomes, say, merge: args.merge, repair, mayRepair, baseline, checks,
+    const resolve = cfg.conflicts?.repair ? conflictRepairer(ctx, { root }) : undefined;
+    const landing = { cfg, root, git, round: p.round, commit: p.commit, date: ctx.date, nightDir: status.nightDir, outcomes, say, merge: args.merge, repair, resolve, mayRepair, baseline, checks,
       onLanded: (landed, early = false) => {
         status.landed = { tip: landed.tip, areas: [...new Set([...(status.landed?.areas ?? []), ...landed.areas])], ...(early ? { early: true } : {}) };
         writeStatus(p.round, status, cfg.state);

@@ -53,6 +53,17 @@ describe('the local runner', () => {
     expect(readFileSync(join(third.to, 'a.txt'), 'utf8')).toBe('a\n');
   });
 
+  it("runs a job on its working tree's own commit and edits, not on the ref it syncs against", async () => {
+    const s = setup();
+    writeFileSync(join(s.frozen, 'b.txt'), 'b\n');
+    git(s.frozen, 'add', '-A');
+    git(s.frozen, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'two');
+    writeFileSync(join(s.frozen, 'b.txt'), 'b edited\n');
+    rmSync(join(s.frozen, 'a.txt'));
+    const r = await run(s, 'mkdir -p .skulkr/out; cat b.txt > .skulkr/out/got; ls a.txt 2>/dev/null >> .skulkr/out/got; true');
+    expect(readFileSync(join(r.to, 'got'), 'utf8')).toBe('b edited\n');
+  });
+
   it('hands a fixer a tree that commits to the frozen tree', async () => {
     const s = setup();
     const frozenTree = git(s.frozen, 'rev-parse', 'HEAD^{tree}');

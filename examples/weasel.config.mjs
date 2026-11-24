@@ -60,7 +60,8 @@ const FIXUP = [
   'true',
 ].join('; ');
 
-const NVM = 'export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"; . "$NVM_DIR/nvm.sh" >/dev/null; nvm use >/dev/null';
+// `nvm use` swaps its own PATH entry in place, so a Node earlier on PATH (Homebrew's, on this Mac) still won.
+const NVM = 'export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"; . "$NVM_DIR/nvm.sh" >/dev/null; nvm use >/dev/null; export PATH="$NVM_BIN:$PATH"';
 
 const config = {
   name: 'weasel',
@@ -197,14 +198,15 @@ const config = {
   icons,
 };
 
-// Local mode runs the gate on this machine: weasel's own suite, in the batch's tree, with the reporter that prints its
+// Local mode runs the gate on this machine: weasel's own suite, in the batch's tree given an install of its own from
+// npm's cache (linking the main checkout's leaves vite refusing to serve files from outside the tree), on its pinned Node, with the reporter that prints its
 // `fleet-fail:` lines, after a preflight that no longer tells it `--no-checks` (README "Local mode").
 export default {
   ...config,
   local: {
     override: {
       gate: {
-        name: 'test', command: ['npm', 'test', '--', '--reporter=default', '--reporter=./scripts/vitest-fleet-fail.mjs'], cwd: 'batch',
+        name: 'test', command: ['bash', '-c', `${NVM}; npm ci --no-audit --no-fund && npm test -- --reporter=default --reporter=./scripts/vitest-fleet-fail.mjs`], cwd: 'batch',
         progress: { tests: '' }, failPrefix: 'fleet-fail:', blame: blameStep,
       },
       checks: { ...config.checks, preflight: { ...config.checks.preflight, gateArgs: [] } },

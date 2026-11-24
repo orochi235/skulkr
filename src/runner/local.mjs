@@ -43,13 +43,19 @@ const leaseTree = (state, source) => {
   }
 };
 
-/** Makes `dir` hold exactly `ref`'s tree plus what `from` has that git does not track (its `.skulkr/in` above all). */
-const syncTree = (dir, from, ref) => {
-  git(dir, ['checkout', '-q', '-f', '--detach', ref]);
+/**
+ * Makes `dir` hold exactly what `from`'s working tree holds: its `HEAD`, the tracked files it changed or deleted, and
+ * what git does not track (its `.skulkr/in` above all). A job's `ref` is only what an onto node syncs against, so it
+ * is not the tree: a batch's preflight runs from the batch's worktree with `main`'s merge base as its `ref`.
+ */
+const syncTree = (dir, from) => {
+  git(dir, ['checkout', '-q', '-f', '--detach', git(from, ['rev-parse', 'HEAD'])]);
   git(dir, ['clean', '-ffdqx', '-e', 'node_modules']);
-  const untracked = execFileSync('git', ['-C', from, 'ls-files', '-o', '--exclude-standard', '-z'], { encoding: 'utf8' })
-    .split('\0').filter(Boolean);
-  for (const path of untracked) cpSync(join(from, path), join(dir, path), { recursive: true });
+  const paths = (...args) => execFileSync('git', ['-C', from, ...args, '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean);
+  for (const path of [...paths('ls-files', '-o', '--exclude-standard'), ...paths('diff', '--name-only', '--diff-filter=d', 'HEAD')]) {
+    cpSync(join(from, path), join(dir, path), { recursive: true });
+  }
+  for (const path of paths('diff', '--name-only', '--diff-filter=D', 'HEAD')) rmSync(join(dir, path), { force: true });
   if (existsSync(join(from, JOB_IN))) cpSync(join(from, JOB_IN), join(dir, JOB_IN), { recursive: true });
 };
 
@@ -165,7 +171,7 @@ export const createLocalRunner = (cfg, { graceMs } = {}) => {
       let tree;
       try {
         tree = leaseTree(cfg.state, git(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']));
-        syncTree(tree.dir, cwd, job.ref ?? git(cwd, ['rev-parse', 'HEAD']));
+        syncTree(tree.dir, cwd);
         // A job outliving this process (killed with SIGKILL) keeps its tree and its record alive by its group.
         const onSpawn = (group) => {
           amendLease(tree.lease, { group });
