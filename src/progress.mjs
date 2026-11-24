@@ -4,14 +4,16 @@
  * would have put it. Runs on the node, from `.skulkr/in`, so it imports nothing outside node itself.
  *
  *   node progress.mjs <files.txt> <result.json>      a reviewer: each listed file it first reads
- *   node progress.mjs --commits <n> [--checks <checks.json>] <result.json>
+ *   node progress.mjs --commits <n> [--checks <checks.json>] [--proof <file>] <result.json>
  *       a fixer: each commit it makes, of its n findings, then, given the config's `checks.tally` patterns, each
- *       check it runs (`checks`) and the tests they pass (`tests`)
+ *       check it runs (`checks`) and the tests they pass (`tests`); with `--proof`, the commit its final check last
+ *       passed at, written to `<file>` and removed when one fails, so the hand-back's verify need not run them again
  *
  * A fixer's stream also gets `skulkr: <text>` lines, which onto ignores and the local runner keeps as the job's `now`:
  * each command it starts, each commit with its subject, and each check's result with the tests that failed.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
@@ -241,6 +243,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const commits = argv[0] === '--commits';
   const tallyAt = argv.indexOf('--checks');
   const tally = tallyAt >= 0 ? JSON.parse(readFileSync(argv[tallyAt + 1], 'utf8')) : null;
+  const proofAt = argv.indexOf('--proof');
+  const proof = proofAt >= 0 ? argv[proofAt + 1] : null;
   const resultPath = argv.at(-1);
   const { start, feed } = commits
     ? createCommitProgress(Number(argv[1]), tally)
@@ -251,6 +255,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   for await (const line of createInterface({ input: process.stdin, crlfDelay: Infinity })) {
     const { progress, result } = feed(line);
     if (progress) process.stdout.write(`${progress}\n`);
+    if (proof && /^skulkr: final: passed$/m.test(progress ?? '')) {
+      try { writeFileSync(proof, `${execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()}\n`); } catch { rmSync(proof, { force: true }); }
+    } else if (proof && /^skulkr: final: failed$/m.test(progress ?? '')) rmSync(proof, { force: true });
     if (result !== undefined) writeFileSync(resultPath, `${result}\n`);
   }
 }

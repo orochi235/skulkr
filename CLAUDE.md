@@ -110,6 +110,9 @@ weasel cutover.
     area giving up its place once it has reviewed and matched (README "Limits", 2026-11-24).
   - under the local runner only: `local.agents` model jobs at once across roles, and review slots defaulting to it
     (README "Local mode"); the map's running `repair` step naming its `job`, verify or repair (2026-11-24).
+  - under the local runner only, each verify on the onto fleet where it can take it (README "Local mode"); and the
+    fixer verify skipping weasel's checks where the fixer's own `checks:gate` passed at that commit with nothing left
+    uncommitted (`progress.mjs --proof`, `$VERIFY_PROVEN`), for every runner (2026-11-24).
   - a run waiting for a place asking the area limit again every 30 seconds, so a raised `limits.json` reaches it
     before an area finishes (2026-11-24).
   Everything else stays at parity.

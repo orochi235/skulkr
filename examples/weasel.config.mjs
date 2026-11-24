@@ -133,7 +133,8 @@ const config = {
     // steps), so the fleet gate runs only tests (2026-11-22). Last, `check:unnameable` on the packages the changes are
     // in, built first: it reads `dist`, so it otherwise first ran at the gate's full build (2026-11-23).
     verify: {
-      command: `npx vitest related --run --maxWorkers=4 ${['!gate', ...BROWSER_PROJECTS.map((p) => `!${p}`)].map((p) => `--project='${p}'`).join(' ')} {files}; s=$?; ${CHECKS} || s=1; npm run -s check:unnameable -- --build {files} || s=1; exit $s`,
+      // The checks are skipped where the fixer's own `checks:gate`, the same checks, passed at this commit (2026-11-24).
+      command: `npx vitest related --run --maxWorkers=4 ${['!gate', ...BROWSER_PROJECTS.map((p) => `!${p}`)].map((p) => `--project='${p}'`).join(' ')} {files}; s=$?; if [ -n "$VERIFY_PROVEN" ]; then echo "skulkr: checks:gate passed at this commit in the fixer's own run; not run again"; else ${CHECKS} || s=1; fi; npm run -s check:unnameable -- --build {files} || s=1; exit $s`,
       gui: {
         probe: `npx vitest list --filesOnly ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {related}`,
         command: `npx vitest related --run --maxWorkers=2 ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {files}`,

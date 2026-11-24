@@ -5,7 +5,7 @@
  * verdict is the command's exit status and the runner's file-level counts.
  */
 import { join } from 'node:path';
-import { JOB_OUT } from './config.mjs';
+import { CHECKS_PROOF, JOB_OUT } from './config.mjs';
 import { stripAnsi } from './ansi.mjs';
 import { q, readIf } from './text.mjs';
 
@@ -25,20 +25,50 @@ const filled = (template) => template.replaceAll('{files}', '$VERIFY_FILES').rep
  * Shell lines that run `command` over the files changed since `$BASE` (and `$VERIFY_EXTRA`, files the caller adds),
  * writing `verify.log`, `verify.exit`, and `verify.files` under the job's output, then, when `probe` is given, the
  * probe's answer to `gui.txt` and its exit to `gui.exit`. Uncommitted changes are dropped first, so what is checked
- * is what the commits hold: a model job records them before. They expect `set +e`.
+ * is what the commits hold: a model job records them before. They expect `set +e`. With `fleet`, the command runs on
+ * the onto fleet ({@link fleetRunLines}), on a GUI node with `gui`, and here where the fleet cannot take it.
  */
-export const verifyLines = (verify, { command = verify.command, probe = verify.gui?.probe } = {}) => [
+export const verifyLines = (verify, { command = verify.command, probe = verify.gui?.probe, fleet = false, gui = false } = {}) => [
   'git reset -q --hard HEAD && git clean -qfd -e .skulkr/',
   `VERIFY_FILES=$( { git diff --name-only --diff-filter=d "$BASE..HEAD"; for f in \${VERIFY_EXTRA:-}; do [ -e "$f" ] && echo "$f"; done; } | sort -u | tr '\\n' ' ' | sed 's/ *$//')`,
   'VERIFY_RELATED=$(for f in $VERIFY_FILES; do printf -- "--related=%s " "$f"; done)',
-  'export VERIFY_FILES VERIFY_RELATED',
+  // The fixer's own final check passed at this very commit, with nothing left uncommitted (`progress.mjs --proof`):
+  // a verify command may skip running it again.
+  `VERIFY_PROVEN=$( [ -s ${JOB_OUT}/${CHECKS_PROOF} ] && [ ! -s ${JOB_OUT}/uncommitted.txt ] && [ "$(cat ${JOB_OUT}/${CHECKS_PROOF})" = "$(git rev-parse HEAD)" ] && echo 1 )`,
+  'export VERIFY_FILES VERIFY_RELATED VERIFY_PROVEN',
   `echo "$VERIFY_FILES" > ${JOB_OUT}/verify.files`,
   'if [ -z "$VERIFY_FILES" ]; then',
   `  echo "no files changed" > ${JOB_OUT}/verify.log; echo 0 > ${JOB_OUT}/verify.exit`,
   'else',
-  `  perl -e 'alarm shift; exec @ARGV' ${(verify.timeoutMin ?? 20) * 60} bash -c ${q(filled(command))} > ${JOB_OUT}/verify.log 2>&1; echo $? > ${JOB_OUT}/verify.exit`,
+  ...(fleet ? fleetRunLines(filled(command), verify.timeoutMin ?? 20, gui) : [`  ${localRun(filled(command), verify.timeoutMin ?? 20)}`]),
   ...(probe ? [`  perl -e 'alarm shift; exec @ARGV' ${PROBE_SECONDS} bash -c ${q(filled(probe))} > ${JOB_OUT}/gui.txt 2> ${JOB_OUT}/gui.err; echo $? > ${JOB_OUT}/gui.exit`] : []),
   'fi',
+];
+
+/** `command` run here, killed after `minutes`, its output in `verify.log` and its exit in `verify.exit`. */
+const localRun = (command, minutes) =>
+  `perl -e 'alarm shift; exec @ARGV' ${minutes * 60} bash -c ${q(command)} > ${JOB_OUT}/verify.log 2>&1; echo $? > ${JOB_OUT}/verify.exit`;
+
+/** What onto prints when the job it placed ended, as against onto itself failing to place or sync it. */
+const ONTO_RAN = '^onto do: job (exited|timed out|was killed)';
+
+/**
+ * `command` on the onto fleet, from a local runner's tree: under its project's `origin` URL, added to the tree as the
+ * `fleet` remote since onto syncs only to a remote the tree names, so commits never pushed reach the node all the
+ * same. Where `onto` is missing, the project has no remote URL, or onto fails before the job runs, it runs here.
+ */
+export const fleetRunLines = (command, minutes, gui = false) => [
+  '  FLEET_URL=$(git -C "$(git remote get-url origin)" remote get-url origin 2>/dev/null); case "$FLEET_URL" in /*) FLEET_URL= ;; esac',
+  '  if [ -n "$FLEET_URL" ] && command -v onto >/dev/null; then',
+  '    git remote get-url fleet >/dev/null 2>&1 || git remote add fleet "$FLEET_URL"',
+  `    onto do --kind test --task "skulkr-verify-$(git rev-parse --short=10 HEAD)${gui ? '-gui' : ''}" --expect ${minutes}m --timeout ${minutes}m --about ${q(`skulkr: verify a fix's commits${gui ? ' (browser tests)' : ''} off the machine running the round`)} --repo "$FLEET_URL" --env VERIFY_FILES="$VERIFY_FILES" --env VERIFY_RELATED="$VERIFY_RELATED" --env VERIFY_PROVEN="$VERIFY_PROVEN"${gui ? ' --gui' : ''} -- bash -c ${q(command)} > ${JOB_OUT}/verify.log 2>&1; echo $? > ${JOB_OUT}/verify.exit`,
+  `    if [ "$(cat ${JOB_OUT}/verify.exit)" != 0 ] && ! grep -qE ${q(ONTO_RAN)} ${JOB_OUT}/verify.log; then`,
+  `      mv ${JOB_OUT}/verify.log ${JOB_OUT}/verify-fleet.log; echo "skulkr: the fleet did not take the verify; running it here"`,
+  `      ${localRun(command, minutes)}`,
+  '    fi',
+  '  else',
+  `    ${localRun(command, minutes)}`,
+  '  fi',
 ];
 
 /** A test file's path in a line of runner output. */

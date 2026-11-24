@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -113,6 +113,21 @@ describe('createCommitProgress checks', () => {
   });
   const result = (id: string, text: string) => JSON.stringify({
     type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: text }] },
+  });
+
+  it('records the commit its final check passed at with --proof, and drops it once that check fails', () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'skulkr-progress-')));
+    dirs.push(dir);
+    const git = (...args: string[]) => spawnSync('git', args, { cwd: dir, encoding: 'utf8' }).stdout.trim();
+    git('init', '-q', '-b', 'main');
+    git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'base');
+    writeFileSync(join(dir, 'checks.json'), JSON.stringify(weaselConfig().checks.tally));
+    const run = (...lines: string[]) => spawnSync(process.execPath, [SCRIPT, '--commits', '1', '--checks', 'checks.json', '--proof', 'proof', 'claude.json'], { cwd: dir, input: lines.join('\n'), encoding: 'utf8' });
+    const failed = JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'g2', is_error: true, content: 'checks:gate: 1 failed' }] } });
+    expect(run(bash('g1', 'npm run checks:gate'), result('g1', 'checks:gate: all 33 passed')).status).toBe(0);
+    expect(readFileSync(join(dir, 'proof'), 'utf8').trim()).toBe(git('rev-parse', 'HEAD'));
+    run(bash('g2', 'npm run checks:gate'), failed);
+    expect(existsSync(join(dir, 'proof'))).toBe(false);
   });
 
   it('reports the checks a fixer runs, of those its commits call for, and their tests, in onto\'s protocol', () => {

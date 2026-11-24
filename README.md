@@ -418,6 +418,7 @@ the account that started the run. Every job (reviews, matches, fixes, repairs) a
 | `main` | fast-forwarded locally, never pushed (`git.push` is off) |
 | Model jobs | refused `WebFetch` and `WebSearch`, beside each role's own refusals |
 | Agents | under the local runner, at most `local.agents` model jobs (default 6) at once, whatever their role, each also holding its role's slot; `"agents"` in `limits.json` changes it for runs already going. A verify job runs no model and holds none (2026-11-24) |
+| Verify | under the local runner, each verify (a fixer's hand-back, a verify or GUI verify job, a baseline) runs on the onto fleet with `onto do --kind test`, under the project's `origin` URL, added to the job's tree as its `fleet` remote, so unpushed commits reach the node. It runs here where `onto` is missing, `origin` is no URL, or onto fails before the job starts; `local.fleetChecks: false` keeps every verify here (2026-11-24) |
 | The run's environment | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` (no telemetry, error reports, or updates) and `npm_config_offline=true` (`npm ci` and `npx` use only npm's cache, and fail rather than download), inherited by every job and command the run starts |
 
 skulkr cannot see what a project's own commands do. A gate or preflight that sends work to a fleet still does, so

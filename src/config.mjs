@@ -13,6 +13,8 @@ export const CONFIG_FILE = 'skulkr.config.mjs';
 /** Inside the frozen tree and every node tree: what a job reads, and what it hands back. */
 export const JOB_IN = '.skulkr/in';
 export const JOB_OUT = '.skulkr/out';
+/** Where in `JOB_OUT` a fixer's progress filter records the commit its final check last passed at. */
+export const CHECKS_PROOF = 'checks.passed';
 
 const DEFAULT_BRIEFS = new URL('../briefs/', import.meta.url);
 
@@ -162,8 +164,11 @@ export const DEFAULTS = {
    * `override` replaces, key by key at the top level, the config's settings that reach off the machine (a gate that
    * runs on a fleet); it is read only in local mode.
    */
-  /** `agents`: model jobs (reviews, matches, fixers, repairs) at once under the local runner, across every role. */
-  local: { enabled: false, agents: 6, override: {} },
+  /**
+   * `agents`: model jobs (reviews, matches, fixers, repairs) at once under the local runner, across every role.
+   * `fleetChecks`: under the local runner, each verify on the onto fleet where onto can take it, else here.
+   */
+  local: { enabled: false, agents: 6, fleetChecks: true, override: {} },
   /**
    * Jobs at once across every node, by role, under a runner that places jobs itself (onto). Unset: the per-node
    * slots times the nodes listed, or one node's slots when none are.

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -139,6 +139,78 @@ describe('verifyLines in bash', () => {
     expect(out('verify.log')).toBe('files: a.ts\n2');
     expect(out('gui.txt')).toBe('--related=a.ts');
     expect(existsSync(join(tree, 'x.test.ts'))).toBe(false);
+  });
+
+  it("says the fixer's final check is proven only where it passed at HEAD with nothing left uncommitted", () => {
+    const tree = jobOut({});
+    git(tree, 'init', '-q', '-b', 'main');
+    writeFileSync(join(tree, 'a.ts'), '1');
+    git(tree, 'add', '-A');
+    git(tree, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'base');
+    const base = git(tree, 'rev-parse', 'HEAD');
+    writeFileSync(join(tree, 'a.ts'), '2');
+    git(tree, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qam', 'fix');
+    const head = git(tree, 'rev-parse', 'HEAD');
+    const proven = (proof: string | null, uncommitted = '') => {
+      rmSync(join(tree, '.skulkr/out'), { recursive: true, force: true });
+      mkdirSync(join(tree, '.skulkr/out'), { recursive: true });
+      if (proof !== null) writeFileSync(join(tree, '.skulkr/out/checks.passed'), `${proof}\n`);
+      writeFileSync(join(tree, '.skulkr/out/uncommitted.txt'), uncommitted);
+      const script = ['set +e', ...verifyLines({ command: 'echo "proven=$VERIFY_PROVEN"' })].join('\n');
+      execFileSync('bash', ['-c', script], { cwd: tree, env: { ...process.env, BASE: base } });
+      return readFileSync(join(tree, '.skulkr/out/verify.log'), 'utf8').trim();
+    };
+    expect(proven(head)).toBe('proven=1');
+    expect(proven(base)).toBe('proven=');
+    expect(proven(null)).toBe('proven=');
+    expect(proven(head, ' M a.ts\n')).toBe('proven=');
+  });
+});
+
+describe('verifyLines on the fleet', () => {
+  const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+
+  /** A local runner's tree: a clone of a project whose own origin is a URL, with one commit since BASE. */
+  const tree = () => {
+    const project = jobOut({});
+    git(project, 'init', '-q', '-b', 'main');
+    git(project, 'remote', 'add', 'origin', 'git@example.com:me/project.git');
+    writeFileSync(join(project, 'a.ts'), '1');
+    git(project, 'add', '-A');
+    git(project, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'base');
+    const dir = mkdtempSync(join(tmpdir(), 'skulkr-fleet-tree-'));
+    dirs.push(dir);
+    execFileSync('git', ['clone', '-q', '--shared', project, dir]);
+    const base = git(dir, 'rev-parse', 'HEAD');
+    writeFileSync(join(dir, 'a.ts'), '2');
+    git(dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qam', 'fix');
+    return { dir, base };
+  };
+  /** Runs the lines with `onto` as `script` (none when null) and answers verify.exit, verify.log and what onto got. */
+  const run = (script: string | null) => {
+    const { dir, base } = tree();
+    const bin = mkdtempSync(join(tmpdir(), 'skulkr-fake-onto-'));
+    dirs.push(bin);
+    if (script !== null) writeFileSync(join(bin, 'onto'), `#!/bin/bash\necho "$@" > ${join(bin, 'args')}\n${script}\n`, { mode: 0o755 });
+    const lines = verifyLines({ command: 'echo "ran here: {files}"; exit 4' }, { fleet: true, probe: null });
+    execFileSync('bash', ['-c', ['mkdir -p .skulkr/out', 'set +e', ...lines].join('\n')], { cwd: dir, env: { ...process.env, BASE: base, PATH: `${bin}:/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin` } });
+    const out = (f: string) => readFileSync(join(dir, '.skulkr/out', f), 'utf8').trim();
+    return { exit: out('verify.exit'), log: out('verify.log'), args: existsSync(join(bin, 'args')) ? readFileSync(join(bin, 'args'), 'utf8') : '', remote: git(dir, 'remote', 'get-url', 'fleet') };
+  };
+
+  it("sends the command to onto under the project's URL, and keeps the job's own exit", () => {
+    const r = run('echo "onto do: job exited 3 on studio"; exit 3');
+    expect(r.exit).toBe('3');
+    expect(r.log).toBe('onto do: job exited 3 on studio');
+    expect(r.args).toContain('--repo git@example.com:me/project.git');
+    expect(r.args).toContain('--env VERIFY_FILES=a.ts');
+    expect(r.remote).toBe('git@example.com:me/project.git');
+  });
+
+  it('runs the command here where onto fails before its job runs', () => {
+    const r = run('echo "onto do: no node has room"; exit 1');
+    expect(r.exit).toBe('4');
+    expect(r.log).toBe('ran here: a.ts');
   });
 });
 

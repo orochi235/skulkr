@@ -4,7 +4,7 @@
  */
 import { createWriteStream, existsSync, mkdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { JOB_IN, JOB_OUT } from './config.mjs';
+import { CHECKS_PROOF, JOB_IN, JOB_OUT } from './config.mjs';
 import { sleep } from './after.mjs';
 import { q, readIf } from './text.mjs';
 import { verifyLines, verifyOf } from './verify.mjs';
@@ -105,16 +105,20 @@ export const fixupLines = (fixup) => {
  */
 const localCfg = (cfg, local) => (local ? { ...cfg, claude: { ...cfg.claude, configDir: local.account } } : cfg);
 
+/** Whether a verify runs on the onto fleet: under the local runner, unless `local.fleetChecks` is false. */
+const verifiesOnFleet = (cfg) => cfg.runner === 'local' && cfg.local?.fleetChecks !== false;
+
 /** A model job's hand-back: its commits since `BASE` as one mbox and what it left uncommitted, then the verify step
  *  unless the job runs locally. */
 const handBackLines = (cfg, local) => {
   const verify = local ? null : verifyOf(cfg);
+  const fleet = verifiesOnFleet(cfg);
   return [
     `git status --porcelain > ${JOB_OUT}/uncommitted.txt`,
     ...fixupLines(cfg.checks.fixup),
     `git format-patch --stdout "$BASE..HEAD" > ${JOB_OUT}/fix.mbox`,
     // The progress reader's `now`: the fixer is done, and what runs now is skulkr's verify.
-    ...(verify ? ['echo "skulkr: verifying the fixer\'s commits"', ...verifyLines(verify)] : []),
+    ...(verify ? ['echo "skulkr: verifying the fixer\'s commits"', ...verifyLines(verify, { fleet })] : []),
     'exit 0',
   ];
 };
@@ -127,7 +131,7 @@ const handBackLines = (cfg, local) => {
 export const fixShell = (cfg, area, budgetUsd, findings, local = null) =>
   [
     'set -e', ...prelude(cfg), fresh, ...treeLines(cfg), 'set +e',
-    agentLine(localCfg(cfg, local), 'fix', `${JOB_IN}/${area}/fix.md`, budgetUsd, `--commits ${findings} --checks ${CHECKS_IN}`),
+    agentLine(localCfg(cfg, local), 'fix', `${JOB_IN}/${area}/fix.md`, budgetUsd, `--commits ${findings} --checks ${CHECKS_IN} --proof ${JOB_OUT}/${CHECKS_PROOF}`),
     ...handBackLines(cfg, local),
   ].join('\n');
 
@@ -148,7 +152,7 @@ export const verifyShell = (cfg, area, { gui = false } = {}) => {
   const verify = verifyOf(cfg);
   return [
     'set -e', ...prelude(cfg), fresh, ...treeLines(cfg), ...applyLines(area), 'set +e',
-    ...verifyLines(verify, gui ? { command: verify.gui.command, probe: null } : {}),
+    ...verifyLines(verify, gui ? { command: verify.gui.command, probe: null, fleet: verifiesOnFleet(cfg), gui } : { fleet: verifiesOnFleet(cfg) }),
     'exit 0',
   ].join('\n');
 };
@@ -161,7 +165,7 @@ export const baselineShell = (cfg, { gui = false } = {}) => {
   const verify = verifyOf(cfg);
   return [
     'set -e', ...prelude(cfg), fresh, ...treeLines(cfg), 'set +e',
-    ...verifyLines(verify, gui ? { command: verify.gui.command, probe: null } : { probe: null }),
+    ...verifyLines(verify, gui ? { command: verify.gui.command, probe: null, fleet: verifiesOnFleet(cfg), gui } : { probe: null, fleet: verifiesOnFleet(cfg) }),
     'exit 0',
   ].join('\n');
 };
