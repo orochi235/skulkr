@@ -159,7 +159,9 @@ describe('laneStepsOf', () => {
   it('gives every step one equal column, filled by its state, a running one by its share of the typical time', () => {
     const spans = laneStepsOf(lane({ A: done({ findings: 5, minutes: 3 }), B: running(at(27.5)), match: W }), NOW);
     expect(spans.map((s) => [s.id, s.ms, s.fill])).toEqual([['A', 1, 1], ['B', 1, 0.5], ['match', 1, 0], ['fix', 1, 0], ['checks', 0.5, 0], ['patch', 0.6, 0]]);
-    expect(spans.filter((s) => s.id !== 'checks').map((s) => s.color)).toEqual(['review', 'reviewed', 'match', 'fix', 'patch'].map((p) => phaseColor(p as never)));
+    // The finished review is dark gray; the rest wear their phases.
+    expect(spans.filter((s) => s.id !== 'checks').map((s) => s.color)).toEqual(['var(--audit-stage-done)', ...['reviewed', 'match', 'fix', 'patch'].map((p) => phaseColor(p as never))]);
+    expect(spans[0]!.ink).toBe('var(--audit-stage-done-ink)');
     expect(spans[1]!.label).toBe('studio · 2.5 min');
     expect(spans[2]!.label).toBe('');
   });

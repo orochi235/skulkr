@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from '
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createCommitProgress, createProgress } from './progress.mjs';
+import { commitSubject, createCommitProgress, createProgress } from './progress.mjs';
 import { claude } from './agent/claude.mjs';
 
 const parseEnvelope = claude.resultOf;
@@ -97,11 +97,12 @@ describe('createCommitProgress', () => {
 
   it('steps once per git commit the fixer runs, out of its findings, and holds there past them', () => {
     const { start, feed } = createCommitProgress(2);
+    const counts = (line: string) => (feed(line).progress ?? '').split('\n').filter((l) => l.startsWith('onto:'));
     expect(start).toBe('onto: progress 0/2');
-    expect(feed(bash('npx vitest run a.test.ts')).progress).toBeUndefined();
-    expect(feed(bash('git add -A && git commit -m one')).progress).toBe('onto: progress 1/2');
-    expect(feed(bash('git -c user.name=a commit -q -m two')).progress).toBe('onto: progress 2/2');
-    expect(feed(bash('git commit -m fixup')).progress).toBeUndefined();
+    expect(counts(bash('npx vitest run a.test.ts'))).toEqual([]);
+    expect(counts(bash('git add -A && git commit -m one'))).toEqual(['onto: progress 1/2']);
+    expect(counts(bash('git -c user.name=a commit -q -m two'))).toEqual(['onto: progress 2/2']);
+    expect(counts(bash('git commit -m fixup'))).toEqual([]);
     expect(feed('{"type":"result","result":"ok"}').result).toBe('{"type":"result","result":"ok"}');
   });
 });
@@ -127,7 +128,7 @@ describe('createCommitProgress checks', () => {
       result('l1', 'lint ok'),
       bash('g1', 'npm run checks:gate'),
       result('g1', 'all 32 passed'),
-    ].flatMap((line) => (feed(line).progress ?? '').split('\n').filter(Boolean));
+    ].flatMap((line) => (feed(line).progress ?? '').split('\n').filter((l) => l.startsWith('onto:')));
     expect(lines).toEqual([
       'onto: progress 1/1',
       'onto: progress 23/23 tests', 'onto: failed 1/23 tests',
@@ -157,6 +158,35 @@ describe('createCommitProgress checks', () => {
 
   it('reports only commits without a tally', () => {
     const { feed } = createCommitProgress(2);
-    expect(feed(bash('t1', 'npx vitest run a.test.ts')).progress).toBeUndefined();
+    expect(feed(bash('t1', 'npx vitest run a.test.ts')).progress).toBe('skulkr: running: npx vitest run a.test.ts');
+  });
+
+  it('names what the fixer runs, each commit by its subject, and each check by how it went', () => {
+    const { feed } = createCommitProgress(1, weaselConfig().checks.tally);
+    const notes = [
+      bash('c1', 'git add -A && git commit -q -m "fix the arc\'s winding" -- packages/geom/src/a.ts packages/geom/src/a.test.ts'),
+      result('c1', ''),
+      bash('t1', 'npx vitest run --maxWorkers=1 packages/geom/src/a.test.ts'),
+      JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't1', is_error: true, content:
+        ' FAIL  packages/geom/src/a.test.ts > arc > winds clockwise\n FAIL  packages/geom/src/a.test.ts > arc > closes\n      Tests  2 failed | 21 passed (23)\n' }] } }),
+      bash('c2', "git commit -m 'fixup'"),
+      bash('l1', 'npm run lint -w @weasel-js/geom'),
+      result('l1', 'lint ok'),
+    ].flatMap((line) => (feed(line).progress ?? '').split('\n').filter((l) => l.startsWith('skulkr:')));
+    expect(notes).toEqual([
+      'skulkr: commit 1/1: fix the arc\'s winding',
+      'skulkr: running: npx vitest run --maxWorkers=1 packages/geom/src/a.test.ts',
+      'skulkr: test packages/geom/src/a.test.ts: 2 failed of 23 (packages/geom/src/a.test.ts > arc > winds clockwise; packages/geom/src/a.test.ts > arc > closes)',
+      'skulkr: fixup commit: fixup',
+      'skulkr: running: npm run lint -w @weasel-js/geom',
+      'skulkr: lint geom: passed',
+    ]);
+  });
+
+  it('reads a commit subject from each way a message is quoted', () => {
+    expect(commitSubject('git commit -m "a b"')).toBe('a b');
+    expect(commitSubject("git commit -qm 'a b' -- x")).toBe('a b');
+    expect(commitSubject("git commit -m $'a b\\nbody'")).toBe('a b');
+    expect(commitSubject('git commit -F msg.txt')).toBe('');
   });
 });

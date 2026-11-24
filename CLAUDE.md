@@ -101,6 +101,8 @@ weasel cutover.
     job resolves it, its outcome `merged after a conflict repair` and `conflictRepaired` on its `area.json`; left out,
     as before, only when that fails, with `; its conflict repair failed` on its why. The map takes a branch off its
     conflict when the log says a conflict repair merged it, or git says it is in `main` or its round's batch.
+  - the run's heartbeat lines (`job …`), a fixer's `skulkr:` lines in its log, a relaunched job's log marker, and a
+    running fix step's `checks`, `tests` and `now` on the map (README "Watching a run", 2026-11-24).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

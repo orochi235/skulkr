@@ -100,10 +100,13 @@ const runShell = (shell, { cwd, env, log, timeoutMs, graceMs = KILL_GRACE_MS, on
       onSpawn?.(child.pid);
     }
     child.stdout.pipe(log, { end: false });
-    if (onProgress) child.stdout.on('data', (chunk) => {
-      const last = latestProgress(String(chunk));
-      if (last) onProgress(last);
-    });
+    if (onProgress) {
+      const reading = createProgressReader();
+      child.stdout.on('data', (chunk) => {
+        const now = reading.feed(String(chunk));
+        if (now) onProgress(now);
+      });
+    }
     child.stderr.pipe(log, { end: false });
     let kill;
     const timer = timeoutMs && setTimeout(() => {
@@ -123,11 +126,44 @@ const runShell = (shell, { cwd, env, log, timeoutMs, graceMs = KILL_GRACE_MS, on
     });
   });
 
-/** The last `onto: progress N/M` count in `text`, the protocol a job's progress filter speaks, as `{ done, total }`. */
-export const latestProgress = (text) => {
-  const all = [...text.matchAll(/^onto: progress (\d+)\/(\d+)\b/gm)];
-  const m = all.at(-1);
-  return m ? { done: Number(m[1]), total: Number(m[2]) } : undefined;
+/**
+ * Reads a job's output as it comes, in the protocol its progress filter speaks, and answers `feed(text)`: the job's
+ * progress so far when `text` moved it, else undefined. Progress is `{ done, total }`, the unit-less count (a fixer's
+ * commits of its findings, a reviewer's files), with `checks` and `tests`, each `{ done, total, failed }`, where the
+ * job counts them, and `now`, its latest `skulkr:` line and when it came. Each counter keeps its own slot, so a
+ * fixer's checks never stand in for its commits.
+ */
+/** @typedef {{ done: number, total: number, failed: number }} JobCounter */
+/** @typedef {{ done?: number, total?: number, checks?: JobCounter, tests?: JobCounter, now?: { text: string, at: string } }} JobProgress */
+export const createProgressReader = () => {
+  let partial = '';
+  /** @type {JobProgress & Record<string, any>} */
+  const p = {};
+  /** @param {string} text @returns {JobProgress | undefined} */
+  const feed = (text) => {
+    const lines = (partial + text).split('\n');
+    partial = lines.pop() ?? '';
+    let moved = false;
+    for (const line of lines) {
+      let m;
+      if ((m = /^onto: (progress|failed) (\d+)\/(\d+)(?: (\w+))?\s*$/.exec(line))) {
+        const [, kind, n, of, unit] = m;
+        if (!unit) {
+          if (kind === 'progress') Object.assign(p, { done: Number(n), total: Number(of) });
+        } else {
+          const c = (p[unit] ??= { done: 0, total: 0, failed: 0 });
+          if (kind === 'progress') Object.assign(c, { done: Number(n), total: Number(of) });
+          else Object.assign(c, { failed: Number(n), total: Number(of) });
+        }
+        moved = true;
+      } else if ((m = /^skulkr: (.+)$/.exec(line))) {
+        p.now = { text: m[1], at: new Date().toISOString() };
+        moved = true;
+      }
+    }
+    return moved ? structuredClone(p) : undefined;
+  };
+  return { feed };
 };
 
 /** Deletes the job records in `dir` older than {@link KEEP_JOBS_MS}, and answers the names of the rest. */

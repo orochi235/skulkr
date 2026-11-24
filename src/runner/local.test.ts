@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { resolveConfig } from '../config.mjs';
-import { createLocalRunner, durationMs, latestProgress } from './local.mjs';
+import { createLocalRunner, createProgressReader, durationMs } from './local.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -164,9 +164,13 @@ describe('the local runner', () => {
 });
 
 describe('local progress', () => {
-  it("reads the last progress count from a job's output", () => {
-    expect(latestProgress('x\nonto: progress 1/4\nonto: progress 2/4 commits\n')).toEqual({ done: 2, total: 4 });
-    expect(latestProgress('nothing here')).toBeUndefined();
+  it("keeps each of a job's counters in its own slot, and its latest note", () => {
+    const { feed } = createProgressReader();
+    expect(feed('nothing here\n')).toBeUndefined();
+    expect(feed('x\nonto: progress 10/10\nonto: progress 6/7 che')).toEqual({ done: 10, total: 10 });
+    const p = feed('cks\nonto: failed 2/7 checks\nonto: progress 84/84 tests\nskulkr: running: npx vitest run a.test.ts\n');
+    expect(p).toMatchObject({ done: 10, total: 10, checks: { done: 6, total: 7, failed: 2 }, tests: { done: 84, total: 84, failed: 0 } });
+    expect(p!.now!.text).toBe('running: npx vitest run a.test.ts');
   });
 
   it("answers a running job's count by its task, and none once it ends", async () => {

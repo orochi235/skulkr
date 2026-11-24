@@ -154,7 +154,9 @@ export const nightLanes = (log, areas, jobs = [], reports = new Map(), names = N
       const key = `${m[1]}\n${m[2]}`;
       finished.set(key, [...(finished.get(key) ?? []), job]);
     } else if (step.state === 'waiting' || (m[2] === 'repair' && step.state === 'running')) {
-      Object.assign(step, { state: 'running', node: job.node, since: job.started, ...(job.progress ? { done: job.progress.done, total: job.progress.total } : {}) });
+      const { done, total, checks, tests, now } = job.progress ?? {};
+      Object.assign(step, { state: 'running', node: job.node, since: job.started, ...(Number.isFinite(total) ? { done, total } : {}),
+        ...(checks ? { checks } : {}), ...(tests ? { tests } : {}), ...(now ? { now } : {}) });
     }
   }
   for (const [key, ran] of finished) {

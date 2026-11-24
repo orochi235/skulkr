@@ -101,6 +101,14 @@ describe('nightLanes', () => {
     expect(debug.steps.B.state).toBe('waiting');
   });
 
+  it("gives a running fixer's step its commits, checks, tests and latest note", () => {
+    const now = { text: 'running: npx vitest run a.test.ts', at: '2026-11-19T21:20:00Z' };
+    const checks = { done: 6, total: 7, failed: 2 };
+    const running = [{ task: 'audit41-a-fix', node: 'local', started: '2026-11-19T21:00:00Z', progress: { done: 10, total: 10, checks, now } }];
+    expect(nightLanes('match 1/1 a: 0 shared of 1 + 1', ['a'], running)[0]!.steps.fix)
+      .toEqual({ state: 'running', node: 'local', since: '2026-11-19T21:00:00Z', done: 10, total: 10, checks, now });
+  });
+
   it("times a done step from onto's finished job nearest its logged minutes, ending when that job did", () => {
     const log = 'review 1/2 core.core.ops A on studio: 5 findings, 24/24 files read, 3.0 min, 1.30M tokens';
     const jobs = [

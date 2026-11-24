@@ -76,6 +76,13 @@ export type LaneStepName = 'A' | 'B' | 'match' | 'fix' | 'patch';
  *  repairs it while that fails. */
 export type LaneStepKey = LaneStepName | 'repair';
 
+/** One counter of a running job's: `done` of `total`, `failed` of them failing. */
+export interface JobCounter {
+  readonly done: number;
+  readonly total: number;
+  readonly failed: number;
+}
+
 export interface LaneStep {
   readonly state: 'waiting' | 'running' | 'done' | 'failed';
   readonly node?: string;
@@ -84,6 +91,10 @@ export interface LaneStep {
    *  findings. */
   readonly done?: number;
   readonly total?: number;
+  /** A running fixer's checks and their tests, where the local runner counts them, and its latest note. */
+  readonly checks?: JobCounter;
+  readonly tests?: JobCounter;
+  readonly now?: { readonly text: string; readonly at: string };
   readonly findings?: number;
   readonly read?: number;
   readonly files?: number;

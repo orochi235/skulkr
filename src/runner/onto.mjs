@@ -147,7 +147,9 @@ export const progressOfTop = (top) => {
  * - `spare()` (optional) answers how much of its capacity is idle now, `{ coresFree, cores }`, or null when it cannot
  *   say.
  * - `progress()` (optional) answers each running job's own count of its work by its task, a Map of `{ done, total }`
- *   (its first counter: a reviewer's files read, a fixer's commits of its findings), empty when it cannot say.
+ *   (its first counter: a reviewer's files read, a fixer's commits of its findings), empty when it cannot say. A runner
+ *   may add `checks` and `tests`, each `{ done, total, failed }`, and `now`, the job's latest `skulkr:` line
+ *   `{ text, at }`, as the local runner does.
  */
 /** `onto top --json`'s fleet totals as `{ coresFree, cores }`, or null where it gives none. */
 export const spareOfTop = (top) => {

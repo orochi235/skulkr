@@ -82,9 +82,9 @@ describe('AuditsPage', () => {
     expect(within(detail).getByText('due again')).toBeInTheDocument();
     expect(within(detail).getByRole('table')).toHaveTextContent('33');
     expect(await screen.findByText('A scene write is lost on undo')).toBeInTheDocument();
-    // The fixer's note is behind the tile, which a note makes a button.
+    // The fixer's note is behind the claim, which a note makes a button.
     expect(screen.queryByText('Undo now keeps it.')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'fixed: details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'A scene write is lost on undo' }));
     expect(await screen.findByText('Undo now keeps it.')).toBeInTheDocument();
     fireEvent.keyDown(screen.getByRole('dialog', { name: 'Defect details' }), { key: 'Escape' });
     await waitFor(() => expect(screen.queryByText('Undo now keeps it.')).toBeNull());

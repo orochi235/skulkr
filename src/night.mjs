@@ -13,6 +13,7 @@ import { strandedHoldFor, strandedRoundsFor } from './stranded.mjs';
 import { capstoneRepairer, repairRefusal } from './capstone.mjs';
 import { gateBaseline } from './repair.mjs';
 import { conflictRepairer } from './conflict.mjs';
+import { startHeartbeat } from './heartbeat.mjs';
 import { checksFor } from './preflight.mjs';
 import { gateAhead } from './fleet.mjs';
 import { areasAtOnce, startAreas } from './admit.mjs';
@@ -198,11 +199,13 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
   let report = '';
   let sweep = { skipped: 'off (it runs only with --sweep)' };
   let frozen;
+  let stopHeartbeat = () => {};
   try {
     frozen = addWorktree(root, cfg.names.frozen(p.round), p.commit);
     const ctx = runContext({ cfg, runner, root, p, args, status, frozen, say, setStep });
     if (cfg.local.on) say(localLine(cfg));
     if (ctx.localFix) say(localFixLine(cfg, ctx.localFix));
+    stopHeartbeat = startHeartbeat({ jobs: () => runner.jobs(status.started), progress: () => runner.progress?.() ?? new Map(), prefix: `${cfg.names.task(p.round, '', '').replace(/-+$/, '')}-`, say });
     mkdirSync(join(frozen, JOB_IN), { recursive: true });
     // The sweep is one job on one node; the reviews fill every other slot while it runs.
     const sweepFix = args.sweep ? startSweep(ctx, (s) => (sweep = s)) : Promise.resolve(undefined);
@@ -262,6 +265,7 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     if (unrun.length) report += `; ${unrun.length} of ${results.length} areas incomplete, reviewer never ran or never finished: ${unrun.join(', ')}`;
     say(`night: ${report}`);
   } finally {
+    stopHeartbeat();
     if (frozen) removeWorktree(root, frozen);
     writeSummary(p.round, {
       round: p.round, commit: p.commit, started: status.started, ended: new Date().toISOString(), nightDir: status.nightDir, report, planned: status.areas,

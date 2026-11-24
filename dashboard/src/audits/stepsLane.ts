@@ -23,19 +23,28 @@ const STEP_COLUMNS: readonly { step: LaneStepKey; part: Part; phase: AuditPhase;
 const CHECKS_COLUMN = { start: 4, width: 0.5 } as const;
 
 
+/** A running fixer's checks as words, `6/7 · 2 failing`, or '' where none are counted. */
+const checksText = (fix: LaneStep): string =>
+  (fix.checks && fix.checks.total ? `${fix.checks.done}/${fix.checks.total}${fix.checks.failed ? ` · ${fix.checks.failed} failing` : ''}` : '');
+
 /** The fixer's checks: lit while it runs them, carrying the node doing it, and filled once it ends. */
 function checksSpan(fix: LaneStep): SpanStripSpan {
   const checking = checkingOf(fix);
   const state = fix.state === 'done' ? 'done' : fix.state === 'failed' ? 'failed' : checking ? 'active' : 'pending';
   return {
-    id: 'checks', start: CHECKS_COLUMN.start, ms: CHECKS_COLUMN.width, title: 'the fixer\'s checks',
-    label: checking ? fix.node ?? '' : '', state, fill: state === 'pending' ? 0 : 1, color: 'var(--audit-checks)',
+    id: 'checks', start: CHECKS_COLUMN.start, ms: CHECKS_COLUMN.width, title: ['the fixer\'s checks', checksText(fix), fix.now?.text ?? ''].filter(Boolean).join('\n'),
+    label: checking ? [fix.node ?? '', checksText(fix)].filter(Boolean).join(NODE_SEP) : '', state, fill: state === 'pending' ? 0 : 1, color: 'var(--audit-checks)',
   };
 }
 
 /** The fix span while its fixer runs its checks: no longer active, its node moved onto the checks column. */
 const fixWhileChecking = (span: SpanStripSpan, fix: LaneStep): SpanStripSpan =>
   (checkingOf(fix) ? { ...span, state: 'done', label: span.label.slice(span.label.indexOf(NODE_SEP) + NODE_SEP.length) } : span);
+
+/** A finished step's span, other than the patch's, in dark gray with white ink, so what is still moving stands out. */
+function withDone(span: SpanStripSpan): SpanStripSpan {
+  return span.state === 'done' && !span.id.startsWith('patch') ? { ...span, color: 'var(--audit-stage-done)', ink: 'var(--audit-stage-done-ink)' } : span;
+}
 
 /** How wide the steps view's window is, in columns. */
 export const STEP_COLUMN_COUNT = Math.max(...STEP_COLUMNS.map((c) => c.start + c.width));
@@ -62,10 +71,10 @@ export function laneStepsOf(lane: AuditLane, now: number): SpanStripSpan[] {
       : since !== null ? Math.min(RUNNING_FILL_CAP, (now - since) / (TYPICAL_MINUTES[part] * MIN))
       : 0;
     return {
-      id: step, start, ms: width, fill, state: SPAN_STATE[s.state], title: `${step}: ${stepText(step, s, now)}`,
+      id: step, start, ms: width, fill, state: SPAN_STATE[s.state], title: [`${step}: ${stepText(step, s, now)}`, s.state === 'running' ? s.now?.text ?? '' : ''].filter(Boolean).join('\n'),
       label: step === 'patch' && s.state !== 'failed' ? tallyOf(lane) : s.state === 'waiting' ? '' : stepText(step, s, now),
       color: partColor(part, s.state === 'failed' ? 'conflict' : phase),
     };
   }).flatMap((span) => (span.id === 'patch' && span.state !== 'failed' ? withUnfixed(span, lane) : span.id === 'fix' ? [fixWhileChecking(span, lane.steps.fix), ...(repairing(lane) ? [] : [checksSpan(lane.steps.fix)])] : [span]))
-    .map((span) => withInk(span));
+    .map((span) => withDone(withInk(span)));
 }

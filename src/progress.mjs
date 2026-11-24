@@ -7,6 +7,9 @@
  *   node progress.mjs --commits <n> [--checks <checks.json>] <result.json>
  *       a fixer: each commit it makes, of its n findings, then, given the config's `checks.tally` patterns, each
  *       check it runs (`checks`) and the tests they pass (`tests`)
+ *
+ * A fixer's stream also gets `skulkr: <text>` lines, which onto ignores and the local runner keeps as the job's `now`:
+ * each command it starts, each commit with its subject, and each check's result with the tests that failed.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
@@ -60,6 +63,13 @@ const bashCommands = (event) => {
 
 const COMMITS = /\bgit\b(?:\s+-c\s+\S+)*\s+commit\b/;
 
+/** The subject a `git commit -m <message>` gives its commit, or '' where it gives none on the command line. */
+export const commitSubject = (command) => {
+  const m = /\s-[a-zA-Z]*m\s*(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|\$'((?:[^'\\]|\\.)*)'|(\S+))/.exec(command);
+  const message = m ? (m[1] ?? m[2] ?? m[3] ?? m[4]).replace(/\\n/g, '\n') : '';
+  return clip(message.split('\n')[0], 72);
+};
+
 /** The Bash tool calls the event's assistant message makes: each call's id and command. */
 const bashCalls = (event) => {
   if (event?.type !== 'assistant' || !Array.isArray(event.message?.content)) return [];
@@ -92,6 +102,20 @@ const checkOf = (command, p) => {
   const lint = p.lint?.exec(command);
   if (lint) return lint[1] ? `lint ${lint[1]}` : 'lint';
   return p.final?.test(command) ? 'final' : null;
+};
+
+/** `text` on one line, cut to `n` characters. */
+const clip = (text, n = 80) => {
+  const one = String(text).replace(/\s+/g, ' ').trim();
+  return one.length > n ? `${one.slice(0, n - 1)}…` : one;
+};
+
+/** The names of the tests a vitest run says failed, the first `n` of them. */
+const failedNames = (text, n = 3) => {
+  const plain = text.replace(/\x1b\[[0-9;]*m/g, '');
+  const named = (re) => [...new Set([...plain.matchAll(re)].map((m) => clip(m[1].replace(/\s+\d+m?s$/, ''), 60)))];
+  const fails = named(/^\s*FAIL\s+(.+)$/gm);
+  return (fails.length ? fails : named(/^\s*[×✗]\s+(.+)$/gm)).slice(0, n);
 };
 
 const compile = (tally) => Object.fromEntries(Object.entries(tally).map(([k, v]) => [k, v ? new RegExp(v) : null]));
@@ -135,16 +159,19 @@ export const createCheckTally = (tally) => {
       if (!check) continue;
       pending.delete(id);
       const tally = check.startsWith('test ') ? testTally(text) : null;
+      const bad = error || (tally ? tally.failed > 0 : false);
+      const names = tally?.failed ? failedNames(text) : [];
+      lines.push(`skulkr: ${check}: ${tally ? `${tally.failed ? `${tally.failed} failed of` : 'passed'} ${tally.passed + tally.failed}` : bad ? 'failed' : 'passed'}${names.length ? ` (${names.join('; ')})` : ''}`);
       if (tally) {
         files.set(check, tally);
         const run = [...files.values()].reduce((n, t) => n + t.passed + t.failed, 0);
         const failed = [...files.values()].reduce((n, t) => n + t.failed, 0);
         lines.push(`onto: progress ${run}/${run} tests`, `onto: failed ${failed}/${run} tests`);
       }
-      latest.set(check, error || (tally ? tally.failed > 0 : false));
+      latest.set(check, bad);
       expected.add(check);
-      const bad = [...latest.values()].filter(Boolean).length;
-      lines.push(`onto: progress ${latest.size}/${expected.size} checks`, `onto: failed ${bad}/${expected.size} checks`);
+      const failing = [...latest.values()].filter(Boolean).length;
+      lines.push(`onto: progress ${latest.size}/${expected.size} checks`, `onto: failed ${failing}/${expected.size} checks`);
     }
     return lines;
   };
@@ -188,11 +215,22 @@ export const createCommitProgress = (findings, tally = null) => {
     const text = assistantText(event);
     if (isReport(text)) report = text;
     const lines = checks.see(event);
-    const commits = bashCommands(event).filter((c) => COMMITS.test(c)).length;
-    if (commits > 0 && made < total) {
-      made = Math.min(total, made + commits);
-      lines.unshift(`onto: progress ${made}/${total}`);
+    const notes = [];
+    let counted = false;
+    for (const command of bashCommands(event)) {
+      if (!COMMITS.test(command)) {
+        notes.push(`skulkr: running: ${clip(command)}`);
+        continue;
+      }
+      const subject = commitSubject(command);
+      if (made < total) {
+        made += 1;
+        counted = true;
+        notes.push(`skulkr: commit ${made}/${total}${subject ? `: ${subject}` : ''}`);
+      } else notes.push(`skulkr: fixup commit${subject ? `: ${subject}` : ''}`);
     }
+    if (counted) lines.unshift(`onto: progress ${made}/${total}`);
+    lines.unshift(...notes);
     return lines.length ? { progress: lines.join('\n') } : {};
   };
   return { start, feed };

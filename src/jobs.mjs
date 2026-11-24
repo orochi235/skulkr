@@ -2,7 +2,7 @@
  * Model jobs on the fleet. Each job runs through the runner from the frozen tree, so the node's tree is the
  * frozen commit plus `.skulkr/in`, in one of onto's pooled trees, which no other running job holds. What a job writes under `.skulkr/out` comes back to a local directory.
  */
-import { createWriteStream, mkdirSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { JOB_IN, JOB_OUT } from './config.mjs';
 import { sleep } from './after.mjs';
@@ -172,7 +172,10 @@ export const timeoutOf = (cfg, { model = true, verify = Boolean(verifyOf(cfg)) }
 /** One runner job from `cwd`, tried again while its tree is busy; its output goes to `logPath`. Answers `{ status, refused, noRoom, node? }`. */
 export const runUntilFree = async (runner, job, { cwd, logPath, waitMs = BUSY_WAIT_MS }) => {
   mkdirSync(job.to, { recursive: true });
+  const again = existsSync(logPath) && statSync(logPath).size > 0;
   const log = createWriteStream(logPath, { flags: 'a' });
+  // A resume runs a job whose result never came home over again, its log appended to the earlier run's.
+  if (again) log.write(`skulkr: relaunched at ${new Date().toISOString()}; the lines above are the earlier run's\n`);
   try {
     for (;;) {
       const run = await runner.run(job, { cwd, log });

@@ -367,6 +367,22 @@ noRoom }`, `unavailableNodes()`, `jobs(sinceIso)` (what the dashboard's lanes ar
 `progress()`, each running job's own count by task (a running step's fill). `src/runner/local.mjs` is the smallest
 complete one.
 
+### Watching a run
+
+While jobs run, the run prints a heartbeat line for each, every 2 minutes when it has moved and every 10 when it has not
+(`src/heartbeat.mjs`). The run's log and `night.log` get the same lines, which nothing parses:
+
+```
+job forge.vite.part1-fix on local · 21 min · commits 10/10 · checks 6/7, 2 failing · tests 84, 3 failing · now: running: npx vitest run packages/…
+```
+
+The counts come from the job's progress filter (`src/progress.mjs`). A fixer's filter also writes `skulkr:` lines to
+its log, which onto ignores: each command it starts, each commit with its subject, and each check with the tests it
+failed. The local runner keeps each counter apart (commits, checks, tests) and takes the latest `skulkr:` line as the job's
+`now`, so the dashboard's fix column counts only commits, its checks column counts checks, and both tooltips show `now`.
+The onto runner reports only its first counter, so its lines carry commits alone. A job that a resume starts over
+gets `skulkr: relaunched at <time>` in its log, below the earlier run's lines.
+
 ### Local fixers
 
 With `--local-fix` (or `localFix.enabled` in the config), fixers and repairs run on this machine and every other job

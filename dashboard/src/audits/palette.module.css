@@ -39,6 +39,9 @@
   --audit-checks: oklch(0.72 0.18 55);
   /* The controller's verify and repair of a fix, after its fixer's checks. */
   --audit-repair: oklch(0.68 0.25 340);
+  /* A lane's finished steps, the patch's aside. */
+  --audit-stage-done: oklch(0.3 0 0);
+  --audit-stage-done-ink: #fff;
   /* The share of a patch its fixer filed rather than fixed. */
   --audit-filed: oklch(0.38 0 0);
   --audit-phase-ramp: linear-gradient(to right, var(--audit-phase-review), var(--audit-phase-reviewed), var(--audit-phase-match),
