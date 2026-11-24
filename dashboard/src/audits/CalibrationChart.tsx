@@ -4,7 +4,7 @@ import { Popover, PopoverDialog } from '@weasel-js/ui/components/Popover';
 import { icon } from '@dash/icons.gen';
 import { useRef } from 'react';
 import { Button, DialogTrigger } from 'react-aria-components';
-import { ticksFor } from './RoundsChart';
+import { CHART_ROUNDS, ticksFor } from './RoundsChart';
 import type { AuditCalibration, CalibrationFactor } from './skulkrMap.types';
 import s from './CalibrationChart.module.css';
 
@@ -42,7 +42,7 @@ export function CalibrationChart({ calibration: cal }: { calibration?: AuditCali
   const measured = useElementSize(box);
   const W = measured.width > 0 ? measured.width : FALLBACK_W;
   const H = measured.height > 0 ? measured.height : FALLBACK_H;
-  const series = cal?.series ?? [];
+  const series = (cal?.series ?? []).slice(-CHART_ROUNDS);
   const ticks = ticksFor(Math.max(0, ...series.map((p) => Math.max(p.predicted, p.found))));
   const top = ticks.at(-1) || 1;
   const fTicks = ticksFor(Math.max(1, ...series.map((p) => p.factor ?? 0)), 3);

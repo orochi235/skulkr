@@ -15,6 +15,9 @@ const FALLBACK_W = 272, FALLBACK_H = 190;
 const PENDING_LABEL = { live: 'live', unmerged: 'unmerged' } as const;
 const M = { top: 8, right: 6, bottom: 22, left: 40 };
 
+/** How many of the latest rounds the rounds and calibration charts show; older ones scroll off the left. */
+export const CHART_ROUNDS = 30;
+
 /** Round ticks for a value axis from 0 to at least `max`: a step of 1, 2 or 5 times a power of ten. */
 export function ticksFor(max: number, count = 4): number[] {
   if (!(max > 0)) return [0];
@@ -62,7 +65,8 @@ export function RoundsChart({ rounds: all, area: picked, areas = [], heatOf }: {
   const H = measured.height > 0 ? measured.height : FALLBACK_H;
   const pickedPasses = picked ? passRoundsOf(picked.passes) : [];
   const area = picked && pickedPasses.length >= AREA_CHART_PASSES ? picked : null;
-  const rounds = area ? areaRoundsOf(area, all) : all;
+  // An area's own passes are few, and each is drawn beside the average nth pass, so the area view keeps them all.
+  const rounds = area ? areaRoundsOf(area, all) : all.slice(-CHART_ROUNDS);
   const averages = area ? nthPassAverages(areas) : [];
   const unit = area ? 'defects' : 'defects per area';
   const ticks = ticksFor(Math.max(0, ...rounds.filter((r) => !isPartial(r)).map((r) => perArea(Math.max(r.est, r.distinct), r)), ...rounds.map((_, i) => averages[i]?.mean ?? 0)));
