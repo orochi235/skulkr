@@ -103,11 +103,9 @@ describe('local mode', () => {
     expect(() => resolveConfig({ agent: { review: 'codex' } }, { local: true, env })).toThrow('local mode runs every job on claude; the config\'s agent names codex');
   });
 
-  it('runs weasel\'s gate as its own suite on this machine', () => {
+  it('keeps weasel\'s fleet gate in local mode', () => {
     const cfg = resolveConfig({ ...weasel }, { file: new URL('../examples/weasel.config.mjs', import.meta.url).pathname, local: true, env });
-    expect(cfg.gate.command[2]).toMatch(/export PATH="\$NVM_BIN:\$PATH"; npm ci --no-audit --no-fund && npm test /);
-    expect(Object.keys(cfg.gate.progress)).toEqual(['tests']);
-    expect(cfg.checks.preflight.gateArgs).toEqual([]);
-    expect(weaselConfig().gate.name).toBe('test:batch');
+    expect(cfg.gate.name).toBe('test:batch');
+    expect(cfg.checks.preflight.gateArgs).toEqual(weaselConfig().checks.preflight.gateArgs);
   });
 });

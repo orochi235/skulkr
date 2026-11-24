@@ -401,8 +401,8 @@ the account that started the run. Every job (reviews, matches, fixes, repairs) a
 
 skulkr cannot see what a project's own commands do. A gate or preflight that sends work to a fleet still does, so
 `local.override` names the settings local mode replaces: each top-level key it holds replaces the config's whole,
-`gate` included, so no fleet-only field is left behind. weasel's swaps `test:batch` for `npm test` in the batch's
-tree, and its preflight stops telling the gate `--no-checks`.
+`gate` included, so no fleet-only field is left behind. weasel's example sets none: its gate stays on the fleet,
+since only model calls need to stay local.
 
 The dry plan and the night log open with a `local:` line naming the account. Like `--local-fix`, a resumed round takes
 the flag again from its own command line.
