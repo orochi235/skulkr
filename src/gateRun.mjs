@@ -48,7 +48,7 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
   const logName = `${batch.name.replace(/\//g, '-')}${tag}`;
   const main = cfg.git.main;
   const gate = cfg.gate.name;
-  const catchUp = () => {
+  const catchUp = async () => {
     const caught = catchUpWithMain(batch.tree, main, cfg.record.ledger ?? null);
     if (caught.moved) {
       tip = caught.tip;
@@ -56,13 +56,13 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
       return true;
     }
     if (!caught.conflict && !caught.failed) return false;
-    ({ batch, tip } = rebuild());
+    ({ batch, tip } = await rebuild());
     const why = caught.conflict ? 'conflicted' : `failed (${caught.failed})`;
     say(`batch: ${main} moved and merging it ${why}; rebuilt the batch on it at ${tip.slice(0, 10)} and testing that`);
     return true;
   };
   // Another run may have landed while this one waited for the lock: test with its work in, not twice.
-  if (merge) catchUp();
+  if (merge) await catchUp();
   for (let pass = 1; ; pass++) {
     const suffix = pass === 1 ? '' : `.${pass}`;
     let log = freshLog(nightDir, `${logName}${suffix}`, cfg.gate.logSuffix);
@@ -76,7 +76,7 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
       say(`gate: ${gate} ${status === 0 ? 'passed' : `failed (${status}); its log is ${log}`}`);
     }
     if (status !== 0) return { batch, tip, log, report: `red: ${batch.name} and its branches kept; worktree ${batch.tree}; logs in ${nightDir}` };
-    if (!merge || pass === MAIN_CATCH_UPS + 1 || !catchUp()) return { batch, tip };
+    if (!merge || pass === MAIN_CATCH_UPS + 1 || !(await catchUp())) return { batch, tip };
   }
 };
 

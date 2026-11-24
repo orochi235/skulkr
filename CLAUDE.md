@@ -97,6 +97,10 @@ weasel cutover.
     job listing and progress now include the local runner's.
   - a capstone failure no branch reaches by path or import laid at the one branch that changed a path its failure's
     message names (README "Verify and repair", 2026-11-23).
+  - conflict repair (README "batch" step, 2026-11-24): a branch that conflicts with the batch merged after a repair
+    job resolves it, its outcome `merged after a conflict repair` and `conflictRepaired` on its `area.json`; left out,
+    as before, only when that fails, with `; its conflict repair failed` on its why. The map takes a branch off its
+    conflict when the log says a conflict repair merged it, or git says it is in `main` or its round's batch.
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

@@ -17,12 +17,13 @@ const holds = (git, ...args) => {
 };
 
 /**
- * Why a batch left a branch out (`makeBatch`'s `conflicted` or `failed` entry), in a phrase fit for a table cell.
+ * Why a batch left a branch out (`makeBatch`'s `conflicted` or `failed` entry, a conflicted one with
+ * `repair`, how its conflict repair went, where one was tried), in a phrase fit for a table cell.
  * @param {{ paths?: string[], error?: string }} out
  */
-export const leftOutWhy = ({ paths, error }) => {
+export const leftOutWhy = ({ paths, error, repair }) => {
   const text = paths
-    ? `merge conflict in ${paths.slice(0, 5).join(', ')}${paths.length > 5 ? `, and ${paths.length - 5} more` : ''}`
+    ? `merge conflict in ${paths.slice(0, 5).join(', ')}${paths.length > 5 ? `, and ${paths.length - 5} more` : ''}${repair ? `; its conflict repair ${repair}` : ''}`
     : `merge failed: ${error}`;
   return text.replaceAll('|', '\\|');
 };

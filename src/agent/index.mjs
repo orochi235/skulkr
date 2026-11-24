@@ -42,7 +42,7 @@ export const requireAgents = (cfg) => ROLES.map((role) => {
   return agent;
 });
 
-const BRIEF_ROLE = { reviewer: 'review', matcher: 'match', fixer: 'fix', repair: 'fix' };
+const BRIEF_ROLE = { reviewer: 'review', matcher: 'match', fixer: 'fix', repair: 'fix', conflict: 'fix' };
 
-/** The brief template's path for `brief` (`reviewer`, `matcher`, `fixer`, `repair`): its agent's own, else the config's. */
+/** The brief template's path for `brief` (`reviewer`, `matcher`, `fixer`, `repair`, `conflict`): its agent's own, else the config's. */
 export const briefPathFor = (cfg, brief) => agentFor(cfg, BRIEF_ROLE[brief]).briefPath?.(cfg, brief) ?? cfg.briefPath(brief);

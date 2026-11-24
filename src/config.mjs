@@ -125,7 +125,7 @@ export const DEFAULTS = {
    */
   review: { preload: true },
   /** Brief templates, paths relative to the config file; unset uses the shipped default. */
-  briefs: { reviewer: undefined, matcher: undefined, fixer: undefined, repair: undefined },
+  briefs: { reviewer: undefined, matcher: undefined, fixer: undefined, repair: undefined, conflict: undefined },
 
   /**
    * How a batch is tested. `{ref}` in the command is the batch branch; `cwd` is `root` or `batch` (its worktree).
@@ -254,6 +254,13 @@ export const DEFAULTS = {
    */
   early: { share: 0.5, left: 0.25, coresFree: 0.5 },
 
+  /**
+   * A branch whose merge into the batch conflicts gets a conflict repair (README "batch" step): a repair job, under the
+   * dollar cap, that resolves the merge keeping both sides, verified as a repair is. `repair: false` leaves such a
+   * branch out, as before; so does a config with no `checks.verify`.
+   */
+  conflicts: { repair: true },
+
   /** An extra check run beside the reviews whose findings go to one fixer; see README "A sweep". */
   sweep: null,
 
@@ -336,6 +343,7 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
   const batchRe = new RegExp(`^${batchSource(batchPattern, '(\\d+)')}$`);
   const leftOutRe = new RegExp(`^batch: ${pre}\\d+-(\\S+?)(?: \\(round (\\d+)\\))? left out: (.+)$`);
   const oldConflictRe = new RegExp(`^batch: ${pre}\\d+-(\\S+) conflicts`);
+  const resolvedRe = new RegExp(`^batch: ${pre}(\\d+)-(\\S+) merged (?:after a conflict repair|with the resolution of its conflict)`);
   const areaBranch = new RegExp(`^${pre}(\\d+)-(.+)$`);
   const briefPath = (role) => (c.briefs[role] ? resolve(base, c.briefs[role]) : new URL(`${role}.md`, DEFAULT_BRIEFS).pathname);
   return {
@@ -394,6 +402,12 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
         const m = leftOutRe.exec(line) ?? oldConflictRe.exec(line);
         if (!m) return null;
         return { area: m[1], why: m[3] ?? 'merge conflict', ...(m[2] ? { earlier: Number(m[2]) } : {}) };
+      },
+      /** A night log's line for a branch a conflict repair merged into the batch (`conflict.mjs`) → `{ area, round }`, the
+       *  branch's own round; null for any other line. */
+      resolved: (line) => {
+        const m = resolvedRe.exec(line);
+        return m ? { area: m[2], round: Number(m[1]) } : null;
       },
       trees: { review: `${name}-skulkr-r`, fix: `${name}-skulkr-f` },
     },

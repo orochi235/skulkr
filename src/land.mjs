@@ -8,6 +8,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { applyFix, commitRecord, fastForwardMain, gitIn, makeBatch, pushMain, removeWorktree } from './batch.mjs';
 import { capstoneText, repairCapstone } from './capstone.mjs';
+import { resolveConflicts } from './conflict.mjs';
 import { alreadyFailing, failuresIn, gateOnFleet } from './gateRun.mjs';
 import { mainRedText, testChecked, testsToRerun } from './preflight.mjs';
 import { leftOutIn, leftOutWhy, recordLeftOut, retryable } from './leftOut.mjs';
@@ -18,6 +19,8 @@ export const EARLY = '-early';
 
 /** Whether a fixer's verify step failed for good: a run that timed out lands, for the capstone to check. */
 export const failedVerify = (verify) => verify?.ok === false && !verify.timedOut;
+/** An area's outcome when a conflict repair merged its branch into the batch. */
+export const conflictRepairedText = (branch) => `\`${branch}\`, merged after a conflict repair`;
 /** An area's outcome when its verify step still fails after its repairs. */
 const leftOutText = (verify) => `left out: verify still failing after ${verify.repairs ?? 0} repairs (${verify.why})`;
 
@@ -98,8 +101,11 @@ const mergeCycles = (a, b) => {
  * that `main` fast-forwarded to `tip` with the round's `areas` in it. `early` makes it an early landing (README "Early
  * landings"): no record, no retry of earlier rounds' branches, and a branch that will not merge, or a batch still red,
  * leaves its branches for the round's own batch rather than out of it.
+ * `resolve(branch, { batch, paths, label })`, where given, is a conflict repair (`conflict.mjs`): a branch that conflicts
+ * with the batch is merged with its resolution, which a rebuilt batch reuses while it applies, and is left out only when
+ * that fails; an early landing tries none.
  */
-export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, mayRepair = /** @type {(started: number) => string} */ (() => ''), baseline, checks = /** @type {any} */ (undefined), early = false, onLanded = /** @type {(landed: { tip: string, areas: string[] }) => void} */ (() => {}) }) => {
+export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, resolve = /** @type {any} */ (undefined), mayRepair = /** @type {(started: number) => string} */ (() => ''), baseline, checks = /** @type {any} */ (undefined), early = false, onLanded = /** @type {(landed: { tip: string, areas: string[] }) => void} */ (() => {}) }) => {
   const idOf = cfg.names.idOf;
   const fixCommits = new Map(results.map((a) => [a.id, a.fixCommits]));
   const main = cfg.git.main;
@@ -108,18 +114,27 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
   let landing = [...branches, ...earlier.keys()];
   let left = [];
   let retried = { merged: 0, out: 0 };
+  /** Each conflict repair's resolution by branch, for a rebuilt batch to reuse. */
+  const kept = new Map();
   /** The batch on main as it is now, with the round's record committed on it. */
-  const build = () => {
+  const build = async () => {
     const made = makeBatch(cfg, root, { round, date, commit, branches: landing, ...(early ? { suffix: EARLY } : {}) });
+    const resolved = resolve && !early && made.conflicted.length
+      ? new Set(await resolveConflicts({ made, kept, resolve, mayRepair: () => mayRepair(0), say }))
+      : new Set();
     retried = { merged: made.merged.filter((b) => earlier.has(b)).length, out: 0 };
     for (const branch of made.merged) {
       if (earlier.has(branch)) {
         say(`batch: ${branch}, left out of round ${earlier.get(branch).round}, merged`);
         continue;
       }
-      outcomes[idOf(branch)] = `\`${branch}\``;
+      outcomes[idOf(branch)] = resolved.has(branch) ? conflictRepairedText(branch) : `\`${branch}\``;
       const area = results.find((a) => a.id === idOf(branch));
-      if (area) area.fixCommits = fixCommits.get(area.id);
+      if (area) {
+        area.fixCommits = fixCommits.get(area.id);
+        if (resolved.has(branch)) area.conflictRepaired = true;
+        else delete area.conflictRepaired;
+      }
     }
     left = [];
     for (const out of [...made.conflicted, ...made.failed]) {
@@ -145,7 +160,7 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     say(`record: ${cfg.record.dir}/round-${round}/ committed on ${made.name} at ${tip.slice(0, 10)}`);
     return { batch: made, tip };
   };
-  let { batch, tip: recorded } = build();
+  let { batch, tip: recorded } = await build();
 
   setStep('merge-wait');
   const release = await waitForLease(mergeLock(cfg.state), { round }, {
@@ -198,7 +213,7 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
         break;
       }
       landing = landing.filter((b) => !out.includes(b));
-      ({ batch, tip: recorded } = build());
+      ({ batch, tip: recorded } = await build());
       say(`capstone: rebuilt ${batch.name} with ${now.repaired.length} repaired and ${out.length} left out; testing again`);
     }
     const retested = cycle && (cycle.repaired.length || cycle.dropped.length || cycle.skipped.length || cycle.unrepairable.length) ? !tested.report : undefined;

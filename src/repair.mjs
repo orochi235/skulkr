@@ -120,9 +120,10 @@ export const checkedIn = async (ctx, area, dir, mbox, label, extra = []) => {
 /**
  * One repair job on `area`'s commits `mbox`, given `log`, the failing output, and asked to make it pass; `extra` are
  * files its verify step checks beside the ones the commits change. Answers the job's result, the mbox now holding
- * every commit of the area, how many commits the repair added, and the directory its verdict is in.
+ * every commit of the area, how many commits the repair added, and the directory its verdict is in. `prompt` replaces
+ * the repair brief, and `about` the job's description (a conflict repair's, `conflict.mjs`).
  */
-export const repairJob = async (ctx, area, { mbox, log, label, attempt, extra = [], baseline = [] }) => {
+export const repairJob = async (ctx, area, { mbox, log, label, attempt, extra = [], baseline = [], prompt, about }) => {
   const inDir = stage(ctx, area.id, mbox);
   writeFileSync(join(inDir, 'verify.log'), log);
   const vars = {
@@ -132,12 +133,12 @@ export const repairJob = async (ctx, area, { mbox, log, label, attempt, extra = 
       ? `These failing files fail on the frozen tree without the area's commits too, so they are not yours to repair; leave them: ${baseline.map((f) => `\`${f}\``).join(', ')}.`
       : '',
   };
-  writeFileSync(join(inDir, 'repair.md'), fill(brief(ctx.cfg, 'repair'), vars));
+  writeFileSync(join(inDir, 'repair.md'), prompt ?? fill(brief(ctx.cfg, 'repair'), vars));
   const to = jobDir(ctx.nightDir, area.id, `repair-${label}`);
   const run = await dispatch(ctx, area, 'repair', {
     kind: 'fix', expect: 'none', shell: repairShell(ctx.cfg, area.id, ctx.budget.fix, ctx.localFix), to, env: nodeEnv(ctx, extra),
     task: ctx.cfg.names.task(ctx.round, area.id, 'repair'), logPath: join(to, '..', `repair-${label}.log`), timeoutMin: timeoutOf(ctx.cfg),
-    about: `Repairs audit round ${ctx.round}'s fixes to area ${area.id}, whose tests fail, without weakening the tests.`,
+    about: about ?? `Repairs audit round ${ctx.round}'s fixes to area ${area.id}, whose tests fail, without weakening the tests.`,
   });
   const stopped = stoppedBeforeModel(to);
   if (stopped) ctx.say(`repair ${area.id}: ${stopped}`);
