@@ -96,6 +96,13 @@ describe('preflightShell', () => {
     expect(shell).toContain('$FROZEN_TREE');
     expect(shell).toContain("bash -c 'npm run checks $PREFLIGHT_TESTS' > .skulkr/out/verify.log 2>&1; echo $? > .skulkr/out/verify.exit");
   });
+
+  it('runs it on the fleet under the local runner, and here where the config keeps checks here', () => {
+    const fleet = preflightShell({ ...cfg, runner: 'local', name: 'proj', local: { ...cfg.local, fleetChecks: true } });
+    expect(fleet).toContain(".skulkr/in/on-fleet test 20 preflight -- bash -c 'npm run checks $PREFLIGHT_TESTS'");
+    const here = preflightShell({ ...cfg, runner: 'local', local: { ...cfg.local, fleetChecks: false } });
+    expect(here).not.toContain('on-fleet');
+  });
 });
 
 describe('testsToRerun', () => {

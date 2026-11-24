@@ -113,6 +113,7 @@ weasel cutover.
   - under the local runner only, each verify on the onto fleet where it can take it (README "Local mode"); and the
     fixer verify skipping weasel's checks where the fixer's own `checks:gate` passed at that commit with nothing left
     uncommitted (`progress.mjs --proof`, `$VERIFY_PROVEN`), for every runner (2026-11-24).
+  - the preflight on the fleet under the local runner, as a verify (2026-11-24).
   - weasel's fixer brief running `checks:gate` through `{{onFleet}}`, the fleet under the local runner and as before
     otherwise (2026-11-24).
   - a resumed run's `resumed: <time>` line in its round's log, and the map showing a step that run redoes as running,

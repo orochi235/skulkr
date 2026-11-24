@@ -12,7 +12,7 @@ import { dispatch } from './dispatch.mjs';
 import { failedWhereIn, failLinesIn } from './gate.mjs';
 import { jobDir, treeLines } from './jobs.mjs';
 import { q, readIf } from './text.mjs';
-import { TIMED_OUT, isTestPath } from './verify.mjs';
+import { ON_FLEET, TIMED_OUT, checksOnFleet, isTestPath, onFleetLines } from './verify.mjs';
 
 /** The config's preflight, or undefined when it names none. */
 export const preflightOf = (cfg) => (cfg.checks?.preflight?.command ? cfg.checks.preflight : undefined);
@@ -25,11 +25,18 @@ export const preflightOf = (cfg) => (cfg.checks?.preflight?.command ? cfg.checks
 export const preflightShell = (cfg, { gui = false } = {}) => {
   const pre = preflightOf(cfg);
   const command = gui ? pre.gui.command : pre.command;
+  const minutes = pre.timeoutMin ?? 20;
+  const fleet = checksOnFleet(cfg);
+  const run = q(command.replaceAll('{tests}', '$PREFLIGHT_TESTS'));
   return [
     'set -e', ...(cfg.setup.prelude ? [cfg.setup.prelude] : []), `rm -rf ${JOB_OUT} && mkdir -p ${JOB_OUT}`, ...treeLines(cfg),
     'set +e',
     'export PREFLIGHT_TESTS',
-    `perl -e 'alarm shift; exec @ARGV' ${(pre.timeoutMin ?? 20) * 60} bash -c ${q(command.replaceAll('{tests}', '$PREFLIGHT_TESTS'))} > ${JOB_OUT}/verify.log 2>&1; echo $? > ${JOB_OUT}/verify.exit`,
+    // Under the local runner it runs on the fleet where the fleet can take it, as a verify does.
+    ...(fleet ? onFleetLines(fleet) : []),
+    fleet
+      ? `perl -e 'alarm shift; exec @ARGV' ${(minutes + 15) * 60} ${ON_FLEET} test ${minutes} preflight${gui ? '-gui --gui' : ''} -- bash -c ${run} > ${JOB_OUT}/verify.log 2>&1; echo $? > ${JOB_OUT}/verify.exit`
+      : `perl -e 'alarm shift; exec @ARGV' ${minutes * 60} bash -c ${run} > ${JOB_OUT}/verify.log 2>&1; echo $? > ${JOB_OUT}/verify.exit`,
     'exit 0',
   ].join('\n');
 };

@@ -66,7 +66,7 @@ export const ON_FLEET = `${JOB_IN}/on-fleet`;
  * A script that runs its arguments on the onto fleet from a local runner's tree, `on-fleet <kind> <minutes> <name>
  * [--gui] -- <command…>`: under the project's `origin` URL, added to the tree as its `fleet` remote since onto syncs
  * only to a remote the tree names, so commits never pushed reach the node all the same; its task named
- * `<project>-<name>-<sha>`, and `VERIFY_*` passed along. Where `onto` is missing, `origin` is no URL, or onto fails
+ * `<project>-<name>-<sha>`, and `VERIFY_*` and `PREFLIGHT_TESTS` passed along. Where `onto` is missing, `origin` is no URL, or onto fails
  * before its job runs, it runs the command here.
  */
 export const onFleetScript = (project) => `#!/bin/bash
@@ -79,7 +79,8 @@ if [ -n "$url" ] && command -v onto >/dev/null; then
   out=$(mktemp)
   onto do --kind "$kind" --task "${project}-$name-$(git rev-parse --short=10 HEAD)" --expect "\${minutes}m" --timeout "\${minutes}m" \\
     --about "skulkr: ${project} $name, off the machine running the round" --repo "$url" $gui \\
-    --env VERIFY_FILES="$VERIFY_FILES" --env VERIFY_RELATED="$VERIFY_RELATED" --env VERIFY_PROVEN="$VERIFY_PROVEN" -- "$@" 2>&1 | tee "$out"
+    --env VERIFY_FILES="$VERIFY_FILES" --env VERIFY_RELATED="$VERIFY_RELATED" --env VERIFY_PROVEN="$VERIFY_PROVEN" \\
+    --env PREFLIGHT_TESTS="$PREFLIGHT_TESTS" -- "$@" 2>&1 | tee "$out"
   s=\${PIPESTATUS[0]}
   if [ "$s" = 0 ] || grep -qE ${q(ONTO_RAN)} "$out"; then rm -f "$out"; exit "$s"; fi
   rm -f "$out"; echo "skulkr: the fleet did not take $name; running it here"
