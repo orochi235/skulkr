@@ -45,9 +45,18 @@ const JOBS = { key: 'jobs', min: 80, max: 900, initial: 220 } as const;
 /** A pane's size the viewer dragged it to, kept between visits. */
 const usePaneSize = ({ key, initial }: { key: string; initial: number }) => useViewerPref(key, initial, readSize);
 
-function stampOf(map: SkulkrMap): string {
+/** How old a live map may be before the header says it is stale: a few of the page's polls. */
+const STALE_MS = 2 * 60_000;
+
+/** A live map's age in whole minutes where it is past {@link STALE_MS}, else null. */
+export const staleMinutesOf = (generated: string, now: number): number | null => {
+  const age = now - Date.parse(generated);
+  return Number.isFinite(age) && age > STALE_MS ? Math.floor(age / 60_000) : null;
+};
+
+function stampOf(map: SkulkrMap, stale: number | null): string {
   const when = new Date(map.generated).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-  return `${map.branch ? `${map.branch} ` : ''}${map.head} · updated ${when}`;
+  return `${map.branch ? `${map.branch} ` : ''}${map.head} · updated ${when}${stale === null ? '' : ` · ${stale} min old`}`;
 }
 
 
@@ -206,13 +215,14 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
   const state = useSkulkrMap({ url: tenant === null ? null : mapUrl(base, tenant), everyMs: SNAPSHOT ? Infinity : everyMs, dev });
   const map = state.status === 'ready' ? state.map : null;
   const view = useLaneView();
+  const stale = map && !SNAPSHOT ? staleMinutesOf(map.generated, Date.now()) : null;
   const continuous = continuousText(map?.continuous);
   const header = map ? (
     <>
       <LaneViewControls view={view} />
       <PrefsButton />
       {continuous && <span className={s.continuous} title={map.continuous?.next}>{continuous}</span>}
-      <span className={s.stamp}>{stampOf(map)}</span>
+      <span className={stale === null ? s.stamp : `${s.stamp} ${s.stale}`}>{stampOf(map, stale)}</span>
     </>
   ) : null;
   const heading = tenant !== null ? <TenantTitle names={names} current={tenant} onChoose={choose} /> : undefined;
@@ -240,7 +250,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
         )}
         {state.status === 'ready' && tenant !== null && (
           <>
-            {state.error && <p className={s.note}>The last refresh failed ({state.error}); showing the map before it.</p>}
+            {state.error && <p className={`${s.note} ${s.stale}`}>The last refresh failed ({state.error}); showing the map before it.</p>}
             <Chart key={tenant} map={state.map} areaUrl={areaUrlFor(base, tenant)} view={view} asOf={{ round: asOfRound, choose: chooseAsOf }} />
           </>
         )}

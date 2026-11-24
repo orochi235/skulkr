@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { WeaselProvider } from '@weasel-js/core';
 import { renderWithIcons } from '@dash/test/icons';
-import { AuditsPage } from './AuditsPage';
+import { AuditsPage, staleMinutesOf } from './AuditsPage';
 import fixture from './fixture.map.json';
 
 const URL = '/test/api/t/example/map';
@@ -175,5 +175,13 @@ describe('AuditsPage', () => {
     serve(500, 'map.mjs blew up');
     renderPage();
     expect(await screen.findByText(/Couldn't read the audit map: 500 map\.mjs blew up/)).toBeInTheDocument();
+  });
+});
+
+describe('staleMinutesOf', () => {
+  it('says how many minutes old a map is once it is past two, and nothing before', () => {
+    const now = Date.parse('2026-11-24T20:30:00Z');
+    expect(staleMinutesOf('2026-11-24T20:29:00Z', now)).toBeNull();
+    expect(staleMinutesOf('2026-11-24T20:17:24Z', now)).toBe(12);
   });
 });

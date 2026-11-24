@@ -16,6 +16,9 @@
   color: var(--audit-muted);
 }
 
+/* A live map past a few polls old, and the refresh failure that left it: what the page shows may no longer be true. */
+.stale { color: var(--audit-phase-conflict); font-weight: var(--wzl-font-weight-bold); }
+
 .continuous {
   composes: numeric from '@weasel-js/theme/numeric.module.css';
   font-size: var(--wzl-font-size-sm);

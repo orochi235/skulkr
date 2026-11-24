@@ -9,7 +9,7 @@
  * one project the CLI finds by itself is the only tenant: `SKULKR_CONFIG` and `SKULKR_ROOT` from this server's
  * environment, else `skulkr.config.mjs` in the directory the child runs in.
  */
-import { execFile } from 'node:child_process';
+import { execFile, type ExecFileException } from 'node:child_process';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -36,6 +36,11 @@ export interface SkulkrRunnerOptions {
 
 const MAP_TIMEOUT_MS = 120_000;
 
+/** Why a CLI run that printed nothing to stderr failed: killed at the timeout, by a signal, or its exit code. */
+const failureOf = (error: ExecFileException): string =>
+  error.killed && error.signal === 'SIGTERM' ? `${error.message} (killed after ${MAP_TIMEOUT_MS / 1000} s)`
+    : error.signal ? `${error.message} (killed by ${error.signal})` : `${error.message} (exit ${error.code ?? '?'})`;
+
 /** A runner for the CLI at `bin`, in `cwd`, with `env`: the server's own unless given. */
 export function createSkulkrRunner({ bin = SKULKR_BIN, env = process.env, cwd, exec = execFile }: SkulkrRunnerOptions = {}): SkulkrRunner {
   const dir = cwd ?? env.SKULKR_ROOT ?? process.cwd();
@@ -43,7 +48,7 @@ export function createSkulkrRunner({ bin = SKULKR_BIN, env = process.env, cwd, e
     // A map takes seconds, and a minute or more on a machine a round has loaded; past this it is killed, and the page
     // keeps the map before it.
     exec(process.execPath, [bin, ...args], { cwd: dir, env, maxBuffer: 32 * 1024 * 1024, timeout: MAP_TIMEOUT_MS },
-      (error, stdout, stderr) => (error ? fail(new Error(String(stderr).trim() || error.message)) : done(String(stdout))));
+      (error, stdout, stderr) => (error ? fail(new Error(String(stderr).trim() || failureOf(error))) : done(String(stdout))));
   });
 }
 

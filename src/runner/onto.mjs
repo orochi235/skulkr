@@ -198,13 +198,21 @@ export const fileStore = (path) => ({
   },
 });
 
+/**
+ * How long the fleet's listings may take before the last kept one stands in. Each asks every node, so one asleep or
+ * stalled node holds it until onto's own deadline; a dashboard's map build waits on both, and its server kills a build
+ * that runs long, which kept the page on an old map for as long as the node stayed slow (2026-11-24).
+ */
+const JOBS_TIMEOUT_MS = 15_000;
+const TOP_TIMEOUT_MS = 8_000;
+
 /** Where the onto runner keeps its last job listing. */
 const JOBS_CACHE = join(process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'), 'skulkr', 'onto-jobs.json');
 
 export const createOntoRunner = () => {
   const listed = keptJobs((hours) => {
     const out = execFileSync('onto', ['jobs', '--json', '--since', `${hours}h`, '--limit', '1000'],
-      { encoding: 'utf8', timeout: 45_000, stdio: ['ignore', 'pipe', 'ignore'] });
+      { encoding: 'utf8', timeout: JOBS_TIMEOUT_MS, stdio: ['ignore', 'pipe', 'ignore'] });
     return (JSON.parse(out).jobs ?? []).filter((j) => j.state === 'running' || j.finished);
   }, { store: fileStore(JOBS_CACHE) });
   return {
@@ -216,7 +224,7 @@ export const createOntoRunner = () => {
   unavailableNodes: () => new Set(),
   spare: () => {
     try {
-      const out = execFileSync('onto', ['top', '--json', '--once'], { encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'] });
+      const out = execFileSync('onto', ['top', '--json', '--once'], { encoding: 'utf8', timeout: TOP_TIMEOUT_MS, stdio: ['ignore', 'pipe', 'ignore'] });
       return spareOfTop(JSON.parse(out));
     } catch {
       return null;
@@ -224,7 +232,7 @@ export const createOntoRunner = () => {
   },
   progress: () => {
     try {
-      const out = execFileSync('onto', ['top', '--json', '--once'], { encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'] });
+      const out = execFileSync('onto', ['top', '--json', '--once'], { encoding: 'utf8', timeout: TOP_TIMEOUT_MS, stdio: ['ignore', 'pipe', 'ignore'] });
       return progressOfTop(JSON.parse(out));
     } catch {
       return new Map();
