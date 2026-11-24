@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cameHome, dispatch, earlierReview } from './dispatch.mjs';
+import { cameHome, dispatch, earlierMinutes, earlierReview } from './dispatch.mjs';
 
 const dirs: string[] = [];
 const job = (files: Record<string, string>) => {
@@ -154,6 +154,15 @@ describe('dispatch on pinned nodes that all refuse', () => {
     }
     expect(runs).toBe(5);
     expect(said.at(-1)).toBe('match a refused by studio; refused 5 times over 120 min, so not launched');
+  });
+});
+
+describe('earlierMinutes', () => {
+  it('answers how long a job that came home took, from its started stamp to its exit, or 0 without them', () => {
+    const { to } = job({ started: '2026-11-24T18:30:04Z\n', exit: '0' });
+    utimesSync(join(to, 'exit'), new Date('2026-11-24T18:32:40Z'), new Date('2026-11-24T18:32:40Z'));
+    expect(earlierMinutes(to)).toBeCloseTo(2.6);
+    expect(earlierMinutes(job({ exit: '0' }).to)).toBe(0);
   });
 });
 

@@ -2,7 +2,7 @@
  * Launching one job of an area: on whichever slot frees first, moving to another node when one turns it away, waiting
  * while no node has room, and reusing a resumed round's result that already came home.
  */
-import { cpSync, existsSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, rmSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { sleep } from './after.mjs';
 import { isFinished, reviewText } from './findings.mjs';
@@ -64,11 +64,23 @@ export const earlierReview = (ctx, area, role, spec) => {
     const to = join(night, relative(ctx.nightDir, spec.to));
     const found = cameHome({ to }, role, ctx.cfg);
     if (!found) continue;
-    cpSync(to, spec.to, { recursive: true });
+    cpSync(to, spec.to, { recursive: true, preserveTimestamps: true });
     ctx.say?.(`${role} ${area.id}: reusing the finished review from ${night}`);
     return found;
   }
   return undefined;
+};
+
+/**
+ * How long a job that came home took when it ran: from its `started` stamp to when its `exit` was written, or 0 where
+ * either is missing (a verify job writes no stamp). A reused job reports these, so a resumed round's log and record
+ * keep the minutes it first took.
+ */
+export const earlierMinutes = (dir) => {
+  const started = Date.parse(readIf(join(dir, STARTED)).trim());
+  const exit = join(dir, existsSync(join(dir, 'exit')) ? 'exit' : 'verify.exit');
+  if (!Number.isFinite(started) || !existsSync(exit)) return 0;
+  return Math.max(0, (statSync(exit).mtimeMs - started) / 60_000);
 };
 
 /**
@@ -83,7 +95,7 @@ export const dispatch = async (ctx, area, role, spec) => {
     const { reply, record } = agentFor(ctx.cfg, role).resultOf(earlier.raw, { cfg: ctx.cfg, role });
     const usage = model ? { area: area.id, role, node: 'earlier', ...record, exit: earlier.exit, reused: true } : undefined;
     if (usage) ctx.usage(usage);
-    return { status: 0, launched: true, node: 'earlier', minutes: 0, reply, usage };
+    return { status: 0, launched: true, node: 'earlier', minutes: earlierMinutes(spec.to), reply, usage };
   }
   let roomWaits = 0;
   let refusals = 0;

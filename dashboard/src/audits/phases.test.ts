@@ -184,6 +184,12 @@ describe('laneStepsOf', () => {
     expect(countedFillOf(6, 6, 2)).toBe(1);
   });
 
+  it("leaves the fixer's checks column saying how many it fixed once the fix is done", () => {
+    const checks = (fix: LaneStep) => laneStepsOf(lane({ fix }), NOW).find((s) => s.id === 'checks')!.label;
+    expect(checks(done({ commits: 2 }))).toBe('checked');
+    expect(checks(done({ commits: 2, fixed: 4 }))).toBe('4 fixed');
+  });
+
   it('says a step is queued once the step before it has finished, and nothing for one further on', () => {
     const label = (steps: Partial<Record<LaneStepName, LaneStep>>, id: string) => laneStepsOf(lane(steps), NOW).find((s) => s.id === id)!.label;
     const matchedLane = { A: done({ findings: 2 }), B: done({ findings: 1 }), match: matched(2, 1, 1) };

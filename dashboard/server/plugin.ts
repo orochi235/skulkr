@@ -34,11 +34,15 @@ export interface SkulkrRunnerOptions {
   readonly cache?: boolean;
 }
 
+const MAP_TIMEOUT_MS = 120_000;
+
 /** A runner for the CLI at `bin`, in `cwd`, with `env`: the server's own unless given. */
 export function createSkulkrRunner({ bin = SKULKR_BIN, env = process.env, cwd, exec = execFile }: SkulkrRunnerOptions = {}): SkulkrRunner {
   const dir = cwd ?? env.SKULKR_ROOT ?? process.cwd();
   return (args) => new Promise((done, fail) => {
-    exec(process.execPath, [bin, ...args], { cwd: dir, env, maxBuffer: 32 * 1024 * 1024, timeout: 60_000 },
+    // A map takes seconds, and a minute or more on a machine a round has loaded; past this it is killed, and the page
+    // keeps the map before it.
+    exec(process.execPath, [bin, ...args], { cwd: dir, env, maxBuffer: 32 * 1024 * 1024, timeout: MAP_TIMEOUT_MS },
       (error, stdout, stderr) => (error ? fail(new Error(String(stderr).trim() || error.message)) : done(String(stdout))));
   });
 }

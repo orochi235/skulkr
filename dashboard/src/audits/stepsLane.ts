@@ -78,7 +78,7 @@ function checksSpan(fix: LaneStep): SpanStripSpan {
   const state = fix.state === 'done' ? 'done' : fix.state === 'failed' ? 'failed' : checking ? 'active' : 'pending';
   return {
     id: 'checks', start: CHECKS_COLUMN.start, ms: CHECKS_COLUMN.width, title: ['the fixer\'s checks', checksText(fix), fix.now?.text ?? ''].filter(Boolean).join('\n'),
-    label: checking ? [fix.node ?? '', checksText(fix)].filter(Boolean).join(NODE_SEP) : '', state, fill: state === 'pending' ? 0 : 1, color: 'var(--audit-checks)',
+    label: checking ? [fix.node ?? '', checksText(fix)].filter(Boolean).join(NODE_SEP) : state === 'done' ? (fix.fixed !== undefined ? `${fix.fixed} fixed` : 'checked') : '', state, fill: state === 'pending' ? 0 : 1, color: 'var(--audit-checks)',
   };
 }
 

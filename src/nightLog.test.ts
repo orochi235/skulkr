@@ -169,6 +169,14 @@ describe('nightLanes repair step', () => {
     expect(nightLanes(fix, ['a'], running)[0]!.steps.repair).toEqual({ state: 'running', node: 'msb-uai', since: '2026-11-20T23:00:00Z', job: 'verify' });
   });
 
+  it("keeps a step's first node and minutes over a resumed round's replay of it", () => {
+    const log = ['review 1/2 a A on local: 3 findings, 9/9 files read, 2.6 min, 0.4M weighted tokens', 'fix 1/1 a on local: 4 commits, 27.3 min, 0.5M weighted tokens',
+      'review 1/2 a A on earlier: 3 findings, 9/9 files read, 0.0 min, 0.4M weighted tokens', 'fix 1/1 a on earlier: 4 commits, 0.0 min, 0.5M weighted tokens'];
+    const { steps } = nightLanes(log.join('\n'), ['a'])[0]!;
+    expect(steps.A).toMatchObject({ node: 'local', minutes: 2.6 });
+    expect(steps.fix).toMatchObject({ node: 'local', minutes: 27.3 });
+  });
+
   it("counts a numbered repair once, though a resumed round logs its reused line again", () => {
     const line = 'repair a 1/2 on local: 1 commits, 22.0 min; verify passed';
     const log = [fix, 'verify a: failed: 1 of 9 test files failed (x.test.ts)', line, 'verify a: failed: 1 of 9 test files failed (x.test.ts)', line.replace('local: 1 commits, 22.0', 'earlier: 1 commits, 0.0')];

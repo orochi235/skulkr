@@ -61,6 +61,10 @@ const capstoneLaid = (line) => {
  * reach. A stage takes a line's kind alone, so a review line that gives no findings still counts toward `reviewing`;
  * a step needs the line's whole form.
  */
+/** A step done from a log line, unless it is a resumed round's replay (`on earlier`) of a step an earlier line already
+ *  finished, whose node and minutes it would otherwise overwrite with the replay's. */
+const doneFrom = (step, fields) => (fields.node === 'earlier' && step.state === 'done' ? step : Object.assign(step, fields));
+
 const readLog = (log, names) => {
   const steps = new Map();
   const stages = new Map();
@@ -77,7 +81,7 @@ const readLog = (log, names) => {
       reviews.set(m[1], n);
       stages.set(m[1], n >= 2 ? 'reviewed' : 'reviewing');
       if ((done = /^review \d+\/\d+ \S+ [AB] on (\S+): (\d+) findings, (\d+)\/(\d+) files read, ([\d.]+) min/.exec(line))) {
-        Object.assign(at(m[1])[m[2]], { state: 'done', node: done[1], findings: Number(done[2]), read: Number(done[3]), files: Number(done[4]), minutes: Number(done[5]) });
+        doneFrom(at(m[1])[m[2]], { state: 'done', node: done[1], findings: Number(done[2]), read: Number(done[3]), files: Number(done[4]), minutes: Number(done[5]) });
       }
     } else if ((m = /^match \d+\/\d+ (\S+):/.exec(line))) {
       stages.set(m[1], 'matched');
@@ -87,7 +91,7 @@ const readLog = (log, names) => {
     } else if ((m = /^fix \d+\/\d+ (\S+) on /.exec(line))) {
       stages.set(m[1], 'fixed');
       if ((done = /^fix \d+\/\d+ \S+ on (\S+): (\d+) commits, ([\d.]+) min/.exec(line))) {
-        Object.assign(at(m[1]).fix, { state: 'done', node: done[1], commits: Number(done[2]), minutes: Number(done[3]) });
+        doneFrom(at(m[1]).fix, { state: 'done', node: done[1], commits: Number(done[2]), minutes: Number(done[3]) });
       }
     } else if ((m = /^patch (\S+): /.exec(line))) {
       stages.set(m[1], 'patched');
