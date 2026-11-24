@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CLOCK_AHEAD_MINUTES, laneViewOf, runClockOf } from './clockLane';
 import { TYPICAL_MINUTES, agentsRunningIn, isFinished, passDone, phaseColor, phaseOf, phasesOf, stageCountsOf, withLivePasses } from './phases';
-import { STEP_COLUMN_COUNT, laneStepsOf } from './stepsLane';
+import { STEP_COLUMN_COUNT, countedFillOf, laneStepsOf } from './stepsLane';
 import fixture from './fixture.map.json';
 import type { AuditLane, AuditRun, LaneStep, LaneStepName, SkulkrMap } from './skulkrMap.types';
 
@@ -60,7 +60,7 @@ describe('laneViewOf', () => {
       ['A', 2, 3, 'done'], ['B', 5, 1, 'done'], ['match', 6, TYPICAL_MINUTES.match, 'done'], ['fix', 18, 12, 'active'], ['patch', 30, TYPICAL_MINUTES.patch, 'pending'],
     ]);
     expect(view.elapsed).toBe('12 min');
-    expect(view.spans.map((s) => s.label)).toEqual(['A 5 found · 3.0 min', 'B 2 found · 4.0 min', '2 shared, 3 unique', 'studio · 12 min', '5 found']);
+    expect(view.spans.map((s) => s.label)).toEqual(['A 5 found · 3.0 min', 'B 2 found · 4.0 min', '5 total (2 shared)', 'studio · 12 min', '5 found']);
     expect(view.spans.map((s) => s.color).slice(0, 3)).toEqual([phaseColor('review'), phaseColor('reviewed'), phaseColor('match')]);
   });
 
@@ -176,6 +176,23 @@ describe('laneStepsOf', () => {
     expect(spans[2]!.label).toBe('');
   });
 
+  it('moves a counted step on by its minutes between counts, never as far as the next count', () => {
+    expect(countedFillOf(0, 6, 0)).toBe(0);
+    expect(countedFillOf(0, 6, 0.1)).toBeCloseTo(0.1);
+    expect(countedFillOf(0, 6, 0.5)).toBeCloseTo(0.9 / 6);
+    expect(countedFillOf(3, 6, 0.1)).toBe(0.5);
+    expect(countedFillOf(6, 6, 2)).toBe(1);
+  });
+
+  it('says a step is queued once the step before it has finished, and nothing for one further on', () => {
+    const label = (steps: Partial<Record<LaneStepName, LaneStep>>, id: string) => laneStepsOf(lane(steps), NOW).find((s) => s.id === id)!.label;
+    const matchedLane = { A: done({ findings: 2 }), B: done({ findings: 1 }), match: matched(2, 1, 1) };
+    expect(label(matchedLane, 'fix')).toBe('queued');
+    expect(label(matchedLane, 'verify')).toBe('');
+    expect(label({ ...matchedLane, fix: done({ commits: 2 }) }, 'verify')).toBe('queued');
+    expect(label({}, 'fix')).toBe('');
+  });
+
   it('runs A, then B, then every later step a column after, on one stripe', () => {
     const spans = laneStepsOf(lane({}), NOW);
     expect(spans.map((s) => [s.id, s.start, s.track, s.trackSpan])).toEqual([
@@ -192,7 +209,8 @@ describe('laneStepsOf', () => {
   it('fills a running step by its own count where onto reports one, and says the count', () => {
     const fixing = lane({ A: done({ findings: 5 }), B: done({ findings: 3 }), match: matched(5, 3, 0), fix: { ...running(at(6)), done: 3, total: 8 } });
     const fix = laneStepsOf(fixing, NOW).find((s) => s.id === 'fix')!;
-    expect(fix.fill).toBe(3 / 8);
+    // Past its typical minutes, it sits most of the way to its next commit.
+    expect(fix.fill).toBeCloseTo((3 + 0.9) / 8);
     expect(fix.label).toMatch(/^studio · 3\/8 · \d/);
     const checking = laneStepsOf(lane({ fix: { ...running(at(6)), done: 8, total: 8 } }), NOW);
     expect(checking.find((s) => s.id === 'fix')!.fill).toBe(1);

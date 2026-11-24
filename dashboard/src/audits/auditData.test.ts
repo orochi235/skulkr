@@ -17,7 +17,7 @@ describe('lanes', () => {
   it('says what each step of an area has done, or how long it has been running', () => {
     const ops = live.lanes[0]!;
     expect(stepText('A', ops.steps.A, now)).toBe('5 found · 2.8 min');
-    expect(stepText('match', ops.steps.match, now)).toBe('2 shared, 3 unique');
+    expect(stepText('match', ops.steps.match, now)).toBe('5 total (2 shared)');
     expect(stepText('fix', ops.steps.fix, now)).toBe('studio · 12 min');
     expect(stepText('patch', ops.steps.patch, now)).toBe('after fix');
     expect(stepText('B', live.lanes[1]!.steps.B, now)).toBe('studio · <1 min');
@@ -103,7 +103,7 @@ describe('jobs', () => {
       node: 'teitou', minutes: 1.5, tokens: 0.4, of: '3/4', bad: true,
     });
     expect(parseJob('fix 2/4 core.ops on studio: 3 commits, 12.0 min, 0.81M weighted tokens')).toMatchObject({ kind: 'fix', tokens: 0.81 });
-    expect(parseJob('match 1/4 core.ops: 2 shared of 5 + 4')).toMatchObject({ kind: 'match', what: '2 shared, 5 unique' });
+    expect(parseJob('match 1/4 core.ops: 2 shared of 5 + 4')).toMatchObject({ kind: 'match', what: '7 total (2 shared)' });
     expect(parseJob('fleet: 2 failed')).toMatchObject({ kind: 'fleet', bad: true });
     expect(parseJob('something else')).toBeNull();
   });
