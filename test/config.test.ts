@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { configPath, merge, resolveConfig } from '../src/config.mjs';
 import { loadRunner } from '../src/runner/index.mjs';
 import { nodeOfLaunch, ontoArgs } from '../src/runner/onto.mjs';
+import weasel from '../examples/weasel.config.mjs';
 import { weaselConfig } from './weaselConfig.ts';
 
 describe('resolveConfig', () => {
@@ -72,5 +73,41 @@ describe('runners', () => {
     const runner = { run: async () => ({ status: 0 }), unavailableNodes: () => new Set(), jobs: () => [] };
     expect(await loadRunner(resolveConfig({ runner }))).toBe(runner);
     await expect(loadRunner(resolveConfig({ runner: { run: () => 0 } }))).rejects.toThrow('lacks unavailableNodes, jobs');
+  });
+});
+
+describe('local mode', () => {
+  const env = { CLAUDE_CONFIG_DIR: '/acct/starting' };
+
+  it('runs every job on this machine as the starting account, pushes nothing, and refuses the web tools', () => {
+    const cfg = resolveConfig({ runner: 'onto', concurrency: { review: 18 }, nodes: { list: ['studio'], fixSlots: 6 }, claude: { configDir: '~/.other' } }, { local: true, env });
+    expect(cfg.local.on).toBe(true);
+    expect(cfg.runner).toBe('local');
+    expect(cfg.nodes).toMatchObject({ list: ['local'], local: null, reviewSlots: 3, fixSlots: 2 });
+    expect(cfg.concurrency).toEqual({ review: 3, fix: 2 });
+    expect(cfg.git).toMatchObject({ remote: 'origin', push: false });
+    expect(cfg.claude.configDir).toBe('/acct/starting');
+    expect(cfg.claude.denied).toEqual(['WebFetch', 'WebSearch']);
+  });
+
+  it('falls back to the config\'s account, and is off unless asked for or enabled', () => {
+    expect(resolveConfig({ claude: { configDir: '~/.other' } }, { local: true, env: {} }).claude.configDir).toBe('~/.other');
+    expect(resolveConfig({ local: { enabled: true } }, { env: {} }).local.on).toBe(true);
+    const off = resolveConfig({ runner: 'onto' }, { env });
+    expect([off.local.on, off.runner, off.git.push, off.claude.denied]).toEqual([false, 'onto', true, []]);
+  });
+
+  it('replaces whole the settings its override names, and refuses an agent other than claude', () => {
+    const cfg = resolveConfig({ gate: { name: 'fleet', jobs: { build: 'x' } }, local: { override: { gate: { name: 'here' } } } }, { local: true, env });
+    expect(cfg.gate).toMatchObject({ name: 'here', jobs: {} });
+    expect(() => resolveConfig({ agent: { review: 'codex' } }, { local: true, env })).toThrow('local mode runs every job on claude; the config\'s agent names codex');
+  });
+
+  it('runs weasel\'s gate as its own suite on this machine', () => {
+    const cfg = resolveConfig({ ...weasel }, { file: new URL('../examples/weasel.config.mjs', import.meta.url).pathname, local: true, env });
+    expect(cfg.gate.command.slice(0, 2)).toEqual(['npm', 'test']);
+    expect(Object.keys(cfg.gate.progress)).toEqual(['tests']);
+    expect(cfg.checks.preflight.gateArgs).toEqual([]);
+    expect(weaselConfig().gate.name).toBe('test:batch');
   });
 });

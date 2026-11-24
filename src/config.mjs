@@ -157,6 +157,13 @@ export const DEFAULTS = {
    */
   localFix: { enabled: false, slots: 2 },
   /**
+   * Local mode (README "Local mode"): every job on this machine, on Claude Code as the account that starts the run,
+   * with nothing pushed, no web tools, and npm offline. `enabled` turns it on for every run, as `--local` does for one.
+   * `override` replaces, key by key at the top level, the config's settings that reach off the machine (a gate that
+   * runs on a fleet); it is read only in local mode.
+   */
+  local: { enabled: false, override: {} },
+  /**
    * Jobs at once across every node, by role, under a runner that places jobs itself (onto). Unset: the per-node
    * slots times the nodes listed, or one node's slots when none are.
    */
@@ -183,6 +190,8 @@ export const DEFAULTS = {
   claude: {
     /** `CLAUDE_CONFIG_DIR` for every job, or unset for the node's default. */
     configDir: undefined,
+    /** Tools every job is refused, beside each role's own; local mode adds the web tools. */
+    denied: [],
     /** Unset: the model and effort the job's settings give, or the account's default. */
     models: { review: undefined, fix: undefined, match: 'haiku' },
     effort: { review: undefined, fix: undefined, match: undefined },
@@ -294,6 +303,29 @@ const concurrencyFor = (given, nodes) => {
   return { review: given?.review ?? nodes.reviewSlots * n, fix: given?.fix ?? nodes.fixSlots * n };
 };
 
+/** The account a run's own jobs start as: the `CLAUDE_CONFIG_DIR` it was started under, else `claude.configDir`. */
+export const startingAccountOf = (user, env = process.env) => env.CLAUDE_CONFIG_DIR || user.claude?.configDir || undefined;
+
+/** What local mode sets in a run's own environment, so every job and command it starts inherits it. */
+export const LOCAL_ENV = { CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1', npm_config_offline: 'true' };
+const WEB_TOOLS = ['WebFetch', 'WebSearch'];
+
+/** `user` as local mode runs it: its `local.override` over it, and every job on this machine as the starting account. */
+const localOf = (user, env) => {
+  const u = { ...user, ...user.local?.override };
+  const agents = typeof u.agent === 'object' && u.agent ? Object.values(u.agent) : [u.agent ?? 'claude'];
+  const other = agents.find((a) => a !== 'claude');
+  if (other) throw new Error(`local mode runs every job on claude; the config's agent names ${other}`);
+  return {
+    ...u,
+    runner: 'local',
+    nodes: { reviewSlots: undefined, fixSlots: undefined, ...u.local?.override?.nodes, list: [], local: null },
+    concurrency: {},
+    git: { ...u.git, push: false },
+    claude: { ...u.claude, configDir: startingAccountOf(user, env), denied: [...new Set([...(u.claude?.denied ?? []), ...WEB_TOOLS])] },
+  };
+};
+
 const isPlain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) && !(v instanceof RegExp) && Object.getPrototypeOf(v) === Object.prototype;
 
 /** `over` laid on `base`: plain objects merge key by key; anything else, arrays included, replaces. */
@@ -319,9 +351,12 @@ const expandHome = (p) => (p?.startsWith('~/') ? join(homedir(), p.slice(2)) : p
 /**
  * The settings a run reads: `user` (a project's config object) over the defaults, with derived values. `file` is the
  * config's path, which relative paths in it are read against; `root` overrides the config's root.
+ * @param {Record<string, any>} [user]
+ * @param {{ file?: string, root?: string, local?: boolean, env?: Record<string, string | undefined> }} [opts]
  */
-export const resolveConfig = (user = {}, { file, root } = {}) => {
-  const c = merge(DEFAULTS, user);
+export const resolveConfig = (user = {}, { file, root, local = false, env = process.env } = {}) => {
+  const on = Boolean(local || user.local?.enabled);
+  const c = merge(DEFAULTS, on ? localOf(user, env) : user);
   const base = file ? dirname(file) : process.cwd();
   const name = c.name ?? 'project';
   const p = c.partition;
@@ -350,6 +385,7 @@ export const resolveConfig = (user = {}, { file, root } = {}) => {
     ...c,
     name,
     file,
+    local: { ...c.local, on },
     nodes: nodesFor(c.nodes, c.runner),
     concurrency: concurrencyFor(c.concurrency, nodesFor(c.nodes, c.runner)),
     root: root ?? (c.root ? resolve(base, expandHome(c.root)) : undefined),
@@ -458,13 +494,13 @@ export const configPath = ({ config, root } = {}, env = process.env) => {
  * Reads and resolves a project's config; `root` (or `SKULKR_ROOT`) overrides the root it names. `fresh` reads the file
  * as it is now rather than as this process first imported it (the modules it imports stay as first imported).
  */
-export const loadConfig = async ({ config, root, fresh = false } = {}, env = process.env) => {
+export const loadConfig = async ({ config, root, fresh = false, local = false } = {}, env = process.env) => {
   const file = configPath({ config, root }, env);
   if (!existsSync(file)) throw new Error(`no config at ${file}; write a ${CONFIG_FILE} (README.md says how) or pass --config`);
   const mod = await import(`${pathToFileURL(file).href}${fresh ? `?mtime=${statSync(file).mtimeMs}` : ''}`);
   const user = typeof mod.default === 'function' ? await mod.default() : mod.default;
   const rootAt = root ?? env.SKULKR_ROOT;
-  return resolveConfig(user ?? {}, { file, root: rootAt ? resolve(expandHome(rootAt)) : undefined });
+  return resolveConfig(user ?? {}, { file, root: rootAt ? resolve(expandHome(rootAt)) : undefined, local, env });
 };
 
 /** A path in the project as given in the config: absolute as is, else from the config's directory. */

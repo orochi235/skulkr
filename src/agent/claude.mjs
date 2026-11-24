@@ -15,11 +15,15 @@ const PROGRESS_IN = `${JOB_IN}/progress.mjs`;
 const model = (name) => (name ? ['--model', name] : []);
 const effort = (level) => (level ? ['--effort', level] : []);
 
-/** The flags that set what each role may do. */
+/** The flags that set what each role may do; `denied`, refused to every role, joins each role's own refusals. */
 const roleFlags = (c, role) => {
-  if (role === 'review') return ['--allowedTools', q(c.reviewTools.join(',')), '--disallowedTools', q(c.reviewDenied.join(',')), ...model(c.models.review), ...effort(c.effort?.review)];
-  if (role === 'match') return ['--disallowedTools', q('Bash,Edit,Write,Task,Agent'), ...model(c.models.match), ...effort(c.effort?.match)];
-  return ['--dangerously-skip-permissions', ...model(c.models.fix), ...effort(c.effort?.fix)];
+  const deny = (own) => {
+    const all = [...own, ...(c.denied ?? [])];
+    return all.length ? ['--disallowedTools', q(all.join(','))] : [];
+  };
+  if (role === 'review') return ['--allowedTools', q(c.reviewTools.join(',')), ...deny(c.reviewDenied), ...model(c.models.review), ...effort(c.effort?.review)];
+  if (role === 'match') return [...deny(['Bash', 'Edit', 'Write', 'Task', 'Agent']), ...model(c.models.match), ...effort(c.effort?.match)];
+  return ['--dangerously-skip-permissions', ...deny([]), ...model(c.models.fix), ...effort(c.effort?.fix)];
 };
 
 /**

@@ -62,7 +62,7 @@ const FIXUP = [
 
 const NVM = 'export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"; . "$NVM_DIR/nvm.sh" >/dev/null; nvm use >/dev/null';
 
-export default {
+const config = {
   name: 'weasel',
   // Kept here in skulkr, so it names weasel's checkout; at cutover drop it: unset is the repo holding the config.
   root: '~/src/weasel',
@@ -195,4 +195,19 @@ export default {
 
   sweep,
   icons,
+};
+
+// Local mode runs the gate on this machine: weasel's own suite, in the batch's tree, with the reporter that prints its
+// `fleet-fail:` lines, after a preflight that no longer tells it `--no-checks` (README "Local mode").
+export default {
+  ...config,
+  local: {
+    override: {
+      gate: {
+        name: 'test', command: ['npm', 'test', '--', '--reporter=default', '--reporter=./scripts/vitest-fleet-fail.mjs'], cwd: 'batch',
+        progress: { tests: '' }, failPrefix: 'fleet-fail:', blame: blameStep,
+      },
+      checks: { ...config.checks, preflight: { ...config.checks.preflight, gateArgs: [] } },
+    },
+  },
 };

@@ -3,12 +3,12 @@
  * README.md at the repository root is its documentation.
  *
  *   skulkr night [--areas K] [--only <id>,…] [--nodes <a>,…] [--dry] [--no-merge]
- *     [--cap-usd N] [--budget-review USD] [--budget-match USD] [--budget-fix USD] [--sweep] [--fix-only [a,…]] [--local-fix]
+ *     [--cap-usd N] [--budget-review USD] [--budget-match USD] [--budget-fix USD] [--sweep] [--fix-only [a,…]] [--local-fix] [--local]
  */
 import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { runArea } from './area.mjs';
-import { localFixLine, localFixOf, parseArgs } from './args.mjs';
+import { localFixLine, localFixOf, localLine, parseArgs } from './args.mjs';
 import { strandedHoldFor, strandedRoundsFor } from './stranded.mjs';
 import { capstoneRepairer, repairRefusal } from './capstone.mjs';
 import { gateBaseline } from './repair.mjs';
@@ -16,7 +16,7 @@ import { checksFor } from './preflight.mjs';
 import { gateAhead } from './fleet.mjs';
 import { areasAtOnce, startAreas } from './admit.mjs';
 import { addWorktree, gitIn, mainCheckout, removeWorktree } from './batch.mjs';
-import { JOB_IN, nextClock } from './config.mjs';
+import { JOB_IN, LOCAL_ENV, nextClock } from './config.mjs';
 import { fixOnlyAreas } from './fixOnly.mjs';
 import { runUntilFree } from './jobs.mjs';
 import { createSlots } from './slots.mjs';
@@ -162,6 +162,8 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
   if (!args.dry && !args.places && !args.nodes?.length && !cfg.nodes.list.length && !cfg.nodes.local) {
     throw new Error(`the config names no nodes for the ${typeof cfg.runner === 'string' ? cfg.runner : 'configured'} runner; set nodes.list or pass --nodes`);
   }
+  // Every job and command the run starts inherits its environment, so local mode's settings go there.
+  if (cfg.local.on) Object.assign(process.env, LOCAL_ENV);
   const root = mainCheckout(cfg);
   const git = gitIn(root);
   const held = args.resume === undefined ? strandedHoldFor(strandedRoundsFor(cfg, git), cfg.maxUnmergedRounds) : null;
@@ -198,6 +200,7 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
   try {
     frozen = addWorktree(root, cfg.names.frozen(p.round), p.commit);
     const ctx = runContext({ cfg, runner, root, p, args, status, frozen, say, setStep });
+    if (cfg.local.on) say(localLine(cfg));
     if (ctx.localFix) say(localFixLine(cfg, ctx.localFix));
     mkdirSync(join(frozen, JOB_IN), { recursive: true });
     // The sweep is one job on one node; the reviews fill every other slot while it runs.

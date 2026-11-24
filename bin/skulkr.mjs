@@ -30,7 +30,7 @@ import { serve } from '../src/service.mjs';
 import { trialCommand } from '../src/trial.mjs';
 import { addTenant, readTenants, removeTenant, requireTenant, tenantsPath } from '../src/tenants.mjs';
 
-const USAGE = 'usage: skulkr <init|night|partition|map|defects|trial|service|config|tenants|menu> [--config <file> | --tenant <name>] [--root <dir>] …';
+const USAGE = 'usage: skulkr <init|night|partition|map|defects|trial|service|config|tenants|menu> [--config <file> | --tenant <name>] [--root <dir>] [--local] …';
 
 /** `argv` less `--config`, `--tenant` and `--root` and their values, and those values. */
 const takeOptions = (argv) => {
@@ -38,6 +38,7 @@ const takeOptions = (argv) => {
   const opts = {};
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--config' || argv[i] === '--root' || argv[i] === '--tenant') opts[argv[i].slice(2)] = argv[++i];
+    else if (argv[i] === '--local') opts.local = true;
     else rest.push(argv[i]);
   }
   if (opts.tenant !== undefined) {

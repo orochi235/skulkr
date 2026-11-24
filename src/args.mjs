@@ -1,4 +1,5 @@
 /** `skulkr night`'s flags, read against the config's defaults. README.md, "A run", lists them. */
+import { startingAccountOf } from './config.mjs';
 import { fixOnlyArg } from './fixOnly.mjs';
 
 /** A run's dollar cap when none is given: `budget.areaCapUsd` for each of its `areas`, or else `budget.capUsd`. */
@@ -9,7 +10,11 @@ export const capFor = (budget, areas) => (budget.areaCapUsd == null ? budget.cap
  * started under, else the config's `claude.configDir` (unset: the CLI's default account). Null otherwise.
  */
 export const localFixOf = (cfg, args, env = process.env) =>
-  (args.localFix ? { account: env.CLAUDE_CONFIG_DIR || cfg.claude?.configDir || undefined } : null);
+  (args.localFix ? { account: startingAccountOf(cfg, env) } : null);
+
+/** The log's and the dry plan's line for a run in local mode (README "Local mode"). */
+export const localLine = (cfg) =>
+  `local: every job on this machine, as ${cfg.claude.configDir ?? "the CLI's default account"}; nothing pushed, no web tools, npm offline`;
 
 /** The log's and the dry plan's line for a run's local fixers (`localFixOf`). */
 export const localFixLine = (cfg, local) =>

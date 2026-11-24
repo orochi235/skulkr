@@ -93,6 +93,7 @@ export default {
 
   runner: 'local',                    // or 'onto', a module path exporting createRunner(cfg), or a runner object
   localFix: { enabled: false, slots: 2 }, // fixers and repairs on this machine, as the starting account ("Local fixers")
+  local: { enabled: false, override: {} }, // every job on this machine, nothing pushed ("Local mode")
   nodes: {
     list: [],                         // nodes jobs are offered to; the local runner's is ['local']; unused under onto
     local: null,                      // or { name, from: '00:00', until: '09:00', fixers: false }: a node usable only in a window
@@ -101,6 +102,7 @@ export default {
   concurrency: { review: 18, fix: 18 }, // jobs at once across the fleet, under a runner that places them (onto)
   claude: {
     configDir: undefined,             // CLAUDE_CONFIG_DIR for every job; unset, the CLI's default account
+    denied: [],                       // tools refused to every job; local mode adds WebFetch and WebSearch
     models: { match: 'haiku' },       // per role (review, match, fix); unset takes what the job's settings give
     effort: {},                       // per role, `--effort`; unset likewise
     settingSources: 'project,local',  // `--setting-sources`: the node account's own settings stay out; null omits it
@@ -165,6 +167,7 @@ the config names one, gets a row.
 | `--anyway` | | start even though stranded rounds hold new ones back (see "Stranded rounds") |
 | `--sweep` | | run the configured sweep too |
 | `--fix-only [a,b]` | | a fix-only round for these areas, or every area with open findings; see "Carried findings" |
+| `--local` | `local.enabled` | local mode: nothing leaves this machine but its model calls; see "Local mode". Any command takes it, so `skulkr config --local` prints the config as local mode runs it |
 | `--local-fix` | `localFix.enabled` | run fixers and repairs on this machine, as the account that started the run; see "Local fixers" |
 | `--resume N` | | pick round N back up, reusing every job whose result came home; it stops starting areas at the first `schedule.stopAt` after the resume. Under the plan lock, it leaves out the areas a live run holds. A round lands once: when its status or `summary.json` names a `landed` tip (set once `main` fast-forwards, with the areas it carried) that `main` still holds, it resumes nothing and says the round already landed |
 | `--cap-usd N` | `budget.areaCapUsd` × `--areas`, else `budget.capUsd` | list-price dollars the run may spend |
@@ -381,6 +384,28 @@ the rules a fixer reads do not.
 A fixer runs its brief's own checks where it runs, so each local fixer runs tests and lints on this machine. Each clone
 also keeps its own `node_modules`. The flag needs the onto or the local runner; under the local runner, where every
 job is local already, it changes only the account. A resumed round takes the flag again from its own command line.
+
+### Local mode
+
+With `--local` (or `local.enabled`), the run's only traffic off this machine is its model calls, made by Claude Code as
+the account that started the run. Every job (reviews, matches, fixes, repairs) and every check runs here.
+
+| | Under `--local` |
+|---|---|
+| Runner | `local`, whatever the config names; its nodes and concurrency go back to the local runner's defaults |
+| Agent | `claude` for every role; a config naming another agent is refused before anything runs |
+| Account | the `CLAUDE_CONFIG_DIR` the run was started under, else `claude.configDir`, else the CLI's default account |
+| `main` | fast-forwarded locally, never pushed (`git.push` is off) |
+| Model jobs | refused `WebFetch` and `WebSearch`, beside each role's own refusals |
+| The run's environment | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` (no telemetry, error reports, or updates) and `npm_config_offline=true` (`npm ci` and `npx` use only npm's cache, and fail rather than download), inherited by every job and command the run starts |
+
+skulkr cannot see what a project's own commands do. A gate or preflight that sends work to a fleet still does, so
+`local.override` names the settings local mode replaces: each top-level key it holds replaces the config's whole,
+`gate` included, so no fleet-only field is left behind. weasel's swaps `test:batch` for `npm test` in the batch's
+tree, and its preflight stops telling the gate `--no-checks`.
+
+The dry plan and the night log open with a `local:` line naming the account. Like `--local-fix`, a resumed round takes
+the flag again from its own command line.
 
 ## Agents
 
