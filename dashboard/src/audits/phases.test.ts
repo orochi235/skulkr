@@ -184,6 +184,11 @@ describe('laneStepsOf', () => {
     expect(countedFillOf(6, 6, 2)).toBe(1);
   });
 
+  it("counts a running fixer's failing checks with the fail mark before the number", () => {
+    const checking = lane({ fix: { ...running(at(6)), done: 3, total: 3, checks: { done: 2, total: 3, failed: 1 } } });
+    expect(laneStepsOf(checking, NOW).find((s) => s.id === 'checks')!.label).toBe('studio · 2/3 · ✗1');
+  });
+
   it("leaves the fixer's checks column saying how many it fixed once the fix is done", () => {
     const checks = (fix: LaneStep) => laneStepsOf(lane({ fix }), NOW).find((s) => s.id === 'checks')!.label;
     expect(checks(done({ commits: 2 }))).toBe('checked');

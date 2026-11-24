@@ -70,9 +70,9 @@ function repairSpan(r: LaneStep | undefined, now: number): SpanStripSpan {
 }
 
 
-/** A running fixer's checks, `6/7 · 2 ✗`, or '' where none are counted. */
+/** A running fixer's checks, `6/7 · ✗2`, or '' where none are counted. */
 const checksText = (fix: LaneStep): string =>
-  (fix.checks && fix.checks.total ? `${fix.checks.done}/${fix.checks.total}${fix.checks.failed ? ` · ${fix.checks.failed} ${FAIL}` : ''}` : '');
+  (fix.checks && fix.checks.total ? `${fix.checks.done}/${fix.checks.total}${fix.checks.failed ? ` · ${FAIL}${fix.checks.failed}` : ''}` : '');
 
 /** The fixer's checks: lit while it runs them, carrying the node doing it, and filled once it ends. */
 function checksSpan(fix: LaneStep): SpanStripSpan {
