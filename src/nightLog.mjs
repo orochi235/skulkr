@@ -9,6 +9,8 @@ import { fixTallyOf } from './findings.mjs';
 const NAMES = resolveConfig().names;
 
 const LANE_STEPS = ['A', 'B', 'match', 'fix', 'patch'];
+/** The line a resumed run writes first into its round's log, before the time it resumed (`night.mjs`). */
+export const RESUMED = 'resumed: ';
 const waitingSteps = () => Object.fromEntries(LANE_STEPS.map((s) => [s, { state: 'waiting' }]));
 
 /**
@@ -134,6 +136,11 @@ const bestFinished = (jobs, minutes) => {
  */
 export const nightLanes = (log, areas, jobs = [], reports = new Map(), names = NAMES) => {
   const { steps: read } = readLog(log, names);
+  // What the log says since the round last resumed: a step done only before that is the earlier run's, and a job
+  // running for it now is that step done again.
+  const resumed = log.lastIndexOf(`\n${RESUMED}`);
+  const sinceResume = resumed === -1 ? null : readLog(log.slice(resumed), names).steps;
+  const earlierRuns = (id, name) => sinceResume !== null && (sinceResume.get(id)?.[name]?.state ?? 'waiting') === 'waiting';
   const lanes = new Map(areas.map((id) => [id, read.get(id) ?? waitingSteps()]));
   const at = (id, step) => lanes.get(id)?.[step];
   for (const [id, steps] of lanes) {
@@ -160,8 +167,18 @@ export const nightLanes = (log, areas, jobs = [], reports = new Map(), names = N
     if (job.finished) {
       const key = `${m[1]}\n${m[2]}`;
       finished.set(key, [...(finished.get(key) ?? []), job]);
-    } else if (step.state === 'waiting' || (m[2] === 'repair' && step.state === 'running')) {
+    } else if (step.state === 'waiting' || (m[2] === 'repair' && step.state === 'running') || earlierRuns(m[1], m[2])) {
       const { done, total, checks, tests, now } = job.progress ?? {};
+      const lane = lanes.get(m[1]);
+      // Redone after a resume: nothing of the earlier run's attempt at it, or at the steps after it, still holds.
+      if (step.state !== 'waiting' && step.state !== 'running') {
+        for (const later of [...LANE_STEPS.slice(LANE_STEPS.indexOf(m[2]) + 1), 'repair']) {
+          if (later === m[2] || !lane[later] || !earlierRuns(m[1], later)) continue;
+          if (later === 'repair') delete lane.repair;
+          else lane[later] = { state: 'waiting' };
+        }
+        for (const key of Object.keys(step)) delete step[key];
+      }
       Object.assign(step, { state: 'running', node: job.node, since: job.started, ...(m[2] === 'repair' ? { job: kind } : {}),
         ...(Number.isFinite(total) ? { done, total } : {}),
         ...(checks ? { checks } : {}), ...(tests ? { tests } : {}), ...(now ? { now } : {}) });

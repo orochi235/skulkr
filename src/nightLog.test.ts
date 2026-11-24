@@ -169,6 +169,20 @@ describe('nightLanes repair step', () => {
     expect(nightLanes(fix, ['a'], running)[0]!.steps.repair).toEqual({ state: 'running', node: 'msb-uai', since: '2026-11-20T23:00:00Z', job: 'verify' });
   });
 
+  it("shows a step a resumed round redoes as running, with nothing of the earlier run's attempt after it", () => {
+    const log = ['review 1/2 a A on local: 3 findings, 9/9 files read, 2.6 min, 0.4M weighted tokens', 'review 2/2 a B on local: 2 findings, 9/9 files read, 3.0 min, 0.4M weighted tokens',
+      'match 1/1 a: 1 shared of 3 + 2', 'fix 1/1 a on local: 0 commits, 12.1 min, 0.00M weighted tokens', 'verify a: failed: 1 of 9 test files failed (x.test.ts)',
+      'resumed: 2026-11-24T20:35:06Z',
+      'review 1/2 a A on earlier: 3 findings, 9/9 files read, 0.0 min, 0.4M weighted tokens', 'review 2/2 a B on earlier: 2 findings, 9/9 files read, 0.0 min, 0.4M weighted tokens', 'match 1/1 a: 1 shared of 3 + 2'];
+    const running = [{ task: 'audit9-a-fix', node: 'local', started: '2026-11-24T20:36:18Z', progress: { done: 1, total: 4 } }];
+    const { steps } = nightLanes(log.join('\n'), ['a'], running)[0]!;
+    expect(steps.fix).toEqual({ state: 'running', node: 'local', since: '2026-11-24T20:36:18Z', done: 1, total: 4 });
+    expect(steps.repair).toBeUndefined();
+    expect(steps.A).toMatchObject({ state: 'done', minutes: 2.6 });
+    // Without a resume, a done step stays done whatever a job listing says.
+    expect(nightLanes(log.slice(0, 5).join('\n'), ['a'], running)[0]!.steps.fix).toMatchObject({ state: 'done', commits: 0 });
+  });
+
   it("keeps a step's first node and minutes over a resumed round's replay of it", () => {
     const log = ['review 1/2 a A on local: 3 findings, 9/9 files read, 2.6 min, 0.4M weighted tokens', 'fix 1/1 a on local: 4 commits, 27.3 min, 0.5M weighted tokens',
       'review 1/2 a A on earlier: 3 findings, 9/9 files read, 0.0 min, 0.4M weighted tokens', 'fix 1/1 a on earlier: 4 commits, 0.0 min, 0.5M weighted tokens'];

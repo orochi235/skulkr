@@ -27,6 +27,7 @@ import { batchAndTest, patchAreas, patchSweep } from './land.mjs';
 import { unitCostOf } from './unitCost.mjs';
 import { begin, localDate, plan, printPlan } from './plan.mjs';
 import { resume } from './resume.mjs';
+import { RESUMED } from './nightLog.mjs';
 import { changedSince, lastPassIn, scaledOf } from './rounds.mjs';
 import { sleep } from './after.mjs';
 import { readJson } from './json.mjs';
@@ -189,6 +190,8 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     echo(line);
     appendFileSync(join(status.nightDir, 'night.log'), `${line}\n`);
   };
+  // Where this run's lines start, so the map can tell a step this run redoes from the earlier run's attempt at it.
+  if (args.resume !== undefined) appendFileSync(join(status.nightDir, 'night.log'), `${RESUMED}${new Date().toISOString()}\n`);
   /** The run's step, and what it waits behind (`{ behind }`) while it waits for a lock or the fleet. */
   const setStep = (step, { behind } = {}) => {
     status.step = step;
