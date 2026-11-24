@@ -42,6 +42,15 @@ describe('areaDefects', () => {
     expect(commitSubjects('From 1a2b Mon Sep 17 00:00:00 2001\nSubject: [PATCH 1/2] keep a lone min\n bound\n\nbody\nFrom 3c4d Mon\nSubject: [PATCH 2/2] draw a choice\n')).toEqual(['keep a lone min bound', 'draw a choice']);
   });
 
+  it("reads a report giving no verdict, a usage limit's refusal written in its place, as no report", () => {
+    const state = tmp();
+    night(state, '2026-11-24T00-00-00-000Z-round83', 'x', { pairs: [], a: ['one'], b: [] });
+    put(join(state, 'nights', '2026-11-24T00-00-00-000Z-round83', 'areas', 'x', 'fix.md'), "You've hit your 5-hour limit · resets 6:30pm (America/New_York)");
+    expect(areaDefects({ records: [], areas: [{ id: 'x', files: ['x/a.ts'] }], id: 'x', state })).toEqual([
+      { round: 83, recorded: false, fixed: false, items: [{ claim: 'one', from: 'A', verdict: 'open', note: '' }] },
+    ]);
+  });
+
   it('follows its files across a recut, and reads no night of an abandoned round or of one with a record', () => {
     const state = tmp();
     const match = (claim: string) => ({ 'match.json': JSON.stringify({ pairs: [], a: [claim], b: [] }) });

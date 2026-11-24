@@ -35,11 +35,13 @@ export const commitSubjects = (mbox) =>
 
 /**
  * One round's items for an area from `read(name)`, which answers one of its files' text or null: the fixer's report,
- * or else the match, with the commits of a fixer that left some but no report, as one stopped partway does.
+ * or else the match, with the commits of a fixer that left some but no report, as one stopped partway does. A report
+ * that gives no verdict (a usage-limit refusal written in its place) counts as none.
  */
 const itemsOf = (read) => {
   const report = read('fix.md');
-  if (report !== null) return { fixed: true, items: reportItems(report) };
+  const answered = report === null ? [] : reportItems(report);
+  if (answered.length) return { fixed: true, items: answered };
   const match = read('match.json');
   if (match === null) return null;
   const mbox = read('fix.mbox');
