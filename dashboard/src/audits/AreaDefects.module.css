@@ -19,62 +19,64 @@
   font-weight: var(--wzl-font-weight-bold);
 }
 
-/* Square tiles, as many across as the panel holds. */
-.list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: var(--wzl-space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+/* One dense row per defect; the claim column takes what the verdict and source leave. */
+.table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: var(--wzl-font-size-sm);
 }
 
-.item {
-  aspect-ratio: 1;
-  min-width: 0;
+.table th {
+  padding: 0 var(--wzl-space-1) 2px;
+  text-align: left;
+  font-size: var(--wzl-font-size-xs);
+  font-weight: var(--wzl-font-weight-normal);
+  color: var(--audit-muted);
+  border-bottom: 1px solid var(--audit-rule);
 }
 
-/* The tile fills its list item; it, not the item, is the button where there is more to read. */
-.tile {
-  display: flex;
-  flex-direction: column;
-  gap: var(--wzl-space-1);
-  height: 100%;
-  box-sizing: border-box;
-  padding: var(--wzl-space-2);
-  overflow: hidden;
-  border: 1px solid var(--audit-rule);
-  border-radius: var(--wzl-radius-md);
-  background: var(--audit-panel);
+.table th:nth-child(1) { width: 92px; }
+.table th:nth-child(2) { width: 64px; }
+
+.table td {
+  padding: 2px var(--wzl-space-1);
+  vertical-align: middle;
+  border-bottom: 1px solid var(--audit-rule);
 }
 
-.tile[role='button'] { cursor: pointer; }
+.verdict,
+.source { white-space: nowrap; }
 
-.tile[role='button']:hover,
-.tile[role='button']:focus-visible,
-.tile[aria-expanded='true'] {
+.claimCell { min-width: 0; }
+
+/* The claim's wrapper, a button where there is more to read than the row shows. */
+.more {
+  position: relative;
+  cursor: pointer;
+  border-radius: var(--wzl-radius-sm);
+}
+
+.more:hover,
+.more:focus-visible,
+.more[aria-expanded='true'] {
   outline: 2px solid var(--audit-ink);
-  outline-offset: -2px;
+  outline-offset: 0;
 }
 
 .details {
   display: grid;
   gap: var(--wzl-space-2);
   max-width: 320px;
-  padding: var(--wzl-space-3);
 }
+
+[role='dialog'] > .details { padding: var(--wzl-space-3); }
 
 .full { font-size: var(--wzl-font-size-sm); }
 
 .note {
   font-size: var(--wzl-font-size-xs);
   color: var(--audit-muted);
-}
-
-.head {
-  display: flex;
-  align-items: center;
-  gap: var(--wzl-space-2);
 }
 
 .from {
@@ -86,18 +88,15 @@
   color: var(--audit-muted);
 }
 
-/* As many lines of the claim as the tile has room for, the last one ended with an ellipsis. */
+/* The claim on one line, cut off with an ellipsis; the tooltip and the popover hold the whole of it. */
 .claim {
-  flex: 1;
-  min-height: 0;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 5;
-  font-size: var(--wzl-font-size-md);
-  line-height: 1.25;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
+
+/* InlineMarkdown's code is pre-wrap, which would break the one line. */
+.table .claim * { white-space: nowrap; }
 
 .commits {
   margin: 0 0 var(--wzl-space-2);

@@ -3,7 +3,8 @@ import { InlineMarkdown } from '@weasel-js/ui/components/InlineMarkdown';
 import { Badge } from '@weasel-js/ui/components/Badge';
 import { Popover, PopoverDialog } from '@weasel-js/ui/components/Popover';
 import { SidebarPanel } from '@weasel-js/ui/components/SidebarPanel';
-import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Focusable, Tooltip, TooltipTrigger } from '@weasel-js/ui/components/Tooltip';
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import type { Grade } from '@weasel-js/theme';
 import { icon } from '@dash/icons.gen';
 import { useAreaDefects } from './useAreaDefects';
@@ -24,55 +25,71 @@ function Source({ from }: { from: string }) {
   );
 }
 
-/** One defect as a square tile: its verdict and source, then as much of its claim as fits. Where the claim is cut off,
- *  or the fixer left a note, pressing the tile opens the whole of both. */
+/** Whether `el`'s one line of text runs past its box, measured again whenever the box changes size. */
+function useClipped(el: RefObject<HTMLElement | null>, text: string): boolean {
+  const [clipped, setClipped] = useState(false);
+  useLayoutEffect(() => {
+    const node = el.current;
+    if (!node) return undefined;
+    const measure = () => setClipped(node.scrollWidth > node.clientWidth + 1);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const seen = new ResizeObserver(measure);
+    seen.observe(node);
+    return () => seen.disconnect();
+  }, [el, text]);
+  return clipped;
+}
+
+/** One defect as a table row: its verdict, who listed it, and its claim on one line. Where the claim is cut off, or the
+ *  fixer left a note, hovering it shows the whole of both, and pressing it opens them. */
 function Defect({ d }: { d: AuditDefect }) {
   const grade = GRADE[d.verdict];
-  const tile = useRef<HTMLDivElement>(null);
   const claim = useRef<HTMLDivElement>(null);
-  const [clipped, setClipped] = useState(false);
+  const clipped = useClipped(claim, d.claim);
   const [open, setOpen] = useState(false);
-  useLayoutEffect(() => {
-    const el = claim.current;
-    if (el) setClipped(el.scrollHeight > el.clientHeight + 1);
-  }, [d.claim]);
   const more = clipped || !!d.note;
   const toggle = () => setOpen((was) => !was);
-  const badge = <Badge shape="pill" size="xs" variant={d.verdict === 'fixed' ? 'solid' : 'outline'} {...(grade ? { grade } : {})}>{d.verdict}</Badge>;
+  const whole = (
+    <div className={s.details}>
+      <div className={s.full}><InlineMarkdown text={d.claim} /></div>
+      {d.note && <div className={s.note}><InlineMarkdown text={d.note} /></div>}
+    </div>
+  );
+  const text = <div ref={claim} className={s.claim}><InlineMarkdown text={d.claim} /></div>;
   return (
-    <li className={s.item} data-verdict={d.verdict}>
-      <div
-        ref={tile} className={s.tile}
-        {...(more ? {
-          role: 'button', tabIndex: 0, 'aria-haspopup': 'dialog' as const, 'aria-expanded': open, 'aria-label': `${d.verdict}: details`,
-          onClick: toggle,
-          onKeyDown: (e: KeyboardEvent) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              toggle();
-            }
-          },
-        } : {})}
-      >
-        <div className={s.head}>
-          {badge}
-          {d.from && <Source from={d.from} />}
-        </div>
-        <div ref={claim} className={s.claim}><InlineMarkdown text={d.claim} /></div>
-      </div>
-      {more && (
-        <Popover triggerRef={tile} open={open} onOpenChange={setOpen} placement="bottom" offset={4}>
-          <PopoverDialog aria-label="Defect details" className={s.details}>
-            <div className={s.head}>
-              {badge}
-              {d.from && <Source from={d.from} />}
-            </div>
-            <div className={s.full}><InlineMarkdown text={d.claim} /></div>
-            {d.note && <div className={s.note}><InlineMarkdown text={d.note} /></div>}
-          </PopoverDialog>
-        </Popover>
-      )}
-    </li>
+    <tr data-verdict={d.verdict}>
+      <td className={s.verdict}>
+        <Badge shape="pill" size="xs" variant={d.verdict === 'fixed' ? 'solid' : 'outline'} {...(grade ? { grade } : {})}>{d.verdict}</Badge>
+      </td>
+      <td className={s.source}>{d.from && <Source from={d.from} />}</td>
+      <td className={s.claimCell}>
+        {!more ? text : (
+          <>
+            <TooltipTrigger>
+              <Focusable>
+                <div
+                  className={s.more} role="button" tabIndex={0} aria-haspopup="dialog" aria-expanded={open}
+                  onClick={toggle}
+                  onKeyDown={(e: KeyboardEvent) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggle();
+                    }
+                  }}
+                >
+                  {text}
+                </div>
+              </Focusable>
+              <Tooltip placement="bottom">{whole}</Tooltip>
+            </TooltipTrigger>
+            <Popover triggerRef={claim} open={open} onOpenChange={setOpen} placement="bottom" offset={4}>
+              <PopoverDialog aria-label="Defect details">{whole}</PopoverDialog>
+            </Popover>
+          </>
+        )}
+      </td>
+    </tr>
   );
 }
 
@@ -98,7 +115,12 @@ export function AreaDefects({ urlOf, id, version }: { urlOf: (id: string) => str
               <p className={s.hint}>What the reviewers found:</p>
             </>
           )}
-          {r.items.length === 0 ? <p className={s.hint}>Nothing found.</p> : <ol className={s.list}>{r.items.map((d, i) => <Defect key={i} d={d} />)}</ol>}
+          {r.items.length === 0 ? <p className={s.hint}>Nothing found.</p> : (
+            <table className={s.table} aria-label={`Round ${r.round}'s defects`}>
+              <thead><tr><th>verdict</th><th>from</th><th>claim</th></tr></thead>
+              <tbody>{r.items.map((d, i) => <Defect key={i} d={d} />)}</tbody>
+            </table>
+          )}
         </section>
       ))}
     </SidebarPanel>
