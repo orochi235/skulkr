@@ -1,8 +1,9 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { resolveConfig } from '../src/config.mjs';
+import { projectVars } from '../src/brief.mjs';
 
-/** The variables `area.mjs` fills in each brief, beside the project's (`project`, `rules`, `test`, `typecheck`, `lint`). */
+/** The variables `area.mjs` fills in each brief, beside the project's (`projectVars`). */
 const FILLED: Record<string, string[]> = {
   reviewer: ['round', 'area', 'commit', 'out', 'files'],
   matcher: [],
@@ -10,7 +11,7 @@ const FILLED: Record<string, string[]> = {
   repair: ['round', 'area', 'attempt', 'command', 'failures', 'baseline', 'log'],
   conflict: ['round', 'area', 'branch', 'batch', 'paths', 'ours', 'theirs', 'command'],
 };
-const PROJECT = ['project', 'rules', 'test', 'typecheck', 'lint'];
+const PROJECT = Object.keys(projectVars(resolveConfig({}), 'fixer'));
 const used = (path: string) => [...readFileSync(path, 'utf8').matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]);
 
 describe('briefs', () => {
