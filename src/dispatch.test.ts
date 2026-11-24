@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cameHome, dispatch, earlierMinutes, earlierReview } from './dispatch.mjs';
+import { cameHome, dispatch, earlierMinutes, earlierReview, limitResetOf } from './dispatch.mjs';
 
 const dirs: string[] = [];
 const job = (files: Record<string, string>) => {
@@ -97,6 +97,47 @@ describe('dispatch of a model job cut off mid-run', () => {
   });
 });
 
+describe('dispatch of a model job the usage limit stopped', () => {
+  it('waits for the reset and runs it again, whole, taking the second answer as its own', async () => {
+    const limited = JSON.stringify({ type: 'result', is_error: true, result: 'You have hit your usage limit', total_cost_usd: 2 });
+    const spec = { ...job({}), kind: 'review', shell: 'true', task: 't', timeoutMin: 5 };
+    let runs = 0;
+    const waits: number[] = [];
+    const said: string[] = [];
+    const ctx = {
+      cfg: {}, frozen: '/nowhere', base: 'b', say: (l: string) => said.push(l), usage: () => {}, refuse: () => {}, budget: { match: 1 },
+      sleep: async (ms: number) => { waits.push(ms); },
+      acquire: async () => ({ node: 'placed', placed: true, release: () => {} }),
+      runner: { run: async () => {
+        runs += 1;
+        writeFileSync(join(spec.to, 'started'), '2026-11-24T22:00:00Z\n');
+        writeFileSync(join(spec.to, 'exit'), '0');
+        writeFileSync(join(spec.to, 'claude.json'), runs === 1 ? limited : ok);
+        return { status: 0 };
+      } },
+    };
+    const got = await dispatch(ctx, { id: 'a' }, 'match', { ...spec, logPath: join(spec.to, 'j.log') });
+    expect(runs).toBe(2);
+    expect(got).toMatchObject({ status: 0, reply: 'done' });
+    expect(waits).toHaveLength(1);
+    expect(said[0]).toMatch(/^match a: stopped by the usage limit; running it again after /);
+  });
+
+  it('takes the stopped answer as it is once the run is stopped', async () => {
+    const limited = JSON.stringify({ type: 'result', is_error: true, result: 'You have hit your usage limit', total_cost_usd: 2 });
+    const spec = { ...job({}), kind: 'review', shell: 'true', task: 't', timeoutMin: 5 };
+    let runs = 0;
+    const ctx = {
+      cfg: {}, frozen: '/nowhere', base: 'b', say: () => {}, usage: () => {}, refuse: () => {}, budget: { match: 1 }, stopped: () => true,
+      sleep: async () => {},
+      acquire: async () => ({ node: 'placed', placed: true, release: () => {} }),
+      runner: { run: async () => { runs += 1; writeFileSync(join(spec.to, 'exit'), '0'); writeFileSync(join(spec.to, 'claude.json'), limited); return { status: 0 }; } },
+    };
+    await dispatch(ctx, { id: 'a' }, 'match', { ...spec, logPath: join(spec.to, 'j.log') });
+    expect(runs).toBe(1);
+  });
+});
+
 describe('dispatch of a refused job', () => {
   it('spends none of its launch retries on refusals', async () => {
     const spec = { ...job({}), kind: 'review', shell: 'true', task: 't', timeoutMin: 5 };
@@ -154,6 +195,17 @@ describe('dispatch on pinned nodes that all refuse', () => {
     }
     expect(runs).toBe(5);
     expect(said.at(-1)).toBe('match a refused by studio; refused 5 times over 120 min, so not launched');
+  });
+});
+
+describe('limitResetOf', () => {
+  it("reads when a usage limit resets, in its zone, and nothing from another reply", () => {
+    const now = new Date('2026-11-24T22:05:30Z');
+    expect(limitResetOf("You've hit your 5-hour limit · resets 6:30pm (America/New_York)", now)?.toISOString()).toBe('2026-11-24T23:30:00.000Z');
+    // Past that time today, it is tomorrow's.
+    expect(limitResetOf("You've hit your 5-hour limit · resets 4pm (America/New_York)", now)?.toISOString()).toBe('2026-11-25T21:00:00.000Z');
+    expect(limitResetOf('You have hit your usage limit', now)?.toISOString()).toBe('2026-11-24T22:20:30.000Z');
+    expect(limitResetOf('fixed 1a2b3c4d', now)).toBeNull();
   });
 });
 

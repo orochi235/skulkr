@@ -233,6 +233,8 @@ what each running area has left of its expected cost, plus one more area would p
 expected to cost the mean of this run's finished areas (`budget.areaGuessUsd` before any has), nor once a stop is requested; a fix-only round's fixers start under the same checks. While the sweep's fixer runs, what it may still spend (`budget.fix` less its spend so far) counts as spent. A capstone repair starts only while no stop is requested and what the run has spent, plus `budget.fix` for it and for each repair started before it, stays within the cap; a branch whose repair does not start is left out, as one whose repair failed is. An area whose reviewers ran always gets its matcher and fixer. Where skulkr picks
 nodes (a pinned run, or a runner that does not place jobs), a node the runner reports unavailable is skipped, and a
 dispatch a node refuses moves to another node and keeps that one out for `nodes.refusedCooldownMin`. Under a placing runner a refused job is launched again each minute, up to 120 times; a run with pinned nodes retries as each node's cooldown ends, for the same two hours. Then the job is given up, and a refusal after a stop request is not retried.
+A model job the account's usage limit stopped partway is run again, whole, once the limit resets (the time its
+refusal names, else 15 minutes on), unless the run is stopped or past `schedule.stopAt` first (2026-11-24).
 A job that failed before its model started is launched up to three times; one whose model started (it writes
 `started` first) and left no `exit` was cut off mid-run and is never launched again, since it was paid for.
 `<state>/limits.json` (`{ "review": n, "fix": n }`) changes the slots per node, or under a placing runner the jobs at

@@ -217,6 +217,8 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     const sweepFix = args.sweep ? startSweep(ctx, (s) => (sweep = s)) : Promise.resolve(undefined);
     setStep('review');
     const deadline = deadlineOf(cfg, status);
+    // A job the usage limit stops waits for its reset only while the run would still start work.
+    ctx.deadline = deadline;
     let sweepFixed;
     const mboxOf = (id) => (id === cfg.sweep?.id ? sweepFixed?.mbox : undefined);
     const repair = verifyOf(cfg) ? capstoneRepairer(ctx, { root, results, mboxOf }) : undefined;

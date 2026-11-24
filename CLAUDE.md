@@ -118,6 +118,8 @@ weasel cutover.
     otherwise (2026-11-24).
   - a resumed run's `resumed: <time>` line in its round's log, and the map showing a step that run redoes as running,
     with the earlier run's attempt at it and at the steps after it cleared (2026-11-24).
+  - a model job the account's usage limit stopped waiting for the limit's reset and running again, whole, unless the
+    run is stopped or past its deadline first (2026-11-24).
   - runner jobs' task names led by the project's name (`weasel-audit82-<area>-<step>`), the old form still read, and a
     fleet verify's task `<project>-verify-<sha>` (2026-11-24).
   - a reused job reporting the minutes it first took (`started` to `exit`), and the map keeping a step's first node and

@@ -83,6 +83,32 @@ export const earlierMinutes = (dir) => {
   return Math.max(0, (statSync(exit).mtimeMs - started) / 60_000);
 };
 
+/** How long past a usage limit's reset a job waits before it runs again, so it does not meet the limit still in force. */
+const LIMIT_SLACK_MS = 2 * 60_000;
+/** How long a job waits for a usage limit whose reset it cannot read. */
+const LIMIT_WAIT_MS = 15 * 60_000;
+
+/**
+ * When the usage limit a reply reports resets, `now` or later, or null for a reply that reports none: `resets 6:30pm
+ * (America/New_York)`, today in that zone, or tomorrow once that time has passed; a limit with no time it can read waits
+ * LIMIT_WAIT_MS.
+ */
+export const limitResetOf = (reply, now) => {
+  if (!/\b(?:hit your|usage) [\w-]* ?limit\b/i.test(reply)) return null;
+  const m = /resets (\d{1,2})(?::(\d{2}))?\s*(am|pm)(?: \(([\w/+-]+)\))?/i.exec(reply);
+  if (!m) return new Date(now.getTime() + LIMIT_WAIT_MS);
+  const hour = (Number(m[1]) % 12) + (m[3].toLowerCase() === 'pm' ? 12 : 0);
+  const minute = Number(m[2] ?? 0);
+  const zone = m[4] ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // The zone's wall clock now, to find how far ahead the reset's wall-clock time is.
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: zone, hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    .formatToParts(now).map((p) => [p.type, p.value]));
+  const nowMin = (Number(parts.hour) % 24) * 60 + Number(parts.minute) + Number(parts.second) / 60;
+  let ahead = hour * 60 + minute - nowMin;
+  if (ahead < 0) ahead += 24 * 60;
+  return new Date(now.getTime() + ahead * 60_000);
+};
+
 /**
  * Runs one job of `area` as `role`. Answers where it ran, how long it took, the model's reply, and the job's usage
  * record (also passed to `ctx.usage`, which counts it against the night and logs it); a verify job runs no model
@@ -152,7 +178,17 @@ export const dispatch = async (ctx, area, role, spec) => {
     }
     if (!model) return { status: result.status, launched: Boolean(exit), node, minutes: minutesSince(t0), reply: '' };
     const agent = agentFor(ctx.cfg, role);
-    const { reply, record } = agent.resultOf(readIf(join(spec.to, agent.resultFile)), { cfg: ctx.cfg, role });
+    const { reply, record, error } = agent.resultOf(readIf(join(spec.to, agent.resultFile)), { cfg: ctx.cfg, role });
+    // The account's usage limit stopped it partway: what it left is not its answer. It runs again, whole, once the
+    // limit resets, unless the run is stopped or past its deadline first.
+    const reset = error ? limitResetOf(reply, new Date()) : null;
+    if (reset && !ctx.stopped?.() && !(ctx.deadline && reset >= ctx.deadline)) {
+      ctx.say(`${role} ${area.id}: stopped by the usage limit; running it again after ${reset.toISOString()}`);
+      if (reply) ctx.usage({ area: area.id, role, node, ...record, exit, limited: true });
+      await (ctx.sleep ?? sleep)(Math.max(0, reset.getTime() - Date.now()) + LIMIT_SLACK_MS);
+      launches -= 1;
+      continue;
+    }
     const usage = { area: area.id, role, node, ...record, exit };
     ctx.usage(usage);
     if (usage.budgetHit) ctx.say(`${role} ${area.id} stopped at its $${ctx.budget[budgetRole(role)]} ceiling`);
