@@ -40,6 +40,19 @@ describe('job command lines', () => {
     expect(claudeOf(reviewShell(resolveConfig({ claude: { cacheTtl: { review: null } } }), 'core', 8))).not.toContain('CACHE_TTL');
   });
 
+  it("run a local fixer or repair as the account given, leaving its verify to a job of its own", () => {
+    const cfg = weaselConfig();
+    const local = { account: '~/.claude-pw' };
+    for (const [fleet, here] of [[fixShell(cfg, 'core', 15, 3), fixShell(cfg, 'core', 15, 3, local)], [repairShell(cfg, 'core', 15), repairShell(cfg, 'core', 15, local)]]) {
+      expect(claudeOf(fleet!)).toContain('CLAUDE_CONFIG_DIR=~/.claude-msb');
+      expect(claudeOf(here!)).toContain('CLAUDE_CONFIG_DIR=~/.claude-pw');
+      expect(fleet).toContain('VERIFY_FILES=');
+      expect(here).not.toContain('VERIFY_FILES=');
+      expect(here).toContain('fix.mbox');
+    }
+    expect(claudeOf(fixShell(cfg, 'core', 15, 3, { account: undefined }))).not.toContain('CLAUDE_CONFIG_DIR');
+  });
+
   it('mark every model job started just before claude runs, and no job that runs no model', () => {
     const cfg = weaselConfig();
     for (const shell of [reviewShell(cfg, 'core', 8), matchShell(cfg, 'core', 1), fixShell(cfg, 'core', 15, 3), repairShell(cfg, 'core', 15)]) {

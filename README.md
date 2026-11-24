@@ -92,6 +92,7 @@ export default {
   },
 
   runner: 'local',                    // or 'onto', a module path exporting createRunner(cfg), or a runner object
+  localFix: { enabled: false, slots: 2 }, // fixers and repairs on this machine, as the starting account ("Local fixers")
   nodes: {
     list: [],                         // nodes jobs are offered to; the local runner's is ['local']; unused under onto
     local: null,                      // or { name, from: '00:00', until: '09:00', fixers: false }: a node usable only in a window
@@ -164,6 +165,7 @@ the config names one, gets a row.
 | `--anyway` | | start even though stranded rounds hold new ones back (see "Stranded rounds") |
 | `--sweep` | | run the configured sweep too |
 | `--fix-only [a,b]` | | a fix-only round for these areas, or every area with open findings; see "Carried findings" |
+| `--local-fix` | `localFix.enabled` | run fixers and repairs on this machine, as the account that started the run; see "Local fixers" |
 | `--resume N` | | pick round N back up, reusing every job whose result came home; it stops starting areas at the first `schedule.stopAt` after the resume. Under the plan lock, it leaves out the areas a live run holds. A round lands once: when its status or `summary.json` names a `landed` tip (set once `main` fast-forwards, with the areas it carried) that `main` still holds, it resumes nothing and says the round already landed |
 | `--cap-usd N` | `budget.areaCapUsd` × `--areas`, else `budget.capUsd` | list-price dollars the run may spend |
 | `--budget-review`, `--budget-match`, `--budget-fix` | `budget.*` | each job's `--max-budget-usd` |
@@ -362,6 +364,24 @@ noRoom }`, `unavailableNodes()`, `jobs(sinceIso)` (what the dashboard's lanes ar
 `progress()`, each running job's own count by task (a running step's fill). `src/runner/local.mjs` is the smallest
 complete one.
 
+### Local fixers
+
+With `--local-fix` (or `localFix.enabled` in the config), fixers and repairs run on this machine and every other job
+stays with the runner. Their `claude -p` runs as the account that started the run: its `CLAUDE_CONFIG_DIR`, else
+`claude.configDir`, else the CLI's default account. They keep `claude.settingSources`, so the account changes and
+the rules a fixer reads do not.
+
+| | Under `--local-fix` |
+|---|---|
+| Where | The local runner's clones in `<state>/trees/`, as node `local` |
+| How many at once | `localFix.slots` (2), apart from the fleet's fix slots; `<state>/limits.json`'s `localFix` changes it for runs already going |
+| A fixer's verify | Not in its job: skulkr runs it on the runner in a verify job of its own, as it does a GUI verify |
+| On the dashboard | The onto runner lists the local runner's jobs and progress beside its own, so a local fixer's lane fills like any other |
+
+A fixer runs its brief's own checks where it runs, so each local fixer runs tests and lints on this machine. Each clone
+also keeps its own `node_modules`. The flag needs the onto or the local runner; under the local runner, where every
+job is local already, it changes only the account. A resumed round takes the flag again from its own command line.
+
 ## Agents
 
 An agent runs a model job. A config's `agent` names one for every role, or one per role as `{ review, match, fix }`
@@ -548,7 +568,7 @@ LaunchAgent, so install from a shell where `node` and `onto` resolve, and set ei
 | A run's claim, status, stop request, and summary | `<state>/runs/<N>/`: the directory is the claim; `status.json` (with its pid) while it runs, `stop` when asked, `summary.json` when it ends | the newest `keepNights`, never a live one nor one started in the last day; pruned when a run starts |
 | Each commit's lines changed, for `staleLines` and calibration's `lines` | `~/.cache/skulkr/<name>/churn.json` | only the commits after the oldest pass asked about: any area's last pass, or the first of a pair of passes; rewritten without the rest on each build that adds one, and dropped when the partition's `roots`, `extensions` or `exclude` change |
 | Node tree leases | `<state>/slots/<node>/<tree>` | deleted as each job ends; one whose pid is dead is taken back |
-| The local runner's clones | `<state>/trees/t<k>` and a lease beside each | one per job running at once; reused, never more than the most jobs ever run at once |
+| The local runner's clones | `<state>/trees/t<k>` and a lease beside each | one per job running at once; reused, never more than the most jobs ever run at once (local fixers' included) |
 | The local runner's job records, for the dashboard | `<state>/local-jobs/`, a file per job | deleted after 7 days, as each job starts and as `jobs()` reads them |
 | Locks | `<state>/plan.lock`, `<state>/merge.lock` | one file each, deleted on release |
 | The fleet queue | `~/.local/state/skulkr/fleet/`: `gate.lease` and a ticket per waiting run in `waiting/` | the lease deleted on release, a ticket when its run takes the gate; a dead pid's of either is cleared |

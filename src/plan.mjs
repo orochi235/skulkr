@@ -5,6 +5,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { requireAgents } from './agent/index.mjs';
+import { localFixLine, localFixOf } from './args.mjs';
 import { gitIn } from './batch.mjs';
 import { openFindingsIn } from './carryRecords.mjs';
 import { nodesAt } from './config.mjs';
@@ -67,6 +68,8 @@ export const nodesLine = (cfg, args) => (args.places && !args.nodes
 export const printPlan = (cfg, p, args, say) => {
   say(`round ${p.round} at ${p.commit.slice(0, 10)}; nodes: ${nodesLine(cfg, args)}; stops dispatching at ${cfg.schedule.stopAt}`);
   say(`budget: ${usd(args.capUsd)} tonight; per job $${args.budget.review} review, $${args.budget.match} match, $${args.budget.fix} fix`);
+  const local = localFixOf(cfg, args);
+  if (local) say(localFixLine(cfg, local));
   if (args.fixOnly) {
     for (const area of p.picked) say(`  ${area.id}: ${plural(p.open.get(area.id).length, 'open finding')}, from rounds ${[...new Set(p.open.get(area.id).map((o) => o.round))].join(', ')}`);
     for (const s of p.skipped ?? []) say(`  ${s.id}: skipped, ${s.why}`);

@@ -151,6 +151,18 @@ describe('placed slots', () => {
     const pinned = createSlots(cfg, ['studio'], { places: true }).take('review');
     expect(pinned).toMatchObject({ node: 'studio', placed: false });
   });
+
+  it("leases local fixers on this machine, named for the runner, apart from the fleet's fixers", () => {
+    const dir = state();
+    const cfg = { ...weaselConfig(dir), concurrency: { review: 2, fix: 1 }, localFix: { enabled: false, slots: 2 } };
+    const slots = createSlots(cfg, undefined, { places: true });
+    expect(slots.take('fix')).toMatchObject({ node: PLACED, placed: true });
+    expect(slots.take('localFix')).toMatchObject({ node: 'local', placed: false, tree: 'weasel-skulkr-flocal-1' });
+    expect(slots.take('localFix')).toMatchObject({ node: 'local', tree: 'weasel-skulkr-flocal-2' });
+    expect(slots.take('localFix')).toBeUndefined();
+    writeFileSync(join(dir, 'limits.json'), JSON.stringify({ localFix: 3 }));
+    expect(slots.take('localFix')?.tree).toBe('weasel-skulkr-flocal-3');
+  });
 });
 
 describe('slotsPerNode', () => {

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { resolveConfig } from '../config.mjs';
-import { createLocalRunner, durationMs } from './local.mjs';
+import { createLocalRunner, durationMs, latestProgress } from './local.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -149,5 +149,21 @@ describe('the local runner', () => {
 
   it('reads runner durations', () => {
     expect([durationMs('55m'), durationMs('90s'), durationMs('2h'), durationMs('none')]).toEqual([3_300_000, 90_000, 7_200_000, undefined]);
+  });
+});
+
+describe('local progress', () => {
+  it("reads the last progress count from a job's output", () => {
+    expect(latestProgress('x\nonto: progress 1/4\nonto: progress 2/4 commits\n')).toEqual({ done: 2, total: 4 });
+    expect(latestProgress('nothing here')).toBeUndefined();
+  });
+
+  it("answers a running job's count by its task, and none once it ends", async () => {
+    const s = setup();
+    const job = run(s, 'echo "onto: progress 1/3"; sleep 1; mkdir -p .skulkr/out', { task: 'audit1-x-fix' });
+    for (let i = 0; i < 50 && !s.runner.progress().size; i++) await new Promise((r) => setTimeout(r, 20));
+    expect(s.runner.progress().get('audit1-x-fix')).toEqual({ done: 1, total: 3 });
+    await job;
+    expect(s.runner.progress().size).toBe(0);
   });
 });

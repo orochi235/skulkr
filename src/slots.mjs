@@ -6,14 +6,18 @@ import { join } from 'node:path';
 import { noFixers, nodesAt } from './config.mjs';
 import { heldAlive, leaseAt, takeLease } from './lease.mjs';
 
+/** The node local fixers (`localFix`) are leased under: this machine, as the local runner names it. */
+export const LOCAL_NODE = 'local';
+
 /**
- * Slots per node for `role`, read again at every lease from `<state>/limits.json` (`{ "review": n, "fix": n }`)
- * when it names one, so a change reaches runs already going; else the config's.
+ * Slots per node for `role`, read again at every lease from `<state>/limits.json` (`{ "review": n, "fix": n,
+ * "localFix": n }`) when it names one, so a change reaches runs already going; else the config's.
  */
 export const slotsPerNode = (cfg, role, totals) => {
-  const fallback = totals ? totals[role === 'fix' ? 'fix' : 'review'] : role === 'fix' ? cfg.nodes.fixSlots : cfg.nodes.reviewSlots;
+  const key = role === 'localFix' ? 'localFix' : role === 'fix' ? 'fix' : 'review';
+  const fallback = key === 'localFix' ? cfg.localFix.slots : totals ? totals[key] : key === 'fix' ? cfg.nodes.fixSlots : cfg.nodes.reviewSlots;
   try {
-    const n = JSON.parse(readFileSync(join(cfg.state, 'limits.json'), 'utf8'))[role === 'fix' ? 'fix' : 'review'];
+    const n = JSON.parse(readFileSync(join(cfg.state, 'limits.json'), 'utf8'))[key];
     return Number.isInteger(n) && n > 0 ? n : fallback;
   } catch {
     return fallback;
@@ -36,14 +40,16 @@ export const createSlots = (cfg, pinned, { about = {}, places = false } = {}) =>
   const state = cfg.state;
   const noFix = noFixers(cfg);
   const take = (role, { now = new Date(), exclude = new Set() } = {}) => {
-    const perNode = placed ? slotsPerNode(cfg, role, cfg.concurrency) : slotsPerNode(cfg, role);
-    const prefix = role === 'fix' ? cfg.names.trees.fix : cfg.names.trees.review;
+    // A local fixer's slot is this machine's, whatever the runner places, and names it as the job's node.
+    const local = role === 'localFix';
+    const perNode = placed && !local ? slotsPerNode(cfg, role, cfg.concurrency) : slotsPerNode(cfg, role);
+    const prefix = local ? `${cfg.names.trees.fix}local-` : role === 'fix' ? cfg.names.trees.fix : cfg.names.trees.review;
     // Fewest live leases of this role first, so jobs spread across nodes instead of filling the first.
     const busy = (node) => {
       const dir = join(state, 'slots', node);
       return existsSync(dir) ? readdirSync(dir).filter((t) => t.startsWith(prefix) && heldAlive(leaseAt(join(dir, t)))).length : 0;
     };
-    const nodes = (placed ? [PLACED] : pinned ?? nodesAt(cfg, now)).map((node, i) => ({ node, i, n: busy(node) })).sort((a, b) => a.n - b.n || a.i - b.i).map((e) => e.node);
+    const nodes = (local ? [LOCAL_NODE] : placed ? [PLACED] : pinned ?? nodesAt(cfg, now)).map((node, i) => ({ node, i, n: busy(node) })).sort((a, b) => a.n - b.n || a.i - b.i).map((e) => e.node);
     for (const node of nodes) {
       if (role === 'fix' && noFix.includes(node)) continue;
       if (exclude.has(node) || (refusedUntil.get(node) ?? 0) > now.getTime()) continue;
@@ -54,7 +60,7 @@ export const createSlots = (cfg, pinned, { about = {}, places = false } = {}) =>
         if (!unlease) continue;
         held.add(key);
         return {
-          node, tree, placed, release: () => {
+          node, tree, placed: placed && !local, release: () => {
             held.delete(key);
             unlease();
           },

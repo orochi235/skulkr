@@ -99,9 +99,16 @@ export const fixupLines = (fixup) => {
   ];
 };
 
-/** A model job's hand-back: its commits since `BASE` as one mbox and what it left uncommitted, then the verify step. */
-const handBackLines = (cfg) => {
-  const verify = verifyOf(cfg);
+/**
+ * How a fixer or repair runs on this machine under `--local-fix` (`localFixOf`): `account`, the `CLAUDE_CONFIG_DIR`
+ * its agent runs as, and no verify step in the job, which skulkr then runs on the fleet in a job of its own.
+ */
+const localCfg = (cfg, local) => (local ? { ...cfg, claude: { ...cfg.claude, configDir: local.account } } : cfg);
+
+/** A model job's hand-back: its commits since `BASE` as one mbox and what it left uncommitted, then the verify step
+ *  unless the job runs locally. */
+const handBackLines = (cfg, local) => {
+  const verify = local ? null : verifyOf(cfg);
   return [
     `git status --porcelain > ${JOB_OUT}/uncommitted.txt`,
     ...fixupLines(cfg.checks.fixup),
@@ -114,21 +121,25 @@ const handBackLines = (cfg) => {
 /**
  * The fixer readies the tree, lets the model fix and commit, hands back its commits as one mbox, and runs the
  * config's verify step over the files they changed.
+ * @param {{ account?: string } | null} [local] a local fixer's run (`localFixOf`), or null for the runner's
  */
-export const fixShell = (cfg, area, budgetUsd, findings) =>
+export const fixShell = (cfg, area, budgetUsd, findings, local = null) =>
   [
     'set -e', ...prelude(cfg), fresh, ...treeLines(cfg), 'set +e',
-    agentLine(cfg, 'fix', `${JOB_IN}/${area}/fix.md`, budgetUsd, `--commits ${findings} --checks ${CHECKS_IN}`),
-    ...handBackLines(cfg),
+    agentLine(localCfg(cfg, local), 'fix', `${JOB_IN}/${area}/fix.md`, budgetUsd, `--commits ${findings} --checks ${CHECKS_IN}`),
+    ...handBackLines(cfg, local),
   ].join('\n');
 
-/** A repair: the area's commits applied, the model given `repair.md`, and every commit since the frozen tree handed
- *  back and verified, as a fixer's are. */
-export const repairShell = (cfg, area, budgetUsd) =>
+/**
+ * A repair: the area's commits applied, the model given `repair.md`, and every commit since the frozen tree handed
+ * back and verified, as a fixer's are.
+ * @param {{ account?: string } | null} [local] as {@link fixShell}'s
+ */
+export const repairShell = (cfg, area, budgetUsd, local = null) =>
   [
     'set -e', ...prelude(cfg), fresh, ...treeLines(cfg), ...applyLines(area), 'set +e',
-    agentLine(cfg, 'fix', `${JOB_IN}/${area}/repair.md`, budgetUsd),
-    ...handBackLines(cfg),
+    agentLine(localCfg(cfg, local), 'fix', `${JOB_IN}/${area}/repair.md`, budgetUsd),
+    ...handBackLines(cfg, local),
   ].join('\n');
 
 /** The verify step alone on the area's commits: its GUI part with `gui`, else the part a model job runs itself. */

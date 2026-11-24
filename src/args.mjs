@@ -4,6 +4,17 @@ import { fixOnlyArg } from './fixOnly.mjs';
 /** A run's dollar cap when none is given: `budget.areaCapUsd` for each of its `areas`, or else `budget.capUsd`. */
 export const capFor = (budget, areas) => (budget.areaCapUsd == null ? budget.capUsd : budget.areaCapUsd * areas);
 
+/**
+ * Under `--local-fix`, how fixers and repairs run on this machine: as `account`, the `CLAUDE_CONFIG_DIR` the run was
+ * started under, else the config's `claude.configDir` (unset: the CLI's default account). Null otherwise.
+ */
+export const localFixOf = (cfg, args, env = process.env) =>
+  (args.localFix ? { account: env.CLAUDE_CONFIG_DIR || cfg.claude?.configDir || undefined } : null);
+
+/** The log's and the dry plan's line for a run's local fixers (`localFixOf`). */
+export const localFixLine = (cfg, local) =>
+  `fixers: on this machine, ${cfg.localFix.slots} at once, as ${local.account ?? "the CLI's default account"}; their verify on the runner`;
+
 export const parseArgs = (cfg, argv) => {
   const value = (flag) => {
     const i = argv.indexOf(flag);
@@ -29,6 +40,7 @@ export const parseArgs = (cfg, argv) => {
     sweep: argv.includes('--sweep'),
     anyway: argv.includes('--anyway'),
     trial: value('--trial'),
+    localFix: argv.includes('--local-fix') || Boolean(cfg.localFix?.enabled),
     capUsd: number('--cap-usd', capFor(cfg.budget, areas)),
     budget: {
       review: number('--budget-review', cfg.budget.review),

@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 import { fromConfig } from '../config.mjs';
 import { createLocalRunner } from './local.mjs';
 import { createOntoRunner } from './onto.mjs';
+import { withLocal } from './withLocal.mjs';
 
 const METHODS = ['run', 'unavailableNodes', 'jobs'];
 
@@ -15,7 +16,7 @@ const check = (runner, what) => {
 export const loadRunner = async (cfg) => {
   const r = cfg.runner;
   if (r === 'local' || r === undefined) return createLocalRunner(cfg);
-  if (r === 'onto') return createOntoRunner(cfg);
+  if (r === 'onto') return withLocal(createOntoRunner(cfg), createLocalRunner(cfg));
   if (typeof r === 'string') {
     const mod = await import(pathToFileURL(fromConfig(cfg, r)).href);
     return check(await mod.createRunner(cfg), r);

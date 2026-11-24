@@ -3,12 +3,12 @@
  * README.md at the repository root is its documentation.
  *
  *   skulkr night [--areas K] [--only <id>,…] [--nodes <a>,…] [--dry] [--no-merge]
- *     [--cap-usd N] [--budget-review USD] [--budget-match USD] [--budget-fix USD] [--sweep] [--fix-only [a,…]]
+ *     [--cap-usd N] [--budget-review USD] [--budget-match USD] [--budget-fix USD] [--sweep] [--fix-only [a,…]] [--local-fix]
  */
 import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { runArea } from './area.mjs';
-import { parseArgs } from './args.mjs';
+import { localFixLine, localFixOf, parseArgs } from './args.mjs';
 import { strandedHoldFor, strandedRoundsFor } from './stranded.mjs';
 import { capstoneRepairer, repairRefusal } from './capstone.mjs';
 import { gateBaseline } from './repair.mjs';
@@ -88,6 +88,7 @@ const runContext = ({ cfg, runner, root, p, args, status, frozen, say, setStep }
       return [[`GIT_AUTHOR_${k}`, v], [`GIT_COMMITTER_${k}`, v]];
     })),
     trial: args.trial,
+    localFix: localFixOf(cfg, args),
     total: args.fixOnly ? { review: 0, match: 0, fix: p.picked.length } : { review: p.picked.length * (args.trial ? 4 : 2), match: p.picked.length * (args.trial ? 2 : 1), fix: p.picked.length },
     stopped: () => stopRequested(p.round, cfg.state),
     /** What area `id`'s jobs have cost so far, a reused job's included as its area's mean counts it. */
@@ -157,6 +158,7 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
   if (args.sweep && !cfg.sweep) throw new Error('--sweep: the config names no sweep');
   if (args.sweep && args.fixOnly) throw new Error('--sweep and --fix-only: a fix-only round runs no checks to fix');
   if (args.trial !== undefined && args.trial !== 'preload') throw new Error(`--trial: the one trial is preload, not ${args.trial}`);
+  if (args.localFix && !runner.routesLocal) throw new Error('--local-fix: this runner cannot send a job to this machine; use the onto or local runner');
   if (!args.dry && !args.places && !args.nodes?.length && !cfg.nodes.list.length && !cfg.nodes.local) {
     throw new Error(`the config names no nodes for the ${typeof cfg.runner === 'string' ? cfg.runner : 'configured'} runner; set nodes.list or pass --nodes`);
   }
@@ -196,6 +198,7 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
   try {
     frozen = addWorktree(root, cfg.names.frozen(p.round), p.commit);
     const ctx = runContext({ cfg, runner, root, p, args, status, frozen, say, setStep });
+    if (ctx.localFix) say(localFixLine(cfg, ctx.localFix));
     mkdirSync(join(frozen, JOB_IN), { recursive: true });
     // The sweep is one job on one node; the reviews fill every other slot while it runs.
     const sweepFix = args.sweep ? startSweep(ctx, (s) => (sweep = s)) : Promise.resolve(undefined);

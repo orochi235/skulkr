@@ -135,7 +135,7 @@ export const repairJob = async (ctx, area, { mbox, log, label, attempt, extra = 
   writeFileSync(join(inDir, 'repair.md'), fill(brief(ctx.cfg, 'repair'), vars));
   const to = jobDir(ctx.nightDir, area.id, `repair-${label}`);
   const run = await dispatch(ctx, area, 'repair', {
-    kind: 'fix', expect: 'none', shell: repairShell(ctx.cfg, area.id, ctx.budget.fix), to, env: nodeEnv(ctx, extra),
+    kind: 'fix', expect: 'none', shell: repairShell(ctx.cfg, area.id, ctx.budget.fix, ctx.localFix), to, env: nodeEnv(ctx, extra),
     task: ctx.cfg.names.task(ctx.round, area.id, 'repair'), logPath: join(to, '..', `repair-${label}.log`), timeoutMin: timeoutOf(ctx.cfg),
     about: `Repairs audit round ${ctx.round}'s fixes to area ${area.id}, whose tests fail, without weakening the tests.`,
   });

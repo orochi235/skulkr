@@ -150,6 +150,13 @@ export const DEFAULTS = {
    */
   runner: 'local',
   /**
+   * Fixers and repairs on this machine, under the account that starts the run (its `CLAUDE_CONFIG_DIR`, else
+   * `claude.configDir`), while every other job stays with the runner; each one's verify goes to the runner in a job of
+   * its own. `enabled` turns it on for every run, as `skulkr night --local-fix` does for one; `slots`, how many run at
+   * once (README "Local fixers").
+   */
+  localFix: { enabled: false, slots: 2 },
+  /**
    * Jobs at once across every node, by role, under a runner that places jobs itself (onto). Unset: the per-node
    * slots times the nodes listed, or one node's slots when none are.
    */

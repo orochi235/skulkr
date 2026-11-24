@@ -25,6 +25,9 @@ const FIX_ROLES = new Set(['fix', 'repair', 'verify']);
 /** Roles whose job hands back commits as `fix.mbox`. */
 const COMMITTING = new Set(['fix', 'repair']);
 
+/** The slots `role`'s job takes: a fixer or repair under `--local-fix` takes this machine's (`localFix`). */
+export const poolFor = (ctx, role) => (ctx.localFix && COMMITTING.has(role) ? 'localFix' : FIX_ROLES.has(role) ? 'fix' : 'review');
+
 /** The budget role a job's `--max-budget-usd` came from. */
 const budgetRole = (role) => (role.startsWith('review') ? 'review' : role === 'repair' ? 'fix' : role);
 
@@ -86,7 +89,7 @@ export const dispatch = async (ctx, area, role, spec) => {
   let refusals = 0;
   let firstRefused;
   for (let launches = 1; ; launches++) {
-    const slot = await ctx.acquire(FIX_ROLES.has(role) ? 'fix' : 'review');
+    const slot = await ctx.acquire(poolFor(ctx, role));
     const t0 = Date.now();
     // What an earlier launch left would otherwise read as this one's answer if this one never runs.
     if (model) for (const f of [STARTED, 'exit', agentFor(ctx.cfg, role).resultFile, 'fix.mbox']) rmSync(join(spec.to, f), { force: true });

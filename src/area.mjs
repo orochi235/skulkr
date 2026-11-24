@@ -93,7 +93,7 @@ export const fix = async (ctx, area, findings, source = reviewedSource(ctx, area
   const vars = { ...projectVars(ctx.cfg, 'fixer'), round: ctx.round, area: area.id, commit: ctx.commit, source };
   writeFileSync(join(ctx.frozen, JOB_IN, area.id, 'fix.md'), fill(brief(ctx.cfg, 'fixer'), vars));
   const run = await dispatch(ctx, area, 'fix', {
-    kind: 'fix', expect: 'none', shell: fixShell(ctx.cfg, area.id, ctx.budget.fix, findings), to, timeoutMin: timeoutOf(ctx.cfg),
+    kind: 'fix', expect: 'none', shell: fixShell(ctx.cfg, area.id, ctx.budget.fix, findings, ctx.localFix), to, timeoutMin: timeoutOf(ctx.cfg),
     env: { FROZEN_TREE: ctx.frozenTree, ...ctx.identity },
     task: ctx.cfg.names.task(ctx.round, area.id, 'fix'), logPath: join(to, '..', 'fix.log'),
     about: `Fixer for audit round ${ctx.round}, area ${area.id}: verifies, tests and fixes its findings.`,

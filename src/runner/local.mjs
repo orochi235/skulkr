@@ -85,7 +85,7 @@ const reapOnExit = () => {
  * `timeoutMs`: SIGTERM, then SIGKILL `graceMs` later if it has not closed. `onSpawn(pid)` hears the group's id.
  * Answers the exit status.
  */
-const runShell = (shell, { cwd, env, log, timeoutMs, graceMs = KILL_GRACE_MS, onSpawn }) =>
+const runShell = (shell, { cwd, env, log, timeoutMs, graceMs = KILL_GRACE_MS, onSpawn, onProgress }) =>
   new Promise((done) => {
     reapOnExit();
     const child = spawn('bash', ['-lc', shell], { cwd, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
@@ -94,6 +94,10 @@ const runShell = (shell, { cwd, env, log, timeoutMs, graceMs = KILL_GRACE_MS, on
       onSpawn?.(child.pid);
     }
     child.stdout.pipe(log, { end: false });
+    if (onProgress) child.stdout.on('data', (chunk) => {
+      const last = latestProgress(String(chunk));
+      if (last) onProgress(last);
+    });
     child.stderr.pipe(log, { end: false });
     let kill;
     const timer = timeoutMs && setTimeout(() => {
@@ -112,6 +116,13 @@ const runShell = (shell, { cwd, env, log, timeoutMs, graceMs = KILL_GRACE_MS, on
       done(status ?? 1);
     });
   });
+
+/** The last `onto: progress N/M` count in `text`, the protocol a job's progress filter speaks, as `{ done, total }`. */
+export const latestProgress = (text) => {
+  const all = [...text.matchAll(/^onto: progress (\d+)\/(\d+)\b/gm)];
+  const m = all.at(-1);
+  return m ? { done: Number(m[1]), total: Number(m[2]) } : undefined;
+};
 
 /** Deletes the job records in `dir` older than {@link KEEP_JOBS_MS}, and answers the names of the rest. */
 const pruneJobs = (dir) => {
@@ -133,6 +144,17 @@ const pruneJobs = (dir) => {
 export const createLocalRunner = (cfg, { graceMs } = {}) => {
   const jobsDir = join(cfg.state, 'local-jobs');
   const record = (file, job) => writeJson(join(jobsDir, file), job);
+  const listed = (since) => {
+    const after = Date.parse(since);
+    const out = [];
+    for (const name of pruneJobs(jobsDir)) {
+      let j = readJson(join(jobsDir, name));
+      if (!j) continue;
+      if (j.state === 'running' && !heldAlive(j)) j = { ...j, state: 'failed', finished: j.started };
+      if (j.state === 'running' || Date.parse(j.finished) >= after || !Number.isFinite(after)) out.push(j);
+    }
+    return out;
+  };
   return {
     run: async (job, { cwd, log }) => {
       pruneJobs(jobsDir);
@@ -150,28 +172,25 @@ export const createLocalRunner = (cfg, { graceMs } = {}) => {
           entry.group = group;
           record(file, entry);
         };
-        status = await runShell(job.shell, { cwd: tree.dir, env: job.env, log, timeoutMs: durationMs(job.timeout), graceMs, onSpawn });
+        const onProgress = (progress) => {
+          entry.progress = progress;
+          record(file, entry);
+        };
+        status = await runShell(job.shell, { cwd: tree.dir, env: job.env, log, timeoutMs: durationMs(job.timeout), graceMs, onSpawn, onProgress });
         const out = join(tree.dir, job.out);
         if (existsSync(out)) cpSync(out, job.to, { recursive: true });
       } catch (error) {
         log.write(`skulkr local runner: ${error.message ?? error}\n`);
       } finally {
         tree?.release();
-        record(file, { ...entry, state: status === 0 ? 'done' : 'failed', exit: status, finished: new Date().toISOString() });
+        const { progress: _, ...ended } = entry;
+        record(file, { ...ended, state: status === 0 ? 'done' : 'failed', exit: status, finished: new Date().toISOString() });
       }
       return { status, busy: false, refused: false };
     },
     unavailableNodes: () => new Set(),
-    jobs: (since) => {
-      const after = Date.parse(since);
-      const out = [];
-      for (const name of pruneJobs(jobsDir)) {
-        let j = readJson(join(jobsDir, name));
-        if (!j) continue;
-        if (j.state === 'running' && !heldAlive(j)) j = { ...j, state: 'failed', finished: j.started };
-        if (j.state === 'running' || Date.parse(j.finished) >= after || !Number.isFinite(after)) out.push(j);
-      }
-      return out;
-    },
+    routesLocal: true,
+    jobs: (since) => listed(since),
+    progress: () => new Map(listed(new Date().toISOString()).flatMap((j) => (j.state === 'running' && j.progress ? [[j.task, j.progress]] : []))),
   };
 };
