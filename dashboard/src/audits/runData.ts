@@ -17,6 +17,9 @@ const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 /** What one step of an area's lane shows. */
 /** Between a running step's node and how long it has run, in its label. */
 export const NODE_SEP = ' · ';
+/** What a bar's caption says for a check that passed and for one that failed: onto's own marks. */
+export const PASS = '✓';
+export const FAIL = '✗';
 
 export function stepText(step: LaneStepKey, s: LaneStep, now: number): string {
   if (s.state === 'running') {
@@ -28,7 +31,7 @@ export function stepText(step: LaneStepKey, s: LaneStep, now: number): string {
   if (step === 'A' || step === 'B') return `${s.findings ?? 0} found · ${minutesText(s.minutes ?? 0)}`;
   if (step === 'match') return matchText(s.shared ?? 0, s.a ?? 0, s.b ?? 0);
   if (step === 'fix') return `${plural(s.commits ?? 0, 'commit')} · ${minutesText(s.minutes ?? 0)}`;
-  if (step === 'repair') return s.outcome === 'timed out' ? 'timed out' : s.attempts ? `${plural(s.attempts, 'repair')} · passed` : 'verified';
+  if (step === 'repair') return s.outcome === 'timed out' ? 'timed out' : s.attempts ? `${plural(s.attempts, 'repair')} · ${PASS}` : PASS;
   return `${s.commits ?? 0} applied${s.resolved ? ` · ${s.resolved}` : ''}`;
 }
 

@@ -2,7 +2,7 @@
 import type { SpanStripSpan } from '@weasel-js/ui/components/SpanStrip';
 import { MIN, SPAN_STATE, ms, patchFillOf, tallyOf, withInk, withUnfixed } from './laneSpans';
 import { TYPICAL_MINUTES, checkingOf, partColor, stepOf, type AuditPhase, type Part } from './phases';
-import { NODE_SEP, stepText } from './runData';
+import { FAIL, NODE_SEP, PASS, stepText } from './runData';
 import type { AuditLane, LaneStep, LaneStepKey } from './skulkrMap.types';
 
 /** The steps view's columns, one stripe: the two blind reviews one after the other, as B starts once A's prompt is
@@ -45,9 +45,9 @@ function verifySpan(r: LaneStep | undefined, now: number, fix: LaneStep): SpanSt
     return { ...base, state: 'active', fill: runningFillOf(r, now), label: text, title: [`verify: ${text}`, r.now?.text ?? ''].filter(Boolean).join('\n') };
   }
   // Once a repair has run, the verify it followed failed; how it ended after is the repair column's to say.
-  if ((r.attempts ?? 0) > 0) return { ...base, state: 'done', fill: 1, label: 'failed', title: 'verify: failed, so a repair ran' };
+  if ((r.attempts ?? 0) > 0) return { ...base, state: 'done', fill: 1, label: FAIL, title: 'verify: failed, so a repair ran' };
   const passed = r.state === 'done';
-  const label = passed ? (r.outcome === 'timed out' ? 'timed out' : 'passed') : r.state === 'failed' ? r.why ?? 'failed' : 'failed';
+  const label = passed ? (r.outcome === 'timed out' ? 'timed out' : PASS) : r.state === 'failed' ? r.why ?? FAIL : FAIL;
   return { ...base, state: passed ? 'done' : 'failed', fill: 1, label, title: `verify: ${label}`, color: passed ? base.color : partColor('repair', 'conflict') };
 }
 
@@ -70,9 +70,9 @@ function repairSpan(r: LaneStep | undefined, now: number): SpanStripSpan {
 }
 
 
-/** A running fixer's checks as words, `6/7 · 2 failing`, or '' where none are counted. */
+/** A running fixer's checks, `6/7 · 2 ✗`, or '' where none are counted. */
 const checksText = (fix: LaneStep): string =>
-  (fix.checks && fix.checks.total ? `${fix.checks.done}/${fix.checks.total}${fix.checks.failed ? ` · ${fix.checks.failed} failing` : ''}` : '');
+  (fix.checks && fix.checks.total ? `${fix.checks.done}/${fix.checks.total}${fix.checks.failed ? ` · ${fix.checks.failed} ${FAIL}` : ''}` : '');
 
 /** The fixer's checks: lit while it runs them, carrying the node doing it, and filled once it ends. */
 function checksSpan(fix: LaneStep): SpanStripSpan {

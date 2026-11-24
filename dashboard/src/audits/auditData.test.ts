@@ -115,7 +115,7 @@ describe('jobs', () => {
       kind: 'fix', label: 'repair 1/2', area: 'core.ops', what: '1 commit; verify passed', node: 'studio', minutes: 4, bad: false,
     });
     expect(parseJob('patch core.ops: left out: verify still failing after 2 repairs (exited 1)')).toMatchObject({ kind: 'patch', bad: true });
-    expect(stepText('repair', { state: 'done', attempts: 1, outcome: 'passed' }, 0)).toBe('1 repair · passed');
+    expect(stepText('repair', { state: 'done', attempts: 1, outcome: 'passed' }, 0)).toBe('1 repair · ✓');
   });
 
   it('reads a patch that did not apply as a bad patch job', () => {
