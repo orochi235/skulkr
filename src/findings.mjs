@@ -156,19 +156,27 @@ const itemOf = (para, extra) => {
   }
   claim = claim.replace(SOURCE, '').replace(/[\s:,.;—-]+$/, '').trim();
   note = note.replace(/^[\s.:;,)—-]+/, '').replace(/^not a defect\b[\s.:;,—-]*/i, '').trim();
-  return { claim, from, verdict, note };
+  return { claim, from, verdict, note, shas: [...new Set(text.match(/\b[0-9a-f]{7,40}\b/g) ?? [])] };
 };
+
+/** Whether a report item answers a finding another line already did (`duplicate of …`). */
+export const isDuplicate = (item) => DUPLICATE.test(item.note);
 
 /**
  * Every defect a fixer's report answers, in its order: those it was handed, then the extras it found, the checks left
- * out. A paragraph is a defect when it gives a verdict about a claim: one that only opens the report with a sha is not.
+ * out. A paragraph is a defect when it gives a verdict about a claim: one that only opens the report with a sha is not,
+ * nor a summary ahead of the first that names a reviewer. With `shas`, each also lists the commits its line names.
  */
-export const reportItems = (report) => {
+export const reportItems = (report, { shas = false } = {}) => {
   const paras = report.split(/\n\s*\n|\n(?=\S)/).map((p) => p.trim()).filter(Boolean);
   const checks = paras.findIndex((p) => CHECKS.test(p));
   const body = checks === -1 ? paras : paras.slice(0, checks);
   const cut = body.findIndex((p) => EXTRAS.test(p));
-  return body.flatMap((p, i) => (VERDICT.test(p) && !/^tally: /i.test(p) && !EXTRAS.test(p) ? [itemOf(p, cut !== -1 && i > cut)] : [])).filter((item) => item.claim);
+  // A summary ahead of the first finding names no reviewer, though it may use a verdict's words.
+  const first = body.findIndex((p) => SOURCE.test(plain(p)));
+  return body.flatMap((p, i) => (VERDICT.test(p) && !/^tally: /i.test(p) && !EXTRAS.test(p) && !(first > 0 && i < first)
+    ? [itemOf(p, cut !== -1 && i > cut)] : [])).filter((item) => item.claim)
+    .map((item) => (shas ? item : (({ shas: _, ...rest }) => rest)(item)));
 };
 
 /** How many findings a fixer's report answers with a question ({@link reportItems}). */
@@ -184,7 +192,7 @@ export const questionsIn = (report) => reportItems(report ?? '').filter((i) => i
  */
 export const fixTallyOf = (report) => {
   const items = reportItems(report);
-  const listed = items.filter((i) => i.from !== 'extra' && !DUPLICATE.test(i.note));
+  const listed = items.filter((i) => i.from !== 'extra' && !isDuplicate(i));
   if (listed.length === 0) {
     const t = TALLY.exec(report);
     return t ? { fixed: Number(t[1]), of: Number(t[2]), extra: Number(t[3]) } : null;

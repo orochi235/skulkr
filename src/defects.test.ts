@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { areaDefects, commitSubjects, defectsFor, openItems } from './defects.mjs';
+import { areaDefects, commitSubjects, defectsFor, foldDuplicates, openItems } from './defects.mjs';
+import { reportItems } from './findings.mjs';
 import { weaselConfig } from '../test/weaselConfig.ts';
 
 const dirs: string[] = [];
@@ -73,6 +74,25 @@ describe('areaDefects', () => {
       [40, false, ['on a batch']],
       [38, true, ['a fix-only round of its own id']],
       [36, true, ['from the old area']],
+    ]);
+  });
+});
+
+describe('foldDuplicates', () => {
+  it("folds a duplicate line into the finding it repeats, by their shared commit or else its words, as both reviewers'", () => {
+    const report = [
+      '- The cursor stays after a gesture ends (A) — fixed 788913d82c',
+      '- The same stuck cursor (B) — duplicate of the cursor finding from A, fixed 788913d82c',
+      '- Immediate params drop `bodyKind` (A) — fixed 59e717f8f4',
+      '- `heldPointer` is read once at attach (B) — fixed 9ba4de092a',
+      '- Wrong reason in the doc (A) — fixed 1a242656a6',
+      '- Params drop it for some kinds (B) — duplicate of the `bodyKind` finding from A',
+    ].join('\n');
+    expect(foldDuplicates(reportItems(report, { shas: true })).map((i: any) => [i.from, i.claim])).toEqual([
+      ['A+B', 'The cursor stays after a gesture ends'],
+      ['A+B', 'Immediate params drop `bodyKind`'],
+      ['B', '`heldPointer` is read once at attach'],
+      ['A', 'Wrong reason in the doc'],
     ]);
   });
 });

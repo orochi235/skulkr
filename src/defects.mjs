@@ -7,7 +7,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gitIn } from './batch.mjs';
-import { reportItems } from './findings.mjs';
+import { likeness } from './carry.mjs';
+import { isDuplicate, reportItems } from './findings.mjs';
 import { partitionAt } from './partition.mjs';
 import { abandonedRounds, nightsByRound, recordsFor } from './recordFiles.mjs';
 import { coveringRounds, inheritPasses, passesFrom } from './rounds.mjs';
@@ -29,6 +30,22 @@ export const openItems = (match, whereOf = null) => {
   ];
 };
 
+/**
+ * A fixer's items with each `duplicate of …` line folded into the finding it repeats, which becomes both reviewers'
+ * (`A+B`): the one from the other reviewer sharing its commit, else the one its words are most like.
+ */
+export const foldDuplicates = (items) => {
+  const kept = items.filter((i) => !isDuplicate(i)).map(({ shas, ...i }) => ({ ...i, shas }));
+  for (const dup of items.filter(isDuplicate)) {
+    const others = kept.filter((k) => (k.from === 'A' && dup.from === 'B') || (k.from === 'B' && dup.from === 'A'));
+    const words = `${dup.claim} ${dup.note}`;
+    const best = others.find((k) => k.shas?.some((h) => dup.shas?.includes(h)))
+      ?? others.reduce((top, k) => (likeness(words, k.claim) > (top ? likeness(words, top.claim) : 0) ? k : top), null);
+    if (best) best.from = 'A+B';
+  }
+  return kept.map(({ shas, ...i }) => i);
+};
+
 /** The subject of each commit in a fixer's mbox, a folded subject joined back into one line. */
 export const commitSubjects = (mbox) =>
   [...mbox.matchAll(/^Subject: (?:\[PATCH[^\]]*\] )?(.*(?:\n[ \t].*)*)/gm)].map((m) => m[1].replace(/\n[ \t]+/g, ' ').trim());
@@ -40,8 +57,8 @@ export const commitSubjects = (mbox) =>
  */
 const itemsOf = (read) => {
   const report = read('fix.md');
-  const answered = report === null ? [] : reportItems(report);
-  if (answered.length) return { fixed: true, items: answered };
+  const answered = report === null ? [] : reportItems(report, { shas: true });
+  if (answered.length) return { fixed: true, items: foldDuplicates(answered) };
   const match = read('match.json');
   if (match === null) return null;
   const mbox = read('fix.mbox');

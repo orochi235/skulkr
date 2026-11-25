@@ -95,6 +95,20 @@ describe('fixTallyOf', () => {
 });
 
 describe('reportItems', () => {
+  it('reads no summary ahead of the first finding as one, though it uses a verdict\'s words', () => {
+    const report = [
+      'Six fixes are committed. The rest of B3 is not a defect: the dispatcher already catches it.',
+      '',
+      '- Spread copy loses methods (A) — fixed c8500e5fc7.',
+      '- Spread-copy handle (B) — duplicate of A\'s spread-copy handle finding.',
+      '- The throw is unguarded (B) — not a defect. The dispatcher catches it.',
+      '',
+      'tally: 2 of 3 fixed, 0 extra fixed',
+    ].join('\n');
+    expect(reportItems(report).map((i: any) => [i.from, i.verdict])).toEqual([['A', 'fixed'], ['B', 'duplicate'], ['B', 'not a defect']]);
+    expect(fixTallyOf(report)).toMatchObject({ fixed: 1, of: 2, dismissed: 1 });
+  });
+
   it('reads a fixed line with no sha, and not an opening line that only names one', () => {
     const report = [
       'Fixed 3811cbf6d9 and the rest are below. The shas changed when I folded follow-ups:',

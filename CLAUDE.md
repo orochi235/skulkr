@@ -132,6 +132,8 @@ weasel cutover.
     changes.
   - a fixer's `skulkr: says: …` lines in its log, a fleet hand-off's `skulkr: on the fleet as <task>` line in its job's
     log, and the heartbeat's `now` cut to 100 characters (README "Watching a run", 2026-11-24).
+  - a fixer's report read with a summary ahead of its first finding that names no reviewer left out, so it no longer
+    counts as a finding the fixer dismissed (2026-11-24).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.
