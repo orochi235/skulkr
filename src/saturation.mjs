@@ -52,16 +52,24 @@ export const chapmanPairs = (ledger) => {
 export const estimatesOf = (ledger) => ({ combined: chao2(ledger.occasions, ledger.defects), perSource: perSource(ledger), chapman: chapmanPairs(ledger) });
 
 /**
- * The yield table: one row per occasion, in order, with what it found (`findings`, `new`) and the combined estimate
- * over the occasions up to it.
+ * The yield table: one row per occasion, in order, with what it found (`findings`, `new`), the combined estimate over
+ * the occasions up to it, what they have cost (`spentUsd`), and that per distinct defect so far (`usdPerDefect`,
+ * undefined while none is found).
  */
 export const yieldRows = (ledger) => {
   const occasions = [...ledger.occasions].sort((a, b) => a.n - b.n);
-  return occasions.map((o, i) => ({
-    ...o,
-    new: ledger.defects.filter((d) => d.firstOccasion === o.n).length,
-    stats: chao2(occasions.slice(0, i + 1), ledger.defects),
-  }));
+  let spentUsd = 0;
+  return occasions.map((o, i) => {
+    spentUsd += o.costUsd ?? 0;
+    const stats = chao2(occasions.slice(0, i + 1), ledger.defects);
+    return {
+      ...o,
+      new: ledger.defects.filter((d) => d.firstOccasion === o.n).length,
+      stats,
+      spentUsd,
+      usdPerDefect: stats.S > 0 ? spentUsd / stats.S : undefined,
+    };
+  });
 };
 
 /**

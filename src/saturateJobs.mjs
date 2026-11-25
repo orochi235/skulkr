@@ -98,8 +98,10 @@ const runLedgerMatch = async (ctx, area, key, attempt, prompt) => {
   const to = join(occasionJobsOf(cfg, area.id, key), `match${attempt}`);
   // A match answers the ledger as it stood, so an earlier attempt's reply is never reused.
   rmSync(to, { recursive: true, force: true });
-  const run = await dispatch({ ...ctx, cfg }, area, 'match', {
-    kind: 'review', expect: 'none', shell: matchShell(cfg, area.id, ctx.budget.match, 'ledger-match.md'), to,
+  // The ledger matcher's own ceiling stands in for the match role's, so dispatch's ceiling line names it too.
+  const budget = { ...ctx.budget, match: ctx.budget.ledgerMatch };
+  const run = await dispatch({ ...ctx, cfg, budget }, area, 'match', {
+    kind: 'review', expect: 'none', shell: matchShell(cfg, area.id, budget.match, 'ledger-match.md'), to,
     task: taskOf(cfg, area.id, key, `match${attempt}`), logPath: join(to, '..', `match${attempt}.log`),
     about: `Matches saturation occasion ${key} of area ${area.id} against its ledger of defects.`,
   });

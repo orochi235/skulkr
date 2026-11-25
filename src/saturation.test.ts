@@ -83,6 +83,14 @@ describe('yieldRows', () => {
     expect(rows[0].stats.f0).toBeUndefined();
     expect(rows[4].stats.f0).toBeCloseTo(12.8, 10);
   });
+
+  it('gives each occasion the cost so far per distinct defect so far', () => {
+    const l = ledgerOf([[], ['A', 'B'], ['B', 'C']]);
+    l.occasions = l.occasions.map((o, i) => ({ ...o, costUsd: [1, 2, 3][i] }));
+    const rows = yieldRows(l);
+    expect(rows.map((r) => r.spentUsd)).toEqual([1, 3, 6]);
+    expect(rows.map((r) => r.usdPerDefect)).toEqual([undefined, 1.5, 2]);
+  });
 });
 
 describe('stopReason', () => {

@@ -42,7 +42,7 @@ const envelope = (result: string, cost: number) => JSON.stringify({ type: 'resul
 const fakeRunner = (seen: string[][], { matchReply }: { matchReply?: () => string } = {}) => {
   let review = 0;
   const tasks: string[] = [];
-  const run = async (job: { to: string; task: string }, { cwd }: { cwd: string }) => {
+  const run = async (job: { to: string; task: string; shell: string }, { cwd }: { cwd: string }) => {
     tasks.push(job.task);
     mkdirSync(job.to, { recursive: true });
     writeFileSync(join(job.to, 'exit'), '0');
@@ -80,7 +80,7 @@ describe('skulkr saturate', () => {
     // The first occasion needs no matcher; each later one runs one.
     expect(runner.tasks.filter((t) => t.endsWith('match1'))).toHaveLength(4);
     expect(runner.tasks[0]).toBe('proj-saturate-src-01-claude-claude');
-    expect(lines).toContain('5/5 claude: 5 findings, 2 new; distinct 13; unseen ≈ 12.8; next-new 32%; $0.60');
+    expect(lines).toContain('5/5 claude: 5 findings, 2 new; distinct 13; unseen ≈ 12.8; next-new 32%; $0.60; $0.22/defect');
     expect(lines.some((l) => /stopped, reached the limit of 5/.test(l))).toBe(true);
     expect(readdirSync(join(cfg.state, 'saturation/src/reviews'))).toEqual(['01-claude.md', '02-claude.md', '03-claude.md', '04-claude.md', '05-claude.md']);
     expect(existsSync(join(cfg.state, 'saturation/src/jobs/05-claude'))).toBe(false);
@@ -104,18 +104,45 @@ describe('skulkr saturate', () => {
     expect(readFileSync(join(root, 'src-saturation.md'), 'utf8')).toContain('claude × codex');
   });
 
-  it('refuses a ledger at another commit unless --fresh', async () => {
+  it("resumes at the ledger's own commit after main moves, and --fresh sets it aside for a new one at the tip", async () => {
     const { root, cfg, git } = project();
     await saturateCommand(cfg, fakeRunner([['A']]), root, ['src', '--max', '1'], () => {});
+    const first = git('rev-parse', 'main');
     writeFileSync(join(root, 'src/y.ts'), 'export const y = 2;\n');
     git('add', '.');
     git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'more');
-    await expect(saturateCommand(cfg, fakeRunner([['B']]), root, ['src', '--max', '2'], () => {})).rejects.toThrow(/--fresh/);
-    await saturateCommand(cfg, fakeRunner([['B']]), root, ['src', '--max', '1', '--fresh'], () => {});
+    const trees: string[] = [];
+    const resumed = fakeRunner([['B']]);
+    const run = resumed.run;
+    resumed.run = async (job, opts) => {
+      trees.push(git('-C', opts.cwd, 'rev-parse', 'HEAD'));
+      return run(job, opts);
+    };
+    await saturateCommand(cfg, resumed, root, ['src', '--max', '2'], () => {});
+    // The review and its ledger match, both in the tree at the ledger's commit.
+    expect(trees).toEqual([first, first]);
+    expect(ledgerOf(cfg, 'src')).toMatchObject({ commit: first, files: ['src/x.ts'] });
+    await saturateCommand(cfg, fakeRunner([['C']]), root, ['src', '--max', '1', '--fresh'], () => {});
     const ledger = ledgerOf(cfg, 'src');
     expect(ledger.commit).toBe(git('rev-parse', 'main'));
     expect(ledger.files).toEqual(['src/x.ts', 'src/y.ts']);
-    expect(ledger.defects.map((d: { claim: string }) => d.claim)).toEqual(['B']);
+    expect(ledger.defects.map((d: { claim: string }) => d.claim)).toEqual(['C']);
+    const aside = ledgerOf(cfg, `src.${first.slice(0, 10)}`);
+    expect(aside.defects.map((d: { claim: string }) => d.claim)).toEqual(['A', 'B']);
+    expect(existsSync(join(cfg.state, 'saturation', `src.${first.slice(0, 10)}`, 'lock'))).toBe(false);
+  });
+
+  it('stops the ledger matcher at budget.ledgerMatch', async () => {
+    const { root, cfg } = project();
+    const runner = fakeRunner([['A'], ['B']]);
+    const shells: string[] = [];
+    const run = runner.run;
+    runner.run = async (job, opts) => {
+      shells.push(job.shell);
+      return run(job, opts);
+    };
+    await saturateCommand({ ...cfg, budget: { ...cfg.budget, ledgerMatch: 2.5 } }, runner, root, ['src', '--max', '2'], () => {});
+    expect(shells.filter((s) => /ledger-match\.md/.test(s)).map((s) => /--max-budget-usd (\S+)/.exec(s)?.[1])).toEqual(['2.5']);
   });
 
   it('ingests a whole report as one occasion through the matcher', async () => {

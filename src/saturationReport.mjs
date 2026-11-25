@@ -17,12 +17,13 @@ const fixed = (n, places) => (n === undefined || Number.isNaN(n) ? '–' : n.toF
 const pct = (n) => (n === undefined ? '–' : `${(n * 100).toFixed(1)}%`);
 
 const yieldTable = (ledger) => table(
-  ['#', 'source', 'findings', 'new', 'distinct', 'Q1', 'Q2', 'est. total', 'unseen', 'next-new', 'cost', 'minutes'],
+  ['#', 'source', 'findings', 'new', 'distinct', 'Q1', 'Q2', 'est. total', 'unseen', 'next-new', 'cost', '$/defect', 'minutes'],
   yieldRows(ledger).map((r) => [
     r.n, r.source, r.findings, r.new, r.stats.S, r.stats.Q1, r.stats.Q2,
-    fixed(r.stats.total, 1), fixed(r.stats.f0, 1), pct(r.stats.nextNew), `$${fixed(r.costUsd ?? 0, 2)}`, fixed(r.minutes ?? 0, 1),
+    fixed(r.stats.total, 1), fixed(r.stats.f0, 1), pct(r.stats.nextNew), `$${fixed(r.costUsd ?? 0, 2)}`,
+    r.usdPerDefect === undefined ? '–' : `$${fixed(r.usdPerDefect, 2)}`, fixed(r.minutes ?? 0, 1),
   ]),
-  [true, false, true, true, true, true, true, true, true, true, true, true],
+  [true, false, true, true, true, true, true, true, true, true, true, true, true],
 );
 
 const estimatesTable = (ledger) => {
@@ -65,7 +66,8 @@ export const reportText = (ledger, rule) => {
     '## Yield by occasion',
     '',
     'The estimates on each row are Chao2 over every occasion up to it. "Unseen" is the estimated number of defects no',
-    'occasion has found; "next-new" is the chance the next occasion\'s finding is one of them.',
+    'occasion has found; "next-new" is the chance the next occasion\'s finding is one of them. "$/defect" is what every',
+    'occasion up to the row has cost, divided by the distinct defects found so far.',
     '',
     yieldTable(ledger),
     '',

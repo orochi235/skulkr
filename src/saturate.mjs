@@ -7,13 +7,13 @@
  *   skulkr saturate report <area>
  *   skulkr saturate rm <area>
  */
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { addWorktree, gitIn, removeWorktree } from './batch.mjs';
 import { allNew, emptyLedger, keepReview, ledgerDirOf, ledgerOf, removeLedger, withOccasion, writeLedger } from './ledger.mjs';
 import { takeLease } from './lease.mjs';
 import { partitionAt } from './partition.mjs';
-import { chao2, stopReason } from './saturation.mjs';
+import { chao2, stopReason, yieldRows } from './saturation.mjs';
 import { writeReport } from './saturationReport.mjs';
 import { createSaturateContext, matchReport, occasionJobsOf, requireSources, runReview } from './saturateJobs.mjs';
 
@@ -40,29 +40,34 @@ const ruleOf = (cfg, max) => ({ max, stopNextNew: cfg.saturate.stopNextNew });
 
 /**
  * The area's ledger and a frozen worktree of its commit, held by this process alone, then `work` run with them; the
- * worktree and the hold are let go however it ends. A ledger at a commit other than `main`'s tip is refused unless
- * `fresh`, which discards it and starts again at the tip.
+ * worktree and the hold are let go however it ends. An existing ledger resumes at its own commit, wherever `main` has
+ * gone since; with `fresh`, it is moved aside to `<area>.<commit>` and a new one starts at `main`'s tip.
  */
 const withFrozen = async (cfg, root, id, { fresh }, work) => {
   const git = gitIn(root);
-  const commit = git('rev-parse', cfg.git.main);
-  const release = takeLease(join(ledgerDirOf(cfg, id), 'lock'), { saturate: id });
-  if (!release) throw new Error(`another skulkr saturate is working on ${id}`);
+  const lock = () => {
+    const unlock = takeLease(join(ledgerDirOf(cfg, id), 'lock'), { saturate: id });
+    if (!unlock) throw new Error(`another skulkr saturate is working on ${id}`);
+    return unlock;
+  };
+  let release = lock();
   let frozen;
   try {
     let ledger = ledgerOf(cfg, id);
     if (ledger && fresh) {
-      for (const f of ['ledger.json', 'reviews', 'jobs']) rmSync(join(ledgerDirOf(cfg, id), f), { recursive: true, force: true });
+      const aside = ledgerDirOf(cfg, `${id}.${ledger.commit.slice(0, 10)}`);
+      release();
+      renameSync(ledgerDirOf(cfg, id), existsSync(aside) ? `${aside}-${Date.now()}` : aside);
+      release = lock();
       ledger = undefined;
     }
-    if (ledger && ledger.commit !== commit) {
-      throw new Error(`${id}'s ledger is at ${ledger.commit.slice(0, 10)}, but ${cfg.git.main} is at ${commit.slice(0, 10)}; --fresh discards the ledger and starts again at ${cfg.git.main}`);
-    }
     if (!ledger) {
-      const area = partitionAt(cfg, root, commit).find((a) => a.id === id);
+      const tip = git('rev-parse', cfg.git.main);
+      const area = partitionAt(cfg, root, tip).find((a) => a.id === id);
       if (!area) throw new Error(`no area named ${id}; see ${cfg.partition.path}`);
-      ledger = emptyLedger(id, commit, area.files);
+      ledger = emptyLedger(id, tip, area.files);
     }
+    const { commit } = ledger;
     frozen = addWorktree(root, `${cfg.naming.prefix}-saturate-${id}`, commit);
     let base = commit;
     try {
@@ -77,11 +82,12 @@ const withFrozen = async (cfg, root, id, { fresh }, work) => {
 
 /** The progress line for occasion `o` just folded into `ledger`. */
 export const occasionLine = (ledger, o, max) => {
-  const s = chao2(ledger.occasions, ledger.defects);
-  const fresh = ledger.defects.filter((d) => d.firstOccasion === o.n).length;
+  const r = yieldRows(ledger).find((row) => row.n === o.n);
+  const s = r.stats;
   const unseen = s.f0 === undefined ? '–' : s.f0.toFixed(1);
   const next = s.nextNew === undefined ? '–' : `${Math.round(s.nextNew * 100)}%`;
-  return `${o.n}/${max} ${o.source}: ${o.findings} findings, ${fresh} new; distinct ${s.S}; unseen ≈ ${unseen}; next-new ${next}; $${o.costUsd.toFixed(2)}`;
+  const perDefect = r.usdPerDefect === undefined ? '–' : `$${r.usdPerDefect.toFixed(2)}`;
+  return `${o.n}/${max} ${o.source}: ${o.findings} findings, ${r.new} new; distinct ${s.S}; unseen ≈ ${unseen}; next-new ${next}; $${o.costUsd.toFixed(2)}; ${perDefect}/defect`;
 };
 
 /**

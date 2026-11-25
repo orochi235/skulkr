@@ -133,7 +133,7 @@ export const DEFAULTS = {
    * `skulkr saturate` (README "Saturation"): `max` occasions at most, one review per source in `sources` (agent names)
    * each iteration, stopping once the chance of a new finding falls under `stopNextNew`.
    */
-  saturate: { max: 40, sources: ['claude'], stopNextNew: 0.10 },
+  saturate: { max: 40, sources: ['claude'], stopNextNew: 0.15 },
 
   /**
    * How a batch is tested. `{ref}` in the command is the batch branch; `cwd` is `root` or `batch` (its worktree).
@@ -261,7 +261,7 @@ export const DEFAULTS = {
    * in its place, the guess at an area's cost, and `nightUsd`, what continuous mode may spend from one `stopAt` to the
    * next (unset: no continuous mode).
    */
-  budget: { review: 8, match: 1, fix: 15, capUsd: 160, areaCapUsd: undefined, areaGuessUsd: 10, nightUsd: undefined },
+  budget: { review: 8, match: 1, ledgerMatch: 3, fix: 15, capUsd: 160, areaCapUsd: undefined, areaGuessUsd: 10, nightUsd: undefined },
   /**
    * Local clock times: the service starts a run at `startAt`; a run stops dispatching at the first `stopAt`.
    * `continuous` keeps rounds coming between them, under `budget.nightUsd` (README "Continuous rounds").
