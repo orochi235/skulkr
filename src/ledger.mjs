@@ -141,7 +141,6 @@ export const matchOf = (reply, ledger, given) => {
   const isNew = new Set();
   for (const f of fresh) {
     index(f.finding, 'a new defect');
-    if (sighted.has(f.finding) || isNew.has(f.finding)) throw new Error(`finding ${f.finding} is accounted for twice`);
     if (typeof f.claim !== 'string' || !f.claim.trim()) throw new Error(`new finding ${f.finding} has no claim`);
     isNew.add(f.finding);
   }

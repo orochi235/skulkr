@@ -44,6 +44,12 @@ describe('matchOf', () => {
     });
   });
 
+  it('takes a finding that sights a ledger defect and adds a new one', () => {
+    const got = matchOf('{"sightings": [{"finding": 0, "defect": "D1"}], "new": [{"finding": 0, "claim": "c"}, {"finding": 1, "claim": "d"}]}', ledger, [{}, {}]);
+    expect(got.sightings).toEqual([{ finding: 0, defect: 'D1' }]);
+    expect(got.new.map((n: any) => n.finding)).toEqual([0, 1]);
+  });
+
   it('takes an ingest reply\'s own findings', () => {
     const got = matchOf('{"findings": [{"claim": "k", "where": "w"}], "new": [{"finding": 0, "claim": "k", "where": "w"}]}', ledger, undefined);
     expect(got.findings).toEqual([{ claim: 'k', where: 'w' }]);
@@ -52,7 +58,7 @@ describe('matchOf', () => {
   it('throws on a finding left out, counted twice, an unknown id, an index out of range, or no JSON', () => {
     const f = [{}, {}];
     expect(() => matchOf('{"new": [{"finding": 0, "claim": "c"}]}', ledger, f)).toThrow(/1 are not accounted/);
-    expect(() => matchOf('{"sightings": [{"finding": 0, "defect": "D1"}], "new": [{"finding": 0, "claim": "c"}, {"finding": 1, "claim": "c"}]}', ledger, f)).toThrow(/twice/);
+    expect(() => matchOf('{"new": [{"finding": 0, "claim": "c"}, {"finding": 1, "claim": "c"}], "same": [{"finding": 0, "as": 1}]}', ledger, f)).toThrow(/twice/);
     expect(() => matchOf('{"sightings": [{"finding": 0, "defect": "D9"}, {"finding": 1, "defect": "D1"}]}', ledger, f)).toThrow(/D9/);
     expect(() => matchOf('{"sightings": [{"finding": 2, "defect": "D1"}]}', ledger, f)).toThrow(/finding 2/);
     expect(() => matchOf('{"new": [{"finding": 0, "claim": "c"}], "same": [{"finding": 1, "as": 5}]}', ledger, f)).toThrow(/not a new defect/);
