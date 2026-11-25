@@ -46,13 +46,15 @@ export const severityOf = (finding) => /^[-*]\s*(?:\*\*)?severity(?::\*\*|\*\*:|
 /**
  * The ledger matcher's prompt: its brief, the ledger's defects, then the new report, either as its parsed `findings`
  * numbered from 0 or, for an ingested report, as `raw` text for the matcher to enumerate.
+ * @param {{ findings?: { claim: string, where: string }[], raw?: string }} report
  */
-export const ledgerMatchPrompt = (brief, ledger, { findings, raw }) => {
+export const ledgerMatchPrompt = (brief, ledger, report) => {
+  const { findings, raw } = report;
   const defects = ledger.defects.map((d) => `${d.id}. ${d.claim}\n   where: ${d.where}`).join('\n') || '(empty)';
-  const report = raw !== undefined
+  const body = raw !== undefined
     ? `# The new report, whole\n\nEnumerate its findings yourself and reply with \`findings\` as well.\n\n${raw}`
-    : `# The new report's findings\n\n${findings.map((f, i) => `${i}. ${f.claim}\n   where: ${f.where}`).join('\n') || '(empty)'}`;
-  return `${brief}\n\n# The ledger\n\n${defects}\n\n${report}\n`;
+    : `# The new report's findings\n\n${(findings ?? []).map((f, i) => `${i}. ${f.claim}\n   where: ${f.where}`).join('\n') || '(empty)'}`;
+  return `${brief}\n\n# The ledger\n\n${defects}\n\n${body}\n`;
 };
 
 /**

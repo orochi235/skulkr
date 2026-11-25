@@ -29,7 +29,7 @@ describe('withOccasion', () => {
   it('adds a sighting once per occasion, by source, and appends new defects after the highest id', () => {
     const match = matchOf(JSON.stringify({ sightings: [{ finding: 0, defect: 'D2' }, { finding: 1, defect: 'D2' }], new: [{ finding: 2, claim: 'x', where: 'y' }] }), two(), [{}, {}, {}]);
     const l = withOccasion(two(), occ(2, 'codex'), match);
-    expect(l.defects.find((d) => d.id === 'D2')).toMatchObject({ sightings: [1, 2], sources: { claude: [1], codex: [2] } });
+    expect(l.defects.find((d: { id: string }) => d.id === 'D2')).toMatchObject({ sightings: [1, 2], sources: { claude: [1], codex: [2] } });
     expect(l.defects.at(-1)).toMatchObject({ id: 'D3', firstOccasion: 2, sources: { codex: [2] } });
     expect(l.occasions.at(-1)).toMatchObject({ n: 2, source: 'codex', findings: 3 });
   });
