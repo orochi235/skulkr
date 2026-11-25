@@ -1,47 +1,61 @@
 # Handoff
 
-For the next session in skulkr. Written 2026-11-24, late evening, pruned the same night; check each claim against the tree before acting on it.
+For the next session in skulkr. Written 2026-11-25, evening. Check each claim against the tree before acting on it.
 
 ## State
 
-On `main` (`git log --oneline @{u}..HEAD` shows what is unpushed). README.md and CLAUDE.md's weasel parity list describe
-everything landed on 2026-11-24: local mode, fleet verify and preflight, the usage-limit retry, resumed-round lanes,
-pins, the dashboard changes.
+On `main`, pushed (`git log --oneline @{u}..HEAD` shows anything unpushed). The fleet suite passed on the last
+commits of the day. Built today, all described in README.md:
 
-**Round 85 of weasel is running on the fleet** (started 2026-11-24 ~22:00 local with `skulkr night --tenant weasel`
-from `~/src/weasel`; log under `~/.local/state/weasel-skulkr/nights/2026-11-25T02-59-57-769Z-round85/`). Outside local
-mode a green round pushes weasel's `main`. Rounds 83 and 84 landed. For a local round, the config is at
-`~/.local/state/weasel-skulkr/weasel-local.config.mjs`.
+- `.skulkr/` as each project's committed audit state: rounds, partition, landed scour ledgers, the defect registry
+  (`.skulkr/defects/<area>.jsonl`), and a SQLite index at `.skulkr/cache/skulkr.db` that `skulkr q <sql>` queries.
+  weasel's record moved there (weasel `be05bfd59e`); its registry holds every defect of rounds 29–88 and the ledgers.
+- The saturation workflow is now called **scour**: `skulkr scour` (aliases `saturate`, `sat`), the dashboard's Scour
+  page (`#<tenant>/scour/<area>`) with the audit map, the ledger list and the defect table, picks synced.
+- The orochi service (`onto service`, tree `skulkr`) runs current skulkr; re-sync it with `onto sync --in skulkr orochi`
+  after changes that matter to rounds.
 
-## Decisions made in conversation (2026-11-24)
+## Next: plan the scour pipeline, then build it
 
-- **Local mode means only that Claude runs on this machine.** Every non-model job — a fixer's `checks:gate`, verifies,
-  GUI verifies, baselines, the preflight, the gate — goes to the onto fleet where it can take it. Never add a heavy
-  local job under the local runner.
-- **Don't assume anything in flight will finish soon**: read its elapsed time against what such jobs take before
-  waiting on it.
-- Pass/fail captions are mark-space-word (`✓ passed`, `✗ failed`); a count puts the mark first with no space (`✗1`).
-  Marks are set in Zapf Dingbats (the page fonts lack them).
-- Finished steps in the steps view are flat dark gray (no tinted gray); the rounds and calibration charts show the
-  latest 30 rounds.
+The user wants to plan the pipeline further before anything is built. The plan is `docs/scour.md`: the stages (pick,
+trawl, collect, judge, land, triage, fix, ask, close, compare), what each hands the next, what is decided, what is open.
+Its stage table's middle columns (core action, UI, user sees) are the user's own wording; keep them unless asked.
 
-## Open
+Points the user has not settled, raised in conversation and not all in the doc:
 
-- kouhai's ledger holds the open work for this repo (`owed`): t-543 #calibration-per-area-round, t-545
-  #next-round-criteria (pins are its first criterion), t-546 #stale-local-job-records, t-547 #killed-fixer-reads-done.
-- Fleet verifies run from skulkr's local job trees (`~/.local/state/weasel-skulkr/trees/tN`), which onto names as
-  repositories `t1`, `t2`, …, so each needs a cold setup per node and they pile onto whichever node set one up. Proposed,
-  not decided: present them to onto as weasel so they use its warm pooled trees.
-- Proposed, not decided: a pin mark on a pinned area's lane (the map cell and the area panel show pins today).
-- keiei's onto copy of skulkr has no dashboard `node_modules`; dashboard fleet runs install first (`npm ci` in the
-  command).
+- In the stage table: `ask` reads Implicit but writes "a list for a person to rule on", and its UI cell repeats scan's
+  progress bar; `triage` has no UI though it decides what fixers get; `compare`'s "Ambient" is undefined; `land`'s
+  "User sees" mixes now ("currently explicit") with intent; `judge` is closer to "configured" than "implicit?".
+- Collect's verb: `fold` or `pool` (one syllable) against `collect`.
+- Whether triage checks each defect with a model, whether fix goes through the round pipeline (proposed, not decided),
+  where the fix plan lives, and whether to rename the `saturation/` paths on disk.
+
+## Decisions made in conversation (2026-11-25)
+
+All are in `docs/scour.md` "Decided" or README.md except these:
+
+- Landing ledgers and moving weasel's record pushes weasel's `main`; both were done with the user's go-ahead. Pushing
+  weasel needs that each time.
+- Saturation defects found only by a scour are never handed to a round's fixer until triage and fix exist.
+
+## Loose ends
+
+- `skulkr sat core.canvas.nodeShapes` (pid 49951, started 08:08) hung on the slot bug fixed in `f4c5c78` and holds that
+  ledger's lock; its 6 defects are unlanded. The user has not said whether to kill it. Read the pid back with
+  `ps -p 49951 -o lstart,command` before acting.
+- weasel's root still holds `review-saturation-tracker.xlsx`, `viewport-review-saturation.md` and
+  `viewport-review-saturation-codex.md`, untracked; the last holds the only copy of that Codex report. The user has not
+  said what to do with them. The other root saturation files are in `~/.Trash/weasel-saturation-root-2026-11-25/`.
+- A stray onto tree `skulkr-weasel` on orochi, made by a mistaken sync, is unused.
+- kouhai's ledger still holds older open work for this repo (`owed`): t-543, t-545, t-546, t-547.
 
 ## Traps
 
-- **The dev server misses edits when `fseventsd` wedges** (100% CPU, many GB), which kills directory watches
-  machine-wide. Check `ps -p $(pgrep -x fseventsd) -o %cpu,rss`; the user runs `sudo killall fseventsd`. The dashboard
-  dev server must be restarted to load changes to `dashboard/server/plugin.ts`.
-- **A stale map shows as a red header** ("updated … · N min old") with the build's error below it; `skulkr map --tenant
-  weasel` run by hand shows the error's stack.
-- `git.push` defaults to true outside local mode: a green round pushes its project's `main`.
-- Running weasel's root `biome check --write` reformats whole files outside labkit: biome lints only `packages/labkit`.
+- **onto syncs a job's tree by `git ls-files`**, which leaves ignored files behind. `.skulkr/in/` and `.skulkr/out/`
+  (a job's scratch) must never be gitignored, or every job loses its inputs; `.skulkr/.gitignore` ignores `cache/` only.
+- **A test that hardcodes `docs/audits/`** now fails, since `record.dir` defaults to `.skulkr`. Build paths from
+  `cfg.record.dir`.
+- **The macOS filesystem is case-insensitive**: `pages.tsx` and `Pages.tsx` are one file.
+- **The dev server misses edits when `fseventsd` wedges**; `dashboard/server/plugin.ts` changes need a dev-server restart.
+- `git.push` defaults to true outside local mode: a green round, a scour landing and the record move all push the
+  project's `main`.
