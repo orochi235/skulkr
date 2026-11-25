@@ -36,6 +36,24 @@ export const withPasses = (lanes, run) => lanes.map((lane) => {
   return { ...lane, pass: passOf(run.round, run.started?.slice(0, 10) ?? '', a, b, shared, a + b - shared) };
 });
 
+const ON_FLEET_AS = /^on the fleet as (\S+)$/;
+
+/**
+ * Each running step whose latest line hands its work to the fleet (`skulkr: on the fleet as <task>`) given `fleet`, that
+ * task's `{ task, node, running }` from `jobs`, the runner's listing; a task the listing lacks yet gives none.
+ */
+export const withFleet = (lanes, jobs) => lanes.map((lane) => {
+  let changed = false;
+  const steps = Object.fromEntries(Object.entries(lane.steps).map(([key, step]) => {
+    const task = step?.state === 'running' ? ON_FLEET_AS.exec(step.now?.text ?? '')?.[1] : undefined;
+    const job = task && jobs.find((j) => j.task === task);
+    if (!job) return [key, step];
+    changed = true;
+    return [key, { ...step, fleet: { task, node: job.node ?? '', running: !job.finished } }];
+  }));
+  return changed ? { ...lane, steps } : lane;
+});
+
 /** Each area's fixer report that has come home, by area. */
 const fixReports = (agent, nightDir, ids) => new Map(nightDir ? ids.flatMap((id) => {
   const file = join(nightDir, 'jobs', id, 'fix', agent.resultFile);
@@ -74,7 +92,7 @@ export const readRun = (found, running, jobs = [], state, { names = NAMES, sweep
     areas: areaIds,
     stages: Object.fromEntries(nightStages(log, names)),
     leftOut: nightLeftOut(log, run.round, names),
-    lanes: withPasses(nightLanes(log, areaIds, running ? own : own.filter((j) => j.finished), fixReports(fixAgent, run.nightDir, areaIds), names), run),
+    lanes: withFleet(withPasses(nightLanes(log, areaIds, running ? own : own.filter((j) => j.finished), fixReports(fixAgent, run.nightDir, areaIds), names), run), running ? jobs : []),
     sweepRunning: Boolean(running && sweepId && jobs.some((j) => !j.finished && (j.task ?? '').endsWith(sweepId))),
     nightDir: run.nightDir ?? null,
     lastLine: lines.at(-1) ?? null,
@@ -106,13 +124,8 @@ export const mergedIn = (cfg, git) => {
   };
 };
 
-/**
- * Every live run, then the one that finished last. `jobs` are the runner's jobs, or `listJobs(sinceIso)` is asked
- * for them (the runner's `jobs`), each running one given its progress from `listProgress()` (the runner's
- * `progress`, a Map by task); `opts` is `readRun`'s.
- */
-/** @param {string} state @param {any[] | null} [jobs] @param {{ listJobs?: (since: string) => any[], listProgress?: () => Map<string, any>, names?: any, sweepId?: string, gate?: any }} [opts] */
-export const readRuns = (state, jobs = null, { listJobs = () => [], listProgress = () => new Map(), ...opts } = {}) => {
+/** The runs a map shows, by their status or summary: every live one, then the one that finished last, if not live. */
+const shownRuns = (state) => {
   const legacy = !existsSync(join(state, 'runs'));
   const current = legacy ? readJson(join(state, 'current.json')) : null;
   // A service still on the one-night runner keeps current.json and last.json instead of runs/.
@@ -121,11 +134,27 @@ export const readRuns = (state, jobs = null, { listJobs = () => [], listProgress
   // A resumed round is live again beside the summary its earlier run left: it is listed once, as the live run.
   const ended = legacy ? (lastJson && lastJson.round !== current?.round ? lastJson : null) : lastFinished(state);
   const last = ended && !live.some((r) => r.round === ended.round) ? ended : null;
-  const all = [...live, ...(last ? [last] : [])];
-  const since = all.map((r) => r.started).filter(Boolean).sort()[0];
+  return { live, last, all: [...live, ...(last ? [last] : [])] };
+};
+
+const sinceOf = (runs) => runs.map((r) => r.started).filter(Boolean).sort()[0];
+
+/** Since when a map needs the runner's jobs: the earliest start among the runs it shows; undefined with none. */
+export const jobsSinceOf = (state) => sinceOf(shownRuns(state).all);
+
+/**
+ * Every live run, then the one that finished last. `jobs` are the runner's jobs, or `listJobs(sinceIso)` is asked
+ * for them (the runner's `jobs`), each running one given its progress from `listProgress(running)` (the runner's
+ * `progress`, a Map by task, told which jobs run); `opts` is `readRun`'s.
+ */
+/** @param {string} state @param {any[] | null} [jobs] @param {{ listJobs?: (since: string) => any[], listProgress?: (running: any[]) => Map<string, any>, names?: any, sweepId?: string, gate?: any }} [opts] */
+export const readRuns = (state, jobs = null, { listJobs = () => [], listProgress = () => new Map(), ...opts } = {}) => {
+  const { live, last, all } = shownRuns(state);
+  const since = sinceOf(all);
   const asked = all.length ? (jobs ?? (since ? listJobs(since) : [])) : [];
   // Only a running job reports progress, so the runner is asked for it only while one runs.
-  const progress = !jobs && asked.some((j) => !j.finished) ? listProgress() : new Map();
+  const running = asked.filter((j) => !j.finished);
+  const progress = !jobs && running.length ? listProgress(running) : new Map();
   const known = asked.map((j) => (progress.has(j.task) ? { ...j, progress: progress.get(j.task) } : j));
   return [...live.map((r) => readRun(r, true, known, state, opts)), ...(last ? [readRun(last, false, known, state, opts)] : [])];
 };
@@ -194,7 +223,7 @@ export const buildMap = (cfg, root, runner) => {
   const { picked, settled } = pickAreas({ areas, passes, covered, staleLines, calibration, depletion: depletion.byArea, count: Infinity, inFlight: new Set(locks.keys()), pinned: pins });
   const settledSet = new Set(settled);
   const merged = mergedIn(cfg, git);
-  const runs = readRuns(cfg.state, null, { listJobs: (since) => runner.jobs(since), listProgress: () => runner.progress?.() ?? new Map(), names: cfg.names, sweepId: cfg.sweep?.id, gate: cfg.gate, fixAgent: agentFor(cfg, 'fix') })
+  const runs = readRuns(cfg.state, null, { listJobs: (since) => runner.jobs(since), listProgress: (running) => runner.progress?.(running) ?? new Map(), names: cfg.names, sweepId: cfg.sweep?.id, gate: cfg.gate, fixAgent: agentFor(cfg, 'fix') })
     .map((r) => settleMerged({ ...r, lanes: r.lanes.map((l) => (l.pass ? { ...l, pass: corrected(l.pass) } : l)) }, merged));
   /** The live run holding each area. */
   const holder = new Map(runs.filter((r) => r.running).flatMap((r) => r.areas.map((id) => [id, r])));

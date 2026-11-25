@@ -43,7 +43,9 @@ export function stepText(step: LaneStepKey, s: LaneStep, now: number): string {
     const count = !s.total ? '' : step !== 'fix' ? `${s.done ?? 0}/${s.total}`
       : (s.done ?? 0) >= s.total ? plural(s.total, 'commit') : `${s.done ?? 0}/${s.total} commits`;
     const ran = s.since ? Math.max(0, (now - Date.parse(s.since)) / 60_000) : null;
-    return withMinutes([s.node ?? '', count].filter(Boolean).join(NODE_SEP), ran) || `${s.node ?? ''}${NODE_SEP}running`;
+    // A step whose work is on the fleet names the node doing it, not the one waiting on it.
+    const node = s.fleet?.running ? s.fleet.node : s.node ?? '';
+    return withMinutes([node, count].filter(Boolean).join(NODE_SEP), ran) || `${node}${NODE_SEP}running`;
   }
   if (s.state === 'failed') return s.why ?? 'failed';
   if (s.state !== 'done') return step === 'patch' ? 'after fix' : 'waiting';

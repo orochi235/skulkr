@@ -9,6 +9,9 @@
  *       check it runs (`checks`) and the tests they pass (`tests`); with `--proof`, the commit its final check last
  *       passed at, written to `<file>` and removed when one fails, so the hand-back's verify need not run them again
  *
+ * A reviewer's stream gets a `skulkr: finding <json>` line, `{ claim, where }`, for each finding as its findings file
+ * gains it, so the dashboard can list a running review's findings from its log on any runner.
+ *
  * A fixer's stream also gets `skulkr: <text>` lines, which onto ignores and the local runner keeps as the job's `now`:
  * what it says between tool calls, each command it starts, each commit with its subject, and each check's result with
  * the tests that failed.
@@ -27,14 +30,48 @@ const readPaths = (event) => {
     .map((c) => c.input.file_path);
 };
 
+/** The prefix of the line {@link createFindingsEcho} prints for each finding. */
+export const FINDING_LINE = 'skulkr: finding ';
+
+/** A findings file's `##` sections that cite a `where:`, as `findings.mjs`' `parseFindings` reads them. */
+const sectionsOf = (text) => text.split(/^## /m).slice(1).flatMap((section) => {
+  const [claim, ...rest] = section.split('\n');
+  const where = /^[-*]\s*(?:\*\*)?where(?::\*\*|\*\*:|:)\s*(.+)$/im.exec(rest.join('\n').replace(/<!--[\s\S]*?-->/g, ''))?.[1].trim() ?? '';
+  return claim.trim() && where ? [{ claim: claim.trim(), where }] : [];
+});
+
+/**
+ * Follows a reviewer's findings file through its Write and Edit tool calls, and answers `see(event)`: a
+ * {@link FINDING_LINE} for each finding the event's calls gave it that no earlier one did, by claim.
+ */
+export const createFindingsEcho = () => {
+  let text = '';
+  const told = new Set();
+  const see = (event) => {
+    if (event?.type !== 'assistant' || !Array.isArray(event.message?.content)) return [];
+    for (const c of event.message.content) {
+      if (c?.type !== 'tool_use' || !/(^|\/)findings\.md$/.test(c.input?.file_path ?? '')) continue;
+      if (c.name === 'Write' && typeof c.input.content === 'string') text = c.input.content;
+      else if (c.name === 'Edit' && typeof c.input.new_string === 'string') {
+        const { old_string: from = '', new_string: to, replace_all: all } = c.input;
+        text = !from ? text + to : all ? text.split(from).join(to) : text.includes(from) ? text.replace(from, () => to) : text + to;
+      }
+    }
+    return sectionsOf(text).filter((f) => !told.has(f.claim)).map((f) => (told.add(f.claim), `${FINDING_LINE}${JSON.stringify(f)}`));
+  };
+  return { see };
+};
+
 /**
  * Answers `feed(line)`, which takes one line of the stream and answers `{ progress, result }`: the
- * progress line to print, if the line read a listed file for the first time, and the line itself when
- * it is the result event. `root` is the tree the listed paths are relative to.
+ * progress line to print, if the line read a listed file for the first time, with a finding line for each finding
+ * the reviewer wrote, and the line itself when it is the result event. `root` is the tree the listed paths are
+ * relative to.
  */
 export const createProgress = (files, root = process.cwd()) => {
   const listed = new Set(files);
   const seen = new Set();
+  const echo = createFindingsEcho();
   const start = `onto: progress 0/${listed.size}`;
   const feed = (line) => {
     let event;
@@ -51,7 +88,8 @@ export const createProgress = (files, root = process.cwd()) => {
       seen.add(rel);
       progress = `onto: progress ${seen.size}/${listed.size}`;
     }
-    return { progress };
+    const lines = [...echo.see(event), ...(progress ? [progress] : [])];
+    return { progress: lines.length ? lines.join('\n') : undefined };
   };
   return { start, feed };
 };

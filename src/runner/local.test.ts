@@ -171,6 +171,7 @@ describe('local progress', () => {
     const p = feed('cks\nonto: failed 2/7 checks\nonto: progress 84/84 tests\nskulkr: running: npx vitest run a.test.ts\n');
     expect(p).toMatchObject({ done: 10, total: 10, checks: { done: 6, total: 7, failed: 2 }, tests: { done: 84, total: 84, failed: 0 } });
     expect(p!.now!.text).toBe('running: npx vitest run a.test.ts');
+    expect(feed('skulkr: finding {"claim":"Drops an event","where":"a.ts:1"}\n')!.now!.text).toBe('found: Drops an event');
   });
 
   it("answers a running job's count by its task, and none once it ends", async () => {

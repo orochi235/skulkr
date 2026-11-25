@@ -4,7 +4,7 @@
  * from `skulkr defects <area>`, the end of an area's newest job log in the running round at `<base>api/t/<name>/tail?id=<area>`
  * and the end of the running round's `night.log` at `<base>api/t/<name>/log` (both read here, not through the CLI, as
  * they are asked for every few seconds), and a POST to `<base>api/t/<name>/pin?id=<area>&on=1|0` runs `skulkr pin|unpin <area>`
- * and answers once the map has been built again. It runs the pipeline's CLI in a child process, since building a map asks the runner
+ * and answers once the map has been built again; `<base>api/t/<name>/events` pushes the map as it changes (`feed.ts`). It runs the pipeline's CLI in a child process, since building a map asks the runner
  * for its jobs and may wait seconds on it, and the server must keep answering meanwhile; requests for one tenant's
  * map that arrive while its build runs share it.
  *
@@ -12,7 +12,7 @@
  * one project the CLI finds by itself is the only tenant: `SKULKR_CONFIG` and `SKULKR_ROOT` from this server's
  * environment, else `skulkr.config.mjs` in the directory the child runs in.
  */
-import { execFile, type ExecFileException } from 'node:child_process';
+import { execFile, spawn, type ExecFileException } from 'node:child_process';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -20,6 +20,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 import { STALE_HEADER, TENANTS_PATH, parseTenantPath } from '../shared/routes.ts';
+import { createFeed } from './feed.ts';
 import { jobTailOf, nightLogTailOf } from './jobTail.ts';
 
 /** The pipeline's CLI, beside the dashboard in its repository. */
@@ -36,6 +37,8 @@ export interface SkulkrRunnerOptions {
   readonly exec?: typeof execFile;
   /** `false` keeps no map on disk between server runs. */
   readonly cache?: boolean;
+  /** The event feed's timings and watcher; tests swap them. */
+  readonly feed?: Partial<Pick<import('./feed.ts').FeedOptions, 'watch' | 'debounceMs' | 'gapMs' | 'everyMs'>>;
 }
 
 const MAP_TIMEOUT_MS = 120_000;
@@ -45,15 +48,46 @@ const failureOf = (error: ExecFileException): string =>
   error.killed && error.signal === 'SIGTERM' ? `${error.message} (killed after ${MAP_TIMEOUT_MS / 1000} s)`
     : error.signal ? `${error.message} (killed by ${error.signal})` : `${error.message} (exit ${error.code ?? '?'})`;
 
+/**
+ * Lifts macOS's background policy off a child the server started. A server started by a launchd agent runs its children
+ * as background work, held to the efficiency cores; on a loaded machine a map build then got 0.23 s of CPU in 32 s and
+ * hit its timeout, where the same build from a terminal took 13 s (2026-11-25).
+ */
+const foreground = (pid: number | undefined) => {
+  if (process.platform !== 'darwin' || !pid) return;
+  execFile('taskpolicy', ['-B', '-p', String(pid)], () => {});
+};
+
 /** A runner for the CLI at `bin`, in `cwd`, with `env`: the server's own unless given. */
 export function createSkulkrRunner({ bin = SKULKR_BIN, env = process.env, cwd, exec = execFile }: SkulkrRunnerOptions = {}): SkulkrRunner {
   const dir = cwd ?? env.SKULKR_ROOT ?? process.cwd();
   return (args) => new Promise((done, fail) => {
     // A map takes seconds, and a minute or more on a machine a round has loaded; past this it is killed, and the page
     // keeps the map before it.
-    exec(process.execPath, [bin, ...args], { cwd: dir, env, maxBuffer: 32 * 1024 * 1024, timeout: MAP_TIMEOUT_MS },
+    const child = exec(process.execPath, [bin, ...args], { cwd: dir, env, maxBuffer: 32 * 1024 * 1024, timeout: MAP_TIMEOUT_MS },
       (error, stdout, stderr) => (error ? fail(new Error(String(stderr).trim() || failureOf(error))) : done(String(stdout))));
+    foreground(child?.pid);
   });
+}
+
+/** Starts a long-running CLI child with `args`; answers how to stop it. */
+export type SkulkrStarter = (args: readonly string[]) => { stop: () => void };
+
+/** Starts `skulkr <args>` as a child that runs until its stdin closes, as `skulkr fetch` does; stopping closes it. */
+export function createSkulkrStarter({ bin = SKULKR_BIN, env = process.env, cwd }: SkulkrRunnerOptions = {}): SkulkrStarter {
+  const dir = cwd ?? env.SKULKR_ROOT ?? process.cwd();
+  return (args) => {
+    const child = spawn(process.execPath, [bin, ...args], { cwd: dir, env, stdio: ['pipe', 'ignore', 'inherit'] });
+    child.on('error', () => {});
+    foreground(child.pid);
+    return {
+      stop: () => {
+        child.stdin?.end();
+        // One stuck in a fleet call ends at that call's timeout; past it, kill it.
+        setTimeout(() => { if (child.exitCode === null) child.kill(); }, 20_000).unref();
+      },
+    };
+  };
 }
 
 /** Runs the CLI with `args` (`['map']`, or a tenant's map or defects), one run at a time; a call during a run gets that run's answer. */
@@ -80,13 +114,13 @@ export interface KeptAnswer {
 }
 
 /** A kept map's reader, and `rebuild`, which builds it again after any build already running and answers that build. */
-export type KeptMap = (() => Promise<KeptAnswer>) & { readonly rebuild: () => Promise<string> };
+export type KeptMap = (() => Promise<KeptAnswer>) & { readonly rebuild: () => Promise<string>; readonly listen: (fn: (text: string) => void) => void };
 
 /**
  * `build` with its last good answer kept: a request gets the kept map at once, and starts a build in the background
  * when that map is older than `freshMs`; only with nothing kept does a request wait for the build. `file` keeps the
  * map across server restarts. A failed build keeps the last good map, answered with the failure beside it until a
- * build succeeds, and fails a request only when there is none.
+ * build succeeds, and fails a request only when there is none. `listen(fn)` hears each good build's map.
  */
 export function createKeptMap(build: () => Promise<string>, file: string | null, { freshMs = FRESH_MS, now = Date.now } = {}): KeptMap {
   let kept: { text: string; at: number } | null = null;
@@ -99,10 +133,12 @@ export function createKeptMap(build: () => Promise<string>, file: string | null,
   }
   let error: string | null = null;
   let building: Promise<string> | null = null;
+  const listeners: ((text: string) => void)[] = [];
   const refresh = () => {
     building ??= build().then((text) => {
       kept = { text, at: now() };
       error = null;
+      for (const fn of listeners) fn(text);
       if (file) {
         try {
           mkdirSync(dirname(file), { recursive: true });
@@ -128,7 +164,7 @@ export function createKeptMap(build: () => Promise<string>, file: string | null,
   };
   // A build already running may have read the state before the change that asks for this one.
   const rebuild = () => (building ?? Promise.resolve('')).catch(() => '').then(refresh);
-  return Object.assign(read, { rebuild });
+  return Object.assign(read, { rebuild, listen: (fn: (text: string) => void) => void listeners.push(fn) });
 }
 
 /** One tenant the dashboard reads: its name, and whether the CLI names it with `--tenant` (a registered one). */
@@ -145,13 +181,14 @@ export async function listTenants(run: SkulkrRunner): Promise<DashTenant[]> {
   return [{ name: cfg.name, registered: false }];
 }
 
-/** What a tenant route asks the CLI: its map, one area's defects, or to pin or unpin one; null for a tenant there is none of. */
+/** What a tenant route asks the CLI: its map (from the fleet listings `skulkr fetch` keeps), one area's defects, or to pin
+ *  or unpin one; null for a tenant there is none of. */
 export function tenantArgs(tenants: readonly DashTenant[], name: string, what: 'map' | 'area' | 'pin' | 'unpin', area: string | null): string[] | null {
   const t = tenants.find((x) => x.name === name);
   if (!t) return null;
   // Options first, so an area id the CLI would read as a flag is never placed before them.
   const pick = t.registered ? ['--tenant', t.name] : [];
-  return what === 'map' ? ['map', ...pick] : [what === 'area' ? 'defects' : what, ...pick, area ?? ''];
+  return what === 'map' ? ['map', ...pick, '--cached-jobs'] : [what === 'area' ? 'defects' : what, ...pick, area ?? ''];
 }
 
 /** A request the routes refuse, told to the client as it is. */
@@ -177,16 +214,25 @@ function createAreaIds(): (text: string) => ReadonlySet<string> {
 }
 
 /** The data routes' handler, with its kept tenants and maps. Each CLI failure is logged here in full, and a viewer sees its summary. */
-export function createRoutes(options: SkulkrRunnerOptions, cli: SkulkrRunner = createSkulkrRunner(options), log: (text: string) => void = console.error) {
+export function createRoutes(options: SkulkrRunnerOptions, cli: SkulkrRunner = createSkulkrRunner(options), log: (text: string) => void = console.error, start: SkulkrStarter = createSkulkrStarter(options)) {
   const run: SkulkrRunner = (args) => cli(args).catch((e: Error) => {
     log(`skulkr ${args.join(' ')} failed:\n${e.message}`);
     throw e;
   });
-  const maps = new Map<string, { kept: KeptMap; ids: (text: string) => ReadonlySet<string> }>();
+  const maps = new Map<string, { kept: KeptMap; ids: (text: string) => ReadonlySet<string>; feed: ReturnType<typeof createFeed> }>();
   const mapOf = (tenant: string, args: readonly string[]) => {
     const key = args.join('\n');
     if (!maps.has(key)) {
-      maps.set(key, { kept: createKeptMap(createSharedRun(run, args), options.cache === false ? null : mapCachePath(tenant)), ids: createAreaIds() });
+      const kept = createKeptMap(createSharedRun(run, args), options.cache === false ? null : mapCachePath(tenant));
+      // While a page watches, `skulkr fetch` keeps the fleet listings fresh, so no build waits on the fleet.
+      let fetching: { stop: () => void } | null = null;
+      const onWatched = (on: boolean) => {
+        if (on) fetching ??= start(['fetch', ...args.slice(1).filter((a) => a !== '--cached-jobs')]);
+        else (fetching?.stop(), fetching = null);
+      };
+      const feed = createFeed({ current: () => kept().then((a) => a.text), rebuild: kept.rebuild, onWatched, ...options.feed });
+      kept.listen(feed.built);
+      maps.set(key, { kept, ids: createAreaIds(), feed });
     }
     return maps.get(key)!;
   };
@@ -219,6 +265,17 @@ export function createRoutes(options: SkulkrRunnerOptions, cli: SkulkrRunner = c
     const tenants = keptTenants().then(({ text }) => JSON.parse(text) as DashTenant[]);
     if (listing) return void json(res, tenants.then((list) => JSON.stringify(list.map(({ name }) => ({ name })))));
     const { tenant, what } = route!;
+    if (what === 'events') {
+      tenants.then((list) => {
+        const mapArgs = tenantArgs(list, tenant, 'map', null);
+        if (!mapArgs) throw new Refusal(400, `no tenant ${tenant}`);
+        mapOf(tenant, mapArgs).feed.subscribe(res, (fn) => req.on('close', fn));
+      }).catch((e: Error) => {
+        res.statusCode = e instanceof Refusal ? e.status : 500;
+        res.end(e instanceof Refusal ? e.message : summaryOf(e.message));
+      });
+      return;
+    }
     void json(res, tenants.then(async (list) => {
       const mapArgs = tenantArgs(list, tenant, 'map', null);
       if (!mapArgs) throw new Refusal(400, `no tenant ${tenant}; this dashboard reads ${list.map((t) => t.name).join(', ')}`);

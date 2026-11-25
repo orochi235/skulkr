@@ -19,6 +19,8 @@ describe('lanes', () => {
     expect(stepText('A', ops.steps.A, now)).toBe('5 found · 2:48');
     expect(stepText('match', ops.steps.match, now)).toBe('5 total (2 shared)');
     expect(stepText('fix', ops.steps.fix, now)).toBe('studio · 12:00');
+    expect(stepText('fix', { ...ops.steps.fix, fleet: { task: 'w-verify-1', node: 'teitou', running: true } }, now)).toBe('teitou · 12:00');
+    expect(stepText('fix', { ...ops.steps.fix, fleet: { task: 'w-verify-1', node: 'teitou', running: false } }, now)).toBe('studio · 12:00');
     expect(stepText('patch', ops.steps.patch, now)).toBe('after fix');
     expect(stepText('B', live.lanes[1]!.steps.B, now)).toBe('studio · 0:30');
     expect(stepText('fix', { state: 'done', commits: 1, minutes: 7.6 }, now)).toBe('1 commit · 7:36');

@@ -8,6 +8,13 @@ area panel's pin toggle POSTs to `api/t/<name>/pin?id=<area>&on=1|0`, which runs
 over a running round's lane reads `api/t/<name>/tail?id=<area>` every 3 seconds, which the plugin answers itself from the
 area's newest job log (`server/jobTail.ts`), adding `onto logs --tail` for a job it handed to the fleet; the log tab reads `api/t/<name>/log`, the end of the
 running round's `night.log`, the same way.
+`api/t/<name>/events` (`server/feed.ts`) streams server-sent events: `map`, on connecting and after each build that
+changed it, and `areas`, the areas whose files a running round wrote. While a page listens, the server looks at the
+running rounds' night directories and the state's `runs/` every second (by size and change time: FSEvents reports
+nothing of a log its writer holds open), runs `skulkr fetch` to keep the fleet's listings fresh so no build waits on
+the fleet, lifts macOS's background policy off each CLI child it starts, builds the map after a change, one build at a time and at least 2 seconds
+apart, and every 15 seconds besides. The page asks for the map only while the stream is down; the defects list asks
+again when its area is touched.
 The menu under the map colors it by defects left (the default), defects left per 10 files, fixed, found, the queue's
 order, open findings, lines changed since a pass, rounds since a pass, rounds read, or files; each has its own ramp in
 the prefs (the defects-left ramp also colors the charts). Under the map, the jobs feed, the queue's head and the pinned

@@ -34,4 +34,14 @@ describe('withLocal', () => {
     expect(both.jobs('2026-11-23T00:00:00Z').map((j: { task: string }) => j.task)).toEqual(['fleet-job', 'local-job']);
     expect([...both.progress().keys()]).toEqual(['fleet-job']);
   });
+
+  it('asks the fleet for progress only while a running job is on it', () => {
+    let asked = 0;
+    const fleet = runner('fleet', { progress: () => (asked++, new Map([['fleet-job', { done: 1, total: 2 }]])) });
+    const both = withLocal(fleet, runner('local'));
+    expect([...both.progress([{ task: 'local-job', node: 'local' }]).keys()]).toEqual(['local-job']);
+    expect(asked).toBe(0);
+    expect([...both.progress([{ task: 'local-job', node: 'local' }, { task: 'fleet-job', node: 'studio' }]).keys()]).toEqual(['fleet-job', 'local-job']);
+    expect(asked).toBe(1);
+  });
 });

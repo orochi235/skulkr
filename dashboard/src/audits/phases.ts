@@ -121,6 +121,15 @@ const ON_FLEET = /^on the fleet as /;
 /** Whether a running fix job's latest line says its model is done and its verify has begun. */
 const handedBack = (now = '') => now === HAND_BACK_VERIFY || ON_FLEET.test(now);
 
+/** The ids of a lane's running spans with no model behind them, which draw lit but do not pulse, so the pulsing spans
+ *  are the round's agents ({@link agentsRunningIn}): a verify, and a fix and its checks once handed back. */
+export function quietSpansOf(lane: AuditLane): ReadonlySet<string> {
+  const quiet = new Set(['verify']);
+  if (lane.steps.fix.state === 'running' && handedBack(lane.steps.fix.now?.text)) quiet.add('fix').add('checks');
+  if (lane.steps.repair?.state === 'running' && lane.steps.repair.job !== 'repair') quiet.add('repair');
+  return quiet;
+}
+
 /** How many model agents a round's lanes have running: its reviewers, matchers, fixers until their hand-back verify,
  *  and repairs; a verify job runs the project's checks, not a model. */
 export function agentsRunningIn(lanes: readonly AuditLane[]): number {

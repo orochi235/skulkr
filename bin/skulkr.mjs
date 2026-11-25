@@ -7,7 +7,8 @@
  *   skulkr init                 writes a starter skulkr.config.mjs for the repository here
  *   skulkr night [flags]        one run (a round); `--dry` prints its plan
  *   skulkr partition [--ref R]  rewrites the partition file
- *   skulkr map [--out FILE]     the dashboard's JSON
+ *   skulkr map [--out FILE] [--cached-jobs]   the dashboard's JSON
+ *   skulkr fetch [--every S]    keeps the fleet listings `map --cached-jobs` reads fresh, until stdin closes
  *   skulkr defects <area>       one area's defects, every round's, as JSON
  *   skulkr pin|unpin <area>     forces an area into every round until it settles, or stops
  *   skulkr saturate <area> …    repeated blind reviews of one area into a ledger, until saturated (alias `sat`)
@@ -23,6 +24,7 @@ import { mainCheckout } from '../src/batch.mjs';
 import { exitAfterFlush, tolerateClosedOutput } from '../src/exit.mjs';
 import { loadConfig } from '../src/config.mjs';
 import { defectsFor } from '../src/defects.mjs';
+import { fetchCommand } from '../src/fetch.mjs';
 import { initCommand } from '../src/init.mjs';
 import { mapCommand } from '../src/map.mjs';
 import { runNight } from '../src/night.mjs';
@@ -35,7 +37,7 @@ import { serve } from '../src/service.mjs';
 import { trialCommand } from '../src/trial.mjs';
 import { addTenant, readTenants, removeTenant, requireTenant, tenantsPath } from '../src/tenants.mjs';
 
-const USAGE = 'usage: skulkr <init|night|partition|map|defects|pin|unpin|saturate|sat|trial|service|config|tenants|menu> [--config <file> | --tenant <name>] [--root <dir>] [--local] …';
+const USAGE = 'usage: skulkr <init|night|partition|map|fetch|defects|pin|unpin|saturate|sat|trial|service|config|tenants|menu> [--config <file> | --tenant <name>] [--root <dir>] [--local] …';
 
 /** `argv` less `--config`, `--tenant` and `--root` and their values, and those values. */
 const takeOptions = (argv) => {
@@ -134,7 +136,10 @@ const main = async () => {
       partitionCommand(cfg, root(), rest);
       return 0;
     case 'map':
-      mapCommand(cfg, root(), await loadRunner(cfg), rest);
+      mapCommand(cfg, root(), await loadRunner(cfg, { cached: rest.includes('--cached-jobs') }), rest);
+      return 0;
+    case 'fetch':
+      await fetchCommand(cfg, await loadRunner(cfg), rest);
       return 0;
     case 'defects':
       process.stdout.write(`${JSON.stringify(defectsFor(cfg, root(), rest[0] ?? ''))}\n`);

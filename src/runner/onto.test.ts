@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { JOBS_TTL_MS, createOntoOutput, fileStore, keptJobs, launchOf } from './onto.mjs';
+import { JOBS_TTL_MS, createOntoOutput, fileStore, keptJobs, launchOf, memoryStore } from './onto.mjs';
 
 describe('keptJobs', () => {
   it('answers from its last call within the TTL, and from its last good answer when a call throws', () => {
@@ -34,6 +34,23 @@ describe('keptJobs', () => {
     expect(list(8)).toEqual([{ task: '8' }]);
     expect(calls).toBe(2);
     expect(keptJobs(() => { throw new Error('x'); })(1)).toEqual([]);
+  });
+
+  it('answers from a listing as old as its ttl, and asks anew when forced', () => {
+    let calls = 0;
+    let t = 0;
+    const list = keptJobs(() => [{ n: ++calls }], { now: () => t, ttlMs: 30_000 });
+    list(2);
+    t = 29_999;
+    expect(list(2)).toEqual([{ n: 1 }]);
+    expect(list(2, { force: true })).toEqual([{ n: 2 }]);
+  });
+
+  it('answers from any kept listing with no ttl, however old or short', () => {
+    let calls = 0;
+    const store = memoryStore();
+    keptJobs(() => [{ n: ++calls }], { store, now: () => 0 })(2);
+    expect(keptJobs(() => [{ n: ++calls }], { store, now: () => 1e9, ttlMs: Infinity })(9)).toEqual([{ n: 1 }]);
   });
 
   it('keeps its last listing in a file, so the next process answers from it when its own call fails', () => {

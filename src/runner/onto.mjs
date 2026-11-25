@@ -149,10 +149,11 @@ export const progressOfTop = (top) => {
  *   `{ task, node, state, started, finished? }`, or `[]` when it cannot say.
  * - `spare()` (optional) answers how much of its capacity is idle now, `{ coresFree, cores }`, or null when it cannot
  *   say.
- * - `progress()` (optional) answers each running job's own count of its work by its task, a Map of `{ done, total }`
+ * - `progress(running?)` (optional) answers each running job's own count of its work by its task, a Map of `{ done, total }`
  *   (its first counter: a reviewer's files read, a fixer's commits of its findings), empty when it cannot say. A runner
  *   may add `checks` and `tests`, each `{ done, total, failed }`, and `now`, the job's latest `skulkr:` line
  *   `{ text, at }`, as the local runner does.
+ * - `refresh(since)` (optional) fetches the listings `jobs` and `progress` answer from now, for a runner that keeps them.
  */
 /** `onto top --json`'s fleet totals as `{ coresFree, cores }`, or null where it gives none. */
 export const spareOfTop = (top) => {
@@ -164,13 +165,20 @@ export const spareOfTop = (top) => {
 export const JOBS_TTL_MS = 10_000;
 
 /**
- * `fetch(hours)`, onto's job listing for the last `hours`, answered from its last call for {@link JOBS_TTL_MS} when that
- * call covered as much, and from its last good answer when a call throws: a listing that times out under load would
- * otherwise blank every running lane.
+ * How old a listing `skulkr map --cached-jobs` takes as it is: any age, since `skulkr fetch` refreshes it, and a pegged
+ * node can make every call time out for minutes (2026-11-25), when a build asking itself would wait and get nothing.
  */
-export const keptJobs = (fetch, { now = Date.now, store = memoryStore() } = {}) => (hours) => {
+export const CACHED_TTL_MS = Infinity;
+
+/**
+ * `fetch(hours)`, onto's job listing for the last `hours`, answered from its last call for `ttlMs` when that call
+ * covered as much (unless `force`), and from its last good answer when a call throws: a listing that times out under
+ * load would otherwise blank every running lane.
+ */
+export const keptJobs = (fetch, { now = Date.now, store = memoryStore(), ttlMs = JOBS_TTL_MS } = {}) => (hours, { force = false } = {}) => {
   const last = store.read();
-  if (last && last.hours >= hours && now() - last.at < JOBS_TTL_MS) return last.jobs;
+  // With no ttl, any kept listing stands: a window an hour short of `hours` misses no running job.
+  if (!force && last && (ttlMs === Infinity || (last.hours >= hours && now() - last.at < ttlMs))) return last.jobs;
   try {
     const jobs = fetch(hours);
     store.write({ hours, at: now(), jobs });
@@ -208,16 +216,37 @@ export const fileStore = (path) => ({
  */
 const JOBS_TIMEOUT_MS = 15_000;
 const TOP_TIMEOUT_MS = 8_000;
+const REFRESH_TIMEOUT_MS = 60_000;
+/**
+ * How long `onto top` waits for each node when asked for progress: a pegged node took 8 s, holding every map build for
+ * a progress counter (2026-11-25); missing it costs that node's counters until the next listing.
+ */
+const TOP_NODE_TIMEOUT = '2s';
 
-/** Where the onto runner keeps its last job listing. */
-const JOBS_CACHE = join(process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'), 'skulkr', 'onto-jobs.json');
+/** Where the onto runner keeps its last job listing and its last `onto top` frame. */
+const CACHE_DIR = join(process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'), 'skulkr');
+const JOBS_CACHE = join(CACHE_DIR, 'onto-jobs.json');
+const TOP_CACHE = join(CACHE_DIR, 'onto-top.json');
 
-export const createOntoRunner = () => {
+/** With `ttlMs`, how old a kept listing it answers from may be: {@link JOBS_TTL_MS} unless given. */
+export const createOntoRunner = (_cfg, { ttlMs = JOBS_TTL_MS } = {}) => {
+  // A refresh waits longer than a build would: nothing waits on it.
+  let jobsTimeout = JOBS_TIMEOUT_MS;
   const listed = keptJobs((hours) => {
     const out = execFileSync('onto', ['jobs', '--json', '--since', `${hours}h`, '--limit', '1000'],
-      { encoding: 'utf8', timeout: JOBS_TIMEOUT_MS, stdio: ['ignore', 'pipe', 'ignore'] });
+      { encoding: 'utf8', timeout: jobsTimeout, stdio: ['ignore', 'pipe', 'ignore'] });
     return (JSON.parse(out).jobs ?? []).filter((j) => j.state === 'running' || j.finished);
-  }, { store: fileStore(JOBS_CACHE) });
+  }, { store: fileStore(JOBS_CACHE), ttlMs });
+  // A frame is kept as a listing of no hours, so any ask is covered by it.
+  const top = keptJobs(() => {
+    const out = execFileSync('onto', ['top', '--json', '--once', '--timeout', TOP_NODE_TIMEOUT],
+      { encoding: 'utf8', timeout: TOP_TIMEOUT_MS, stdio: ['ignore', 'pipe', 'ignore'] });
+    return JSON.parse(out);
+  }, { store: fileStore(TOP_CACHE), ttlMs });
+  const hoursSince = (since) => {
+    const hours = Math.max(1, Math.ceil((Date.now() - Date.parse(since)) / 3_600_000) + 1);
+    return Number.isFinite(hours) ? hours : 24;
+  };
   return {
   // Unpinned, a job waits in onto's queue and starts on whichever node has room first, so no one busy machine
   // holds it; each node's own policy (`onto set --refuse`, `--quiet`, `--weight`) says what it takes.
@@ -233,17 +262,13 @@ export const createOntoRunner = () => {
       return null;
     }
   },
-  progress: () => {
-    try {
-      const out = execFileSync('onto', ['top', '--json', '--once'], { encoding: 'utf8', timeout: TOP_TIMEOUT_MS, stdio: ['ignore', 'pipe', 'ignore'] });
-      return progressOfTop(JSON.parse(out));
-    } catch {
-      return new Map();
-    }
-  },
-  jobs: (since) => {
-    const hours = Math.max(1, Math.ceil((Date.now() - Date.parse(since)) / 3_600_000) + 1);
-    return listed(Number.isFinite(hours) ? hours : 24);
+  progress: () => progressOfTop(top(0) ?? {}),
+  jobs: (since) => listed(hoursSince(since)),
+  /** Asks onto for both listings now and keeps them, for the job listing since `since` (`skulkr fetch`). */
+  refresh: (since) => {
+    jobsTimeout = REFRESH_TIMEOUT_MS;
+    listed(hoursSince(since), { force: true });
+    top(0, { force: true });
   },
   };
 };

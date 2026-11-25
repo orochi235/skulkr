@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileS
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { commitSubject, createCommitProgress, createProgress } from './progress.mjs';
+import { commitSubject, createCommitProgress, createFindingsEcho, createProgress } from './progress.mjs';
 import { claude } from './agent/claude.mjs';
 
 const parseEnvelope = claude.resultOf;
@@ -49,6 +49,27 @@ describe('createProgress', () => {
     expect(start).toBe('onto: progress 0/3');
     expect(out.flatMap((o) => (o.progress ? [o.progress] : []))).toEqual(['onto: progress 1/3', 'onto: progress 2/3', 'onto: progress 3/3']);
     expect(out.flatMap((o) => (o.result !== undefined ? [o.result] : []))).toEqual([RESULT]);
+  });
+});
+
+const tool = (name: string, input: Record<string, unknown>) => ({ type: 'assistant', message: { content: [{ type: 'tool_use', id: 't', name, input }] } });
+const OUT = `${ROOT}/.skulkr/out/findings.md`;
+
+describe('createFindingsEcho', () => {
+  it('prints each finding once its section cites a where, following Write and Edit, and ignores other files', () => {
+    const { see } = createFindingsEcho();
+    expect(see(tool('Write', { file_path: OUT, content: '# Findings\n\n## Drops the second event\n' }))).toEqual([]);
+    expect(see(tool('Edit', { file_path: OUT, old_string: '## Drops the second event\n', new_string: '## Drops the second event\n- where: src/a.ts:3\n\n## Leaks a timer\n- **where:** src/b.ts:9\n' })))
+      .toEqual(['skulkr: finding {"claim":"Drops the second event","where":"src/a.ts:3"}', 'skulkr: finding {"claim":"Leaks a timer","where":"src/b.ts:9"}']);
+    expect(see(tool('Edit', { file_path: OUT, old_string: 'Leaks a timer', new_string: 'Leaks a timer' }))).toEqual([]);
+    expect(see(tool('Write', { file_path: `${ROOT}/notes.md`, content: '## Other\n- where: x.ts:1\n' }))).toEqual([]);
+    expect(see(tool('Edit', { file_path: OUT, old_string: '<!-- nowhere -->', new_string: '## Files read\n- src/a.ts\n' }))).toEqual([]);
+  });
+
+  it("puts the reviewer's findings among its progress lines", () => {
+    const { feed } = createProgress(FILES, ROOT);
+    expect(feed(JSON.stringify(tool('Write', { file_path: OUT, content: '## Bad\n- where: src/a.ts:1\n' }))).progress)
+      .toBe('skulkr: finding {"claim":"Bad","where":"src/a.ts:1"}');
   });
 });
 

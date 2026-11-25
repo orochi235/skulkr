@@ -8,7 +8,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gitIn } from './batch.mjs';
 import { likeness } from './carry.mjs';
-import { isDuplicate, reportItems } from './findings.mjs';
+import { isDuplicate, parseFindings, reportItems } from './findings.mjs';
+import { FINDING_LINE } from './progress.mjs';
 import { partitionAt } from './partition.mjs';
 import { abandonedRounds, nightsByRound, recordsFor } from './recordFiles.mjs';
 import { coveringRounds, inheritPasses, passesFrom } from './rounds.mjs';
@@ -65,6 +66,34 @@ const itemsOf = (read) => {
   return { fixed: false, items: openItems(JSON.parse(match)), ...(mbox ? { commits: commitSubjects(mbox) } : {}) };
 };
 
+/** The findings a reviewer's log says it has written so far, from its `skulkr: finding` lines (`progress.mjs`). */
+export const loggedFindings = (log) => (log ?? '').split('\n').flatMap((line) => {
+  if (!line.startsWith(FINDING_LINE)) return [];
+  try {
+    const { claim, where } = JSON.parse(line.slice(FINDING_LINE.length));
+    return typeof claim === 'string' && claim ? [{ claim, where: String(where ?? '') }] : [];
+  } catch {
+    return [];
+  }
+});
+
+/**
+ * An unmatched round's findings for area `id` from its night directory `dir`: each reviewer's finished findings file,
+ * else what its log says it has written so far, every one `reviewing` and listed once by claim; null before either
+ * reviewer has a log.
+ */
+export const reviewingOf = (dir, id) => {
+  const sides = ['A', 'B'].map((side) => {
+    const report = readIf(join(dir, 'jobs', id, side, 'findings.md'));
+    const log = readIf(join(dir, 'jobs', id, `${side}.log`));
+    return { side, log, found: report !== null ? parseFindings(report) : loggedFindings(log) };
+  });
+  if (sides.every((s) => s.log === null)) return null;
+  const items = sides.flatMap(({ side, found }) => [...new Map(found.map((f) => [f.claim, f])).values()]
+    .map(({ claim }) => ({ claim, from: side, verdict: 'reviewing', note: '' })));
+  return { fixed: false, reviewing: true, items };
+};
+
 /** Several records' items (`itemsOf`') for one round as one: items and commits joined, fixed once all were. */
 const joinedOf = (got) => ({
   fixed: got.every((g) => g.fixed), items: got.flatMap((g) => g.items),
@@ -76,7 +105,8 @@ const joinedOf = (got) => ({
  * `records` are `recordFiles.mjs`' (`recordsFor`'s, abandoned rounds left out). An area's rounds are its covering
  * rounds (`coveringRounds` of its `inheritPasses` history), so they follow its files across a recut, and every round
  * holding a record of its own id; a round's records are joined. A round with no record at all, unless abandoned, is
- * read from its night directory under `state`, unrecorded.
+ * read from its night directory under `state`, unrecorded; before its match, from its reviewers' findings so far
+ * (`reviewingOf`).
  */
 export const areaDefects = ({ records, areas, id, state }) => {
   const byKey = new Map(records.map((r) => [`${r.round}\n${r.id}`, r]));
@@ -99,7 +129,7 @@ export const areaDefects = ({ records, areas, id, state }) => {
   const abandoned = abandonedRounds(state, nights);
   for (const { round, dir } of nights.values()) {
     if (recordedRounds.has(round) || abandoned.has(round)) continue;
-    const got = itemsOf((f) => readIf(join(dir, 'areas', id, f)));
+    const got = itemsOf((f) => readIf(join(dir, 'areas', id, f))) ?? reviewingOf(dir, id);
     if (got) found.push({ round, recorded: false, ...got });
   }
   return found.sort((x, y) => y.round - x.round);

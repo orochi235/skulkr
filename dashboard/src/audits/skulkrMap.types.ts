@@ -103,6 +103,8 @@ export interface JobCounter {
 export interface LaneStep {
   readonly state: 'waiting' | 'running' | 'done' | 'failed';
   readonly node?: string;
+  /** The fleet job a running step handed its work to (`skulkr: on the fleet as <task>`), once the fleet lists it. */
+  readonly fleet?: { readonly task: string; readonly node: string; readonly running: boolean };
   readonly since?: string;
   /** A running step's own count of its work, as onto reports it: a reviewer's files read, a fixer's commits of its
    *  findings. */
@@ -319,7 +321,8 @@ export interface AuditDefect {
   /** `A`, `B`, `A+B`, `sweep`, `carried` for an earlier round's open finding handed to this round's fixer (README
    *  "Carried findings"), or `extra` for one the fixer found itself. */
   readonly from: string;
-  readonly verdict: 'fixed' | 'not a defect' | 'duplicate' | 'question' | 'not fixed' | 'open';
+  /** `reviewing`: a reviewer listed it and no match has paired the two lists yet. */
+  readonly verdict: 'fixed' | 'not a defect' | 'duplicate' | 'question' | 'not fixed' | 'open' | 'reviewing';
   readonly note: string;
 }
 
@@ -328,6 +331,8 @@ export interface AuditAreaRound {
   readonly round: number;
   readonly recorded: boolean;
   readonly fixed: boolean;
+  /** Set while its reviewers have not been matched: its items are each reviewer's findings so far. */
+  readonly reviewing?: boolean;
   readonly items: readonly AuditDefect[];
   /** The subjects of a fixer's commits where it left commits but no report, as one stopped partway does. */
   readonly commits?: readonly string[];

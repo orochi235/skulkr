@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CLOCK_AHEAD_MINUTES, laneViewOf, runClockOf } from './clockLane';
-import { TYPICAL_MINUTES, agentsRunningIn, isFinished, passDone, phaseColor, phaseOf, phasesOf, stageCountsOf, withLivePasses } from './phases';
+import { TYPICAL_MINUTES, agentsRunningIn, isFinished, passDone, phaseColor, phaseOf, phasesOf, quietSpansOf, stageCountsOf, withLivePasses } from './phases';
 import { STEP_COLUMN_COUNT, countedFillOf, laneStepsOf } from './stepsLane';
 import fixture from './fixture.map.json';
 import type { AuditLane, AuditRun, LaneStep, LaneStepName, SkulkrMap } from './skulkrMap.types';
@@ -271,6 +271,11 @@ describe('the repair step', () => {
     const repairing: AuditLane = { id: 'x', steps: { ...lane(fixed).steps, repair: { ...running(at(25)), job: 'repair' } } };
     const onFleet = lane({ A: done({ findings: 1 }), B: done({ findings: 1 }), match: matched(1, 1, 0), fix: { ...running(at(25)), now: { text: 'on the fleet as weasel-verify-1a2b3c4d5e', at: at(30) } } });
     expect(agentsRunningIn([fixing, handingBack, reviewing, verifying, repairing, onFleet])).toBe(4);
+    // What pulses is what counts: a verify, and a fix handed back with its checks, draw lit but still.
+    expect([...quietSpansOf(fixing)]).toEqual(['verify']);
+    expect([...quietSpansOf(onFleet)]).toEqual(['verify', 'fix', 'checks']);
+    expect([...quietSpansOf(verifying)]).toEqual(['verify', 'repair']);
+    expect([...quietSpansOf(repairing)]).toEqual(['verify']);
   });
 
 

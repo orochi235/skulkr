@@ -2,7 +2,7 @@
 import { pathToFileURL } from 'node:url';
 import { fromConfig } from '../config.mjs';
 import { createLocalRunner } from './local.mjs';
-import { createOntoRunner } from './onto.mjs';
+import { CACHED_TTL_MS, createOntoRunner } from './onto.mjs';
 import { withLocal } from './withLocal.mjs';
 
 const METHODS = ['run', 'unavailableNodes', 'jobs'];
@@ -13,10 +13,12 @@ const check = (runner, what) => {
   return runner;
 };
 
-export const loadRunner = async (cfg) => {
+/** With `cached`, the runner answers fleet listings from what `skulkr fetch` keeps, however old ({@link CACHED_TTL_MS}). */
+export const loadRunner = async (cfg, { cached = false } = {}) => {
+  const opts = cached ? { ttlMs: CACHED_TTL_MS } : {};
   const r = cfg.runner;
   if (r === 'local' || r === undefined) return createLocalRunner(cfg);
-  if (r === 'onto') return withLocal(createOntoRunner(cfg), createLocalRunner(cfg));
+  if (r === 'onto') return withLocal(createOntoRunner(cfg, opts), createLocalRunner(cfg));
   if (typeof r === 'string') {
     const mod = await import(pathToFileURL(fromConfig(cfg, r)).href);
     return check(await mod.createRunner(cfg), r);

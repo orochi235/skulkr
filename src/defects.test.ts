@@ -52,6 +52,19 @@ describe('areaDefects', () => {
     ]);
   });
 
+  it("lists a round's findings before its match: a finished reviewer's file, else what its log says so far", () => {
+    const state = tmp();
+    const jobs = join(state, 'nights', '2026-11-25T00-00-00-000Z-round88', 'jobs', 'x');
+    put(join(jobs, 'A.log'), 'onto: progress 1/3\nskulkr: finding {"claim":"Drops an event","where":"x/a.ts:1"}\nskulkr: finding {"claim":"Drops an event","where":"x/a.ts:1"}\nskulkr: finding {broken\n');
+    put(join(jobs, 'B.log'), 'onto: progress 3/3\n');
+    put(join(jobs, 'B', 'findings.md'), '## Leaks a timer\n- where: x/b.ts:9\n\n## Files read\n- x/b.ts\n');
+    expect(areaDefects({ records: [], areas: [{ id: 'x', files: ['x/a.ts'] }], id: 'x', state })).toEqual([
+      { round: 88, recorded: false, fixed: false, reviewing: true, items: [
+        { claim: 'Drops an event', from: 'A', verdict: 'reviewing', note: '' }, { claim: 'Leaks a timer', from: 'B', verdict: 'reviewing', note: '' },
+      ] },
+    ]);
+  });
+
   it('follows its files across a recut, and reads no night of an abandoned round or of one with a record', () => {
     const state = tmp();
     const match = (claim: string) => ({ 'match.json': JSON.stringify({ pairs: [], a: [claim], b: [] }) });

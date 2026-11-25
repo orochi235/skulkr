@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pin } from './pins.mjs';
-import { buildMap, fleetOf,fleetProgressOf, gateFailuresOf, gateNodesOf, gateOutcomesOf, gateRunsOf, mergedIn, nightRoundOf, nightsOf, readRuns, rerunOf, withPasses } from './map.mjs';
+import { buildMap, fleetOf,fleetProgressOf, gateFailuresOf, gateNodesOf, gateOutcomesOf, gateRunsOf, mergedIn, nightRoundOf, nightsOf, readRuns, rerunOf, withFleet, withPasses } from './map.mjs';
 import { gitIn } from './batch.mjs';
 import { progressOfTop } from './runner/onto.mjs';
 import { resolveConfig } from './config.mjs';
@@ -257,3 +257,14 @@ describe('buildMap', () => {
   });
 });
 
+describe('withFleet', () => {
+  it('names the fleet job a running step handed its work to, by its task', () => {
+    const lane = (text: string) => ({ id: 'x', steps: { fix: { state: 'done' }, repair: { state: 'running', job: 'verify', now: { text, at: '' } } } });
+    const jobs = [{ task: 'weasel-verify-5b3c4d0047', node: 'teitou' }, { task: 'weasel-verify-old', node: 'studio', finished: '2026' }];
+    expect(withFleet([lane('on the fleet as weasel-verify-5b3c4d0047')], jobs)[0]!.steps.repair)
+      .toMatchObject({ fleet: { task: 'weasel-verify-5b3c4d0047', node: 'teitou', running: true } });
+    expect(withFleet([lane('on the fleet as weasel-verify-old')], jobs)[0]!.steps.repair).toMatchObject({ fleet: { node: 'studio', running: false } });
+    const unlisted = lane('on the fleet as weasel-verify-new');
+    expect(withFleet([unlisted], jobs)[0]).toBe(unlisted);
+  });
+});

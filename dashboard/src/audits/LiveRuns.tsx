@@ -7,7 +7,7 @@ import { clockRuler } from './clock';
 import { GateFailures } from './GateFailures';
 import { LeftOut } from './LeftOut';
 import { laneViewOf, runClockOf, type LaneView } from './clockLane';
-import { agentsRunningIn, passDone, STAGE_LABEL, phaseClass, stageCountsOf, BRIGHT_FILLS } from './phases';
+import { agentsRunningIn, passDone, quietSpansOf, STAGE_LABEL, phaseClass, stageCountsOf, BRIGHT_FILLS } from './phases';
 import { Icon } from '@weasel-js/ui/components/Icon';
 import { icon } from '@dash/icons.gen';
 import { STEP_COLUMN_COUNT, laneStepsOf } from './stepsLane';
@@ -36,10 +36,10 @@ function withMarks(text: string): ReactNode {
 const MARKS = new RegExp(`[${PASS}${FAIL}]`);
 const MARK_SPLIT = new RegExp(`([${PASS}${FAIL}])`);
 
-/** A span's caption as the lane draws it: a running one with its node's name marked, so the name alone pulses (the
+/** A span's caption as the lane draws it: a running one with its node's name marked, so the name alone pulses where `pulse` (the
  *  label up to its separator, or all of it where it has none); its closing duration set at its right edge; and any pass
  *  or fail mark in its own font. The label keeps the words for the tooltip and screen readers. */
-function withNode(span: SpanStripSpan): SpanStripSpan {
+function withNode(span: SpanStripSpan, pulse = true): SpanStripSpan {
   const minutes = TRAILING_MINUTES.exec(span.label);
   const rest = minutes ? span.label.slice(0, minutes.index) : span.label;
   const clock = minutes ? <span className={s.minutes}>{minutes[1]}</span> : null;
@@ -48,7 +48,7 @@ function withNode(span: SpanStripSpan): SpanStripSpan {
     return clock || MARKS.test(rest) ? { ...span, content: <>{clock}{withMarks(rest)}</> } : span;
   }
   const end = at === -1 ? rest.length : at;
-  const node = span.color && BRIGHT_FILLS.has(span.color) ? `${s.node} ${s.onBright}` : s.node;
+  const node = !pulse ? undefined : span.color && BRIGHT_FILLS.has(span.color) ? `${s.node} ${s.onBright}` : s.node;
   return { ...span, content: <>{clock}<span className={node}>{rest.slice(0, end)}</span>{withMarks(rest.slice(end))}</> };
 }
 
@@ -102,10 +102,11 @@ export const dotsWidthFor = (passes: number): number => {
 
 /** An area's lane as a stack row: its name, and `spans`, its steps in the view chosen. */
 function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanStripSpan[], passes: number, files?: number, tracks = 1, pinned = false, locked = false): SpanStripsRow {
+  const quiet = quietSpansOf(lane);
   return {
     id: lane.id,
     ...(tracks > 1 ? { className: s.twoTracks } : {}),
-    spans: spans.map((span) => withNode(span)),
+    spans: spans.map((span) => withNode(span, !quiet.has(span.id))),
     'aria-label': lane.id,
     valueText: view.elapsed ? `${view.phase}, ${view.elapsed} in` : view.phase,
     lead: (

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { after } from '@weasel-js/registry';
 import { STALE_HEADER } from '@shared/routes';
+import { listenToMap } from './mapEvents';
 import type { SkulkrMap } from './skulkrMap.types';
 
 export type SkulkrMapState =
@@ -48,15 +49,18 @@ export interface UseSkulkrMapOptions {
   readonly dev?: boolean;
   /** Changing it asks again at once: after the page changed what the map shows, such as a pin. */
   readonly asked?: number;
+  /** Where the server pushes the map as it changes; while that stream is open, the page does not ask. */
+  readonly eventsUrl?: string | null;
 }
 
 /**
- * The audit map's data from the dev server, asked for again every `everyMs` while the page is visible, and at
- * once when it becomes visible again. A failed ask keeps the last map it had and says why. It starts from the map this
- * viewer last drew from `url`, kept in local storage, so a reload draws at once and the first answer replaces it.
+ * The audit map's data from the dev server, pushed from `eventsUrl` as it changes, and otherwise (no stream, or one
+ * reconnecting) asked for again every `everyMs` while the page is visible, and at once when it becomes visible again.
+ * A failed ask keeps the last map it had and says why. It starts from the map this viewer last drew from `url`, kept
+ * in local storage, so a reload draws at once and the first answer replaces it.
  */
 export function useSkulkrMap(options: UseSkulkrMapOptions): SkulkrMapState {
-  const { url, everyMs = POLL_MS, dev = true, asked = 0 } = options;
+  const { url, everyMs = POLL_MS, dev = true, asked = 0, eventsUrl = null } = options;
   // Another tenant's map is not this one's: state is held by url, and a url with none yet starts from its kept copy.
   const start = useMemo(() => startOf(url), [url]);
   const [held, setHeld] = useState<{ url: string | null; state: SkulkrMapState }>(() => ({ url, state: start }));
@@ -87,8 +91,24 @@ export function useSkulkrMap(options: UseSkulkrMapOptions): SkulkrMapState {
         setState((was) => (was.status === 'ready' ? { ...was, error } : { status: 'failed', error }));
       }
     };
+    const pushed = eventsUrl ? listenToMap(eventsUrl, {
+      map: (text) => {
+        if (!live) return;
+        try {
+          const map = JSON.parse(text) as SkulkrMap;
+          keepMap(url, map);
+          setState({ status: 'ready', map });
+        } catch {
+          // A torn push is followed by the next one.
+        }
+      },
+    }) : null;
     const loop = () => {
       if (!live || document.hidden) return;
+      if (pushed?.open()) {
+        if (Number.isFinite(everyMs)) stop = after(everyMs, loop);
+        return;
+      }
       asking = true;
       void ask().finally(() => {
         asking = false;
@@ -105,9 +125,10 @@ export function useSkulkrMap(options: UseSkulkrMapOptions): SkulkrMapState {
     return () => {
       live = false;
       stop();
+      pushed?.stop();
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [url, everyMs, dev, asked]);
+  }, [url, everyMs, dev, asked, eventsUrl]);
   if (!dev) return { status: 'no-server' };
   return held.url === url ? held.state : start;
 }

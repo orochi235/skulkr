@@ -26,7 +26,7 @@ import { liveEstimatesOf, phasesOf, withLivePasses, type AuditPhase } from './ph
 import { continuousText } from './runData';
 import { useAuditPalette } from './useAuditPalette';
 import { useSkulkrMap } from './useSkulkrMap';
-import { SNAPSHOT, areaUrlFor, logUrlFor, mapUrl, pinUrlFor, tailUrlFor, tenantsUrl } from '@dash/dataSource';
+import { SNAPSHOT, areaUrlFor, eventsUrlFor, logUrlFor, mapUrl, pinUrlFor, tailUrlFor, tenantsUrl } from '@dash/dataSource';
 import { AppTitle } from '@dash/AppTitle';
 import { TenantTitle } from '@dash/tenants/TenantTitle';
 import { titleFor } from '@dash/title';
@@ -91,8 +91,8 @@ export const createPinArea = (urlOf: (id: string, on: boolean) => string, done: 
   done();
 };
 
-function Chart({ map, areaUrl, tailUrl = null, logUrl = null, view, asOf, pinArea }: {
-  map: SkulkrMap; areaUrl: (id: string) => string; tailUrl?: ((id: string) => string) | null; logUrl?: string | null; view: LaneSettings; asOf: AsOf; pinArea?: PinArea | undefined;
+function Chart({ map, areaUrl, eventsUrl = null, tailUrl = null, logUrl = null, view, asOf, pinArea }: {
+  map: SkulkrMap; areaUrl: (id: string) => string; eventsUrl?: string | null; tailUrl?: ((id: string) => string) | null; logUrl?: string | null; view: LaneSettings; asOf: AsOf; pinArea?: PinArea | undefined;
 }) {
   const [scene] = useState(createAuditScene);
   const selection = useSelection({ scene, mode: 'single' });
@@ -192,7 +192,7 @@ function Chart({ map, areaUrl, tailUrl = null, logUrl = null, view, asOf, pinAre
               />
             </SidebarPanel>
           ) : <AreaDetail area={area} holder={area && past === null ? runHolding(map.runs, area.id) : undefined} asOf={past} onPin={pinArea} />}
-          {picked && <AreaDefects urlOf={areaUrl} id={picked} version={defectsVersionOf(map, picked)} />}
+          {picked && <AreaDefects urlOf={areaUrl} id={picked} version={defectsVersionOf(map, picked)} eventsUrl={eventsUrl} />}
         </aside>
       </div>
       <ResizeHandle
@@ -246,7 +246,8 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
   const [tenant, choose] = useTenantChoice(names);
   const [asOfRound, chooseAsOf] = useAsOfRound(tenant);
   const [asked, setAsked] = useState(0);
-  const state = useSkulkrMap({ url: tenant === null ? null : mapUrl(base, tenant), everyMs: SNAPSHOT ? Infinity : everyMs, dev, asked });
+  const eventsUrl = tenant === null || !dev ? null : eventsUrlFor(base, tenant);
+  const state = useSkulkrMap({ url: tenant === null ? null : mapUrl(base, tenant), everyMs: SNAPSHOT ? Infinity : everyMs, dev, asked, eventsUrl });
   const pinUrl = useMemo(() => (tenant === null ? null : pinUrlFor(base, tenant)), [base, tenant]);
   const pinArea = useMemo(() => (pinUrl ? createPinArea(pinUrl, () => setAsked((n) => n + 1)) : undefined), [pinUrl]);
   const map = state.status === 'ready' ? state.map : null;
@@ -288,7 +289,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
         {state.status === 'ready' && tenant !== null && (
           <>
             {state.error && <p className={`${s.note} ${s.stale}`}>The last refresh failed ({state.error}); showing the map before it.</p>}
-            <Chart key={tenant} map={state.map} areaUrl={areaUrlFor(base, tenant)} tailUrl={tailUrlFor(base, tenant)} logUrl={logUrlFor(base, tenant)} view={view} asOf={{ round: asOfRound, choose: chooseAsOf }} pinArea={pinArea} />
+            <Chart key={tenant} map={state.map} areaUrl={areaUrlFor(base, tenant)} eventsUrl={eventsUrl} tailUrl={tailUrlFor(base, tenant)} logUrl={logUrlFor(base, tenant)} view={view} asOf={{ round: asOfRound, choose: chooseAsOf }} pinArea={pinArea} />
           </>
         )}
         <p className={s.foot}>

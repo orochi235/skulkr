@@ -412,7 +412,8 @@ failed. The local runner keeps each counter apart (commits, checks, tests) and t
 The onto runner reports only its first counter, so its lines carry commits alone. A job that a resume starts over
 gets `skulkr: relaunched at <time>` in its log, below the earlier run's lines. A fixer's log also carries what it says
 between tool calls (`skulkr: says: …`), and a job that hands a verify to the fleet writes `skulkr: on the fleet as
-<task>` once onto has it.
+<task>` once onto has it. A Claude reviewer's log gets `skulkr: finding {"claim","where"}` for each finding as its
+findings file gains it, on either runner, since the fleet streams a job's output back as it runs (2026-11-25).
 
 Resting the pointer on a running round's lane opens the end of that area's newest job log beside it, read from the
 round's `jobs/<area>/` every 3 seconds while it shows, and where that log hands its job to the fleet, the fleet task's
@@ -677,7 +678,11 @@ own `skulk` service is down (2026-11-21). What is left of the cutover is in "Mov
 jobs feed, the queue, and an area's defects. Its dev server lists the tenants at `api/tenants` (`skulkr tenants ls`,
 or with none registered the one project `SKULKR_CONFIG` or the working directory names), and serves each tenant's
 map at `api/t/<name>/map` and an area's defects at `api/t/<name>/area?id=<area>`, by running `skulkr map` and
-`skulkr defects` with `--tenant` (which refuses an id not in the partition). A POST to `api/t/<name>/pin?id=<area>&on=1`
+`skulkr defects` with `--tenant` (which refuses an id not in the partition). An area's defects list a round its reviewers
+have not been matched in yet by each reviewer's findings so far, `reviewing`: a finished reviewer's findings file, else
+its log's finding lines. `api/t/<name>/events` pushes the map to the page after each build that changes it, built with `skulkr map --cached-jobs`
+(the fleet listings as `skulkr fetch`, run by the server while a page watches, last kept them), and the ids
+of areas whose files a running round wrote, so an open defects list asks again (2026-11-25). A POST to `api/t/<name>/pin?id=<area>&on=1`
 (or `on=0`) runs `skulkr pin` (or `unpin`) and answers once the map is built again (see "Pins"). The page's title is a menu of the tenants; the one shown is in the URL hash
 (`#weasel`), and each viewer's last choice is remembered. A slider above the treemap shows the areas as they stood after
 an earlier round, from each area's `lastByRound` (see "History follows files"), the round after an `@` in the hash

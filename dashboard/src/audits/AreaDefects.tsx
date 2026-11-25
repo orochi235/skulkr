@@ -13,7 +13,7 @@ import { EXTRA } from './runData';
 import s from './AreaDefects.module.css';
 
 const GRADE: Readonly<Record<AuditDefect['verdict'], Grade | undefined>> = {
-  fixed: 'success', 'not a defect': undefined, duplicate: undefined, question: 'warn', 'not fixed': 'danger', open: 'info',
+  fixed: 'success', 'not a defect': undefined, duplicate: undefined, question: 'warn', 'not fixed': 'danger', open: 'info', reviewing: undefined,
 };
 
 /** A verdict as its badge reads, where that differs from the fixer's word for it. */
@@ -106,8 +106,8 @@ function Defect({ d, source }: { d: AuditDefect; source: boolean }) {
 
 /** What each round found in the picked area and what became of each: the fixer's report once it has one. Who listed
  *  each defect shows only for a round not yet recorded. */
-export function AreaDefects({ urlOf, id, version }: { urlOf: (id: string) => string; id: string; version: string }) {
-  const state = useAreaDefects(urlOf, id, version);
+export function AreaDefects({ urlOf, id, version, eventsUrl = null }: { urlOf: (id: string) => string; id: string; version: string; eventsUrl?: string | null }) {
+  const state = useAreaDefects(urlOf, id, version, eventsUrl);
   return (
     <SidebarPanel title="Defects">
       <div className={s.id}>{id}</div>
@@ -118,7 +118,7 @@ export function AreaDefects({ urlOf, id, version }: { urlOf: (id: string) => str
         <section key={r.round} className={s.round}>
           <h3 className={s.title}>
             Round {r.round}
-            <span className={s.hint}>{r.recorded ? '' : r.fixed ? ' · not merged yet' : r.commits ? ' · its fixer stopped before reporting' : ' · no fixer report yet'}</span>
+            <span className={s.hint}>{r.recorded ? '' : r.fixed ? ' · not merged yet' : r.commits ? ' · its fixer stopped before reporting' : r.reviewing ? ' · its reviewers are still finding' : ' · no fixer report yet'}</span>
           </h3>
           {r.commits && r.commits.length > 0 && (
             <>

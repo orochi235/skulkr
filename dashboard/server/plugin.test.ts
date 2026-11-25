@@ -61,9 +61,9 @@ describe('tenants', () => {
 
   it('asks the CLI for a tenant\'s map and defects by its name, and for no tenant it does not read', () => {
     const list = [{ name: 'weasel', registered: true }, { name: 'solo', registered: false }];
-    expect(tenantArgs(list, 'weasel', 'map', null)).toEqual(['map', '--tenant', 'weasel']);
+    expect(tenantArgs(list, 'weasel', 'map', null)).toEqual(['map', '--tenant', 'weasel', '--cached-jobs']);
     expect(tenantArgs(list, 'weasel', 'area', 'core.ops')).toEqual(['defects', '--tenant', 'weasel', 'core.ops']);
-    expect(tenantArgs(list, 'solo', 'map', null)).toEqual(['map']);
+    expect(tenantArgs(list, 'solo', 'map', null)).toEqual(['map', '--cached-jobs']);
     expect(tenantArgs(list, 'weasel', 'unpin', 'core.ops')).toEqual(['unpin', '--tenant', 'weasel', 'core.ops']);
     expect(tenantArgs(list, 'nope', 'map', null)).toBeNull();
   });
@@ -105,11 +105,28 @@ describe('createRoutes', () => {
     expect(cli.mock.calls.filter(([args]) => args[0] === 'defects')).toHaveLength(1);
   });
 
+  it("streams a tenant's map, and runs skulkr fetch while a page watches", async () => {
+    const started: string[][] = [];
+    const stopped: string[][] = [];
+    const cli = vi.fn(async (args: readonly string[]) => (args[0] === 'tenants' ? tenants : args[0] === 'map' ? map : ''));
+    const handle = createRoutes({ cache: false, feed: { watch: () => ({ close: () => {} }), everyMs: 60_000 } }, cli, () => {},
+      (args) => (started.push([...args]), { stop: () => stopped.push([...args]) }));
+    const written: string[] = [];
+    let close = () => {};
+    const req = { url: '/api/t/weasel/events', method: 'GET', on: (_e: string, fn: () => void) => { close = fn; } } as unknown as IncomingMessage;
+    const res = { writeHead: () => {}, write: (f: string) => (written.push(f), true) } as unknown as ServerResponse;
+    handle(req, res, () => {});
+    await vi.waitFor(() => expect(written.some((f) => f.startsWith('event: map'))).toBe(true));
+    expect(started).toEqual([['fetch', '--tenant', 'weasel']]);
+    close();
+    expect(stopped).toEqual([['fetch', '--tenant', 'weasel']]);
+  });
+
   it('pins or unpins an area by POST, then builds the map again before answering', async () => {
     const { cli, get } = routesOver(async (args) => (args[0] === 'tenants' ? tenants : args[0] === 'map' ? map : ''));
     expect(await get('/api/t/weasel/pin?id=core.ops&on=1', 'POST')).toMatchObject({ status: 200, body: '{"ok":true}' });
     const calls = cli.mock.calls.map(([args]) => args.join(' '));
-    expect(calls.slice(calls.indexOf('pin --tenant weasel core.ops'))).toEqual(['pin --tenant weasel core.ops', 'map --tenant weasel']);
+    expect(calls.slice(calls.indexOf('pin --tenant weasel core.ops'))).toEqual(['pin --tenant weasel core.ops', 'map --tenant weasel --cached-jobs']);
     expect(await get('/api/t/weasel/pin?id=core.ops&on=0', 'POST')).toMatchObject({ status: 200 });
     expect(cli).toHaveBeenCalledWith(['unpin', '--tenant', 'weasel', 'core.ops']);
     expect(await get('/api/t/weasel/pin?id=core.ops&on=1')).toMatchObject({ status: 405 });

@@ -10,7 +10,12 @@ export const withLocal = (fleet, local) => {
     ...fleet,
     run: (job, opts) => (job.node === LOCAL_NODE ? local.run({ ...job, node: undefined }, opts) : fleet.run(job, opts)),
     jobs: (since) => both('jobs', since),
-    progress: () => new Map(both('progress')),
+    refresh: (since) => fleet.refresh?.(since),
+    // `onto top` takes seconds, so the fleet is asked only while one of the `running` jobs is on it.
+    progress: (running) => new Map([
+      ...(!running || running.some((j) => j.node !== LOCAL_NODE) ? fleet.progress?.() ?? [] : []),
+      ...(local.progress?.() ?? []),
+    ]),
     /** Whether a job can be sent to this machine by naming node `local`. */
     routesLocal: true,
   };
