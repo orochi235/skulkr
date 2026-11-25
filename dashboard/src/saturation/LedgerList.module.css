@@ -41,8 +41,9 @@
   text-align: end;
 }
 
-.within { min-width: 5ch; }
+/* Sized in em, not ch: the header and the rows are set in different fonts, whose ch differ. */
+.within { inline-size: 3em; }
 
-.defects { min-width: 7ch; }
+.defects { inline-size: 4.2em; }
 
-.unseen { min-width: 6ch; }
+.unseen { inline-size: 3.6em; }
