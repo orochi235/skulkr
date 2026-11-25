@@ -39,6 +39,8 @@ describe('triage fields', () => {
     const match = matchOf('{"sightings": [{"finding": 0, "defect": "D1"}], "new": [], "same": []}', first, again);
     const second = withOccasion(first, { n: 2, source: 'codex' }, match);
     expect(second.defects[0]).toMatchObject({ severity: 'high', size: 'design', confidence: 'sure', scenario: 'a huge delta with no max → zoom collapses to 1e-9', sightings: [1, 2] });
+    const fresh = matchOf('{"sightings": [], "new": [{"finding": 0, "claim": "y", "where": "src/zoom.ts:9", "severity": ""}], "same": []}', second, again);
+    expect(withOccasion(second, { n: 3, source: 'claude' }, fresh).defects[1]).toMatchObject({ id: 'D2', severity: 'high', size: 'design' });
   });
 
   it('takes them from a matcher’s enumeration of an ingested report', () => {

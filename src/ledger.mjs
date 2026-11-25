@@ -192,8 +192,9 @@ export const withOccasion = (ledger, occasion, match) => {
     })
     : d));
   for (const f of match.new) {
-    const triage = triageFrom(match.findings[f.finding] ?? {});
-    defects.push({ id: nextId(defects), claim: f.claim, where: f.where, severity: f.severity, ...triage, firstOccasion: n, sightings: [n], sources: { [source]: [n] } });
+    const found = match.findings[f.finding] ?? {};
+    const triage = triageFrom(found);
+    defects.push({ id: nextId(defects), claim: f.claim, where: f.where, severity: f.severity || found.severity || '', ...triage, firstOccasion: n, sightings: [n], sources: { [source]: [n] } });
   }
   return { ...ledger, occasions: [...ledger.occasions, { ...occasion, findings: match.findings.length }], defects };
 };
