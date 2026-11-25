@@ -108,7 +108,7 @@ describe('verify and repair job lines', () => {
   it('write the on-fleet script before a local fixer starts, for its brief to run its checks on the fleet with', () => {
     const local = fixShell(resolveConfig({ name: 'proj' }), 'core', 15, 3);
     expect(at(local, "cat > .skulkr/in/on-fleet <<'SKULKR_ON_FLEET'")).toBeLessThan(at(local, 'claude -p'));
-    expect(local).toContain('--task "proj-$name-');
+    expect(local).toContain('task="proj-$name-');
     expect(fixShell(resolveConfig({ name: 'proj', local: { fleetChecks: false } }), 'core', 15, 3)).not.toContain('on-fleet');
   });
 

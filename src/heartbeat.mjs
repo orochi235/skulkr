@@ -16,6 +16,9 @@ const counterText = (name, c) => {
   return `${name} ${count}${c.failed ? `, ${c.failed} failing` : ''}`;
 };
 
+/** How much of a job's latest note its heartbeat line keeps: a fixer's `says:` notes run longer than the log needs. */
+const NOW_CHARS = 100;
+
 /**
  * What a running job's heartbeat says of it, without its minutes so a job whose line has not changed can be told
  * from one that has: its count, in its role's unit, its checks and tests where it counts them, and its latest note.
@@ -27,7 +30,7 @@ export const jobStateOf = (job, label) => {
     Number.isFinite(p.total) ? `${UNIT[step] ?? 'done'} ${p.done}/${p.total}` : '',
     counterText('checks', p.checks),
     counterText('tests', p.tests),
-    p.now ? `now: ${p.now.text}` : '',
+    p.now ? `now: ${p.now.text.length > NOW_CHARS ? `${p.now.text.slice(0, NOW_CHARS - 1)}…` : p.now.text}` : '',
   ].filter(Boolean).join(' · ');
 };
 

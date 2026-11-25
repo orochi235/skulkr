@@ -130,6 +130,8 @@ weasel cutover.
   - pins (README "Pins", 2026-11-24): an area `skulkr pin` names is picked first until it settles, then unpinned by the
     next real round's plan; the plan marks it `(pinned)` and the map gives it `pinned: true`. With no pins, nothing
     changes.
+  - a fixer's `skulkr: says: …` lines in its log, a fleet hand-off's `skulkr: on the fleet as <task>` line in its job's
+    log, and the heartbeat's `now` cut to 100 characters (README "Watching a run", 2026-11-24).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

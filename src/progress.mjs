@@ -10,7 +10,8 @@
  *       passed at, written to `<file>` and removed when one fails, so the hand-back's verify need not run them again
  *
  * A fixer's stream also gets `skulkr: <text>` lines, which onto ignores and the local runner keeps as the job's `now`:
- * each command it starts, each commit with its subject, and each check's result with the tests that failed.
+ * what it says between tool calls, each command it starts, each commit with its subject, and each check's result with
+ * the tests that failed.
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -182,6 +183,9 @@ export const createCheckTally = (tally) => {
 
 /** A fixer's verdict that it fixed a finding, `fixed <sha>`, which `findings.mjs` counts too. */
 export const FIXED_MARK = /\bfixed (?:in )?`?[0-9a-f]{7,}/i;
+/** How much of a fixer's own words a `says:` line keeps. */
+const SAYS_CHARS = 240;
+
 /** Text that reads as a fixer's report: its closing tally line, or a verdict. */
 const isReport = (text) => /^tally: /m.test(text) || FIXED_MARK.test(text);
 
@@ -217,7 +221,7 @@ export const createCommitProgress = (findings, tally = null) => {
     const text = assistantText(event);
     if (isReport(text)) report = text;
     const lines = checks.see(event);
-    const notes = [];
+    const notes = text.trim() && !isReport(text) ? [`skulkr: says: ${clip(text, SAYS_CHARS)}`] : [];
     let counted = false;
     for (const command of bashCommands(event)) {
       if (!COMMITS.test(command)) {

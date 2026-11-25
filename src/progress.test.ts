@@ -95,6 +95,14 @@ describe('createCommitProgress', () => {
     expect(JSON.parse(plain.feed(result('fixed 1a2b3c4d | a thing (A)')).result!)).not.toHaveProperty('report');
   });
 
+  it('passes on what the fixer says between tool calls, on one line, but not its report', () => {
+    const say = (text: string) => JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text }] } });
+    const { feed } = createCommitProgress(1);
+    expect(feed(say('The flip test fails because\nthe mirror ignores the parent.')).progress).toBe('skulkr: says: The flip test fails because the mirror ignores the parent.');
+    expect(feed(say('x'.repeat(400))).progress).toHaveLength('skulkr: says: '.length + 240);
+    expect(feed(say('fixed 1a2b3c4d | a thing (A)\ntally: 1 of 1 fixed, 0 extra fixed')).progress).toBeUndefined();
+  });
+
   it('steps once per git commit the fixer runs, out of its findings, and holds there past them', () => {
     const { start, feed } = createCommitProgress(2);
     const counts = (line: string) => (feed(line).progress ?? '').split('\n').filter((l) => l.startsWith('onto:'));
