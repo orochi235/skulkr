@@ -511,7 +511,8 @@ mean anything. Run it again to go on from where it stopped: it resumes the ledge
 `<state>/saturation/<area>.<commit>` and starts a new one; `skulkr saturate rm <area>.<commit>` deletes an old one.
 A review that never finishes is kept beside the ledger as `unfinished-…` and not counted.
 
-`ingest` folds in a report written elsewhere, in any Markdown shape, as one occasion: the matcher reads it whole and
+`ingest` folds in a report written elsewhere, in any Markdown shape, as one occasion (Codex's
+`skills/skulkr-review-saturation`, linked into `~/.codex/skills/`, ends each area this way): the matcher reads it whole and
 lists its findings itself. A multi-pass audit whose passes shared context counts as one occasion, not one per pass,
 since its passes were not independent. `ls` lists every ledger with its estimates, cost and defects (`--json` for the
 dashboard's saturation page); `report` rewrites the report file from the ledger; `rm` deletes the ledger.

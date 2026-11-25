@@ -19,6 +19,8 @@ weasel cutover.
 - `src/agent/` — the agent interface (documented in `index.mjs`): what a model job runs, chosen per role by the config's
   `agent`. `claude.mjs`, the default, owns every `claude -p` flag and how its `claude.json` reads; `codex.mjs` runs
   reviewers on the Codex CLI.
+- `skills/` — agent skills that drive skulkr, linked into an agent's skills directory: `skulkr-review-saturation`,
+  Codex's hand-run saturation review, which ingests its report into the area's ledger.
 - `briefs/` — the shipped default briefs. `examples/weasel.config.mjs` and `examples/weasel/` are weasel's config,
   briefs, and control-sweep adapter, kept to reproduce weasel's behavior exactly.
 - `dashboard/` — the standalone Vite app, its own package (not a workspace); `dashboard/README.md`.
