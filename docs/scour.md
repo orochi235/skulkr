@@ -16,7 +16,7 @@ checks them against the current code, and nothing fixes them.
 
 Separate stages let each step run where and when it is cheapest:
 
-- scans can run overnight on the fleet;
+- trawls can run overnight on the fleet;
 - collecting can be run again after the matcher changes;
 - fixing can work through the fix plan in round-sized pieces.
 
@@ -25,12 +25,12 @@ Each stage reads only what the stage before it wrote, so any stage can be rerun 
 ## The flow
 
 ```
-pick → [scan → collect → judge]* → land → triage → fix (→ verify → batch → merge) → close
+pick → [trawl → collect → judge]* → land → triage → fix (→ verify → batch → merge) → close
                                                           ↘ ask
                                    compare (any time after land)
 ```
 
-Scan, collect and judge loop until the stop rule holds. Everything after `land` works from committed data in the
+Trawl, collect and judge loop until the stop rule holds. Everything after `land` works from committed data in the
 project's `.skulkr/`, never from one machine's state directory.
 
 ## Stages
@@ -38,7 +38,7 @@ project's `.skulkr/`, never from one machine's state directory.
 | Stage | Takes | Writes | Core action | UI expression(s) | User sees? | Exists today |
 |---|---|---|---|---|---|---|
 | **pick** | the partition, the registry, a budget | the areas to saturate, the frozen commit, the sources | The user (or a script) specifies a job | Whatever interface we use to pick an area from the map | Explicit | only as `--at` and `--sources` on one area |
-| **scan** | a picked area | one raw report per occasion, unmatched, under the ledger's `reviews/` | We run the job | Updates: progress bar and frequent log events/status updates | Explicit | inside `saturate <area>`'s loop; the Codex skill and `ingest` bring outside reports |
+| **trawl** | a picked area | one raw report per occasion, unmatched, under the ledger's `reviews/` | We run the job | Updates: progress bar and frequent log events/status updates | Explicit | inside `saturate <area>`'s loop; the Codex skill and `ingest` bring outside reports |
 | **collect** | reports not yet in the ledger | the ledger's distinct defects and sightings (the ledger matcher) | Job results binned in the ledger | Items in various results lists | Implicit? | inside the same loop, as `foldIn` |
 | **judge** | the ledger | whether to scan again: the stop rule, and which source to add next from the per-source estimates | Flow control over scanning process | Prefs that govern batch flow control | Implicit? | inside the loop |
 | **land** | a stopped ledger | `.skulkr/saturation/<area>/<commit>/` and the registry lines it adds, committed to `main` | Saves results from recent scans to the database | | Currently explicit, should be automatic | `saturate land` |
@@ -52,8 +52,8 @@ project's `.skulkr/`, never from one machine's state directory.
 
 | From → to | The file |
 |---|---|
-| pick → scan | `<state>/saturation/<area>/ledger.json` with its frozen `commit` and `files`, and no occasions yet |
-| scan → collect | `reviews/<NN>-<source>.md` beside the ledger, listed in an `unfolded` list until collect takes them |
+| pick → trawl | `<state>/saturation/<area>/ledger.json` with its frozen `commit` and `files`, and no occasions yet |
+| trawl → collect | `reviews/<NN>-<source>.md` beside the ledger, listed in an `unfolded` list until collect takes them |
 | collect → judge | the ledger's `occasions` and `defects`; every estimate is computed from these |
 | land → triage | `.skulkr/saturation/…/ledger.json` and `.skulkr/defects/<area>.jsonl` |
 | triage → fix | the fix plan, under `.skulkr/` (to design): batches of registry ids, each with the files they touch |
@@ -63,7 +63,9 @@ project's `.skulkr/`, never from one machine's state directory.
 
 - The workflow is called **scour**: it both searches an area thoroughly and scrubs it clean. `skulkr scour` is the
   command, `saturate` and `sat` its aliases; "saturated" still names the stop rule's condition (2026-11-25).
-- Scour runs as stages that each run on their own: scan, collect, triage, fix (2026-11-25; `sort` renamed `triage` the same day).
+- Scour runs as stages that each run on their own: trawl, collect, triage, fix (2026-11-25; first drafted as scan and sort).
+- The search stage is **trawl**: haul after haul over one frozen commit until the catch thins, each occasion a haul;
+  `skulkr scour trawl <area>`, so the command never says "scour scan" (2026-11-25).
 - A defect only a scour found is not handed to a round's fixers until triage and fix exist (2026-11-25).
 
 ## Open

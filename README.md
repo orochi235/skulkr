@@ -519,7 +519,7 @@ Running one reviewer of each pair on each agent, `agent: { review: … }` aside,
 
 ## Scour
 
-Splitting this into stages (pick, scan, collect, judge, land, triage, fix) is designed, mostly unbuilt, in
+Splitting this into stages (pick, trawl, collect, judge, land, triage, fix) is designed, mostly unbuilt, in
 `docs/scour.md`.
 
 A round's two reviews estimate what an area holds from one overlap. `skulkr scour` (aliases `saturate`, `sat`) asks the
