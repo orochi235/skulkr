@@ -40,12 +40,6 @@ All are in `docs/scour.md` "Decided" or README.md except these:
 
 ## Loose ends
 
-- `skulkr sat core.canvas.nodeShapes` (pid 49951, started 08:08) hung on the slot bug fixed in `f4c5c78` and holds that
-  ledger's lock; its 6 defects are unlanded. The user has not said whether to kill it. Read the pid back with
-  `ps -p 49951 -o lstart,command` before acting.
-- weasel's root still holds `review-saturation-tracker.xlsx`, `viewport-review-saturation.md` and
-  `viewport-review-saturation-codex.md`, untracked; the last holds the only copy of that Codex report. The user has not
-  said what to do with them. The other root saturation files are in `~/.Trash/weasel-saturation-root-2026-11-25/`.
 - A stray onto tree `skulkr-weasel` on orochi, made by a mistaken sync, is unused.
 - kouhai's ledger still holds older open work for this repo (`owed`): t-543, t-545, t-546, t-547.
 
