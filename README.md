@@ -519,6 +519,9 @@ Running one reviewer of each pair on each agent, `agent: { review: … }` aside,
 
 ## Saturation
 
+Splitting this into stages (pick, scan, collect, judge, land, sort, fix) is designed, mostly unbuilt, in
+`docs/saturation.md`.
+
 A round's two reviews estimate what an area holds from one overlap. `skulkr saturate` (alias `sat`) asks the
 question harder for one area: blind reviews of it, again and again, at one frozen commit with no fixes between them,
 until capture–recapture says further reviews would find little new. Nothing it records feeds a round: not history,
