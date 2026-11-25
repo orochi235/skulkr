@@ -2,7 +2,7 @@
 import { pref, type PrefPath } from '@weasel-js/prefs';
 import { usePref, usePrefsStore } from '@weasel-js/prefs/react';
 import { localStorageAdapter } from '@weasel-js/storage';
-import { ALL_METRICS, HEAT_METRIC_SPECS, HEAT_METRICS, type HeatMetric } from './heatMetrics';
+import { ALL_METRICS, HEAT_METRIC_SPECS, HEAT_METRICS, SATURATION_METRICS, type HeatMetric } from './heatMetrics';
 import { HEAT_SCHEMES, type HeatScheme } from './heatSchemes';
 
 /** The most the map numbers: eight rounds of the queue, in half rounds. */
@@ -43,9 +43,9 @@ export const DASH_PREFS = pref.group('Dashboard', {
       min: 0, max: MAX_HALVES, step: 1, control: 'slider',
     }),
   }),
-  saturation: pref.group('Saturation', {
-    colorBy: pref.enum<HeatMetric>('Color by', 'saturationOpen', ALL_METRICS, {
-      description: "What the saturation page's map shades its areas by; the legend under the map switches it too.",
+  saturation: pref.group('Scour', {
+    colorBy: pref.enum<HeatMetric>('Color by', 'saturationOpen', SATURATION_METRICS, {
+      description: "What the Scour page's map shades its areas by; the legend under the map switches it too.",
     }),
   }),
   lanes: pref.group('Lanes', {

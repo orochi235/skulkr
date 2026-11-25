@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { asNodeId } from '@weasel-js/core';
 import { useSelection } from '@weasel-js/editing';
 import { createAuditScene } from '@dash/audits/auditScene';
-import { ALL_METRICS } from '@dash/audits/heatMetrics';
+import { SATURATION_METRICS } from '@dash/audits/heatMetrics';
 import { Treemap } from '@dash/audits/Treemap';
 import { useAuditPalette } from '@dash/audits/useAuditPalette';
 import type { AuditArea } from '@dash/audits/skulkrMap.types';
@@ -18,6 +18,9 @@ const NO_PHASES: ReadonlyMap<string, AuditPhase> = new Map();
 export const saturationByArea = (ledgers: readonly SaturationLedger[]) => new Map(ledgers.filter((l) => l.id === l.area).map((l) => [l.area, {
   open: l.defects.filter((d) => (d.registry?.status ?? 'open') === 'open').length,
   unseen: l.unseen,
+  distinct: l.distinct,
+  occasions: l.occasions,
+  nextNew: l.nextNew,
 }]));
 
 /** The audit map's treemap, shaded by what each area's saturation ledger says; picking an area picks its ledger. */
@@ -52,7 +55,7 @@ export function SaturationMap({ areas, ledgers, picked, onPick }: {
       {probes}
       <Treemap
         scene={scene} selection={selection} areas={shaded} palette={colors} phases={NO_PHASES} onHover={() => {}}
-        colorByPref="saturation.colorBy" metrics={ALL_METRICS}
+        colorByPref="saturation.colorBy" metrics={SATURATION_METRICS}
       />
     </div>
   );

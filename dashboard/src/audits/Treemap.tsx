@@ -108,7 +108,9 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
   const heatOwn = useMemo(() => heatScaleOf(areas), [areas]);
   const leftHeat = heatGiven ?? heatOwn;
   // Shaded by another metric, the map takes that metric's values, its scale, and the ramp its pref names.
-  const [colorBy, setColorBy] = useDashPref(colorByPref);
+  const [chosen, setColorBy] = useDashPref(colorByPref);
+  // A choice saved before this page's menu narrowed shows as its first metric.
+  const colorBy = metrics.includes(chosen) ? chosen : metrics[0]!;
   const [scheme] = useDashPref(colorBy === 'left' ? 'map.scheme' : `map.schemes.${colorBy}`) as [HeatScheme, unknown];
   const values = useMemo(() => (colorBy === 'left' ? null : HEAT_METRIC_SPECS[colorBy].valuesIn(areas)), [colorBy, areas]);
   const heat = useMemo(() => (values ? metricScaleOf(colorBy, values) : leftHeat), [values, colorBy, leftHeat]);
