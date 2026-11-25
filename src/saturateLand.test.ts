@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -111,5 +111,6 @@ describe('skulkr saturate land', () => {
   it('refuses an area with no ledger', async () => {
     const { root, cfg } = project();
     await expect(land(cfg, root)).rejects.toThrow('src has no saturation ledger');
+    expect(existsSync(join(cfg.state, 'saturation/src'))).toBe(false);
   });
 });

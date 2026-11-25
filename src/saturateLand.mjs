@@ -53,6 +53,8 @@ const withLedgersHeld = (cfg, ids, work) =>
  */
 export const landLedgers = async (cfg, root, ids, say = () => {}) => {
   if (ids.length === 0) throw new Error('no saturation ledger to land');
+  // Before any hold, which would make a directory for an id that names no ledger.
+  for (const id of ids) if (!ledgerOf(cfg, id)) throw new Error(`${id} has no saturation ledger`);
   return withLedgersHeld(cfg, ids, async () => {
     const ledgers = ids.map((id) => {
       const ledger = ledgerOf(cfg, id);
