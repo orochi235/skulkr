@@ -10,6 +10,7 @@
  *   skulkr map [--out FILE]     the dashboard's JSON
  *   skulkr defects <area>       one area's defects, every round's, as JSON
  *   skulkr pin|unpin <area>     forces an area into every round until it settles, or stops
+ *   skulkr saturate <area> …    repeated blind reviews of one area into a ledger, until saturated (alias `sat`)
  *   skulkr trial                the preload trials' digest (`night --trial preload` runs one)
  *   skulkr service              the long-running service (requests on stdin): the config's project, or with
  *                              none named, every registered tenant
@@ -28,11 +29,12 @@ import { runNight } from '../src/night.mjs';
 import { partitionAt, partitionCommand } from '../src/partition.mjs';
 import { pin, pinsOf, unpin } from '../src/pins.mjs';
 import { loadRunner } from '../src/runner/index.mjs';
+import { saturateCommand } from '../src/saturate.mjs';
 import { serve } from '../src/service.mjs';
 import { trialCommand } from '../src/trial.mjs';
 import { addTenant, readTenants, removeTenant, requireTenant, tenantsPath } from '../src/tenants.mjs';
 
-const USAGE = 'usage: skulkr <init|night|partition|map|defects|pin|unpin|trial|service|config|tenants|menu> [--config <file> | --tenant <name>] [--root <dir>] [--local] …';
+const USAGE = 'usage: skulkr <init|night|partition|map|defects|pin|unpin|saturate|sat|trial|service|config|tenants|menu> [--config <file> | --tenant <name>] [--root <dir>] [--local] …';
 
 /** `argv` less `--config`, `--tenant` and `--root` and their values, and those values. */
 const takeOptions = (argv) => {
@@ -139,6 +141,11 @@ const main = async () => {
     case 'pin':
     case 'unpin':
       pinCommand(cfg, root(), command, rest[0]);
+      return 0;
+    case 'saturate':
+    case 'sat':
+      tolerateClosedOutput();
+      await saturateCommand(cfg, await loadRunner(cfg), root(), rest);
       return 0;
     case 'trial':
       trialCommand(cfg);

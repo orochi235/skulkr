@@ -26,7 +26,7 @@ const TRIAL_STAGGER_MS = 30_000;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Every one of `files` at the frozen tree `frozen`, each under its path, for a preload trial's prompt. */
-const preloadedFiles = (frozen, files) => [
+export const preloadedFiles = (frozen, files) => [
   "## The listed files' contents",
   '',
   'Every listed file follows as it stands at the frozen commit, so you need not open them to read them.',

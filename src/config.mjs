@@ -127,7 +127,13 @@ export const DEFAULTS = {
    */
   review: { preload: true },
   /** Brief templates, paths relative to the config file; unset uses the shipped default. */
-  briefs: { reviewer: undefined, matcher: undefined, fixer: undefined, repair: undefined, conflict: undefined },
+  briefs: { reviewer: undefined, matcher: undefined, fixer: undefined, repair: undefined, conflict: undefined, ledgerMatch: undefined },
+
+  /**
+   * `skulkr saturate` (README "Saturation"): `max` occasions at most, one review per source in `sources` (agent names)
+   * each iteration, stopping once the chance of a new finding falls under `stopNextNew`.
+   */
+  saturate: { max: 40, sources: ['claude'], stopNextNew: 0.15 },
 
   /**
    * How a batch is tested. `{ref}` in the command is the batch branch; `cwd` is `root` or `batch` (its worktree).
@@ -199,7 +205,8 @@ export const DEFAULTS = {
     /** Tools every job is refused, beside each role's own; local mode adds the web tools. */
     denied: [],
     /** Unset: the model and effort the job's settings give, or the account's default. */
-    models: { review: undefined, fix: undefined, match: 'haiku' },
+    /** `ledgerMatch`: the saturation ledger's matcher, which has to tell one defect from another across many reports. */
+    models: { review: undefined, fix: undefined, match: 'haiku', ledgerMatch: 'opus' },
     effort: { review: undefined, fix: undefined, match: undefined },
     /**
      * `--setting-sources` for every job: without `user`, the job reads none of the node account's own settings
@@ -254,7 +261,7 @@ export const DEFAULTS = {
    * in its place, the guess at an area's cost, and `nightUsd`, what continuous mode may spend from one `stopAt` to the
    * next (unset: no continuous mode).
    */
-  budget: { review: 8, match: 1, fix: 15, capUsd: 160, areaCapUsd: undefined, areaGuessUsd: 10, nightUsd: undefined },
+  budget: { review: 8, match: 1, ledgerMatch: 3, fix: 15, capUsd: 160, areaCapUsd: undefined, areaGuessUsd: 10, nightUsd: undefined },
   /**
    * Local clock times: the service starts a run at `startAt`; a run stops dispatching at the first `stopAt`.
    * `continuous` keeps rounds coming between them, under `budget.nightUsd` (README "Continuous rounds").
