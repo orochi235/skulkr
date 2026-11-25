@@ -23,7 +23,7 @@ import { liveEstimatesOf, phasesOf, withLivePasses, type AuditPhase } from './ph
 import { continuousText } from './runData';
 import { useAuditPalette } from './useAuditPalette';
 import { useSkulkrMap } from './useSkulkrMap';
-import { SNAPSHOT, areaUrlFor, mapUrl, tenantsUrl } from '@dash/dataSource';
+import { SNAPSHOT, areaUrlFor, mapUrl, pinUrlFor, tenantsUrl } from '@dash/dataSource';
 import { AppTitle } from '@dash/AppTitle';
 import { TenantTitle } from '@dash/tenants/TenantTitle';
 import { titleFor } from '@dash/title';
@@ -75,7 +75,17 @@ interface AsOf {
   readonly choose: (round: number | null) => void;
 }
 
-function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: string) => string; view: LaneSettings; asOf: AsOf }) {
+/** Pins or unpins an area, answering once the server has built the map again; refuses with the server's reason. */
+type PinArea = (id: string, on: boolean) => Promise<void>;
+
+/** A {@link PinArea} posting to `urlOf`, then `done`, which asks for the map again. */
+export const createPinArea = (urlOf: (id: string, on: boolean) => string, done: () => void): PinArea => async (id, on) => {
+  const res = await fetch(urlOf(id, on), { method: 'POST' });
+  if (!res.ok) throw new Error((await res.text()).slice(0, 200) || `${res.status}`);
+  done();
+};
+
+function Chart({ map, areaUrl, view, asOf, pinArea }: { map: SkulkrMap; areaUrl: (id: string) => string; view: LaneSettings; asOf: AsOf; pinArea?: PinArea | undefined }) {
   const [scene] = useState(createAuditScene);
   const selection = useSelection({ scene, mode: 'single' });
   const [hovered, setHovered] = useState<string | null>(null);
@@ -170,7 +180,7 @@ function Chart({ map, areaUrl, view, asOf }: { map: SkulkrMap; areaUrl: (id: str
                 note={`${matches.length.toLocaleString()} of ${shown.length.toLocaleString()} areas`}
               />
             </SidebarPanel>
-          ) : <AreaDetail area={area} holder={area && past === null ? runHolding(map.runs, area.id) : undefined} asOf={past} />}
+          ) : <AreaDetail area={area} holder={area && past === null ? runHolding(map.runs, area.id) : undefined} asOf={past} onPin={pinArea} />}
           {picked && <AreaDefects urlOf={areaUrl} id={picked} version={defectsVersionOf(map, picked)} />}
         </aside>
       </div>
@@ -212,7 +222,10 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
   const names = tenants.status === 'ready' ? tenants.names : [];
   const [tenant, choose] = useTenantChoice(names);
   const [asOfRound, chooseAsOf] = useAsOfRound(tenant);
-  const state = useSkulkrMap({ url: tenant === null ? null : mapUrl(base, tenant), everyMs: SNAPSHOT ? Infinity : everyMs, dev });
+  const [asked, setAsked] = useState(0);
+  const state = useSkulkrMap({ url: tenant === null ? null : mapUrl(base, tenant), everyMs: SNAPSHOT ? Infinity : everyMs, dev, asked });
+  const pinUrl = useMemo(() => (tenant === null ? null : pinUrlFor(base, tenant)), [base, tenant]);
+  const pinArea = useMemo(() => (pinUrl ? createPinArea(pinUrl, () => setAsked((n) => n + 1)) : undefined), [pinUrl]);
   const map = state.status === 'ready' ? state.map : null;
   const view = useLaneView();
   const stale = map && !SNAPSHOT ? staleMinutesOf(map.generated, Date.now()) : null;
@@ -251,7 +264,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
         {state.status === 'ready' && tenant !== null && (
           <>
             {state.error && <p className={`${s.note} ${s.stale}`}>The last refresh failed ({state.error}); showing the map before it.</p>}
-            <Chart key={tenant} map={state.map} areaUrl={areaUrlFor(base, tenant)} view={view} asOf={{ round: asOfRound, choose: chooseAsOf }} />
+            <Chart key={tenant} map={state.map} areaUrl={areaUrlFor(base, tenant)} view={view} asOf={{ round: asOfRound, choose: chooseAsOf }} pinArea={pinArea} />
           </>
         )}
         <p className={s.foot}>

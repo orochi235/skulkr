@@ -7,7 +7,8 @@ weasel cutover.
 
 ## Layout
 
-- `bin/skulkr.mjs` — the one command (`init`, `night`, `partition`, `map`, `defects`, `service`, `config`, `tenants`).
+- `bin/skulkr.mjs` — the one command (`init`, `night`, `partition`, `map`, `defects`, `pin`, `unpin`, `service`, `config`,
+  `tenants`).
 - `src/` — the pipeline, plain Node ESM `.mjs` with no build. `config.mjs` holds every default and derives the
   names and regexes the rest reads; no other file may hold a project-specific value.
 - `src/runner/` — the runner interface (documented in `onto.mjs`): `local.mjs`, the default, runs every job on this
@@ -126,6 +127,9 @@ weasel cutover.
     minutes over a resumed round's `on earlier` replay of it (2026-11-24).
   - a run waiting for a place asking the area limit again every 30 seconds, so a raised `limits.json` reaches it
     before an area finishes (2026-11-24).
+  - pins (README "Pins", 2026-11-24): an area `skulkr pin` names is picked first until it settles, then unpinned by the
+    next real round's plan; the plan marks it `(pinned)` and the map gives it `pinned: true`. With no pins, nothing
+    changes.
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

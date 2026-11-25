@@ -9,6 +9,7 @@
  *   skulkr partition [--ref R]  rewrites the partition file
  *   skulkr map [--out FILE]     the dashboard's JSON
  *   skulkr defects <area>       one area's defects, every round's, as JSON
+ *   skulkr pin|unpin <area>     forces an area into every round until it settles, or stops
  *   skulkr trial                the preload trials' digest (`night --trial preload` runs one)
  *   skulkr service              the long-running service (requests on stdin): the config's project, or with
  *                              none named, every registered tenant
@@ -24,13 +25,14 @@ import { defectsFor } from '../src/defects.mjs';
 import { initCommand } from '../src/init.mjs';
 import { mapCommand } from '../src/map.mjs';
 import { runNight } from '../src/night.mjs';
-import { partitionCommand } from '../src/partition.mjs';
+import { partitionAt, partitionCommand } from '../src/partition.mjs';
+import { pin, pinsOf, unpin } from '../src/pins.mjs';
 import { loadRunner } from '../src/runner/index.mjs';
 import { serve } from '../src/service.mjs';
 import { trialCommand } from '../src/trial.mjs';
 import { addTenant, readTenants, removeTenant, requireTenant, tenantsPath } from '../src/tenants.mjs';
 
-const USAGE = 'usage: skulkr <init|night|partition|map|defects|trial|service|config|tenants|menu> [--config <file> | --tenant <name>] [--root <dir>] [--local] …';
+const USAGE = 'usage: skulkr <init|night|partition|map|defects|pin|unpin|trial|service|config|tenants|menu> [--config <file> | --tenant <name>] [--root <dir>] [--local] …';
 
 /** `argv` less `--config`, `--tenant` and `--root` and their values, and those values. */
 const takeOptions = (argv) => {
@@ -80,6 +82,15 @@ const tenantsCommand = async ([verb, ...args]) => {
   throw new Error('usage: skulkr tenants <ls|add|rm>');
 };
 
+/** `skulkr pin|unpin <area>`. An id no longer in the partition can still be unpinned. */
+const pinCommand = (cfg, root, verb, id) => {
+  if (!id) throw new Error(`usage: skulkr ${verb} <area>`);
+  const known = verb === 'unpin' && pinsOf(cfg).has(id) || partitionAt(cfg, root, cfg.git.main).some((a) => a.id === id);
+  if (!known) throw new Error(`no area named ${id}; see ${cfg.partition.path}`);
+  const changed = verb === 'pin' ? pin(cfg, id) : unpin(cfg, id);
+  console.log(changed ? `${verb}ned ${id}` : `${id} was ${verb === 'pin' ? 'already' : 'not'} pinned`);
+};
+
 /** Whether `skulkr service` hosts the registry: no config named and at least one tenant registered. */
 const hostsRegistry = (opts) => opts.config === undefined && opts.root === undefined && !process.env.SKULKR_CONFIG && readTenants().length > 0;
 
@@ -124,6 +135,10 @@ const main = async () => {
       return 0;
     case 'defects':
       process.stdout.write(`${JSON.stringify(defectsFor(cfg, root(), rest[0] ?? ''))}\n`);
+      return 0;
+    case 'pin':
+    case 'unpin':
+      pinCommand(cfg, root(), command, rest[0]);
       return 0;
     case 'trial':
       trialCommand(cfg);

@@ -1,8 +1,10 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { fleetOf, fleetProgressOf, gateFailuresOf, gateNodesOf, gateOutcomesOf, gateRunsOf, mergedIn, nightRoundOf, nightsOf, readRuns, rerunOf, withPasses } from './map.mjs';
+import { pin } from './pins.mjs';
+import { buildMap, fleetOf,fleetProgressOf, gateFailuresOf, gateNodesOf, gateOutcomesOf, gateRunsOf, mergedIn, nightRoundOf, nightsOf, readRuns, rerunOf, withPasses } from './map.mjs';
 import { gitIn } from './batch.mjs';
 import { progressOfTop } from './runner/onto.mjs';
 import { resolveConfig } from './config.mjs';
@@ -221,6 +223,32 @@ describe('gate outcomes and reruns', () => {
   it('finds each task\'s first counter in onto top\'s answer', () => {
     const top = { nodes: [{ name: 'studio', jobs: [{ task: 'audit50-a-A', progress: [{ done: 4, total: 9 }, { done: 1, total: 2 }] }, { task: 'x' }] }] };
     expect([...progressOfTop(top)]).toEqual([['audit50-a-A', { done: 4, total: 9 }]]);
+  });
+});
+
+describe('buildMap', () => {
+  it('marks a pinned area and queues it first', () => {
+    const root = mkdtempSync(join(tmpdir(), 'skulkr-map-pins-'));
+    const state = mkdtempSync(join(tmpdir(), 'skulkr-map-state-'));
+    dirs.push(root, state);
+    const home = process.env.HOME;
+    process.env.HOME = root;
+    try {
+      const run = (...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+      run('init', '-q', '-b', 'main');
+      for (const pkg of ['core', 'ui']) {
+        mkdirSync(join(root, 'packages', pkg, 'src'), { recursive: true });
+        writeFileSync(join(root, 'packages', pkg, 'src', 'a.ts'), 'export const a = 1;\n');
+      }
+      run('add', '-A');
+      run('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'c');
+      const cfg = weaselConfig(state);
+      pin(cfg, 'ui');
+      const map = buildMap(cfg, root, { jobs: () => [] });
+      expect(map.areas.map((a: any) => [a.id, a.queue, a.pinned])).toEqual([['core', 2, undefined], ['ui', 1, true]]);
+    } finally {
+      process.env.HOME = home;
+    }
   });
 });
 

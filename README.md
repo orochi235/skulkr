@@ -183,6 +183,13 @@ git: on disk, and on batches `main` has not merged, less those of a round abando
 `abandoned` file); the rounds chart marks a round read from a batch `pending: 'unmerged'`. An area a live run holds, or an unmerged `audit<N>-<area>` branch, is skipped, and the map's queue numbers skip it
 too.
 
+**Pins.** `skulkr pin <area>` forces an area into every round until it settles, and `skulkr unpin <area>` stops that
+(2026-11-24). Pinned areas are picked first, ahead of never-audited ones and within `--areas`, in the order above among
+themselves; one a live run or an unmerged branch holds waits as any other does. The pins are a list of area ids in
+`<state>/pins.json`, beside `limits.json`, so pinning commits nothing. A real round's plan unpins each pinned area that
+has settled and says so (`unpinned <id>: settled`); a dry plan only marks the pinned picks `(pinned)`. The map gives a
+pinned area `pinned: true`, and the dashboard draws a pin on its cell and a toggle in its area panel.
+
 **History follows files.** A pass belongs to the files it read (its `files.txt`, also `files` in its `area.json`),
 not to its area's name, so a recut partition keeps what was learned. An area inherits every pass that read any of
 its files now, with a *share*: the part of that pass's files the area holds. The pass's Chapman estimate and its
@@ -563,7 +570,8 @@ own `skulk` service is down (2026-11-21). What is left of the cutover is in "Mov
 jobs feed, the queue, and an area's defects. Its dev server lists the tenants at `api/tenants` (`skulkr tenants ls`,
 or with none registered the one project `SKULKR_CONFIG` or the working directory names), and serves each tenant's
 map at `api/t/<name>/map` and an area's defects at `api/t/<name>/area?id=<area>`, by running `skulkr map` and
-`skulkr defects` with `--tenant` (which refuses an id not in the partition). The page's title is a menu of the tenants; the one shown is in the URL hash
+`skulkr defects` with `--tenant` (which refuses an id not in the partition). A POST to `api/t/<name>/pin?id=<area>&on=1`
+(or `on=0`) runs `skulkr pin` (or `unpin`) and answers once the map is built again (see "Pins"). The page's title is a menu of the tenants; the one shown is in the URL hash
 (`#weasel`), and each viewer's last choice is remembered. A slider above the treemap shows the areas as they stood after
 an earlier round, from each area's `lastByRound` (see "History follows files"), the round after an `@` in the hash
 (`#weasel@41`). `dashboard/README.md` says how to start it.

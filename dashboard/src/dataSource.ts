@@ -1,4 +1,4 @@
-import { TENANTS_PATH, tenantAreaPath, tenantMapPath } from '@shared/routes';
+import { TENANTS_PATH, tenantAreaPath, tenantMapPath, tenantPinPath } from '@shared/routes';
 
 /**
  * Whether this build reads a snapshot written by `scripts/snapshot.mjs` instead of the dev server: static files a
@@ -18,3 +18,7 @@ export const mapUrl = (base: string, name: string): string =>
 /** Where it reads one area's defects in tenant `name`. */
 export const areaUrlFor = (base: string, name: string) => (id: string): string =>
   SNAPSHOT ? `${base}snapshot/${enc(name)}/area/${enc(id)}.json` : `${base}${tenantAreaPath(name)}?id=${enc(id)}`;
+
+/** Where a POST pins or unpins one area in tenant `name`; null for a snapshot, which pins nothing. */
+export const pinUrlFor = (base: string, name: string): ((id: string, on: boolean) => string) | null =>
+  SNAPSHOT ? null : (id, on) => `${base}${tenantPinPath(name)}?id=${enc(id)}&on=${on ? 1 : 0}`;

@@ -100,8 +100,22 @@ describe('pickAreas', () => {
       { round: 32, id: 'a', distinct: 0, files: ['a.ts'] },
     ]);
     const passes = readPasses(root, 'docs/audits');
-    expect(pickAreas({ areas: [area('a')], passes, touched: never, count: 5 })).toEqual({ picked: [], settled: ['a'] });
+    expect(pickAreas({ areas: [area('a')], passes, touched: never, count: 5 })).toEqual({ picked: [], settled: ['a'], unpin: [] });
     expect(pickAreas({ areas: [area('a')], passes, touched: () => true, count: 5 }).picked).toEqual(['a']);
+  });
+
+  it('picks pinned areas first, by rank among themselves, and names the settled ones to unpin', () => {
+    const root = fixture([
+      { round: 31, id: 'a', distinct: 5, files: ['a.ts'] },
+      { round: 32, id: 'b', distinct: 5, files: ['b.ts'] },
+      { round: 31, id: 's', distinct: 1, files: ['s.ts'] },
+      { round: 32, id: 's', distinct: 0, files: ['s.ts'] },
+    ]);
+    const passes = readPasses(root, 'docs/audits');
+    const areas = ['a', 'b', 'c', 'd', 's'].map((id) => area(id));
+    expect(pickAreas({ areas, passes, touched: never, count: 3 }).picked).toEqual(['c', 'd', 'a']);
+    expect(pickAreas({ areas, passes, touched: never, count: 3, pinned: new Set(['b', 'd', 's']) })).toEqual({ picked: ['d', 'b', 'c'], settled: ['s'], unpin: ['s'] });
+    expect(pickAreas({ areas, passes, touched: never, count: 3, pinned: new Set(['b', 'a']), inFlight: new Set(['a']) }).picked).toEqual(['b', 'c', 'd']);
   });
 
   it('does not settle on one quiet pass, a loud pass, or a changed file list', () => {
@@ -118,7 +132,7 @@ describe('pickAreas', () => {
 
   it('does not settle, or throw, on two quiet passes that recorded no file list', () => {
     const passes = new Map([['a', [{ round: 31, id: 'a', distinct: 0 }, { round: 32, id: 'a', distinct: 0 }]]]);
-    expect(pickAreas({ areas: [area('a')], passes, touched: never, count: 5 })).toEqual({ picked: ['a'], settled: [] });
+    expect(pickAreas({ areas: [area('a')], passes, touched: never, count: 5 })).toEqual({ picked: ['a'], settled: [], unpin: [] });
   });
 
   it('ignores the passes\' own fix commits when asking whether files changed', () => {

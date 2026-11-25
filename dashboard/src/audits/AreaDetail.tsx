@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Badge } from '@weasel-js/ui/components/Badge';
+import { Button } from '@weasel-js/ui/components/Button';
 import { DetailList, DetailRow } from '@weasel-js/ui/components/DetailList';
 import { SidebarPanel } from '@weasel-js/ui/components/SidebarPanel';
 import type { Grade } from '@weasel-js/theme';
@@ -73,9 +74,32 @@ function Venn({ a, both, b }: { a: ReactNode; both: ReactNode; b: ReactNode }) {
   );
 }
 
+/** Pins or unpins an area into every round until it settles (`onPin`), saying why when the server refuses. */
+function PinToggle({ area, onPin }: { area: AuditArea; onPin: (id: string, on: boolean) => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<{ id: string; text: string } | null>(null);
+  const pinned = area.pinned ?? false;
+  const toggle = () => {
+    setBusy(true);
+    setError(null);
+    onPin(area.id, !pinned).catch((e: Error) => setError({ id: area.id, text: e.message })).finally(() => setBusy(false));
+  };
+  return (
+    <div className={s.pin}>
+      <Button size="sm" variant="ghost" pressed={pinned} loading={busy} disabled={busy} onClick={toggle}
+        title={pinned ? 'Stop forcing it into every round' : 'Pick it in every round until it settles'}>
+        {pinned ? 'Pinned' : 'Pin'}
+      </Button>
+      {error?.id === area.id && <span className={s.pinError} role="alert">{error.text}</span>}
+    </div>
+  );
+}
+
 /** The area under the pointer, or else the one picked: its status, its counts, and every pass over it; as of a past
- *  round (`areasAsOf`), only whether it had been audited by then. */
-export function AreaDetail({ area, holder, asOf = null }: { area: AuditArea | undefined; holder: AuditRun | undefined; asOf?: number | null }) {
+ *  round (`areasAsOf`), only whether it had been audited by then. `onPin`, where the page can pin, gives it a pin toggle. */
+export function AreaDetail({ area, holder, asOf = null, onPin }: {
+  area: AuditArea | undefined; holder: AuditRun | undefined; asOf?: number | null; onPin?: ((id: string, on: boolean) => Promise<void>) | undefined;
+}) {
   const last = area && lastPassOf(area);
   const fixed = area && fixedIn(area);
   const chapman = area && area.passes.length > 0 ? chapmanIn(area) : null;
@@ -87,7 +111,10 @@ export function AreaDetail({ area, holder, asOf = null }: { area: AuditArea | un
       {!area ? <p className={s.hint}>Hover or click an area for its passes.</p> : (
         <div className={s.body}>
           <div className={s.id}>{area.id}</div>
-          <div><Badge shape="pill" size="sm" variant="solid" {...(grade ? { grade } : {})}>{badge}</Badge></div>
+          <div className={s.status}>
+            <Badge shape="pill" size="sm" variant="solid" {...(grade ? { grade } : {})}>{badge}</Badge>
+            {onPin && asOf === null && <PinToggle area={area} onPin={onPin} />}
+          </div>
           <DetailList values="figures" columns="auto">
             <DetailRow label="source files">{area.files}</DetailRow>
             <DetailRow label="passes">{area.passes.length}</DetailRow>

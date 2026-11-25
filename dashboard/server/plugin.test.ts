@@ -64,12 +64,14 @@ describe('tenants', () => {
     expect(tenantArgs(list, 'weasel', 'map', null)).toEqual(['map', '--tenant', 'weasel']);
     expect(tenantArgs(list, 'weasel', 'area', 'core.ops')).toEqual(['defects', '--tenant', 'weasel', 'core.ops']);
     expect(tenantArgs(list, 'solo', 'map', null)).toEqual(['map']);
+    expect(tenantArgs(list, 'weasel', 'unpin', 'core.ops')).toEqual(['unpin', '--tenant', 'weasel', 'core.ops']);
     expect(tenantArgs(list, 'nope', 'map', null)).toBeNull();
   });
 
   it('reads a tenant route back from its path', () => {
     expect(parseTenantPath(`/base/${tenantMapPath('skulkr.demo')}`)).toEqual({ tenant: 'skulkr.demo', what: 'map' });
     expect(parseTenantPath('/base/api/t/a/area')).toEqual({ tenant: 'a', what: 'area' });
+    expect(parseTenantPath('/base/api/t/a/pin')).toEqual({ tenant: 'a', what: 'pin' });
     expect(parseTenantPath('/base/api/tenants')).toBeNull();
   });
 });
@@ -80,14 +82,14 @@ describe('createRoutes', () => {
     const cli = vi.fn(answer);
     const logged: string[] = [];
     const handle = createRoutes({ cache: false }, cli, (t) => logged.push(t));
-    const get = (url: string) => new Promise<{ status: number; body: string; headers: Record<string, string> }>((done) => {
+    const get = (url: string, method = 'GET') => new Promise<{ status: number; body: string; headers: Record<string, string> }>((done) => {
       const headers: Record<string, string> = {};
       const res = {
         statusCode: 200,
         setHeader: (k: string, v: string) => { headers[k.toLowerCase()] = v; },
         end(body: string) { done({ status: this.statusCode, body, headers }); },
       };
-      handle({ url, method: 'GET' } as IncomingMessage, res as unknown as ServerResponse, () => done({ status: -1, body: '', headers }));
+      handle({ url, method } as IncomingMessage, res as unknown as ServerResponse, () => done({ status: -1, body: '', headers }));
     });
     return { cli, logged, get };
   }
@@ -101,6 +103,18 @@ describe('createRoutes', () => {
     expect(await get('/api/t/weasel/area?id=--config')).toMatchObject({ status: 400 });
     expect(await get('/api/t/weasel/area?id=nope')).toMatchObject({ status: 400 });
     expect(cli.mock.calls.filter(([args]) => args[0] === 'defects')).toHaveLength(1);
+  });
+
+  it('pins or unpins an area by POST, then builds the map again before answering', async () => {
+    const { cli, get } = routesOver(async (args) => (args[0] === 'tenants' ? tenants : args[0] === 'map' ? map : ''));
+    expect(await get('/api/t/weasel/pin?id=core.ops&on=1', 'POST')).toMatchObject({ status: 200, body: '{"ok":true}' });
+    const calls = cli.mock.calls.map(([args]) => args.join(' '));
+    expect(calls.slice(calls.indexOf('pin --tenant weasel core.ops'))).toEqual(['pin --tenant weasel core.ops', 'map --tenant weasel']);
+    expect(await get('/api/t/weasel/pin?id=core.ops&on=0', 'POST')).toMatchObject({ status: 200 });
+    expect(cli).toHaveBeenCalledWith(['unpin', '--tenant', 'weasel', 'core.ops']);
+    expect(await get('/api/t/weasel/pin?id=core.ops&on=1')).toMatchObject({ status: 405 });
+    expect(await get('/api/t/weasel/pin?id=nope&on=1', 'POST')).toMatchObject({ status: 400 });
+    expect(await get('/api/t/weasel/map', 'POST')).toMatchObject({ status: 405 });
   });
 
   it('shares one defects run among the requests for an area made while it runs', async () => {

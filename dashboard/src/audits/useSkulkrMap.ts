@@ -46,6 +46,8 @@ export interface UseSkulkrMapOptions {
   /** Whether a server with the data routes can be there at all: the dev server or the preview of a build. A page
    *  hosted with neither finds out from the route's answer and says so. */
   readonly dev?: boolean;
+  /** Changing it asks again at once: after the page changed what the map shows, such as a pin. */
+  readonly asked?: number;
 }
 
 /**
@@ -54,7 +56,7 @@ export interface UseSkulkrMapOptions {
  * viewer last drew from `url`, kept in local storage, so a reload draws at once and the first answer replaces it.
  */
 export function useSkulkrMap(options: UseSkulkrMapOptions): SkulkrMapState {
-  const { url, everyMs = POLL_MS, dev = true } = options;
+  const { url, everyMs = POLL_MS, dev = true, asked = 0 } = options;
   // Another tenant's map is not this one's: state is held by url, and a url with none yet starts from its kept copy.
   const start = useMemo(() => startOf(url), [url]);
   const [held, setHeld] = useState<{ url: string | null; state: SkulkrMapState }>(() => ({ url, state: start }));
@@ -105,7 +107,7 @@ export function useSkulkrMap(options: UseSkulkrMapOptions): SkulkrMapState {
       stop();
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [url, everyMs, dev]);
+  }, [url, everyMs, dev, asked]);
   if (!dev) return { status: 'no-server' };
   return held.url === url ? held.state : start;
 }

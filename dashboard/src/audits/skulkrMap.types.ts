@@ -59,6 +59,8 @@ export interface AuditArea {
   readonly icon?: string;
   /** The round whose unmerged branch holds it, which keeps it out of the queue; absent when none does, or a live run does. */
   readonly locked?: number;
+  /** Pinned by the user (`skulkr pin`): picked ahead of every other area until it settles; absent when not. */
+  readonly pinned?: boolean;
   /** How many findings a round reported that no fixer has acted on since; absent when none. */
   readonly openFindings?: number;
   /** Those findings, oldest first, each with the round that first reported it. */

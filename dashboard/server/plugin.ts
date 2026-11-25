@@ -1,7 +1,8 @@
 /**
  * Dev-server Vite plugin serving the dashboard's data: the tenants it reads at `<base>api/tenants`, and for each,
  * the JSON `skulkr map` prints at `<base>api/t/<name>/map` and one area's defects at `<base>api/t/<name>/area?id=<area>`,
- * from `skulkr defects <area>`. It runs the pipeline's CLI in a child process, since building a map asks the runner
+ * from `skulkr defects <area>`, and a POST to `<base>api/t/<name>/pin?id=<area>&on=1|0` runs `skulkr pin|unpin <area>`
+ * and answers once the map has been built again. It runs the pipeline's CLI in a child process, since building a map asks the runner
  * for its jobs and may wait seconds on it, and the server must keep answering meanwhile; requests for one tenant's
  * map that arrive while its build runs share it.
  *
@@ -75,13 +76,16 @@ export interface KeptAnswer {
   readonly error: string | null;
 }
 
+/** A kept map's reader, and `rebuild`, which builds it again after any build already running and answers that build. */
+export type KeptMap = (() => Promise<KeptAnswer>) & { readonly rebuild: () => Promise<string> };
+
 /**
  * `build` with its last good answer kept: a request gets the kept map at once, and starts a build in the background
  * when that map is older than `freshMs`; only with nothing kept does a request wait for the build. `file` keeps the
  * map across server restarts. A failed build keeps the last good map, answered with the failure beside it until a
  * build succeeds, and fails a request only when there is none.
  */
-export function createKeptMap(build: () => Promise<string>, file: string | null, { freshMs = FRESH_MS, now = Date.now } = {}): () => Promise<KeptAnswer> {
+export function createKeptMap(build: () => Promise<string>, file: string | null, { freshMs = FRESH_MS, now = Date.now } = {}): KeptMap {
   let kept: { text: string; at: number } | null = null;
   if (file) {
     try {
@@ -113,12 +117,15 @@ export function createKeptMap(build: () => Promise<string>, file: string | null,
     });
     return building;
   };
-  return () => {
+  const read = () => {
     if (!kept) return refresh().then((text) => ({ text, error: null }));
     // A failure reaches the requests after it, as `error`.
     if (now() - kept.at > freshMs) refresh().catch(() => {});
     return Promise.resolve({ text: kept.text, error });
   };
+  // A build already running may have read the state before the change that asks for this one.
+  const rebuild = () => (building ?? Promise.resolve('')).catch(() => '').then(refresh);
+  return Object.assign(read, { rebuild });
 }
 
 /** One tenant the dashboard reads: its name, and whether the CLI names it with `--tenant` (a registered one). */
@@ -135,13 +142,13 @@ export async function listTenants(run: SkulkrRunner): Promise<DashTenant[]> {
   return [{ name: cfg.name, registered: false }];
 }
 
-/** What a tenant route asks the CLI: its map, or one area's defects; null for a tenant there is none of. */
-export function tenantArgs(tenants: readonly DashTenant[], name: string, what: 'map' | 'area', area: string | null): string[] | null {
+/** What a tenant route asks the CLI: its map, one area's defects, or to pin or unpin one; null for a tenant there is none of. */
+export function tenantArgs(tenants: readonly DashTenant[], name: string, what: 'map' | 'area' | 'pin' | 'unpin', area: string | null): string[] | null {
   const t = tenants.find((x) => x.name === name);
   if (!t) return null;
   // Options first, so an area id the CLI would read as a flag is never placed before them.
   const pick = t.registered ? ['--tenant', t.name] : [];
-  return what === 'map' ? ['map', ...pick] : ['defects', ...pick, area ?? ''];
+  return what === 'map' ? ['map', ...pick] : [what === 'area' ? 'defects' : what, ...pick, area ?? ''];
 }
 
 /** A request the routes refuse, told to the client as it is. */
@@ -172,7 +179,7 @@ export function createRoutes(options: SkulkrRunnerOptions, cli: SkulkrRunner = c
     log(`skulkr ${args.join(' ')} failed:\n${e.message}`);
     throw e;
   });
-  const maps = new Map<string, { kept: () => Promise<KeptAnswer>; ids: (text: string) => ReadonlySet<string> }>();
+  const maps = new Map<string, { kept: KeptMap; ids: (text: string) => ReadonlySet<string> }>();
   const mapOf = (tenant: string, args: readonly string[]) => {
     const key = args.join('\n');
     if (!maps.has(key)) {
@@ -199,9 +206,10 @@ export function createRoutes(options: SkulkrRunnerOptions, cli: SkulkrRunner = c
     const route = parseTenantPath(path);
     const listing = path.endsWith(`/${TENANTS_PATH}`);
     if (!route && !listing) return next();
-    if (req.method !== 'GET') {
+    const method = route?.what === 'pin' ? 'POST' : 'GET';
+    if (req.method !== method) {
       res.statusCode = 405;
-      res.end('GET only');
+      res.end(`${method} only`);
       return;
     }
     // The registry is kept like a map, so a tenant added while the server runs shows up within FRESH_MS.
@@ -213,8 +221,14 @@ export function createRoutes(options: SkulkrRunnerOptions, cli: SkulkrRunner = c
       if (!mapArgs) throw new Refusal(400, `no tenant ${tenant}; this dashboard reads ${list.map((t) => t.name).join(', ')}`);
       const map = mapOf(tenant, mapArgs);
       if (what === 'map') return map.kept();
-      const id = new URLSearchParams(query).get('id') ?? '';
+      const params = new URLSearchParams(query);
+      const id = params.get('id') ?? '';
       if (id.startsWith('-') || !map.ids((await map.kept()).text).has(id)) throw new Refusal(400, `no area ${JSON.stringify(id)} in ${tenant}`);
+      if (what === 'pin') {
+        await run(tenantArgs(list, tenant, params.get('on') === '1' ? 'pin' : 'unpin', id)!);
+        await map.kept.rebuild();
+        return JSON.stringify({ ok: true });
+      }
       const args = tenantArgs(list, tenant, 'area', id)!;
       const key = args.join('\n');
       if (!areaRuns.has(key)) areaRuns.set(key, createSharedRun(run, args));

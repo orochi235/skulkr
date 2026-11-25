@@ -109,7 +109,7 @@ function labelLines(area: AuditArea, cell: MapCell, font: string): string[] {
   const room = cell.height - 6 - (area.queue !== null ? 17 : 0);
   const label = labelIn(area.id, cell.parent);
   const perChar = textWidth(label, font, 12) / Math.max(1, label.length);
-  return wrapAtDots(label, Math.floor((cell.width - 8 - dotsRoom(pipCountOf(area.passes.length, area.locked !== undefined), cell.width)) / perChar), Math.max(1, Math.floor(room / LINE)));
+  return wrapAtDots(label, Math.floor((cell.width - 8 - dotsRoom(pipCountOf(area.passes.length, area.locked !== undefined, area.pinned ?? false), cell.width)) / perChar), Math.max(1, Math.floor(room / LINE)));
 }
 
 function cellData(
@@ -145,6 +145,7 @@ function cellData(
     ...(tone === 'settled' ? { settled: true } : {}),
     dots: area.passes.length,
     ...(area.locked !== undefined ? { locked: true } : {}),
+    ...(area.pinned ? { pinned: true } : {}),
     ...(lit ? { glow: palette.live } : {}),
     pulse: 1,
   };

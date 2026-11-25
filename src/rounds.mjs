@@ -316,13 +316,14 @@ export const areasInFlightFor = (cfg, git) => new Set(areaLocksFor(cfg, git).key
 export const rankOf = (left, stale) => Math.max(Math.round(left), stale > 0 ? 1 : 0);
 
 /**
- * Tonight's areas: never audited first, in partition order, then the due ones by `rankOf`, then most lines changed
- * since their last pass (`staleLines`, by id), then the longest since their last pass; settled areas, and areas an
- * unlanded round still holds (`inFlight`), are skipped. An area counts as never audited when its `covered` share is
- * under COVERED. `passes` is each area's history (`inheritPasses`'); `calibration` is `calibrationFor`'s over it,
- * computed when not given. Answers `{ picked, settled }`, each a list of ids.
+ * Tonight's areas: pinned ones first (`pinned`, from `pins.mjs`), then never audited, in partition order, then the due
+ * ones by `rankOf`, then most lines changed since their last pass (`staleLines`, by id), then the longest since their
+ * last pass; among the pinned, the same order. Settled areas, and areas an unlanded round still holds (`inFlight`), are
+ * skipped, pinned or not. An area counts as never audited when its `covered` share is under COVERED. `passes` is each
+ * area's history (`inheritPasses`'); `calibration` is `calibrationFor`'s over it, computed when not given. Answers
+ * `{ picked, settled, unpin }`, each a list of ids: `unpin` the pinned areas that are settled.
  */
-export const pickAreas = ({ areas, passes, touched, count, inFlight = new Set(), covered = new Map(), staleLines = new Map(), calibration = calibrationFor(passes) }) => {
+export const pickAreas = ({ areas, passes, touched, count, inFlight = new Set(), covered = new Map(), staleLines = new Map(), calibration = calibrationFor(passes), pinned = new Set() }) => {
   const settled = [];
   const fresh = [];
   const seen = [];
@@ -342,7 +343,9 @@ export const pickAreas = ({ areas, passes, touched, count, inFlight = new Set(),
     seen.push({ id: area.id, last: last.round, stale, rank: rankOf(last.leftCorrected, stale) });
   }
   seen.sort((x, y) => y.rank - x.rank || y.stale - x.stale || x.last - y.last || (x.id < y.id ? -1 : 1));
-  return { picked: [...fresh, ...seen.map((s) => s.id)].slice(0, count), settled };
+  const order = [...fresh, ...seen.map((s) => s.id)];
+  const picked = [...order.filter((id) => pinned.has(id)), ...order.filter((id) => !pinned.has(id))].slice(0, count);
+  return { picked, settled, unpin: settled.filter((id) => pinned.has(id)) };
 };
 
 /** What `churnSince` takes for `cfg`'s project at `root`: its source filter, and the cache kept under it. */

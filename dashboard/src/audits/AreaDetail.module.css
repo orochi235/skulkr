@@ -9,6 +9,24 @@
   overflow-wrap: anywhere;
 }
 
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--wzl-space-2);
+}
+
+.pin {
+  display: flex;
+  align-items: center;
+  gap: var(--wzl-space-2);
+  margin-inline-start: auto;
+}
+
+.pinError {
+  font-size: var(--wzl-font-size-sm);
+  color: var(--audit-muted);
+}
+
 .hint {
   margin: 0;
   font-size: var(--wzl-font-size-sm);

@@ -152,6 +152,19 @@ describe('pips', () => {
     expect(pipCountOf(4, true)).toBe(5);
     expect(pipCountOf(9, false)).toBe(5);
     expect(pipCountOf(10, true)).toBe(3);
+    expect(pipCountOf(10, true, true)).toBe(4);
+  });
+
+  it('give a pinned area a pin left of its dots', () => {
+    const scene = createAuditScene();
+    const areas = map.areas.map((a) => (a.id === 'geom' ? { ...a, pinned: true } : a));
+    syncAuditScene(scene, auditNodeSpecs(areas, layoutMap(areas, 900, 400), PALETTE));
+    const pinned = cellOf(scene, 'geom');
+    expect(pinned.pinned).toBe(true);
+    expect(cellOf(scene, 'core.ops').pinned).toBeUndefined();
+    const pose = { x: 0, y: 0, width: 120, height: 80 };
+    const paint = (data: AuditCellData) => AUDIT_PAINTER.paint({ data } as Parameters<typeof AUDIT_PAINTER.paint>[0], pose);
+    expect(paint(pinned).length - paint({ ...pinned, pinned: false }).length).toBe(2);
   });
 });
 

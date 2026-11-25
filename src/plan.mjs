@@ -12,6 +12,7 @@ import { nodesAt } from './config.mjs';
 import { planFixOnly } from './fixOnly.mjs';
 import { waitForLease } from './lease.mjs';
 import { partitionAt } from './partition.mjs';
+import { pinsOf, unpin } from './pins.mjs';
 import { recordsFor } from './recordFiles.mjs';
 import { areaStats, areasInFlightFor, lastPassIn, nextRound, passesIn, pickAreas, scaledOf } from './rounds.mjs';
 import { claimRound, claimedRounds, liveRuns, planLock, writeStatus } from './runs.mjs';
@@ -51,13 +52,14 @@ export const plan = (cfg, root, args) => {
     if (missing.length > 0) throw new Error(`no area named ${missing.join(', ')}; see ${cfg.partition.path}`);
     return { commit, round, picked: picked.map((id) => byId.get(id)), passes, staleLines, running, open, skipped };
   }
-  const picked = args.only
-    ? args.only.slice(0, args.areas)
+  const pins = pinsOf(cfg);
+  const { picked, unpin: settledPins } = args.only
+    ? { picked: args.only.slice(0, args.areas), unpin: [] }
     : pickAreas({
       areas, passes, covered, staleLines, touched, count: args.areas,
-      inFlight: new Set([...inFlight, ...held]),
-    }).picked;
-  return { commit, round, picked: picked.map((id) => byId.get(id)), passes, staleLines, running, open };
+      inFlight: new Set([...inFlight, ...held]), pinned: pins,
+    });
+  return { commit, round, picked: picked.map((id) => byId.get(id)), passes, staleLines, running, open, pins, settledPins };
 };
 
 /** Where a run's jobs go, for its first line. */
@@ -77,11 +79,12 @@ export const printPlan = (cfg, p, args, say) => {
     say(`jobs: ${p.picked.length} fixes, no reviews; then ${cfg.names.batch(localDate(), p.round)}`);
     return;
   }
+  for (const id of p.unpinned ?? []) say(`unpinned ${id}: settled`);
   for (const area of p.picked) {
     const last = lastPassIn(p.passes.get(area.id));
     const stale = p.staleLines?.get(area.id) ?? 0;
     const left = last && Math.round(scaledOf(last).unfound * 10) / 10;
-    say(`  ${area.id}: ${area.files.length} files${last ? `, last pass round ${last.round} (${last.distinct} distinct, ~${left} left${stale ? `; ${stale} lines changed since` : ''})` : ', never audited'}`);
+    say(`  ${area.id}${p.pins?.has(area.id) ? ' (pinned)' : ''}: ${area.files.length} files${last ? `, last pass round ${last.round} (${last.distinct} distinct, ~${left} left${stale ? `; ${stale} lines changed since` : ''})` : ', never audited'}`);
     const open = p.open?.get(area.id)?.length;
     if (open) say(`    carries ${plural(open, 'open finding')} from earlier rounds`);
     say(`    ${area.files.slice(0, 4).join(' ')}${area.files.length > 4 ? ' …' : ''}`);
@@ -89,6 +92,12 @@ export const printPlan = (cfg, p, args, say) => {
   if (cfg.sweep) say(args.sweep ? `${sweepName(cfg)}: one job at the frozen commit beside the reviews, and a fixer for what it finds` : `${sweepName(cfg)}: off (it runs only with --sweep)`);
   say(`jobs: ${p.picked.length * (args.trial ? 4 : 2)} reviews, up to ${p.picked.length * (args.trial ? 2 : 1)} matches and ${p.picked.length} fixes; then ${cfg.names.batch(localDate(), p.round)}`);
   for (const r of p.running) say(`round ${r.round} is running (pid ${r.pid}, step ${r.step}); its areas are left out above`);
+};
+
+/** Unpins the plan's pinned areas that have settled, and lists them on it as `unpinned`, for `printPlan`. */
+export const unpinSettled = (cfg, p) => {
+  p.unpinned = (p.settledPins ?? []).filter((id) => unpin(cfg, id));
+  return p;
 };
 
 /**
@@ -99,7 +108,7 @@ export const printPlan = (cfg, p, args, say) => {
 export const begin = async (cfg, root, args, say) => {
   const release = await waitForLease(planLock(cfg.state), {}, { pollMs: 1_000 });
   try {
-    const p = plan(cfg, root, args);
+    const p = unpinSettled(cfg, plan(cfg, root, args));
     if (p.picked.length === 0) {
       printPlan(cfg, p, args, say);
       return { p };

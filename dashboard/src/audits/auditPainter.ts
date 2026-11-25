@@ -4,7 +4,7 @@ import { circlePath, pathFromD, type Path } from '@weasel-js/geom';
 import { glyphCommands, type GlyphPath } from './glyph';
 import { framePadOf, iconBoxIn } from './mapLayout';
 
-/** The room one pip (a pass dot, the open circle, the padlock) takes along a cell's top edge, and between rows. */
+/** The room one pip (a pass dot, the open circle, the padlock, the pin) takes along a cell's top edge, and between rows. */
 const PIP = 6;
 
 /** The most pips a row holds, as a lane's pass dots run in fives. */
@@ -17,10 +17,10 @@ export const pipsPerRowIn = (width: number): number => Math.max(1, Math.min(PIPS
 export const passPipsOf = (passes: number): { readonly fives: number; readonly ones: number } =>
   ({ fives: Math.floor(passes / 5), ones: passes % 5 });
 
-/** The pips a cell wears, right to left: its passes' (`passPipsOf`), then the padlock. */
-export const pipCountOf = (passes: number, locked: boolean): number => {
+/** The pips a cell wears, right to left: its passes' (`passPipsOf`), then the padlock, then the pin. */
+export const pipCountOf = (passes: number, locked: boolean, pinned = false): number => {
   const { fives, ones } = passPipsOf(passes);
-  return fives + ones + (locked ? 1 : 0);
+  return fives + ones + (locked ? 1 : 0) + (pinned ? 1 : 0);
 };
 
 export interface AuditCellData {
@@ -48,6 +48,8 @@ export interface AuditCellData {
   readonly dots: number;
   /** An earlier round's unmerged branch holds it: a padlock left of the dots. */
   readonly locked?: boolean;
+  /** Pinned into every round until it settles: a pin left of the dots and padlock. */
+  readonly pinned?: boolean;
   /** A glow's color while something naming the area elsewhere on the page is hovered. */
   readonly glow?: string;
   /** The outline flashed on an area a round's recut made or split, fading as the page sets its opacity. */
@@ -145,11 +147,11 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
     const check = pathFromD(`M ${x} ${y + 4} L ${x + 3} ${y + 7} L ${x + 9} ${y}`);
     out.push({ kind: 'path', path: check, stroke: { paint: { color: d.ink, opacity: 0.8 }, width: 1.6 } });
   }
-  // Drawn right to left: filled fives, then open ones, then the padlock. A row holds what the cell's width does; the rest
+  // Drawn right to left: filled fives, then open ones, then the padlock, then the pin. A row holds what the cell's width does; the rest
   // wrap below, as long as the cell is tall enough.
   const { fives, ones } = passPipsOf(d.dots);
   const dotCount = fives + ones;
-  const pips = pipCountOf(d.dots, d.locked ?? false);
+  const pips = pipCountOf(d.dots, d.locked ?? false, d.pinned ?? false);
   const perRow = pipsPerRowIn(p.width);
   const rows = Math.ceil(pips / perRow);
   if (pips > 0 && p.width >= 10 && p.height >= 4 + rows * PIP) {
@@ -166,6 +168,11 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
       // The shackle stops short of the body, so the two read apart at this size.
       out.push({ kind: 'path', path: pathFromD(`M ${x - 2.5} ${y - 0.3} h 5 v 3.5 h -5 Z`), fill: { paint: ink } });
       out.push({ kind: 'path', path: pathFromD(`M ${x - 1.4} ${y - 1.1} V ${y - 2} A 1.4 1.4 0 0 1 ${x + 1.4} ${y - 2} V ${y - 1.1}`), stroke: { paint: ink, width: 0.9 } });
+    }
+    if (d.pinned) {
+      const { x, y } = at(dotCount + (d.locked ? 1 : 0));
+      out.push({ kind: 'path', path: circlePath(x, y - 1, 1.8, 12), fill: { paint: ink } });
+      out.push({ kind: 'path', path: pathFromD(`M ${x} ${y} V ${y + 3}`), stroke: { paint: ink, width: 0.9 } });
     }
   }
   const texts: DrawCommand[] = [];

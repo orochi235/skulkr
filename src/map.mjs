@@ -12,6 +12,7 @@ import { fleetOf } from './gate.mjs';
 import { areaIcons, iconsFor } from './icons.mjs';
 import { partitionAt } from './partition.mjs';
 import { correctedLeftOf } from './calibration.mjs';
+import { pinsOf } from './pins.mjs';
 import { COVERED, areaLocksFor, areaStats, calibrationFor, chapman, drawnPassOf, incompleteByRound, lastByRoundIn, lastDrawnPassIn, passOf, passesIn, pickAreas } from './rounds.mjs';
 import { openFindingsIn } from './carryRecords.mjs';
 import { recutsIn } from './recuts.mjs';
@@ -189,7 +190,8 @@ export const buildMap = (cfg, root, runner) => {
   const calibration = calibrationFor(passes, pairLines);
   const corrected = (p) => ({ ...p, leftCorrected: correctedLeftOf(p, calibration) });
   const locks = areaLocksFor(cfg, git);
-  const { picked, settled } = pickAreas({ areas, passes, covered, staleLines, calibration, touched, count: Infinity, inFlight: new Set(locks.keys()) });
+  const pins = pinsOf(cfg);
+  const { picked, settled } = pickAreas({ areas, passes, covered, staleLines, calibration, touched, count: Infinity, inFlight: new Set(locks.keys()), pinned: pins });
   const settledSet = new Set(settled);
   const merged = mergedIn(cfg, git);
   const runs = readRuns(cfg.state, null, { listJobs: (since) => runner.jobs(since), listProgress: () => runner.progress?.() ?? new Map(), names: cfg.names, sweepId: cfg.sweep?.id, gate: cfg.gate, fixAgent: agentFor(cfg, 'fix') })
@@ -221,6 +223,7 @@ export const buildMap = (cfg, root, runner) => {
       ...(stale ? { staleLines: stale } : {}),
       // Held by an earlier round's unmerged branch, rather than by a live run, which `status` already says.
       ...(locks.has(area.id) && !run ? { locked: locks.get(area.id) } : {}),
+      ...(pins.has(area.id) ? { pinned: true } : {}),
       ...(open.get(area.id)?.length ? { openFindings: open.get(area.id).length, open: open.get(area.id).map(({ round, claim, where }) => ({ round, claim, where })) } : {}),
       ...(icons.byArea.has(area.id) ? { icon: icons.byArea.get(area.id) } : {}),
       _raw: own,
