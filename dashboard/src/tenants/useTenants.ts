@@ -13,9 +13,34 @@ export type TenantsState =
 /** How often the list is asked for again, so a tenant registered meanwhile shows up. */
 export const TENANTS_POLL_MS = 60_000;
 
-/** The tenants the dashboard's dev server reads, from `url`, asked for again every `everyMs`. */
+const KEPT = 'skulkr-tenants:';
+
+/** The tenant names this viewer last read from `url`, so a reload names its tenant, and draws its kept map, at once. */
+function keptNamesOf(url: string): readonly string[] | null {
+  try {
+    const names: unknown = JSON.parse(localStorage.getItem(KEPT + url) ?? 'null');
+    return Array.isArray(names) && names.length && names.every((n) => typeof n === 'string') ? names : null;
+  } catch {
+    return null;
+  }
+}
+
+function keepNames(url: string, names: readonly string[]): void {
+  try {
+    localStorage.setItem(KEPT + url, JSON.stringify(names));
+  } catch {
+    // Full or refused storage costs only the instant first draw on the next load.
+  }
+}
+
+/** The tenants the dashboard's dev server reads, from `url`, asked for again every `everyMs`. It starts from the list
+ *  this viewer last read, kept in local storage, and the first answer replaces it. */
 export function useTenants({ url, dev, everyMs = TENANTS_POLL_MS }: { url: string; dev: boolean; everyMs?: number }): TenantsState {
-  const [state, setState] = useState<TenantsState>(dev ? { status: 'loading' } : { status: 'no-server' });
+  const [state, setState] = useState<TenantsState>(() => {
+    if (!dev) return { status: 'no-server' };
+    const kept = keptNamesOf(url);
+    return kept ? { status: 'ready', names: kept } : { status: 'loading' };
+  });
   useEffect(() => {
     if (!dev) return;
     let live = true;
@@ -32,6 +57,7 @@ export function useTenants({ url, dev, everyMs = TENANTS_POLL_MS }: { url: strin
         if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
         const list = (await res.json()) as { name: string }[];
         const names = list.map((t) => t.name);
+        keepNames(url, names);
         if (live) setState((was) => (was.status === 'ready' && was.names.join('\n') === names.join('\n') ? was : { status: 'ready', names }));
       } catch (e) {
         if (live) setState((was) => (was.status === 'ready' ? was : { status: 'failed', error: (e as Error).message }));

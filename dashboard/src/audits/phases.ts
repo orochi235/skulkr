@@ -115,6 +115,11 @@ export function stageCountsOf(lanes: readonly AuditLane[]): { done: number; tota
 
 /** What a fix job prints once its model has finished and its hand-back verify starts (`src/jobs.mjs`). */
 const HAND_BACK_VERIFY = "verifying the fixer's commits";
+/** The line a job writes once it hands a verify to the fleet: the fixer is done by then, as at {@link HAND_BACK_VERIFY}. */
+const ON_FLEET = /^on the fleet as /;
+
+/** Whether a running fix job's latest line says its model is done and its verify has begun. */
+const handedBack = (now = '') => now === HAND_BACK_VERIFY || ON_FLEET.test(now);
 
 /** How many model agents a round's lanes have running: its reviewers, matchers, fixers until their hand-back verify,
  *  and repairs; a verify job runs the project's checks, not a model. */
@@ -122,7 +127,7 @@ export function agentsRunningIn(lanes: readonly AuditLane[]): number {
   let n = 0;
   for (const { steps } of lanes) {
     for (const step of ['A', 'B', 'match'] as const) if (steps[step].state === 'running') n += 1;
-    if (steps.fix.state === 'running' && steps.fix.now?.text !== HAND_BACK_VERIFY) n += 1;
+    if (steps.fix.state === 'running' && !handedBack(steps.fix.now?.text)) n += 1;
     if (steps.repair?.state === 'running' && steps.repair.job === 'repair') n += 1;
   }
   return n;

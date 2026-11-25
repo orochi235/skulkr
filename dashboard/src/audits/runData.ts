@@ -1,18 +1,22 @@
 /** What the audit page says about runs: each one's headline, its lanes, and the jobs its log reports. */
 import type { AuditContinuous, AuditLeftOut, AuditRun, LaneStep, LaneStepKey } from './skulkrMap.types';
 
-/**
- * `m` minutes as a lane says them, `<1 min`, `8.2 min` or `12 min`, a tenth shown under ten. Spelled out: the lanes
- * set their labels in capitals, where `8.2m` reads as 8.2 million.
- */
+/** `m` minutes as a lane says them, `m:ss`, or `h:mm:ss` from an hour up. */
 export function minutesText(m: number): string {
-  return m < 1 ? '<1 min' : m < 10 ? `${m.toFixed(1)} min` : `${Math.round(m)} min`;
+  const total = Math.max(0, Math.round(m * 60));
+  const two = (n: number) => String(n).padStart(2, '0');
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor(total / 60) % 60;
+  return hours ? `${hours}:${two(minutes)}:${two(total % 60)}` : `${minutes}:${two(total % 60)}`;
 }
+
+/** A label's closing duration, as {@link minutesText} writes it, with the separator before it. */
+export const TRAILING_MINUTES = /(?: · )?(\d+(?::\d\d){1,2})$/;
 
 /** Minutes since `iso`, as {@link minutesText} says them. */
 export const minutesSince = (iso: string, now: number): string => minutesText(Math.max(0, (now - new Date(iso).getTime()) / 60_000));
 
-const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
+export const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 
 /** What one step of an area's lane shows. */
 /** Between a running step's node and how long it has run, in its label. */
@@ -24,16 +28,29 @@ export const FAIL = '✗';
 export const PASSED = `${PASS} passed`;
 export const FAILED = `${FAIL} failed`;
 
+/** The least a lane shows a duration for: a step that took less says only what it did. */
+const SHOWN_MINUTES = 10 / 60;
+
+/** `text`, then `minutes` as {@link minutesText} says them where they reach {@link SHOWN_MINUTES}. */
+const withMinutes = (text: string, minutes: number | null): string =>
+  minutes !== null && Number.isFinite(minutes) && minutes >= SHOWN_MINUTES ? [text, minutesText(minutes)].filter(Boolean).join(NODE_SEP) : text;
+
 export function stepText(step: LaneStepKey, s: LaneStep, now: number): string {
   if (s.state === 'running') {
-    const count = s.total ? `${s.done ?? 0}/${s.total} · ` : '';
-    return `${s.node ?? ''}${NODE_SEP}${count}${s.since ? minutesSince(s.since, now) : 'running'}`;
+    // A fixer's count is its commits; once all are made it says them as a finished fix does, through its checks.
+    const count = !s.total ? '' : step !== 'fix' ? `${s.done ?? 0}/${s.total}`
+      : (s.done ?? 0) >= s.total ? plural(s.total, 'commit') : `${s.done ?? 0}/${s.total} commits`;
+    const ran = s.since ? Math.max(0, (now - Date.parse(s.since)) / 60_000) : null;
+    return withMinutes([s.node ?? '', count].filter(Boolean).join(NODE_SEP), ran) || `${s.node ?? ''}${NODE_SEP}running`;
   }
   if (s.state === 'failed') return s.why ?? 'failed';
   if (s.state !== 'done') return step === 'patch' ? 'after fix' : 'waiting';
-  if (step === 'A' || step === 'B') return `${s.findings ?? 0} found · ${minutesText(s.minutes ?? 0)}`;
-  if (step === 'match') return matchText(s.shared ?? 0, s.a ?? 0, s.b ?? 0);
-  if (step === 'fix') return `${plural(s.commits ?? 0, 'commit')} · ${minutesText(s.minutes ?? 0)}`;
+  if (step === 'A' || step === 'B') return withMinutes(`${s.findings ?? 0} found`, s.minutes ?? null);
+  if (step === 'match') {
+    const took = s.minutes ?? (s.started && s.ended ? (Date.parse(s.ended) - Date.parse(s.started)) / 60_000 : null);
+    return withMinutes(matchText(s.shared ?? 0, s.a ?? 0, s.b ?? 0), took);
+  }
+  if (step === 'fix') return withMinutes(plural(s.commits ?? 0, 'commit'), s.minutes ?? null);
   if (step === 'repair') return s.outcome === 'timed out' ? 'timed out' : s.attempts ? `${plural(s.attempts, 'repair')} · ${PASSED}` : PASSED;
   return `${s.commits ?? 0} applied${s.resolved ? ` · ${s.resolved}` : ''}`;
 }

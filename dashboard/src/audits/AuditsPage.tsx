@@ -9,6 +9,9 @@ import { JobsFeed } from './JobsFeed';
 import { LaneViewControls, LiveRuns, useLaneView, type LaneSettings } from './LiveRuns';
 import { Stats } from './Stats';
 import { TopTabs } from './TopTabs';
+import { BottomTabs } from './BottomTabs';
+import { Issues } from './Issues';
+import { LogTabs } from './LogTabs';
 import { Treemap } from './Treemap';
 import { RoundPicker } from './RoundPicker';
 import { areasAsOf, bothIn, matchingIn, pastRoundsOf, roundScopeIn } from './asOf';
@@ -23,7 +26,7 @@ import { liveEstimatesOf, phasesOf, withLivePasses, type AuditPhase } from './ph
 import { continuousText } from './runData';
 import { useAuditPalette } from './useAuditPalette';
 import { useSkulkrMap } from './useSkulkrMap';
-import { SNAPSHOT, areaUrlFor, mapUrl, pinUrlFor, tenantsUrl } from '@dash/dataSource';
+import { SNAPSHOT, areaUrlFor, logUrlFor, mapUrl, pinUrlFor, tailUrlFor, tenantsUrl } from '@dash/dataSource';
 import { AppTitle } from '@dash/AppTitle';
 import { TenantTitle } from '@dash/tenants/TenantTitle';
 import { titleFor } from '@dash/title';
@@ -31,7 +34,7 @@ import { useTenantChoice, useTenants } from '@dash/tenants/useTenants';
 import { readSize, useViewerPref } from './viewerPref';
 import { useDashPref } from './dashPrefs';
 import { heatStopsOf } from './heatSchemes';
-import { PrefsButton } from './PrefsButton';
+import { LoupeButton, PrefsButton } from './PrefsButton';
 import type { SkulkrMap } from './skulkrMap.types';
 import palette from './palette.module.css';
 import s from './AuditsPage.module.css';
@@ -41,6 +44,9 @@ const ASIDE = { key: 'aside', min: 240, max: 560, initial: 300 } as const;
 const TOP = { key: 'top', min: 80, max: 900, initial: 260 } as const;
 const TABS = { key: 'tabs', min: 200, max: 720, initial: 300 } as const;
 const JOBS = { key: 'jobs', min: 80, max: 900, initial: 220 } as const;
+/** The bottom pane's first two panels, the jobs feed and the queue's tabs; the third takes what they leave. */
+const FEED = { key: 'feed', min: 240, max: 1400, initial: 560 } as const;
+const QUEUE = { key: 'queue', min: 200, max: 900, initial: 340 } as const;
 
 /** A pane's size the viewer dragged it to, kept between visits. */
 const usePaneSize = ({ key, initial }: { key: string; initial: number }) => useViewerPref(key, initial, readSize);
@@ -85,7 +91,9 @@ export const createPinArea = (urlOf: (id: string, on: boolean) => string, done: 
   done();
 };
 
-function Chart({ map, areaUrl, view, asOf, pinArea }: { map: SkulkrMap; areaUrl: (id: string) => string; view: LaneSettings; asOf: AsOf; pinArea?: PinArea | undefined }) {
+function Chart({ map, areaUrl, tailUrl = null, logUrl = null, view, asOf, pinArea }: {
+  map: SkulkrMap; areaUrl: (id: string) => string; tailUrl?: ((id: string) => string) | null; logUrl?: string | null; view: LaneSettings; asOf: AsOf; pinArea?: PinArea | undefined;
+}) {
   const [scene] = useState(createAuditScene);
   const selection = useSelection({ scene, mode: 'single' });
   const [hovered, setHovered] = useState<string | null>(null);
@@ -100,6 +108,8 @@ function Chart({ map, areaUrl, view, asOf, pinArea }: { map: SkulkrMap; areaUrl:
   const [topHeight, setTopHeight, keepTop] = usePaneSize(TOP);
   const [tabsWidth, setTabsWidth, keepTabs] = usePaneSize(TABS);
   const [jobsHeight, setJobsHeight, keepJobs] = usePaneSize(JOBS);
+  const [feedWidth, setFeedWidth, keepFeed] = usePaneSize(FEED);
+  const [queueWidth, setQueueWidth, keepQueue] = usePaneSize(QUEUE);
   const mainRef = useRef<HTMLDivElement>(null);
   // The sizes are read by the page's root, which holds every pane.
   useLayoutEffect(() => {
@@ -108,13 +118,17 @@ function Chart({ map, areaUrl, view, asOf, pinArea }: { map: SkulkrMap; areaUrl:
     root?.style.setProperty('--audit-top-height', `${topHeight}px`);
     root?.style.setProperty('--audit-jobs-height', `${jobsHeight}px`);
     root?.style.setProperty('--audit-tabs-width', `${tabsWidth}px`);
-  }, [asideWidth, topHeight, jobsHeight, tabsWidth]);
+    root?.style.setProperty('--audit-feed-width', `${feedWidth}px`);
+    root?.style.setProperty('--audit-queue-width', `${queueWidth}px`);
+  }, [asideWidth, topHeight, jobsHeight, tabsWidth, feedWidth, queueWidth]);
 
   const picked = selection.current[0] ?? null;
   const shownId = hovered ?? picked;
   const areas = useMemo(() => withLivePasses(map.areas, map.runs), [map.areas, map.runs]);
   const passCounts = useMemo(() => new Map(areas.map((a) => [a.id, roundCountOf(a)])), [areas]);
   const fileCounts = useMemo(() => new Map(areas.map((a) => [a.id, a.files])), [areas]);
+  const pinnedIds = useMemo(() => new Set(areas.filter((a) => a.pinned).map((a) => a.id)), [areas]);
+  const lockedIds = useMemo(() => new Set(areas.filter((a) => a.locked !== undefined).map((a) => a.id)), [areas]);
   const pastRounds = useMemo(() => pastRoundsOf(map), [map]);
   const past = asOf.round !== null && pastRounds.includes(asOf.round) ? asOf.round : null;
   const shown = useMemo(() => (past === null ? areas : areasAsOf(map.areas, past)), [areas, map.areas, past]);
@@ -149,12 +163,9 @@ function Chart({ map, areaUrl, view, asOf, pinArea }: { map: SkulkrMap; areaUrl:
     <>
       {probes}
       <div className={s.top}>
-        <div className={s.runs}><LiveRuns runs={map.runs} leftOut={map.leftOut} unmerged={unmerged} now={Date.parse(map.generated)} on={on} view={view} focus={picked} passes={passCounts} files={fileCounts} /></div>
+        <div className={s.runs}><LiveRuns runs={map.runs} tailUrl={tailUrl} leftOut={map.leftOut} unmerged={unmerged} now={Date.parse(map.generated)} on={on} view={view} focus={picked} passes={passCounts} files={fileCounts} pinned={pinnedIds} locked={lockedIds} /></div>
         <ResizeHandle className={s.vseam} value={tabsWidth} min={TABS.min} max={TABS.max} invert onInput={setTabsWidth} onChange={keepTabs} aria-label="Resize the rounds and queue tabs" />
-        <TopTabs
-          rounds={map.rounds} calibration={map.calibration} area={pickedArea} areas={areas} heatOf={heatOf} next={next}
-          nextNote={past === null ? undefined : `The queue now, not after round ${past}.`} onPick={pick} onLight={setLit}
-        />
+        <TopTabs rounds={map.rounds} calibration={map.calibration} area={pickedArea} areas={areas} heatOf={heatOf} />
       </div>
       <ResizeHandle
         className={s.seam} orientation="horizontal" value={topHeight} min={TOP.min} max={TOP.max}
@@ -165,7 +176,7 @@ function Chart({ map, areaUrl, view, asOf, pinArea }: { map: SkulkrMap; areaUrl:
         <Treemap
           scene={scene} selection={selection} areas={shown} palette={colors} phases={past === null ? phases : NO_PHASES}
           {...(past === null ? { estimates } : {})} onHover={setHovered} lit={lit} areasPerRound={map.areasPerRound} glyphs={map.icons}
-          asOf={past} inColor={inColor} heat={heat} recut={recut} header={pastRounds.length ? <RoundPicker rounds={pastRounds} value={past} onChange={asOf.choose} onlyRound={onlyRound} onOnlyRound={setOnlyRound} /> : null}
+          asOf={past} inColor={inColor} heat={heat} recut={recut} thermal={themed.depth} header={pastRounds.length ? <RoundPicker rounds={pastRounds} value={past} onChange={asOf.choose} onlyRound={onlyRound} onOnlyRound={setOnlyRound} /> : null}
         />
         <ResizeHandle value={asideWidth} min={ASIDE.min} max={ASIDE.max} invert onInput={setAsideWidth} onChange={keepAside} aria-label="Resize the side panel" />
         <aside className={s.aside} aria-label="Area">
@@ -188,7 +199,19 @@ function Chart({ map, areaUrl, view, asOf, pinArea }: { map: SkulkrMap; areaUrl:
         className={s.seam} orientation="horizontal" invert value={jobsHeight} min={JOBS.min} max={JOBS.max}
         onInput={setJobsHeight} onChange={keepJobs} aria-label="Resize the jobs feed"
       />
-      <div className={s.jobs}><JobsFeed runs={map.runs} onLight={setLit} /></div>
+      <div className={s.jobs}>
+        <div className={s.jobsFeed}><JobsFeed runs={map.runs} onLight={setLit} /></div>
+        <ResizeHandle className={s.vseam} value={feedWidth} min={FEED.min} max={FEED.max} onInput={setFeedWidth} onChange={keepFeed} aria-label="Resize the jobs feed's width" />
+        <BottomTabs
+          areas={areas} next={next} nextNote={past === null ? undefined : `The queue now, not after round ${past}.`}
+          onPick={pick} onLight={setLit} onPin={pinArea}
+        />
+        <ResizeHandle className={s.vseam} value={queueWidth} min={QUEUE.min} max={QUEUE.max} onInput={setQueueWidth} onChange={keepQueue} aria-label="Resize the queue's width" />
+        <LogTabs
+          logUrl={logUrl}
+          issues={<Issues areas={areas} runs={map.runs.filter((r) => r.running || unmerged.has(r.round))} leftOut={map.leftOut ?? []} onPick={pick} onLight={setLit} />}
+        />
+      </div>
     </>
   );
 }
@@ -233,6 +256,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
   const header = map ? (
     <>
       <LaneViewControls view={view} />
+      <LoupeButton />
       <PrefsButton />
       {continuous && <span className={s.continuous} title={map.continuous?.next}>{continuous}</span>}
       <span className={stale === null ? s.stamp : `${s.stamp} ${s.stale}`}>{stampOf(map, stale)}</span>
@@ -264,7 +288,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
         {state.status === 'ready' && tenant !== null && (
           <>
             {state.error && <p className={`${s.note} ${s.stale}`}>The last refresh failed ({state.error}); showing the map before it.</p>}
-            <Chart key={tenant} map={state.map} areaUrl={areaUrlFor(base, tenant)} view={view} asOf={{ round: asOfRound, choose: chooseAsOf }} pinArea={pinArea} />
+            <Chart key={tenant} map={state.map} areaUrl={areaUrlFor(base, tenant)} tailUrl={tailUrlFor(base, tenant)} logUrl={logUrlFor(base, tenant)} view={view} asOf={{ round: asOfRound, choose: chooseAsOf }} pinArea={pinArea} />
           </>
         )}
         <p className={s.foot}>

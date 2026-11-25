@@ -1,5 +1,5 @@
 import { InlineMarkdown } from '@weasel-js/ui/components/InlineMarkdown';
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Checkbox } from '@weasel-js/ui/components/Checkbox';
 import { SegmentedBar } from '@weasel-js/ui/components/Segmented';
 import { SpanStrips, type SpanStripSpan, type SpanStripsRow } from '@weasel-js/ui/components/SpanStrip';
@@ -10,11 +10,13 @@ import { laneViewOf, runClockOf, type LaneView } from './clockLane';
 import { agentsRunningIn, passDone, STAGE_LABEL, phaseClass, stageCountsOf, BRIGHT_FILLS } from './phases';
 import { Icon } from '@weasel-js/ui/components/Icon';
 import { icon } from '@dash/icons.gen';
-import { STEP_COLUMN_COUNT, filesText, laneStepsOf } from './stepsLane';
+import { STEP_COLUMN_COUNT, laneStepsOf } from './stepsLane';
 import { passPipsOf } from './auditPainter';
 import { gateRunsOf, inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
-import { FAIL, NODE_SEP, PASS, elapsedText, headlineOf, lastLineOf, spendOf, startedText } from './runData';
+import { FAIL, NODE_SEP, PASS, TRAILING_MINUTES, elapsedText, headlineOf, lastLineOf, spendOf, startedText } from './runData';
 import { useDashPref } from './dashPrefs';
+import { JobTail } from './JobTail';
+import { LockMark, PinMark } from './Marks';
 import type { AuditLane, AuditLeftOut, AuditRun } from './skulkrMap.types';
 import s from './LiveRuns.module.css';
 
@@ -35,18 +37,19 @@ const MARKS = new RegExp(`[${PASS}${FAIL}]`);
 const MARK_SPLIT = new RegExp(`([${PASS}${FAIL}])`);
 
 /** A span's caption as the lane draws it: a running one with its node's name marked, so the name alone pulses (the
- *  label up to its separator, or all of it where it has none); a lane's first step, given its area's `files`, leading
- *  with their count and the page icon in place of the word; and any pass or fail mark in its own font. The label keeps
- *  the words for the tooltip and screen readers. */
-function withNode(span: SpanStripSpan, files?: number): SpanStripSpan {
-  const lead = span.id === 'A' && files !== undefined && span.label.startsWith(filesText(files)) ? filesText(files) : '';
-  const rest = span.label.slice(lead.length).replace(/^ · /, '');
-  const mark = lead ? <>{files}<Icon name={icon('ui:page')} size={11} className={s.page} />{rest ? ' · ' : ''}</> : null;
+ *  label up to its separator, or all of it where it has none); its closing duration set at its right edge; and any pass
+ *  or fail mark in its own font. The label keeps the words for the tooltip and screen readers. */
+function withNode(span: SpanStripSpan): SpanStripSpan {
+  const minutes = TRAILING_MINUTES.exec(span.label);
+  const rest = minutes ? span.label.slice(0, minutes.index) : span.label;
+  const clock = minutes ? <span className={s.minutes}>{minutes[1]}</span> : null;
   const at = rest.indexOf(NODE_SEP);
-  if (span.state !== 'active' || rest === '' || at === 0) return mark || MARKS.test(rest) ? { ...span, content: <>{mark}{withMarks(rest)}</> } : span;
+  if (span.state !== 'active' || rest === '' || at === 0) {
+    return clock || MARKS.test(rest) ? { ...span, content: <>{clock}{withMarks(rest)}</> } : span;
+  }
   const end = at === -1 ? rest.length : at;
   const node = span.color && BRIGHT_FILLS.has(span.color) ? `${s.node} ${s.onBright}` : s.node;
-  return { ...span, content: <>{mark}<span className={node}>{rest.slice(0, end)}</span>{withMarks(rest.slice(end))}</> };
+  return { ...span, content: <>{clock}<span className={node}>{rest.slice(0, end)}</span>{withMarks(rest.slice(end))}</> };
 }
 
 /** The capstone's runs that have failed, each with what it failed, in the shared lane's order. */
@@ -98,10 +101,11 @@ export const dotsWidthFor = (passes: number): number => {
 };
 
 /** An area's lane as a stack row: its name, and `spans`, its steps in the view chosen. */
-function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanStripSpan[], passes: number, files?: number): SpanStripsRow {
+function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanStripSpan[], passes: number, files?: number, tracks = 1, pinned = false, locked = false): SpanStripsRow {
   return {
     id: lane.id,
-    spans: spans.map((span) => withNode(span, files)),
+    ...(tracks > 1 ? { className: s.twoTracks } : {}),
+    spans: spans.map((span) => withNode(span)),
     'aria-label': lane.id,
     valueText: view.elapsed ? `${view.phase}, ${view.elapsed} in` : view.phase,
     lead: (
@@ -109,8 +113,15 @@ function laneRow(lane: AuditLane, view: LaneView, on: AreaHandlers, spans: SpanS
         type="button" className={s.name} data-lane={lane.id} onClick={(e) => { e.stopPropagation(); on.onPick(lane.id); }}
         onPointerEnter={() => on.onLight(lane.id)} onPointerLeave={() => on.onLight(null)} onFocus={() => on.onLight(lane.id)} onBlur={() => on.onLight(null)}
       >
+        {pinned && <PinMark className={s.nameMark} label="pinned" />}
+        {locked && <LockMark className={s.nameMark} label="held by an unmerged round" />}
         <span className={s.nameText}>{lane.id}</span>
         <PassDots passes={passes} />
+        {files !== undefined && (
+          <span className={s.files} title={`${files} source ${files === 1 ? 'file' : 'files'}`} aria-hidden="true">
+            {files}<Icon name={icon('ui:page')} size={11} className={s.page} />
+          </span>
+        )}
       </button>
     ),
   };
@@ -149,15 +160,25 @@ const SHARED_WINDOW = { from: 0, to: 2 };
 
 /** The run's areas, on the run's clock or as a grid of steps; a finished one stays, filled, until the run ends, unless
  *  the viewer hides those whose pass is done, as the map shows them. */
-function Lanes({ run, now, mode, hideComplete, on, passes, files }: {
+function Lanes({ run, now, mode, hideComplete, on, passes, files, pinned, locked, tailUrl }: {
   run: AuditRun; now: number; mode: LaneMode; hideComplete: boolean; on: AreaHandlers; passes: ReadonlyMap<string, number>; files: ReadonlyMap<string, number>;
+  pinned: ReadonlySet<string>; locked: ReadonlySet<string>;
+  /** Where a lane's job log is read, for the callout hovering it shows; null where none can be. */
+  tailUrl: ((id: string) => string) | null;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Resting on a lane opens its job log beside the pointer; moving to another lane, or off them, closes it.
+  const [callout, setCallout] = useState<{ id: string; x: number; y: number } | null>(null);
+  const waiting = useRef<{ id: string; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const stopWaiting = () => { if (waiting.current) clearTimeout(waiting.current.timer); waiting.current = null; };
+  useEffect(() => stopWaiting, []);
   const clock = runClockOf(run, now);
   const lanes = run.lanes.map((lane) => ({ lane, view: laneViewOf(lane, now, clock.from) })).filter(({ lane }) => !hideComplete || !passDone(lane));
   const widest = Math.max(0, ...run.lanes.map((l) => l.id.length));
   useLayoutEffect(() => { ref.current?.style.setProperty('--audit-lead-ch', String(widest)); }, [widest]);
-  const dotsPx = dotsWidthFor(Math.max(0, ...run.lanes.map((l) => passes.get(l.id) ?? 0)));
+  // A lane's pin and padlock sit before its name, so the column makes room for as many as a lane has.
+  const marks = Math.max(0, ...run.lanes.map((l) => Number(pinned.has(l.id)) + Number(locked.has(l.id))));
+  const dotsPx = dotsWidthFor(Math.max(0, ...run.lanes.map((l) => passes.get(l.id) ?? 0))) + marks * MARK_PX;
   useLayoutEffect(() => { ref.current?.style.setProperty('--audit-dots-px', `${dotsPx}px`); }, [dotsPx]);
   // A label's element is remade whenever its text changes, restarting its pulse; one shared start keeps every pulse in step.
   useLayoutEffect(() => {
@@ -166,7 +187,7 @@ function Lanes({ run, now, mode, hideComplete, on, passes, files }: {
     }
   });
   if (lanes.length === 0) return null;
-  const rows = lanes.map(({ lane, view }) => laneRow(lane, view, on, mode === 'steps' ? laneStepsOf(lane, now, files.get(lane.id)) : view.spans, passes.get(lane.id) ?? 0, mode === 'steps' ? files.get(lane.id) : undefined));
+  const rows = lanes.map(({ lane, view }) => laneRow(lane, view, on, mode === 'steps' ? laneStepsOf(lane, now) : view.spans, passes.get(lane.id) ?? 0, files.get(lane.id), mode === 'clock' ? view.tracks : 1, pinned.has(lane.id), locked.has(lane.id)));
   // Anywhere on a lane picks and lights its area, as its name does; the name stays the keyboard's way in.
   const areaAt = (target: EventTarget) => {
     const row = target instanceof Element ? target.closest('[role="listitem"]') : null;
@@ -177,11 +198,23 @@ function Lanes({ run, now, mode, hideComplete, on, passes, files }: {
     <div
       ref={ref} className={s.lanesHit}
       onClick={(e) => { const id = areaAt(e.target); if (id) on.onPick(id); }}
-      onPointerOver={(e) => on.onLight(areaAt(e.target))} onPointerLeave={() => on.onLight(null)}
+      onPointerOver={(e) => on.onLight(areaAt(e.target))}
+      onPointerMove={(e) => {
+        if (!tailUrl) return;
+        const id = areaAt(e.target);
+        if (id === (callout?.id ?? null) || (id !== null && waiting.current?.id === id)) return;
+        stopWaiting();
+        setCallout(null);
+        if (!id) return;
+        const { clientX: x, clientY: y } = e;
+        waiting.current = { id, timer: setTimeout(() => { waiting.current = null; setCallout({ id, x, y }); }, CALLOUT_DELAY_MS) };
+      }}
+      onPointerLeave={() => { on.onLight(null); stopWaiting(); setCallout(null); }}
     >
       {mode === 'clock'
-        ? <SpanStrips aria-label={`Round ${run.round} lanes`} window={clock} at={now} ruler={clockRuler(clock.from)} rows={rows} />
+        ? <SpanStrips className={s.laneStack} aria-label={`Round ${run.round} lanes`} window={clock} at={now} ruler={clockRuler(clock.from)} rows={rows} />
         : <SpanStrips aria-label={`Round ${run.round} lanes`} window={{ from: 0, to: STEP_COLUMN_COUNT }} rows={rows} />}
+      {callout && tailUrl && <JobTail id={callout.id} url={tailUrl(callout.id)} now={now} at={callout} />}
     </div>
   );
 }
@@ -203,8 +236,9 @@ function StageCounts({ run }: { run: AuditRun }) {
 
 /** One run's strip: what it is doing and what it has spent, its last line, what its batch left out, and a lane per
  *  area in flight. */
-function RunStrip({ run, now, mode, hideComplete, on, passes, files }: {
+function RunStrip({ run, now, mode, hideComplete, on, passes, files, tailUrl, pinned, locked }: {
   run: AuditRun; now: number; mode: LaneMode; hideComplete: boolean; on: AreaHandlers; passes: ReadonlyMap<string, number>; files: ReadonlyMap<string, number>;
+  tailUrl: ((id: string) => string) | null; pinned: ReadonlySet<string>; locked: ReadonlySet<string>;
 }) {
   return (
     <section className={cx(s.run, !run.running && s.idle)} aria-label={`Round ${run.round}`}>
@@ -212,7 +246,12 @@ function RunStrip({ run, now, mode, hideComplete, on, passes, files }: {
         <div className={s.pulse} aria-hidden="true" />
         <div className={s.what}>
           <span>{headlineOf(run)}</span>
-          {run.started && <span className={s.started}>{[startedText(run.started, now), elapsedText(run, now)].filter(Boolean).join(' • ')}</span>}
+          {run.started && (
+            <span className={s.started}>
+              {startedText(run.started, now)}
+              {elapsedText(run, now) && <> • <span className={s.elapsed}>{elapsedText(run, now)}</span></>}
+            </span>
+          )}
         </div>
         {run.lanes.length > 0 ? <StageCounts run={run} /> : <span />}
         <div className={s.line} title={lastLineOf(run)}><InlineMarkdown text={lastLineOf(run)} /></div>
@@ -222,7 +261,7 @@ function RunStrip({ run, now, mode, hideComplete, on, passes, files }: {
       <LeftOut entries={(run.leftOut ?? []).filter((e) => e.round === run.round)} label="left out" name={`Round ${run.round}, left out of the batch`} on={on} />
       {run.lanes.length > 0 && (
         <div className={s.lanes} data-mode={mode}>
-          <Lanes run={run} now={now} mode={mode} hideComplete={hideComplete} on={on} passes={passes} files={files} />
+          <Lanes run={run} now={now} mode={mode} hideComplete={hideComplete} on={on} passes={passes} files={files} pinned={pinned} locked={locked} tailUrl={run.running ? tailUrl : null} />
           {(inSharedSteps(run) || run.lanes.every(passDone)) && (
             <SpanStrips
               aria-label={`Round ${run.round}, every area`} window={SHARED_WINDOW}
@@ -247,17 +286,29 @@ function RunStrip({ run, now, mode, hideComplete, on, passes, files }: {
   );
 }
 
+
 /** A strip for every run still running, and for every finished one whose batch has not merged; a merged round lives on
  *  in the rounds chart and the map. */
 const NO_PASSES: ReadonlyMap<string, number> = new Map();
+const NO_MARKS: ReadonlySet<string> = new Set();
+/** How long the pointer rests on a lane before its job log opens beside it. */
+const CALLOUT_DELAY_MS = 350;
+/** The room a lane name's pin or padlock takes, with its gap: an 11px icon. */
+const MARK_PX = 15;
 
-export function LiveRuns({ runs, unmerged, now, on, view, focus = null, passes = NO_PASSES, files = NO_PASSES, leftOut = [] }: {
+export function LiveRuns({ runs, unmerged, now, on, view, focus = null, passes = NO_PASSES, files = NO_PASSES, leftOut = [], tailUrl = null, pinned = NO_MARKS, locked = NO_MARKS }: {
   runs: readonly AuditRun[]; unmerged: ReadonlySet<number>; now: number; on: AreaHandlers;
+  /** The areas pinned into every round, each lane's name marked with a pin. */
+  pinned?: ReadonlySet<string>;
+  /** The areas an unmerged round's branch holds, each lane's name marked with a padlock. */
+  locked?: ReadonlySet<string>;
+  /** Where an area's job log is read, for the running round's tail; null where none can be. */
+  tailUrl?: ((id: string) => string) | null;
   /** Branches earlier batches left out that later ones still try (the map's `leftOut`). */
   leftOut?: readonly AuditLeftOut[];
   /** How many passes each area has had, by id, for the dots on its lane as on its map cell. */
   passes?: ReadonlyMap<string, number>;
-  /** How many source files each area holds, by id, for the first step of its lane in the steps view. */
+  /** How many source files each area holds, by id, after its lane's name and dots. */
   files?: ReadonlyMap<string, number>;
   /** How every round's lanes are drawn; the page holds it, and its controls, so one setting covers them all. */
   view: LaneSettings;
@@ -275,7 +326,7 @@ export function LiveRuns({ runs, unmerged, now, on, view, focus = null, passes =
   if (live.length === 0) return <section className={cx(s.run, s.idle)}><div className={s.what}>No round running</div>{earlier}</section>;
   return (
     <div ref={root} className={s.runs} aria-live="polite">
-      {live.map((run) => <RunStrip key={run.round} run={run} now={now} mode={view.mode} hideComplete={view.hideComplete} on={on} passes={passes} files={files} />)}
+      {live.map((run) => <RunStrip key={run.round} run={run} now={now} mode={view.mode} hideComplete={view.hideComplete} on={on} passes={passes} files={files} tailUrl={tailUrl} pinned={pinned} locked={locked} />)}
       {earlier}
     </div>
   );

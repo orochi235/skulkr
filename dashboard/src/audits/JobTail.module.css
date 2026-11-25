@@ -1,0 +1,30 @@
+.tail {
+  position: fixed;
+  z-index: 20;
+  /* Beside the pointer, below and right of it, held inside the window. */
+  left: clamp(8px, calc(var(--x, 0px) + 14px), calc(100vw - var(--tail-width) - 8px));
+  top: calc(var(--y, 0px) + 18px);
+  --tail-width: min(620px, calc(100vw - 16px));
+  width: var(--tail-width);
+  padding: var(--wzl-space-2) var(--wzl-space-3);
+  border: 1px solid var(--audit-rule);
+  border-radius: 6px;
+  background: var(--audit-panel);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.28);
+  pointer-events: none;
+}
+.head { display: flex; gap: var(--wzl-space-3); align-items: baseline; font-size: var(--wzl-font-size-xs); }
+.area { font-weight: var(--wzl-font-weight-bold); }
+.file { color: var(--wzl-fg-muted); }
+.age { composes: numeric from '@weasel-js/theme/numeric.module.css'; margin-inline-start: auto; color: var(--wzl-fg-muted); }
+.body {
+  margin: var(--wzl-space-1) 0 0;
+  max-height: 11lh;
+  overflow: auto;
+  font-family: var(--wzl-font-mono, ui-monospace, monospace);
+  font-size: var(--wzl-font-size-2xs);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--wzl-fg);
+}

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { usePrefsState } from '@weasel-js/prefs/react';
 import { Button } from '@weasel-js/ui/components/Button';
+import { Icon } from '@weasel-js/ui/components/Icon';
+import { icon } from '@dash/icons.gen';
 import { PrefsDialog } from '@weasel-js/ui/components/Prefs';
-import { useDashPrefs } from './dashPrefs';
+import { useDashPref, useDashPrefs } from './dashPrefs';
 
 /** Whether `e` is the prefs shortcut: Cmd+comma, or Ctrl+comma off a Mac. */
 export const isPrefsShortcut = (e: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>): boolean =>
@@ -23,11 +25,23 @@ export function PrefsButton() {
   }, []);
   return (
     <>
-      <Button size="sm" variant="ghost" onClick={() => setOpen(true)} title="Prefs (⌘,)" aria-keyshortcuts="Meta+Comma">Prefs</Button>
+      <Button size="sm" variant="ghost" onClick={() => setOpen(true)} title="Prefs (⌘,)" aria-label="Prefs" aria-keyshortcuts="Meta+Comma">
+        <Icon name={icon('ui:settings')} size={16} />
+      </Button>
       <PrefsDialog
-        {...form} open={open} onOpenChange={setOpen} title="Dashboard prefs" layout="list"
+        {...form} open={open} onOpenChange={setOpen} title="Dashboard prefs" layout="rail"
         footer={<Button size="sm" onClick={() => reset()}>Reset all</Button>}
       />
     </>
+  );
+}
+
+/** The header's loupe toggle: the magnifier over the map, which F2 toggles too. */
+export function LoupeButton() {
+  const [loupe, setLoupe] = useDashPref('map.loupe');
+  return (
+    <Button size="sm" variant="ghost" pressed={loupe} onClick={() => setLoupe(!loupe)} title="Loupe (F2)" aria-label="Loupe" aria-keyshortcuts="F2">
+      <Icon name={icon('ui:loupe')} size={16} />
+    </Button>
   );
 }

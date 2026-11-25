@@ -149,13 +149,12 @@ describe('pips', () => {
     expect(pipsPerRowIn(33)).toBe(4);
     expect(pipsPerRowIn(16)).toBe(2);
     expect(pipsPerRowIn(6)).toBe(1);
-    expect(pipCountOf(4, true)).toBe(5);
-    expect(pipCountOf(9, false)).toBe(5);
-    expect(pipCountOf(10, true)).toBe(3);
-    expect(pipCountOf(10, true, true)).toBe(4);
+    expect(pipCountOf(4)).toBe(4);
+    expect(pipCountOf(9)).toBe(5);
+    expect(pipCountOf(10)).toBe(2);
   });
 
-  it('give a pinned area a pin left of its dots', () => {
+  it('give a pinned area a pin in its queue number\'s corner, at its size, left of the number', () => {
     const scene = createAuditScene();
     const areas = map.areas.map((a) => (a.id === 'geom' ? { ...a, pinned: true } : a));
     syncAuditScene(scene, auditNodeSpecs(areas, layoutMap(areas, 900, 400), PALETTE));
@@ -164,7 +163,18 @@ describe('pips', () => {
     expect(cellOf(scene, 'core.ops').pinned).toBeUndefined();
     const pose = { x: 0, y: 0, width: 120, height: 80 };
     const paint = (data: AuditCellData) => AUDIT_PAINTER.paint({ data } as Parameters<typeof AUDIT_PAINTER.paint>[0], pose);
-    expect(paint(pinned).length - paint({ ...pinned, pinned: false }).length).toBe(2);
+    // The corner's marks are drawn in the clipped group of texts that ends the cell: a number alone, or a pin before it.
+    const corner = (data: AuditCellData) => {
+      const last = paint(data).at(-1)!;
+      return last.kind === 'group' ? last.children : [];
+    };
+    const queued = { ...pinned, queue: 7, label: [] };
+    expect(corner(queued).length - corner({ ...queued, pinned: false }).length).toBe(2);
+    const [number, head] = corner(queued);
+    expect(number).toMatchObject({ kind: 'text' });
+    expect(head).toMatchObject({ kind: 'path' });
+    // A padlock joins them, left of the pin: a body and a shackle.
+    expect(corner({ ...queued, locked: true }).length - corner(queued).length).toBe(2);
   });
 });
 

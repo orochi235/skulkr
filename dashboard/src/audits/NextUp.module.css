@@ -23,6 +23,8 @@
 .pick:hover,
 .pick:focus-visible { color: var(--audit-live); }
 
+.mark { flex: none; align-self: center; opacity: 0.85; }
+
 .id {
   min-width: 0;
   overflow-wrap: anywhere;

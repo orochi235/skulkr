@@ -47,8 +47,8 @@ describe('AuditsPage', () => {
     expect(screen.getByText('main 6b331e4', { exact: false })).toBeInTheDocument();
 
     const lanes = screen.getByRole('list', { name: 'Round 41 lanes' });
-    expect(within(lanes).getByRole('meter', { name: 'core.ops' })).toHaveAttribute('aria-valuetext', 'fix, 12 min in');
-    expect(within(lanes).getAllByTitle(/studio · 12 min/).some((el) => el.textContent === 'studio · 12 min')).toBe(true);
+    expect(within(lanes).getByRole('meter', { name: 'core.ops' })).toHaveAttribute('aria-valuetext', 'fix, 12:00 in');
+    expect(within(lanes).getAllByTitle(/studio · 12:00/).some((el) => el.textContent === '12:00studio')).toBe(true);
     expect(within(lanes).getAllByText('studio')).not.toHaveLength(0);
     expect(screen.getByText('conflict')).toBeInTheDocument();
     expect(screen.queryByRole('meter', { name: 'all areas, fleet tests' })).not.toBeInTheDocument();
@@ -115,7 +115,6 @@ describe('AuditsPage', () => {
     expect(picker).toHaveAttribute('aria-valuetext', 'after round 39');
     expect(screen.getByText('after round 39', { selector: 'output' })).toBeInTheDocument();
     expect(window.location.hash).toBe('#example@39');
-    expect(screen.getByText('round 39:')).toBeInTheDocument();
     // What is known only of now keeps its place in the legend, so the map does not move, but is out of reach.
     expect(screen.getByText('settled').closest('[inert]')).not.toBeNull();
     const stats = screen.getByRole('region', { name: 'Headline stats' });

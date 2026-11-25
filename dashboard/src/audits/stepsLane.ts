@@ -2,7 +2,7 @@
 import type { SpanStripSpan } from '@weasel-js/ui/components/SpanStrip';
 import { MIN, SPAN_STATE, ms, patchFillOf, tallyOf, withInk, withUnfixed } from './laneSpans';
 import { TYPICAL_MINUTES, checkingOf, partColor, stepOf, type AuditPhase, type Part } from './phases';
-import { FAIL, FAILED, NODE_SEP, PASSED, stepText } from './runData';
+import { FAIL, FAILED, NODE_SEP, PASSED, plural, stepText } from './runData';
 import type { AuditLane, LaneStep, LaneStepKey } from './skulkrMap.types';
 
 /** The steps view's columns, one stripe: the two blind reviews one after the other, as B starts once A's prompt is
@@ -26,10 +26,14 @@ const VERIFY_COLUMN = { start: 4.5, width: 0.5 } as const;
 const repairUnderWay = (r: LaneStep | undefined): boolean =>
   r?.state === 'running' && (r.job === 'repair' || (r.job !== 'verify' && r.outcome === 'failed'));
 
+/** How far past its count a counted step's minutes may move its fill: half the way to the next, so the bar never reads
+ *  as nearer the next count than the one its caption gives. */
+const BETWEEN_COUNTS = 0.5;
+
 /** A counted step's fill: `done` of `total`, or as far as `timeShare` (its minutes over its typical ones) goes, but never
- *  past most of the way to the next count. */
+ *  past halfway to the next count. */
 export const countedFillOf = (done: number, total: number, timeShare: number): number =>
-  Math.min(1, Math.max(done / total, Math.min(timeShare, (done + RUNNING_FILL_CAP) / total)));
+  Math.min(1, Math.max(done / total, Math.min(timeShare, (done + BETWEEN_COUNTS) / total)));
 
 /** How far a running verify or repair has got: its minutes so far into a repair's typical minutes, short of full. */
 const runningFillOf = (r: LaneStep, now: number): number =>
@@ -47,8 +51,13 @@ function verifySpan(r: LaneStep | undefined, now: number, fix: LaneStep): SpanSt
     const text = stepText('repair', r, now);
     return { ...base, state: 'active', fill: runningFillOf(r, now), label: text, title: [`verify: ${text}`, r.now?.text ?? ''].filter(Boolean).join('\n') };
   }
-  // Once a repair has run, the verify it followed failed; how it ended after is the repair column's to say.
-  if ((r.attempts ?? 0) > 0) return { ...base, state: 'done', fill: 1, label: FAILED, title: 'verify: failed, so a repair ran' };
+  // Once a repair has run, the verify it followed failed; one that went on to pass says so, as nothing after it does.
+  const tried = r.attempts ?? 0;
+  if (tried > 0 && r.state === 'done' && r.outcome !== 'timed out') {
+    const label = `${PASSED} (${tried})`;
+    return { ...base, state: 'done', fill: 1, label, title: `verify: failed, then passed after ${plural(tried, 'repair')}` };
+  }
+  if (tried > 0) return { ...base, state: 'done', fill: 1, label: FAILED, title: 'verify: failed, so a repair ran' };
   const passed = r.state === 'done';
   const label = passed ? (r.outcome === 'timed out' ? 'timed out' : PASSED) : r.state === 'failed' ? r.why ?? FAILED : FAILED;
   return { ...base, state: passed ? 'done' : 'failed', fill: 1, label, title: `verify: ${label}`, color: passed ? base.color : partColor('repair', 'conflict') };
@@ -95,8 +104,6 @@ const QUEUED = 'queued';
 /** How wide the steps view's window is, in columns. */
 export const STEP_COLUMN_COUNT = Math.max(...STEP_COLUMNS.map((c) => c.start + c.width));
 
-/** How the steps view's first segment names an area's files, ahead of its step's own words. */
-export const filesText = (files: number): string => `${files} ${files === 1 ? 'file' : 'files'}`;
 
 /** How full a running step is drawn at most, until it finishes. */
 const RUNNING_FILL_CAP = 0.9;
@@ -104,9 +111,9 @@ const RUNNING_FILL_CAP = 0.9;
 /**
  * An area's lane as the steps view draws it: a column of one length per step, filled by its state, a running one by its
  * own count where onto reports one (a fixer's commits of its findings), else as far as its minutes so far go into its
- * typical minutes, short of full until it finishes. Its first segment leads with the area's `files`, when given.
+ * typical minutes, short of full until it finishes.
  */
-export function laneStepsOf(lane: AuditLane, now: number, files?: number): SpanStripSpan[] {
+export function laneStepsOf(lane: AuditLane, now: number): SpanStripSpan[] {
   return STEP_COLUMNS.map(({ step, part, phase, start, width }, i): SpanStripSpan => {
     const s = stepOf(lane, step);
     const queued = s.state === 'waiting' && i > 0 && step !== 'patch' && stepOf(lane, STEP_COLUMNS[i - 1]!.step).state === 'done';
@@ -121,7 +128,6 @@ export function laneStepsOf(lane: AuditLane, now: number, files?: number): SpanS
     return {
       id: step, start, ms: width, fill, state: SPAN_STATE[s.state], title: [`${step}: ${stepText(step, s, now)}`, s.state === 'running' ? s.now?.text ?? '' : ''].filter(Boolean).join('\n'),
       label: step === 'patch' && s.state !== 'failed' ? tallyOf(lane)
-        : step === 'A' && files !== undefined ? [filesText(files), s.state === 'waiting' ? '' : stepText(step, s, now)].filter(Boolean).join(' · ')
         : s.state === 'waiting' ? (queued ? QUEUED : '') : stepText(step, s, now),
       color: partColor(part, s.state === 'failed' ? 'conflict' : phase),
     };

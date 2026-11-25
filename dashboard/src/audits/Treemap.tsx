@@ -2,7 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { SceneCanvas, asNodeId, registerCanvasFont, type SceneCanvasApi, type SelectionApi } from '@weasel-js/core';
 import { useHud, useHudContribution, useLoupe } from '@weasel-js/hud/react';
 import type { Hud } from '@weasel-js/hud';
-import { Checkbox } from '@weasel-js/ui/components/Checkbox';
 import { useAnimator } from '@weasel-js/animator/react';
 import { usePrefersReducedMotion, watchResize } from '@weasel-js/react';
 import * as presets from '@weasel-js/editing/presets';
@@ -10,6 +9,9 @@ import { auditNodeSpecs, breathe, flashRecut, syncAuditScene, type AuditPalette,
 import { layoutMap } from './mapLayout';
 import { heatScaleOf, type HeatScale } from './areaData';
 import { HeatLegend } from './HeatLegend';
+import { LockMark } from './Marks';
+import { HEAT_METRICS, HEAT_METRIC_SPECS, metricScaleOf, type HeatMetric } from './heatMetrics';
+import { heatStopsOf, type HeatScheme } from './heatSchemes';
 import { OFF_PIPELINE, PHASE_LABEL, SWEEP, phaseClass, type AuditPhase } from './phases';
 import { Slider } from '@weasel-js/ui/components/Slider';
 import { MAX_HALVES, useDashPref } from './dashPrefs';
@@ -45,6 +47,8 @@ export interface TreemapProps {
   readonly recut?: readonly string[] | null;
   /** What sits above the map: the round picker. */
   readonly header?: ReactNode;
+  /** The theme's own ramp, for a metric whose scheme is `thermal`; by default `palette`'s. */
+  readonly thermal?: AuditPalette['depth'];
 }
 
 /** Every audit area as a cell of a treemap drawn on the scene graph: hover and click pick through the canvas's
@@ -54,7 +58,7 @@ const NO_GLYPHS: Readonly<Record<string, string>> = {};
 const RECUT_FADE_MS = 1800;
 const HALF_STOPS = Array.from({ length: MAX_HALVES + 1 }, (_, i) => i);
 
-export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, inColor = null, heat: heatGiven, recut = null, header }: TreemapProps) {
+export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, inColor = null, heat: heatGiven, recut = null, header, thermal }: TreemapProps) {
   // How many half-rounds of the queue's head to number on the map, each in its area's corner.
   const [halves, setHalves] = useDashPref('map.upcoming');
   const [gray] = useDashPref('map.gray');
@@ -99,11 +103,21 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
     if (was !== null && now.length === 1 && now[0] === was) selection.clear();
   };
   const heatOwn = useMemo(() => heatScaleOf(areas), [areas]);
-  const heat = heatGiven ?? heatOwn;
+  const leftHeat = heatGiven ?? heatOwn;
+  // Shaded by another metric, the map takes that metric's values, its scale, and the ramp its pref names.
+  const [colorBy, setColorBy] = useDashPref('map.colorBy');
+  const [scheme] = useDashPref(colorBy === 'left' ? 'map.scheme' : `map.schemes.${colorBy}`) as [HeatScheme, unknown];
+  const values = useMemo(() => (colorBy === 'left' ? null : HEAT_METRIC_SPECS[colorBy].valuesIn(areas)), [colorBy, areas]);
+  const heat = useMemo(() => (values ? metricScaleOf(colorBy, values) : leftHeat), [values, colorBy, leftHeat]);
+  const shades = useMemo(
+    () => (colorBy === 'left' ? palette : { ...palette, depth: heatStopsOf(scheme) ?? thermal ?? palette.depth }),
+    [colorBy, palette, scheme, thermal],
+  );
+  const metric = HEAT_METRIC_SPECS[colorBy];
   const layout = useMemo(() => layoutMap(areas, size.width, size.height), [areas, size]);
   useLayoutEffect(() => {
-    syncAuditScene(scene, auditNodeSpecs(areas, layout, palette, phases, lit, places, estimates, glyphs, inColor, gray / 100, heat));
-  }, [scene, areas, layout, palette, phases, lit, places, estimates, glyphs, inColor, gray, heat]);
+    syncAuditScene(scene, auditNodeSpecs(areas, layout, shades, phases, lit, places, estimates, glyphs, inColor, gray / 100, heat, values));
+  }, [scene, areas, layout, shades, phases, lit, places, estimates, glyphs, inColor, gray, heat, values]);
 
   // The map's text is set in the theme's faces, which the canvas draws from the document's fonts once each loads.
   useEffect(() => {
@@ -164,16 +178,14 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
         {canvasReady && <MapLoupe canvasRef={canvasRef} hud={hud} visible={loupe} onClose={closeLoupe} />}
       </div>
       <div className={s.legend}>
-        <span><i className={`${s.key} ${s.uncharted}`} />never audited</span>
-        <span>
-          audited, estimated defects left after <span className={s.asOfText}>{asOf === null ? 'the last pass' : `round ${asOf}`}:</span>
-          <HeatLegend heat={heat} />
-        </span>
+        <select className={s.colorBy} aria-label="Color the map by" value={colorBy} onChange={(e) => setColorBy(e.currentTarget.value as HeatMetric)}>
+          {HEAT_METRICS.map((m) => <option key={m} value={m}>{HEAT_METRIC_SPECS[m].name}</option>)}
+        </select>
+        <HeatLegend heat={heat} stops={colorBy === 'left' ? null : shades.depth} />
         <span>· passes: ● five, ○ one</span>
-        <Checkbox className={s.loupeToggle} isSelected={loupe} onChange={setLoupe}>loupe (F2)</Checkbox>
         {/* Kept in place, faded and out of reach, for a past round, so the legend and the map above it never move. */}
         <span className={asOf === null ? s.nowKeys : `${s.nowKeys} ${s.nowOff}`} inert={asOf !== null} aria-hidden={asOf !== null || undefined}>
-          <NowLegend halves={halves} places={places} onInput={setHalves} onChange={setHalves} />
+          <NowLegend halves={halves} places={places} onInput={setHalves} onChange={setHalves} none={metric.none} />
         </span>
       </div>
     </div>
@@ -193,15 +205,17 @@ function MapLoupe({ canvasRef, hud, visible, onClose }: {
 }
 
 /** The legend's keys for what is known only of now: changes since a pass, settling, live runs, the queue numbers. */
-function NowLegend({ halves, places, onInput, onChange }: {
+function NowLegend({ halves, places, onInput, onChange, none }: {
   halves: number; places: number; onInput: (halves: number) => void; onChange: (halves: number) => void;
+  /** What a hatched cell means under the metric the map is shaded by: never audited, or no value of it. */
+  none: string;
 }) {
   return (
     <>
       <span><i className={`${s.key} ${s.worn}`} />changed since its pass</span>
       <span><i className={`${s.key} ${s.settled}`} />settled</span>
       <span>
-        <svg className={s.lock} width="8" height="10" viewBox="0 0 8 10" aria-hidden="true"><path d="M2.5 4.3V3a1.5 1.5 0 0 1 3 0v1.3" /><rect x="1" y="5" width="6" height="4.5" /></svg>
+        <LockMark className={s.lock} size={10} />
         held by an unmerged round
       </span>
       <span className={s.phases}>
@@ -213,6 +227,7 @@ function NowLegend({ halves, places, onInput, onChange }: {
         </span>
         {OFF_PIPELINE.map((p) => <span key={p} className={phaseClass(p)}><i className={`${s.key} ${s.live}`} />{PHASE_LABEL[p]}</span>)}
       </span>
+      <span><i className={`${s.key} ${s.uncharted}`} />{none}</span>
       <span className={s.upcoming}>
         numbered upcoming:
         <Slider

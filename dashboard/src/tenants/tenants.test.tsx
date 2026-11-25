@@ -16,6 +16,11 @@ describe('useTenants', () => {
     const { result } = renderHook(() => useTenants({ url: '/api/tenants', dev: true, everyMs: 60_000 }));
     await waitFor(() => expect(result.current).toEqual({ status: 'ready', names: ['weasel', 'demo'] }));
 
+    // A reload starts from the list it read last, before any answer.
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+    expect(renderHook(() => useTenants({ url: '/api/tenants', dev: true, everyMs: 60_000 })).result.current).toEqual({ status: 'ready', names: ['weasel', 'demo'] });
+
+    localStorage.clear();
     vi.stubGlobal('fetch', vi.fn(async () => new Response('<html></html>', { status: 200, headers: { 'content-type': 'text/html' } })));
     const bare = renderHook(() => useTenants({ url: '/api/tenants', dev: true, everyMs: 60_000 }));
     await waitFor(() => expect(bare.result.current.status).toBe('no-server'));

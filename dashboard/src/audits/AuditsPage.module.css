@@ -71,8 +71,14 @@
 .root > .jobs {
   flex: 0 1 var(--audit-jobs-height, 220px);
   min-height: 80px;
-  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(0, var(--audit-feed-width, 560px)) auto minmax(0, var(--audit-queue-width, 340px)) auto minmax(0, 1fr);
+  gap: var(--wzl-space-2);
 }
+
+.jobs > .vseam { align-self: stretch; }
+
+.jobsFeed { min-width: 0; min-height: 0; overflow: auto; }
 
 .root > .seam { margin-block: calc(-1 * var(--wzl-space-3)); }
 
@@ -80,6 +86,9 @@
   .root { overflow: auto; }
 
   .root > .top { grid-template-columns: minmax(0, 1fr); }
+
+  .root > .jobs { grid-template-columns: minmax(0, 1fr); flex: none; }
+  .jobs > .vseam { display: none; }
 
   .root > .main {
     flex: none;

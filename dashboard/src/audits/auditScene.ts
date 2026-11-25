@@ -109,17 +109,18 @@ function labelLines(area: AuditArea, cell: MapCell, font: string): string[] {
   const room = cell.height - 6 - (area.queue !== null ? 17 : 0);
   const label = labelIn(area.id, cell.parent);
   const perChar = textWidth(label, font, 12) / Math.max(1, label.length);
-  return wrapAtDots(label, Math.floor((cell.width - 8 - dotsRoom(pipCountOf(roundCountOf(area), area.locked !== undefined, area.pinned ?? false), cell.width)) / perChar), Math.max(1, Math.floor(room / LINE)));
+  return wrapAtDots(label, Math.floor((cell.width - 8 - dotsRoom(pipCountOf(roundCountOf(area)), cell.width)) / perChar), Math.max(1, Math.floor(room / LINE)));
 }
 
 function cellData(
   area: AuditArea, cell: MapCell, palette: AuditPalette, heat: HeatScale, phase: AuditPhase | undefined, lit: boolean, upcoming: number,
-  estimate: number | undefined, glyph: string | undefined, gray = 0,
+  estimate: number | undefined, glyph: string | undefined, gray = 0, value?: number | null,
 ): AuditCellData {
-  const tone = toneOf(area);
+  // Shaded by another metric (`value` given), an area with none is drawn as never audited is, and every other by its value.
+  const tone = value === undefined ? toneOf(area) : value === null ? 'unaudited' : { left: value };
   // An estimate older than its files' last changes wears a cut corner; its color stays the heat its estimate gives,
   // since a color washed toward the panel reads as another estimate.
-  const worn = typeof tone === 'object' && changedSincePass(area);
+  const worn = value === undefined && typeof tone === 'object' && changedSincePass(area);
   const toned = tone === 'settled' ? palette.settled : tone === 'unaudited' ? palette.uncharted : heatColorOf(palette.depth, heat.at, tone.left);
   const fill = gray > 0 ? grayOf(toned, gray) : toned;
   const ink = tone === 'unaudited' ? palette.ink : inkOn(fill, palette);
@@ -130,7 +131,7 @@ function cellData(
     kind: 'audit-cell',
     fill: { color: fill },
     ...(tone === 'unaudited' ? {
-      over: { kind: 'hatch', color: grayOf(estimate === undefined ? palette.hatch : rampAt(palette.depth, heat.at(estimate)), gray), size: 6, lineWidth: 1.6 },
+      over: { kind: 'hatch', color: grayOf(estimate === undefined || value !== undefined ? palette.hatch : rampAt(palette.depth, heat.at(estimate)), gray), size: 6, lineWidth: 1.6 },
     } : {}),
     ...(worn ? { worn } : {}),
     edge: palette.panel,
@@ -142,7 +143,7 @@ function cellData(
     font: palette.font.ui,
     numericFont: palette.font.numeric,
     ...(showsQueue ? { queue: area.queue! } : {}),
-    ...(tone === 'settled' ? { settled: true } : {}),
+    ...(area.status === 'settled' ? { settled: true } : {}),
     dots: roundCountOf(area),
     ...(area.locked !== undefined ? { locked: true } : {}),
     ...(area.pinned ? { pinned: true } : {}),
@@ -171,6 +172,8 @@ export function auditNodeSpecs(
   grayAmount = 1,
   /** The heat scale the cells are shaded on; by default the one `areas` themselves set. */
   heat: HeatScale = heatScaleOf(areas),
+  /** Each area's value on another metric to shade by, on `heat`; null shades by defects left. */
+  values: ReadonlyMap<string, number | null> | null = null,
 ): AuditNodeSpec[] {
   const byId = new Map(areas.map((a) => [a.id, a]));
   const frameBox = new Map(layout.frames.map((f) => [f.name, f]));
@@ -192,7 +195,8 @@ export function auditNodeSpecs(
     out.push({
       id: asNodeId(c.id), parent: c.parent === null ? null : frameIdOf(c.parent), pickable: true,
       pose: poseIn(c, parent), data: cellData(area, c, palette, heat, phases.get(area.id), area.id === lit, upcoming, estimates.get(area.id),
-        area.icon !== undefined && Object.hasOwn(glyphs, area.icon) ? glyphs[area.icon] : undefined, inColor !== null && !inColor.has(area.id) ? grayAmount : 0),
+        area.icon !== undefined && Object.hasOwn(glyphs, area.icon) ? glyphs[area.icon] : undefined, inColor !== null && !inColor.has(area.id) ? grayAmount : 0,
+        values ? values.get(area.id) ?? null : undefined),
     });
   }
   return out;

@@ -74,7 +74,7 @@ export function sharedSpansOf(run: AuditRun): SpanStripSpan[] {
             : state === 'failed' && said ? `${g.label}${NODE_SEP}${said}` : g.label,
         color: phaseColor(state === 'failed' ? 'conflict' : g.phase),
         ...(failed || fleet ? { title: [
-          ...(fleet ? [`${fleet.done.toLocaleString()} of ${fleet.total.toLocaleString()} done`] : []),
+          ...(fleet ? [`${fleet.done.toLocaleString()}/${fleet.total.toLocaleString()} done`] : []),
           ...(failed ? [...failed.names, ...(failed.files > failed.names.length ? [`and ${failed.files - failed.names.length} more`] : [])] : []),
         ].join('\n') } : {}),
       };

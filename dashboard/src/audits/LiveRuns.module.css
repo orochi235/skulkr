@@ -34,6 +34,8 @@
 .pulse {
   width: 10px;
   height: 10px;
+  /* Its column shares the strip's 18px gap; the title sits nearer, a small gap from the dot. */
+  margin-inline-end: calc(var(--wzl-space-2) - 18px);
   border-radius: 50%;
   background: var(--audit-live);
 }
@@ -87,6 +89,9 @@
   color: var(--audit-muted);
 }
 
+/* How long the round has run, in the title's own ink: white on the dark theme. */
+.elapsed { composes: numeric from '@weasel-js/theme/numeric.module.css'; font-weight: var(--wzl-font-weight-bold); color: var(--audit-ink); }
+
 .view {
   display: flex;
   align-items: center;
@@ -116,6 +121,11 @@
 /* The all-areas row stacks its two fleet runs, so it is tall enough for two stripes of small text. */
 .lanes .shared { --span-strip-height: 28px; }
 
+/* A clock lane whose reviews overlap runs them on two tracks, at twice the height so each keeps a lane's text. The
+   stack sizes every row to one strip height (weasel's SpanStrips), so its rows here size to their own strips instead. */
+.lanes .twoTracks { --span-strip-height: 36px; }
+.lanes .laneStack { grid-template-rows: none; grid-auto-rows: auto; }
+
 .lanes {
   --span-strip-height: 18px;
   --span-strip-text: var(--wzl-font-size-xs);
@@ -137,8 +147,9 @@
   padding: 0;
   border: 0;
   background: none;
-  /* The widest name, and room for its dots after it (--audit-dots-px, set from the most passes a lane shows). */
-  min-width: calc(var(--audit-lead-ch, 0) * 1ch + var(--audit-dots-px, 0px));
+  /* The widest name, room for its dots after it (--audit-dots-px, set from the most passes a lane shows), and its file
+     count's fixed cell. */
+  min-width: calc(var(--audit-lead-ch, 0) * 1ch + var(--audit-dots-px, 0px) + var(--audit-files-px));
   font: inherit;
   font-family: var(--wzl-font-ui);
   font-size: var(--wzl-font-size-sm);
@@ -189,6 +200,21 @@
   75% { color: color-mix(in srgb, #fff 20%, #000); animation-timing-function: cubic-bezier(0.6, 0, 0.65, 0.8); }
 }
 /* The page icon standing for "files" in a lane's first step, set off from the digits before and the words after. */
+/* A segment's duration, at its right edge in a lighter weight than its caption; floated first so the caption before it
+   ellipsizes short of it. */
+.minutes { composes: numeric from '@weasel-js/theme/numeric.module.css'; float: inline-end; margin-inline-start: 0.5em; font-weight: var(--wzl-font-weight-light); }
+/* An area's file count, after its name's dots, in a cell as wide as a four-digit count and its page icon, so the counts
+   line up down the lanes. */
+.lanes { --audit-files-px: calc(4ch + 18px); }
+.files {
+  composes: numeric from '@weasel-js/theme/numeric.module.css';
+  flex: none;
+  width: var(--audit-files-px);
+  text-align: end;
+  font-weight: var(--wzl-font-weight-light);
+  white-space: nowrap;
+}
+.nameMark { flex: none; opacity: 0.85; }
 .page { flex: none; vertical-align: -1px; margin-inline: 1px 2px; }
 /* onto's pass and fail marks, ✓ and ✗: drawn by a font that has them, as the page's own fonts do not. */
 /* Each in a box as wide as Zapf Dingbats draws ✓, the wider, centered, so a column of verdicts lines up whichever mark it shows. */

@@ -16,12 +16,15 @@ const now = Date.parse(map.generated);
 describe('lanes', () => {
   it('says what each step of an area has done, or how long it has been running', () => {
     const ops = live.lanes[0]!;
-    expect(stepText('A', ops.steps.A, now)).toBe('5 found · 2.8 min');
+    expect(stepText('A', ops.steps.A, now)).toBe('5 found · 2:48');
     expect(stepText('match', ops.steps.match, now)).toBe('5 total (2 shared)');
-    expect(stepText('fix', ops.steps.fix, now)).toBe('studio · 12 min');
+    expect(stepText('fix', ops.steps.fix, now)).toBe('studio · 12:00');
     expect(stepText('patch', ops.steps.patch, now)).toBe('after fix');
-    expect(stepText('B', live.lanes[1]!.steps.B, now)).toBe('studio · <1 min');
-    expect(stepText('fix', { state: 'done', commits: 1, minutes: 7.6 }, now)).toBe('1 commit · 7.6 min');
+    expect(stepText('B', live.lanes[1]!.steps.B, now)).toBe('studio · 0:30');
+    expect(stepText('fix', { state: 'done', commits: 1, minutes: 7.6 }, now)).toBe('1 commit · 7:36');
+    // A step that took under 10 seconds says only what it did.
+    expect(stepText('fix', { state: 'done', commits: 1, minutes: 0.1 }, now)).toBe('1 commit');
+    expect(stepText('match', { state: 'done', shared: 1, a: 2, b: 3, started: '2026-11-24T10:00:00Z', ended: '2026-11-24T10:00:04Z' }, now)).toBe('4 total (1 shared)');
     expect(stepText('patch', { state: 'failed', why: 'conflicts; left out of the batch' }, now)).toBe('conflicts; left out of the batch');
     expect(stepText('patch', { state: 'done', commits: 2, resolved: 'merged after a conflict repair' }, now)).toBe('2 applied · merged after a conflict repair');
   });

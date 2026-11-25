@@ -2,16 +2,29 @@
 import { pref, type PrefPath } from '@weasel-js/prefs';
 import { usePref, usePrefsStore } from '@weasel-js/prefs/react';
 import { localStorageAdapter } from '@weasel-js/storage';
+import { HEAT_METRIC_SPECS, HEAT_METRICS, type HeatMetric } from './heatMetrics';
 import { HEAT_SCHEMES, type HeatScheme } from './heatSchemes';
 
 /** The most the map numbers: eight rounds of the queue, in half rounds. */
 export const MAX_HALVES = 16;
 
+/** A ramp to choose for each metric the map can shade by but defects left, whose ramp the charts share (`map.scheme`). */
+function schemePrefs() {
+  const others = HEAT_METRICS.filter((m): m is Exclude<HeatMetric, 'left'> => m !== 'left');
+  return Object.fromEntries(others.map((m) => [m, pref.enum<HeatScheme>(HEAT_METRIC_SPECS[m].name, HEAT_METRIC_SPECS[m].scheme, HEAT_SCHEMES, {
+    description: `The ramp the map shades ${HEAT_METRIC_SPECS[m].legend} along.`,
+  })])) as Record<Exclude<HeatMetric, 'left'>, ReturnType<typeof pref.enum<HeatScheme>>>;
+}
+
 export const DASH_PREFS = pref.group('Dashboard', {
   map: pref.group('Map', {
-    scheme: pref.enum<HeatScheme>('Heat colors', 'thermal', HEAT_SCHEMES, {
-      description: 'The ramp the map shades estimated defects left along, and its legend and charts with it.',
+    colorBy: pref.enum<HeatMetric>('Color by', 'left', HEAT_METRICS, {
+      description: 'What the map shades its areas by; the legend under the map switches it too.',
     }),
+    scheme: pref.enum<HeatScheme>('Heat colors: defects left', 'thermal', HEAT_SCHEMES, {
+      description: 'The ramp the map shades estimated defects left along, and the rounds and calibration charts with it.',
+    }),
+    schemes: pref.group('Heat colors by metric', schemePrefs()),
     grayOut: pref.boolean('Gray out areas the round shown skipped', false, {
       description: 'The round picked on the slider, or the last round at now.',
     }),

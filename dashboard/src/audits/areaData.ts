@@ -115,15 +115,23 @@ export const heatScaleOf = (areas: readonly AuditArea[]): HeatScale => heatScale
 export const heatScaleOverRounds = (areas: readonly AuditArea[]): HeatScale =>
   heatScaleFor([...leftNowIn(areas), ...areas.flatMap((a) => (a.lastByRound ?? []).map((e) => e.left))]);
 
-/** The heat scale for estimates `values`, its top their 98th percentile. */
-function heatScaleFor(values: readonly number[]): HeatScale {
-  const left = values.filter(Number.isFinite).sort((x, y) => x - y);
-  const top = Math.max(HEAT_FLOOR, quantile(left, 0.98));
+/** How a heat scale reads its values: the least its top may be, and whether a low value is the hot end. */
+export interface HeatScaleOptions {
+  readonly floor?: number;
+  readonly reverse?: boolean;
+}
+
+/** The heat scale for `values`, its top their 98th percentile, at least `floor`. */
+export function heatScaleFor(values: readonly number[], { floor = HEAT_FLOOR, reverse = false }: HeatScaleOptions = {}): HeatScale {
+  const sorted = values.filter(Number.isFinite).sort((x, y) => x - y);
+  const top = Math.max(floor, quantile(sorted, 0.98));
   const scale = warpScale({ domain: [0, top], range: [0, 1], to: Math.log1p, from: Math.expm1 });
-  const at = (v: number) => Math.min(1, Math.max(0, scale.position(Math.max(0, v))));
+  const along = (v: number) => Math.min(1, Math.max(0, scale.position(Math.max(0, v))));
+  const at = reverse ? (v: number) => 1 - along(v) : along;
   // The top keeps its own tick, so a round one crowding it gives way.
   const ticks = [
-    ...scale.ticks(4).filter((v) => at(v) < 1 - TOP_ROOM).map((value) => ({ label: String(value), value })),
+    // A reversed scale counts places, which start at 1.
+    ...scale.ticks(4).filter((v) => along(v) < 1 - TOP_ROOM && !(reverse && v === 0)).map((value) => ({ label: String(value), value })),
     { label: 'top', value: top },
   ];
   return { top, at, ticks };

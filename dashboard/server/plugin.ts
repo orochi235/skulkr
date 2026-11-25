@@ -1,7 +1,9 @@
 /**
  * Dev-server Vite plugin serving the dashboard's data: the tenants it reads at `<base>api/tenants`, and for each,
  * the JSON `skulkr map` prints at `<base>api/t/<name>/map` and one area's defects at `<base>api/t/<name>/area?id=<area>`,
- * from `skulkr defects <area>`, and a POST to `<base>api/t/<name>/pin?id=<area>&on=1|0` runs `skulkr pin|unpin <area>`
+ * from `skulkr defects <area>`, the end of an area's newest job log in the running round at `<base>api/t/<name>/tail?id=<area>`
+ * and the end of the running round's `night.log` at `<base>api/t/<name>/log` (both read here, not through the CLI, as
+ * they are asked for every few seconds), and a POST to `<base>api/t/<name>/pin?id=<area>&on=1|0` runs `skulkr pin|unpin <area>`
  * and answers once the map has been built again. It runs the pipeline's CLI in a child process, since building a map asks the runner
  * for its jobs and may wait seconds on it, and the server must keep answering meanwhile; requests for one tenant's
  * map that arrive while its build runs share it.
@@ -18,6 +20,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 import { STALE_HEADER, TENANTS_PATH, parseTenantPath } from '../shared/routes.ts';
+import { jobTailOf, nightLogTailOf } from './jobTail.ts';
 
 /** The pipeline's CLI, beside the dashboard in its repository. */
 export const SKULKR_BIN = fileURLToPath(new URL('../../bin/skulkr.mjs', import.meta.url));
@@ -221,9 +224,19 @@ export function createRoutes(options: SkulkrRunnerOptions, cli: SkulkrRunner = c
       if (!mapArgs) throw new Refusal(400, `no tenant ${tenant}; this dashboard reads ${list.map((t) => t.name).join(', ')}`);
       const map = mapOf(tenant, mapArgs);
       if (what === 'map') return map.kept();
+      if (what === 'log') {
+        const { runs } = JSON.parse((await map.kept()).text) as { runs: { running?: boolean; nightDir?: string | null }[] };
+        const nightDir = runs.findLast((r) => r.running)?.nightDir ?? runs.at(-1)?.nightDir;
+        return JSON.stringify(nightDir ? nightLogTailOf(nightDir) : null);
+      }
       const params = new URLSearchParams(query);
       const id = params.get('id') ?? '';
       if (id.startsWith('-') || !map.ids((await map.kept()).text).has(id)) throw new Refusal(400, `no area ${JSON.stringify(id)} in ${tenant}`);
+      if (what === 'tail') {
+        const { runs } = JSON.parse((await map.kept()).text) as { runs: { running?: boolean; nightDir?: string | null }[] };
+        const nightDir = runs.findLast((r) => r.running)?.nightDir;
+        return JSON.stringify(nightDir ? await jobTailOf(nightDir, id) : null);
+      }
       if (what === 'pin') {
         await run(tenantArgs(list, tenant, params.get('on') === '1' ? 'pin' : 'unpin', id)!);
         await map.kept.rebuild();

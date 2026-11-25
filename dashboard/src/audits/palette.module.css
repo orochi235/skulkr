@@ -39,9 +39,9 @@
   --audit-checks: oklch(0.72 0.18 55);
   /* The controller's verify and repair of a fix, after its fixer's checks. */
   --audit-repair: oklch(0.68 0.25 340);
-  /* A lane's finished steps, the patch's aside. */
-  --audit-stage-done: oklch(0.3 0 0);
-  --audit-stage-done-ink: #fff;
+  /* A lane's finished steps, the patch's aside: light on the light page, dark on the dark one. */
+  --audit-stage-done: oklch(0.88 0 0);
+  --audit-stage-done-ink: #000;
   /* The share of a patch its fixer filed rather than fixed. */
   --audit-filed: oklch(0.38 0 0);
   --audit-phase-ramp: linear-gradient(to right, var(--audit-phase-review), var(--audit-phase-reviewed), var(--audit-phase-match),
@@ -57,7 +57,11 @@
 
 /* Black can't read on the dark track, so a dark page sets no lane ink and each span takes its strip's own: the page's
    ink on the track, black or white by its fill's lightness where filled. */
-:global([data-wzl-mode='dark']) .palette { --audit-lane-ink: initial; }
+:global([data-wzl-mode='dark']) .palette {
+  --audit-lane-ink: initial;
+  --audit-stage-done: oklch(0.3 0 0);
+  --audit-stage-done-ink: #fff;
+}
 
 /* An element wearing a phase reads `--audit-phase`. */
 .phase-review { --audit-phase: var(--audit-phase-review); }

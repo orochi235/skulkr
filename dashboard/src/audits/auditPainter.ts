@@ -3,8 +3,9 @@ import { resolvePaintPattern, textCommandFromRuns, type DrawCommand, type NodeSh
 import { circlePath, pathFromD, type Path } from '@weasel-js/geom';
 import { glyphCommands, type GlyphPath } from './glyph';
 import { framePadOf, iconBoxIn } from './mapLayout';
+import { LOCK_WIDTH, PIN_WIDTH, padlockShapeAt, pinShapeAt } from './markShapes';
 
-/** The room one pip (a pass dot, the open circle, the padlock, the pin) takes along a cell's top edge, and between rows. */
+/** The room one pip (a pass dot, the open circle) takes along a cell's top edge, and between rows. */
 const PIP = 6;
 
 /** The most pips a row holds, as a lane's pass dots run in fives. */
@@ -17,10 +18,10 @@ export const pipsPerRowIn = (width: number): number => Math.max(1, Math.min(PIPS
 export const passPipsOf = (passes: number): { readonly fives: number; readonly ones: number } =>
   ({ fives: Math.floor(passes / 5), ones: passes % 5 });
 
-/** The pips a cell wears, right to left: its passes' (`passPipsOf`), then the padlock, then the pin. */
-export const pipCountOf = (passes: number, locked: boolean, pinned = false): number => {
+/** The pips a cell wears: its passes', as `passPipsOf` tallies them. */
+export const pipCountOf = (passes: number): number => {
   const { fives, ones } = passPipsOf(passes);
-  return fives + ones + (locked ? 1 : 0) + (pinned ? 1 : 0);
+  return fives + ones;
 };
 
 export interface AuditCellData {
@@ -46,9 +47,9 @@ export interface AuditCellData {
   readonly settled?: boolean;
   /** Its passes, drawn as `passPipsOf` tallies them. */
   readonly dots: number;
-  /** An earlier round's unmerged branch holds it: a padlock left of the dots. */
+  /** An earlier round's unmerged branch holds it: a padlock in the queue number's corner, at its size, left of the pin. */
   readonly locked?: boolean;
-  /** Pinned into every round until it settles: a pin left of the dots and padlock. */
+  /** Pinned into every round until it settles: a pin in the queue number's corner, at its size, left of it. */
   readonly pinned?: boolean;
   /** A glow's color while something naming the area elsewhere on the page is hovered. */
   readonly glow?: string;
@@ -117,6 +118,24 @@ function queueSizeIn(queue: number, p: { width: number; height: number }): numbe
   return size;
 }
 
+/** The map's pin at `cx`, `top`, `size` tall (`pinShapeAt`). */
+function pinAt(cx: number, top: number, size: number, color: string): DrawCommand[] {
+  const { head, needle } = pinShapeAt(cx, top, size);
+  return [
+    { kind: 'path', path: circlePath(head.cx, head.cy, head.r, 16), fill: { paint: { color } } },
+    { kind: 'path', path: pathFromD(`M ${needle.x} ${needle.from} V ${needle.to}`), stroke: { paint: { color }, width: needle.width } },
+  ];
+}
+
+/** The map's padlock at `cx`, `top`, `size` tall (`padlockShapeAt`). */
+function padlockAt(cx: number, top: number, size: number, color: string): DrawCommand[] {
+  const { body, shackle } = padlockShapeAt(cx, top, size);
+  return [
+    { kind: 'path', path: rect(body), fill: { paint: { color } } },
+    { kind: 'path', path: pathFromD(shackle.d), stroke: { paint: { color }, width: shackle.width } },
+  ];
+}
+
 function filled(path: Path, paint: PosedPaint): DrawCommand[] {
   const resolved = resolvePaintPattern(paint);
   return resolved ? [{ kind: 'path', path, fill: { paint: resolved } }] : [];
@@ -147,11 +166,11 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
     const check = pathFromD(`M ${x} ${y + 4} L ${x + 3} ${y + 7} L ${x + 9} ${y}`);
     out.push({ kind: 'path', path: check, stroke: { paint: { color: d.ink, opacity: 0.8 }, width: 1.6 } });
   }
-  // Drawn right to left: filled fives, then open ones, then the padlock, then the pin. A row holds what the cell's width does; the rest
+  // Drawn right to left: filled fives, then open ones. A row holds what the cell's width does; the rest
   // wrap below, as long as the cell is tall enough.
   const { fives, ones } = passPipsOf(d.dots);
   const dotCount = fives + ones;
-  const pips = pipCountOf(d.dots, d.locked ?? false, d.pinned ?? false);
+  const pips = pipCountOf(d.dots);
   const perRow = pipsPerRowIn(p.width);
   const rows = Math.ceil(pips / perRow);
   if (pips > 0 && p.width >= 10 && p.height >= 4 + rows * PIP) {
@@ -163,17 +182,6 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
         ? { kind: 'path', path: circlePath(c.x, c.y, 2, 12), fill: { paint: ink } }
         : { kind: 'path', path: circlePath(c.x, c.y, 1.6, 12), stroke: { paint: ink, width: 1 } });
     }
-    if (d.locked) {
-      const { x, y } = at(dotCount);
-      // The shackle stops short of the body, so the two read apart at this size.
-      out.push({ kind: 'path', path: pathFromD(`M ${x - 2.5} ${y - 0.3} h 5 v 3.5 h -5 Z`), fill: { paint: ink } });
-      out.push({ kind: 'path', path: pathFromD(`M ${x - 1.4} ${y - 1.1} V ${y - 2} A 1.4 1.4 0 0 1 ${x + 1.4} ${y - 2} V ${y - 1.1}`), stroke: { paint: ink, width: 0.9 } });
-    }
-    if (d.pinned) {
-      const { x, y } = at(dotCount + (d.locked ? 1 : 0));
-      out.push({ kind: 'path', path: circlePath(x, y - 1, 1.8, 12), fill: { paint: ink } });
-      out.push({ kind: 'path', path: pathFromD(`M ${x} ${y} V ${y + 3}`), stroke: { paint: ink, width: 0.9 } });
-    }
   }
   const texts: DrawCommand[] = [];
   const lines = d.label ?? [];
@@ -182,11 +190,17 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
     if (d.backing) texts.push(...chip(p.x + 2, y - 1, line, 12, d.backing));
     texts.push(text(p.x + 4, y, line, d.ink, d.font, 12));
   });
-  if (d.queue !== undefined) {
-    const size = queueSizeIn(d.queue, p);
-    const inset = Math.min(4, (p.width - digitsWidth(d.queue, size)) / 2);
-    texts.push(text(p.x + p.width - inset - digitsWidth(d.queue, size), p.y + p.height - size - Math.min(4, (p.height - size) / 2), String(d.queue), d.ink, d.numericFont, size, 700));
-  }
+  // The queue number, the pin and the padlock share the cell's bottom-right corner and its size, right to left.
+  const corner = d.queue !== undefined || d.pinned || d.locked ? queueSizeIn(d.queue ?? 0, p) : 0;
+  const numberWidth = d.queue !== undefined ? digitsWidth(d.queue, corner) : 0;
+  const pinWidth = d.pinned ? corner * PIN_WIDTH : 0;
+  const lockWidth = d.locked ? corner * LOCK_WIDTH : 0;
+  const inset = Math.min(4, (p.width - numberWidth - pinWidth - lockWidth) / 2);
+  const top = p.y + p.height - corner - Math.min(4, (p.height - corner) / 2);
+  const right = p.x + p.width - inset;
+  if (d.queue !== undefined) texts.push(text(right - numberWidth, top, String(d.queue), d.ink, d.numericFont, corner, 700));
+  if (d.pinned) texts.push(...pinAt(right - numberWidth - pinWidth * 0.6, top, corner, d.ink));
+  if (d.locked) texts.push(...padlockAt(right - numberWidth - pinWidth - lockWidth * 0.55, top, corner, d.ink));
   // The clip keeps a label inside its own cell where its width was only estimated.
   if (texts.length > 0) out.push({ kind: 'group', clip: rect(p, 1), children: texts });
   return out;

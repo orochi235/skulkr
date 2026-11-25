@@ -65,6 +65,8 @@ export interface LaneView {
   readonly elapsed: string | null;
   /** When its last part ended, where known. */
   readonly ended: number | null;
+  /** How many tracks its spans run on: two where its reviews overlap, one otherwise. */
+  readonly tracks: number;
 }
 
 /**
@@ -76,23 +78,25 @@ export function laneViewOf(lane: AuditLane, now: number, roundStart: number): La
   let cursor = roundStart;
   let elapsed: string | null = null;
   let ended: number | null = null;
+  let aSpan: { start: number; end: number } | null = null;
+  let overlap = false;
   const spans = stretchesOf(lane).map((stretch): SpanStripSpan => {
     const { p, id, phase } = stretch;
     const times = timesOf(p, now);
     // A patch waits from its fix's end for the round's batch, shaded by what the fix did; any other part not begun yet
-    // can begin no earlier than now. B starts no earlier than A's span ends, so the two never overlap on one row.
+    // can begin no earlier than now. B runs from its own start, beside A where the two overlap.
     const waitsForBatch = p.part === 'patch' && p.state === 'waiting' && lane.steps.fix.state === 'done';
     const unbegun = p.state === 'waiting' && !waitsForBatch ? Math.max(cursor, now) : cursor;
-    const start = id === 'B' ? Math.max(times.start ?? unbegun, cursor) : times.start ?? unbegun;
+    const start = id === 'B' ? times.start ?? Math.max(unbegun, aSpan?.start ?? unbegun) : times.start ?? unbegun;
     const typical = TYPICAL_MINUTES[p.part] * MIN;
-    const end = id === 'B' && p.state === 'running'
-      ? Math.max(now, start + Math.max(0, typical - (now - (times.start ?? now))))
-      : times.end ?? (waitsForBatch
+    const end = times.end ?? (waitsForBatch
         ? Math.max(now, start + TYPICAL_MINUTES.patch * MIN)
         : start + (p.state === 'done' ? (measuredOf(p) ?? TYPICAL_MINUTES[p.part]) * MIN : typical));
     if (p.state === 'running') elapsed = minutesText((now - (times.start ?? start)) / MIN);
     if (p.state === 'done' || p.state === 'failed') ended = Math.max(ended ?? end, end);
-    cursor = end;
+    if (id === 'A') aSpan = { start, end };
+    if (id === 'B' && aSpan && start < aSpan.end) overlap = true;
+    cursor = id === 'B' && aSpan ? Math.max(aSpan.end, end) : end;
     const steps: readonly LaneStepKey[] = id === 'A' || id === 'B' ? [id] : STEPS_OF[p.part];
     const title = steps.map((name) => `${name}: ${stepText(name, stepOf(lane, name), now)}`).join('; ');
     return {
@@ -101,7 +105,9 @@ export function laneViewOf(lane: AuditLane, now: number, roundStart: number): La
     };
   }).flatMap((span) => (span.id === 'patch' ? withUnfixed(span, lane) : [span]))
     .map((span) => withInk(span));
-  return { phase: phaseOf(lane), finished: isFinished(lane), spans, elapsed, ended };
+  // Reviews that overlap take a track each, and every other part spans both.
+  const tracked = overlap ? spans.map((span) => (span.id === 'A' ? { ...span, track: 0 } : span.id === 'B' ? { ...span, track: 1 } : { ...span, trackSpan: 2 })) : spans;
+  return { phase: phaseOf(lane), finished: isFinished(lane), spans: tracked, elapsed, ended, tracks: overlap ? 2 : 1 };
 }
 
 /** The clock a run's lanes share: from its start to `now`, and room ahead. Steady whichever lanes are shown. */

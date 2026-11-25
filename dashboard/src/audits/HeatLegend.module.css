@@ -9,7 +9,9 @@
   display: block;
   height: 10px;
   border-radius: 2px;
-  background: var(--audit-heat-ramp);
+  /* Spelled out, not `--audit-heat-ramp`, so a ramp the bar sets on itself (`stops`) resolves here. */
+  background: linear-gradient(in oklch to right, var(--audit-depth-0), var(--audit-depth-1), var(--audit-depth-2),
+    var(--audit-depth-3), var(--audit-depth-4));
 }
 
 .ticks {

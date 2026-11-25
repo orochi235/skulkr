@@ -4,6 +4,7 @@ import type { AuditArea } from './skulkrMap.types';
 import s from './NextUp.module.css';
 import { ordinal } from './ordinal';
 import { roundCountOf } from './areaData';
+import { LockMark, PinMark } from './Marks';
 
 /** A list of areas, by default the ones a run would pick next, numbered by their queue places; each picks its cell on
  *  the map, and lights it while hovered. */
@@ -25,6 +26,8 @@ export function NextUp({ areas, onPick, onLight, note, numbered = true }: {
               type="button" className={s.pick} onClick={() => onPick(a.id)}
               onPointerEnter={() => onLight(a.id)} onPointerLeave={() => onLight(null)} onFocus={() => onLight(a.id)} onBlur={() => onLight(null)}
             >
+              {a.pinned && <PinMark className={s.mark} label="pinned" />}
+              {a.locked !== undefined && <LockMark className={s.mark} label="held by an unmerged round" />}
               <span className={s.id}>{a.id}</span>
               <span className={s.files} title={`${a.files} source files`}>
                 {a.files}<Icon name={icon('ui:page')} size={11} className={s.page} />

@@ -4,7 +4,15 @@ A live page of each tenant's audit rounds: the areas as a treemap shaded by what
 running round's lanes, the rounds chart, the jobs coming back, the queue, and an area's defects. Its data comes from
 the pipeline's CLI (`../bin/skulkr.mjs tenants ls`, `map` and `defects <area>`), which a small Vite plugin
 (`server/plugin.ts`) runs on each request at `api/tenants`, `api/t/<name>/map` and `api/t/<name>/area?id=<area>`; the
-area panel's pin toggle POSTs to `api/t/<name>/pin?id=<area>&on=1|0`, which runs `pin` or `unpin`.
+area panel's pin toggle POSTs to `api/t/<name>/pin?id=<area>&on=1|0`, which runs `pin` or `unpin`. The job-log callout
+over a running round's lane reads `api/t/<name>/tail?id=<area>` every 3 seconds, which the plugin answers itself from the
+area's newest job log (`server/jobTail.ts`), adding `onto logs --tail` for a job it handed to the fleet; the log tab reads `api/t/<name>/log`, the end of the
+running round's `night.log`, the same way.
+The menu under the map colors it by defects left (the default), defects left per 10 files, fixed, found, the queue's
+order, open findings, lines changed since a pass, rounds since a pass, rounds read, or files; each has its own ramp in
+the prefs (the defects-left ramp also colors the charts). Under the map, the jobs feed, the queue's head and the pinned
+areas (tabs), and the running round's `night.log`, raw, beside the issues (what the gate fails, failed steps, left-out
+branches, open findings; tabs) sit side by side, their seams dragged to resize them. A reload starts from the tenant list and map this browser read last.
 The title's menu switches tenants; the URL hash names the one shown. A slider above the treemap shows it as it stood
 after an earlier round, shaded only by what was left then (settling, changes and live runs are known only of now);
 the hash carries the round after an `@` (`#weasel@41`), so the view survives a reload and can be shared. Maps without
@@ -22,8 +30,9 @@ its root; with neither, `skulkr.config.mjs` in the directory the server starts i
 
 ## weasel
 
-The page is built on weasel (`@weasel-js/*`), pinned to 2.0.0 from npm. The map's loupe (F2, or "loupe" in its
-legend) is `@weasel-js/hud`'s, over the map's canvas.
+The page is built on weasel (`@weasel-js/*`), pinned to 2.0.0 from npm. The map's loupe (F2, or the loupe button in
+the header) is `@weasel-js/hud`'s round lens, over the map's canvas; the round lens is unreleased (weasel 7d11e12034), so
+it needs the alpo link below until a release carries it.
 
 On a machine with weasel checked out, alpo can serve the checkout over the published packages:
 

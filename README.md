@@ -188,7 +188,7 @@ too.
 themselves; one a live run or an unmerged branch holds waits as any other does. The pins are a list of area ids in
 `<state>/pins.json`, beside `limits.json`, so pinning commits nothing. A real round's plan unpins each pinned area that
 has settled and says so (`unpinned <id>: settled`); a dry plan only marks the pinned picks `(pinned)`. The map gives a
-pinned area `pinned: true`, and the dashboard draws a pin on its cell and a toggle in its area panel.
+pinned area `pinned: true`, and the dashboard draws a pin in its cell's bottom-right corner, at the queue number's size and left of it, and a toggle in its area panel.
 
 **History follows files.** A pass belongs to the files it read (its `files.txt`, also `files` in its `area.json`),
 not to its area's name, so a recut partition keeps what was learned. An area inherits every pass that read any of
@@ -394,7 +394,13 @@ its log, which onto ignores: each command it starts, each commit with its subjec
 failed. The local runner keeps each counter apart (commits, checks, tests) and takes the latest `skulkr:` line as the job's
 `now`, so the dashboard's fix column counts only commits, its checks column counts checks, and both tooltips show `now`.
 The onto runner reports only its first counter, so its lines carry commits alone. A job that a resume starts over
-gets `skulkr: relaunched at <time>` in its log, below the earlier run's lines.
+gets `skulkr: relaunched at <time>` in its log, below the earlier run's lines. A fixer's log also carries what it says
+between tool calls (`skulkr: says: …`), and a job that hands a verify to the fleet writes `skulkr: on the fleet as
+<task>` once onto has it.
+
+Resting the pointer on a running round's lane opens the end of that area's newest job log beside it, read from the
+round's `jobs/<area>/` every 3 seconds while it shows, and where that log hands its job to the fleet, the fleet task's
+own last lines from `onto logs --tail`.
 
 ### Local fixers
 
@@ -498,8 +504,8 @@ stranded one, so each merges worse. While more rounds are stranded than `maxUnme
 held), and continuous mode waits, its `next` saying why. Land, delete, or abandon the batch to let rounds start again.
 
 An area an earlier round's unmerged `audit<N>-<area>` branch holds stays out of the queue until that branch lands or is
-deleted. The map gives it `locked`, that round, unless a live run holds it, and the dashboard draws a padlock beside its
-pass dots.
+deleted. The map gives it `locked`, that round, unless a live run holds it, and the dashboard draws a padlock in its
+cell's bottom-right corner, at the queue number's size, left of any pin.
 
 ## Continuous rounds
 

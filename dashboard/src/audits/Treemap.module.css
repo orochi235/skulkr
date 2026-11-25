@@ -25,8 +25,6 @@
 .nowKeys { display: contents; }
 .nowOff > * { opacity: 0.35; }
 
-/* Sized for "the last pass:", so "round 66:" in its place leaves the keys after it where they were. */
-.asOfText { display: inline-block; min-width: 14ch; }
 
 .legend {
   flex: none;
@@ -38,6 +36,8 @@
   font-size: var(--wzl-font-size-md);
   color: var(--audit-muted);
 }
+
+.colorBy { font: inherit; color: var(--wzl-fg); }
 
 .key {
   display: inline-block;
@@ -77,14 +77,10 @@
 
 /* The padlock a cell wears while an earlier round's unmerged branch holds it. */
 .lock {
-  width: 8px;
-  height: 10px;
   margin-right: 5px;
   vertical-align: -1px;
 }
 
-.lock path { fill: none; stroke: currentColor; stroke-width: 1.1; }
-.lock rect { fill: currentColor; }
 
 .live {
   background: transparent;
@@ -141,4 +137,3 @@
 }
 
 /* At the legend's far end, apart from the keys. */
-.loupeToggle { margin-inline-start: auto; }
