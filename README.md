@@ -388,6 +388,24 @@ A ledger is read ahead of the first round reviewed at or after its commit. A rou
 in the same area, takes that defect over, and a later fixer's words close one; a defect only a ledger found is never
 handed to a fixer, so open findings and carried findings are the same with or without ledgers (2026-11-25).
 
+## The index
+
+`<record.dir>/cache/skulkr.db`, a SQLite database (`node:sqlite`) built from the committed record and ignored by git
+(`.skulkr/.gitignore`). It is built again whenever the record's tree at `HEAD`, or any change to it not yet committed,
+differs from what it was built from, so it is never edited and never out of date. `skulkr q <sql> [--json]` queries
+it; `saturate ls` reads each landed ledger's defects' registry lines from it. `map` reads the record itself.
+
+| Table | A row per |
+|---|---|
+| `areas`, `files` | area of the partition, and each of its files |
+| `defects`, `defect_files` | registry line (`status`, `verdict`, `resolved_round`, `resolved_sha`, `first_round`, `first_ledger`, …), and each path it cites |
+| `sightings` | report of a defect: a round's (`round`, `area`, `reviewer`) or a ledger's (`ledger`, `ledger_defect`, `occasions`, `sources`) |
+| `passes` | round's area record: its counts, Chapman's estimate, `cost_usd`, `commit`, `date` |
+| `jobs` | job in a round's `usage.jsonl` |
+| `ledgers`, `occasions` | landed saturation ledger, and each of its occasions |
+
+    skulkr q "select area, count(*) open from defects where status = 'open' group by area order by open desc"
+
 ## A sweep
 
 A config's `sweep` is an extra check run once per round beside the reviews, whose findings go to one fixer. It is
@@ -766,6 +784,8 @@ LaunchAgent, so install from a shell where `node` and `onto` resolve, and set ei
 | Each commit's lines changed, for `staleLines` and calibration's `lines` | `~/.cache/skulkr/<name>/churn.json` | only the commits after the oldest pass asked about: any area's last pass, or the first of a pair of passes; rewritten without the rest on each build that adds one, and dropped when the partition's `roots`, `extensions` or `exclude` change |
 | A saturation ledger | `<state>/saturation/<area>/`: `ledger.json`, `reviews/`, and `jobs/` while an occasion runs | `saturate.max` occasions; each occasion's job outputs deleted once it is recorded; `skulkr saturate rm <area>` deletes the lot. `--fresh` moves an old ledger aside to `<area>.<commit>`, kept until `rm <area>.<commit>` |
 | A landed saturation ledger | `<record.dir>/saturation/<area>/<commit>/` in the project, committed to `main` | one directory per area and frozen commit, replaced by each landing of it; at most `saturate.max` reviews |
+| The defect registry | `<record.dir>/defects/<area>.jsonl` in the project, committed | one line per defect, rewritten whole at each record commit and landing |
+| The index | `<record.dir>/cache/skulkr.db` in the checkout, ignored by git | one file, replaced whenever the record changes |
 | Node tree leases | `<state>/slots/<node>/<tree>` | deleted as each job ends; one whose pid is dead is taken back |
 | The local runner's clones | `<state>/trees/t<k>` and a lease beside each | one per job running at once; reused, never more than the most jobs ever run at once (local fixers' included) |
 | The local runner's job records, for the dashboard | `<state>/local-jobs/`, a file per job | deleted after 7 days, as each job starts and as `jobs()` reads them |

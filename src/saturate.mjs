@@ -188,7 +188,7 @@ export const saturateCommand = async (cfg, runner, root, argv, say = (line) => c
     return ids.map((id) => ledgerOf(cfg, id));
   }
   if (first === 'ls') {
-    const list = ledgerListOf(cfg);
+    const list = ledgerListOf(cfg, root);
     if (args.json) say(JSON.stringify(list));
     else for (const line of ledgerListLines(list)) say(line);
     return list;

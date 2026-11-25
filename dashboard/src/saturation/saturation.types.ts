@@ -11,6 +11,9 @@ export interface SaturationDefect {
   readonly sources: readonly string[];
   /** The source that found it outside any occasion, for a defect no occasion reported; else null. */
   readonly onlyBy: string | null;
+  /** Its line in the project's defect registry, once its ledger has landed: the registry's id, its status (`open`,
+   *  `fixed`, …) and the commit that resolved it; null before. */
+  readonly registry: { readonly id: string; readonly status: string; readonly sha: string | null } | null;
 }
 
 /** One area's saturation ledger, summed up: its repeated blind reviews at one frozen commit and what they found. */

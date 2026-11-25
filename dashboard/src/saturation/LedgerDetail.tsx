@@ -10,7 +10,14 @@ const COLUMNS: readonly DataGridColumn<SaturationDefect>[] = [
   { id: 'where', header: 'Where', className: s.where },
   { id: 'sightings', header: 'Seen', numeric: true },
   { id: 'sources', header: 'By', accessor: (d) => (d.onlyBy ? `${d.onlyBy} only` : d.sources.join(', ')), sortable: false },
+  { id: 'status', header: 'Status', accessor: (d) => d.registry?.status ?? 'not landed', render: statusOf },
 ];
+
+/** A defect's registry status, with the commit that resolved it. */
+function statusOf(d: SaturationDefect) {
+  if (!d.registry) return <span className={s.unlanded}>not landed</span>;
+  return d.registry.sha ? <>{d.registry.status} <code>{d.registry.sha.slice(0, 10)}</code></> : d.registry.status;
+}
 
 /** One ledger: how far its reviews got, and its distinct defects. */
 export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {

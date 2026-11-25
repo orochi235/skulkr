@@ -4,11 +4,17 @@
  */
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { gitIn } from './batch.mjs';
 import { ledgerOf } from './ledger.mjs';
+import { queryIndex } from './recordIndex.mjs';
 import { chao2, sourcesOf, stopReason, stopRuleOf } from './saturation.mjs';
 
-/** One ledger's summary and defects; `id` is its directory, an area or a set-aside `<area>.<commit>`. */
-export const ledgerSummaryOf = (cfg, id, ledger) => {
+/**
+ * One ledger's summary and defects; `id` is its directory, an area or a set-aside `<area>.<commit>`. `registered`
+ * answers, for a landed ledger's key, each of its defects' registry line by defect id (`{ id, status, sha }`).
+ */
+export const ledgerSummaryOf = (cfg, id, ledger, registered = () => new Map()) => {
+  const inRegistry = registered(`${ledger.area}@${ledger.commit.slice(0, 10)}`);
   const stats = chao2(ledger.occasions, ledger.defects);
   const costUsd = ledger.occasions.reduce((sum, o) => sum + (o.costUsd ?? 0), 0);
   return {
@@ -34,17 +40,33 @@ export const ledgerSummaryOf = (cfg, id, ledger) => {
       firstOccasion: d.firstOccasion ?? null,
       sources: Object.keys(d.sources ?? {}).filter((s) => d.sources[s].length),
       onlyBy: d.sightings.length ? null : d.source ?? null,
+      registry: inRegistry.get(d.id) ?? null,
     })),
   };
 };
 
-/** Every ledger in `cfg`'s state directory, summed up, by id. */
-export const ledgerListOf = (cfg) => {
+/** For a landed ledger's key, its defects' registry lines by defect id, read from the index of the record under `root`. */
+const registeredIn = (cfg, root) => {
+  let rows = [];
+  try {
+    rows = queryIndex(cfg, gitIn(root), root, 'select s.ledger, s.ledger_defect, d.id, d.status, d.resolved_sha from sightings s join defects d on d.id = s.defect where s.ledger is not null');
+  } catch { /* no record to index */ }
+  const byLedger = new Map();
+  for (const r of rows) {
+    if (!byLedger.has(r.ledger)) byLedger.set(r.ledger, new Map());
+    byLedger.get(r.ledger).set(r.ledger_defect, { id: r.id, status: r.status, sha: r.resolved_sha });
+  }
+  return (key) => byLedger.get(key) ?? new Map();
+};
+
+/** Every ledger in `cfg`'s state directory, summed up, by id; each landed one's defects with their registry lines from `root`'s record. */
+export const ledgerListOf = (cfg, root) => {
   const dir = join(cfg.state, 'saturation');
   if (!existsSync(dir)) return [];
+  const registered = root ? registeredIn(cfg, root) : undefined;
   return readdirSync(dir).sort().flatMap((id) => {
     const ledger = ledgerOf(cfg, id);
-    return ledger ? [ledgerSummaryOf(cfg, id, ledger)] : [];
+    return ledger ? [ledgerSummaryOf(cfg, id, ledger, registered)] : [];
   });
 };
 

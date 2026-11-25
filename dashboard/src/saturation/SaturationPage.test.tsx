@@ -13,8 +13,8 @@ const ledger = (id: string, unseen: number, defects: SaturationLedger['defects']
 
 const LEDGERS = [
   ledger('core.animation', 9.6, [
-    { id: 'D1', claim: 'A rejected tween still records its pose', where: 'poseHelpers.ts:110', severity: 'medium', sightings: 7, firstOccasion: 1, sources: ['codex', 'claude'], onlyBy: null },
-    { id: 'D2', claim: 'A pose read during teardown throws', where: 'animator.ts:40', severity: 'low', sightings: 0, firstOccasion: null, sources: [], onlyBy: 'codex' },
+    { id: 'D1', claim: 'A rejected tween still records its pose', where: 'poseHelpers.ts:110', severity: 'medium', sightings: 7, firstOccasion: 1, sources: ['codex', 'claude'], onlyBy: null, registry: { id: 'd-0123456789', status: 'fixed', sha: '96c86df9c8aa' } },
+    { id: 'D2', claim: 'A pose read during teardown throws', where: 'animator.ts:40', severity: 'low', sightings: 0, firstOccasion: null, sources: [], onlyBy: 'codex', registry: null },
   ]),
   ledger('geom.booleans', 1.2, []),
 ];
@@ -47,6 +47,8 @@ describe('SaturationPage', () => {
     const detail = screen.getByRole('region', { name: "core.animation's defects" });
     expect(within(detail).getByText('A rejected tween still records its pose')).toBeInTheDocument();
     expect(within(detail).getByText('codex only')).toBeInTheDocument();
+    expect(within(detail).getByText('96c86df9c8')).toBeInTheDocument();
+    expect(within(detail).getByText('not landed')).toBeInTheDocument();
     expect(window.location.hash).toBe('#weasel/saturation/core.animation');
   });
 

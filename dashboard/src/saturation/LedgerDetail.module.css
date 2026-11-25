@@ -42,3 +42,5 @@
   overflow-wrap: anywhere;
   max-width: 40ch;
 }
+
+.unlanded { color: var(--wzl-fg-muted); }

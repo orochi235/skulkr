@@ -2,8 +2,6 @@
 
 Open work on skulkr. Each entry says when it closes.
 
-- [ ] (P1) Build `.skulkr/` and the defect registry, `docs/skulkr-dir.md` (designed 2026-11-25, nothing built). Closes
-  when its four phases are built and the design doc is folded into the README and deleted.
 - [ ] (P2) Saturation ledgers' defects reach no fixer: landed ledgers under `<record.dir>/saturation/` are read by
   nothing. They are to be fixed eventually; the mechanism is undecided (2026-11-25). A defect was found at the ledger's
   frozen commit, so whatever hands it to a fixer has it re-checked against the current tree first. The dashboard's
