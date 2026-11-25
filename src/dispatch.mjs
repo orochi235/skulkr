@@ -2,12 +2,13 @@
  * Launching one job of an area: on whichever slot frees first, moving to another node when one turns it away, waiting
  * while no node has room, and reusing a resumed round's result that already came home.
  */
-import { cpSync, existsSync, rmSync, statSync } from 'node:fs';
+import { cpSync, existsSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { sleep } from './after.mjs';
 import { isFinished, reviewText } from './findings.mjs';
 import { STARTED, runJob } from './jobs.mjs';
 import { readIf } from './text.mjs';
+import { readJson } from './json.mjs';
 import { agentFor } from './agent/index.mjs';
 
 const minutesSince = (t0) => (Date.now() - t0) / 60_000;
@@ -50,6 +51,26 @@ export const cameHome = (spec, role, cfg) => {
   if (result.error) return undefined;
   if (role.startsWith('review') && !isFinished(reviewText(readIf(join(spec.to, 'findings.md')), result.reply))) return undefined;
   return { exit, raw };
+};
+
+/** The model role each of an area's job directories ran as, or undefined for one that runs no model (a verify). */
+const roleOfDir = (name) => (/^T?[AB]$/.test(name) ? `review-${name}` : /^match(-T)?$/.test(name) ? 'match' : name === 'fix' ? 'fix' : /^repair-\d+$/.test(name) ? 'repair' : undefined);
+
+/**
+ * Whether area `id` would cost nothing new on a resume: its reviews came home, as did every model job it started
+ * after them, and its fixer did too unless its reviews left nothing to fix. Each would be reused (`dispatch`).
+ */
+export const isPaidFor = (cfg, nightDir, id) => {
+  const dir = join(nightDir, 'jobs', id);
+  if (!existsSync(dir)) return false;
+  const names = readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+  const home = (name) => Boolean(cameHome({ to: join(dir, name) }, roleOfDir(name), cfg));
+  if (!home('A') || !home('B')) return false;
+  if (!names.every((name) => !roleOfDir(name) || home(name))) return false;
+  if (names.includes('fix')) return true;
+  const record = join(nightDir, 'areas', id);
+  const matched = readJson(join(record, 'match.json'));
+  return Boolean(matched) && matched.a.length + matched.b.length === 0 && !existsSync(join(record, 'carried.json'));
 };
 
 /**

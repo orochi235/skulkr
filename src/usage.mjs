@@ -1,4 +1,6 @@
 /** Usage records, one per model job, as its agent's `resultOf` reads them (`src/agent/`), and what they add up to. */
+import { join } from 'node:path';
+import { readIf } from './text.mjs';
 
 /**
  * What each kind of token costs against an input token, the same ratios for every Claude model: a cache read is
@@ -20,12 +22,32 @@ export const totals = (records) => ({
 });
 
 /**
+ * What each area's jobs cost in the night at `nightDir` so far, by area id, from its `usage.jsonl`: a resumed round's
+ * spend before the resume. A reused job's record repeats a cost already counted, so it adds nothing.
+ */
+export const spendIn = (nightDir) => {
+  const spent = new Map();
+  for (const line of readIf(join(nightDir, 'usage.jsonl')).split('\n')) {
+    if (!line.trim()) continue;
+    let record;
+    try {
+      record = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!record.reused && record.area) spent.set(record.area, (spent.get(record.area) ?? 0) + (record.costUsd ?? 0));
+  }
+  return spent;
+};
+
+/**
  * Whether a night that has spent `used` dollars may start another area, expecting each to cost the mean of `finished`
  * (dollar costs of its finished areas) or `guess`. `running` holds what each area still running has spent so far, which
- * `used` already counts, so each is expected to cost only the rest of its share.
+ * `used` already counts, so each is expected to cost only the rest of its share; `before` is what the next area spent
+ * before a resume, which `used` counts too.
  */
-export const mayStartArea = ({ used, finished, running, cap, guess }) => {
+export const mayStartArea = ({ used, finished, running, cap, guess, before = 0 }) => {
   const expected = finished.length > 0 ? finished.reduce((s, n) => s + n, 0) / finished.length : guess;
   const rest = running.reduce((s, spent) => s + Math.max(0, expected - spent), 0);
-  return used + rest + expected <= cap;
+  return used + rest + Math.max(0, expected - before) <= cap;
 };

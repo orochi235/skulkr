@@ -170,7 +170,7 @@ the config names one, gets a row.
 | `--fix-only [a,b]` | | a fix-only round for these areas, or every area with open findings; see "Carried findings" |
 | `--local` | `local.enabled` | local mode: nothing leaves this machine but its model calls; see "Local mode". Any command takes it, so `skulkr config --local` prints the config as local mode runs it |
 | `--local-fix` | `localFix.enabled` | run fixers and repairs on this machine, as the account that started the run; see "Local fixers" |
-| `--resume N` | | pick round N back up, reusing every job whose result came home; it stops starting areas at the first `schedule.stopAt` after the resume. Under the plan lock, it leaves out the areas a live run holds. A round lands once: when its status or `summary.json` names a `landed` tip (set once `main` fast-forwards, with the areas it carried) that `main` still holds, it resumes nothing and says the round already landed |
+| `--resume N` | | pick round N back up, reusing every job whose result came home; it stops starting areas at the first `schedule.stopAt` after the resume. Under the plan lock, it leaves out the areas a live run holds. A round lands once: when its status or `summary.json` names a `landed` tip (set once `main` fast-forwards, with the areas it carried) that `main` still holds, it resumes nothing and says the round already landed. The record an earlier attempt committed on the round's batch is no earlier pass of its areas |
 | `--cap-usd N` | `budget.areaCapUsd` × `--areas`, else `budget.capUsd` | list-price dollars the run may spend |
 | `--budget-review`, `--budget-match`, `--budget-fix` | `budget.*` | each job's `--max-budget-usd` |
 
@@ -251,7 +251,7 @@ reviews already running, fixers, and verify steps go on.
 **Limits.** Each job's model is stopped at `claude.timeoutMin` and the runner stops the job ten minutes later, so
 what it wrote still comes home. A run starts no new area after `schedule.stopAt`, nor when what it has spent, plus
 what each running area has left of its expected cost, plus one more area would pass the dollar cap, an area being
-expected to cost the mean of this run's finished areas (`budget.areaGuessUsd` before any has), nor once a stop is requested; a fix-only round's fixers start under the same checks. While the sweep's fixer runs, what it may still spend (`budget.fix` less its spend so far) counts as spent. A capstone repair starts only while no stop is requested and what the run has spent, plus `budget.fix` for it and for each repair started before it, stays within the cap; a branch whose repair does not start is left out, as one whose repair failed is. An area whose reviewers ran always gets its matcher and fixer. Where skulkr picks
+expected to cost the mean of this run's finished areas (`budget.areaGuessUsd` before any has), nor once a stop is requested. A resumed round's area is expected to cost only what it had not spent before the resume, and one whose every model job came home, to be reused, costs nothing and starts past the cap and `schedule.stopAt` (2026-11-25); a fix-only round's fixers start under the same checks. While the sweep's fixer runs, what it may still spend (`budget.fix` less its spend so far) counts as spent. A capstone repair starts only while no stop is requested and what the run has spent, plus `budget.fix` for it and for each repair started before it, stays within the cap; a branch whose repair does not start is left out, as one whose repair failed is. An area whose reviewers ran always gets its matcher and fixer. Where skulkr picks
 nodes (a pinned run, or a runner that does not place jobs), a node the runner reports unavailable is skipped, and a
 dispatch a node refuses moves to another node and keeps that one out for `nodes.refusedCooldownMin`. Under a placing runner a refused job is launched again each minute, up to 120 times; a run with pinned nodes retries as each node's cooldown ends, for the same two hours. Then the job is given up, and a refusal after a stop request is not retried.
 A model job the account's usage limit stopped partway is run again, whole, once the limit resets (the time its
@@ -332,6 +332,7 @@ What it differs in from the round's batch:
 | branches left out of earlier rounds | not retried | retried |
 | a branch that will not merge | waits for the round's batch | left out, in `left-out.json` |
 | still red after its capstone | its branches wait for the round's batch, and its batch branch goes | the batch and branches are kept |
+| green, but `main` would not fast-forward | its branches wait for the round's batch, and its batch branch goes | the batch and branches are kept |
 
 The round's batch merges the landed `main` in, as it does after any landing. `status.landed` carries `early: true`
 until the round's batch lands, so `--resume` runs the round on rather than calling it landed, and skips the areas

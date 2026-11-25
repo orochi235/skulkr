@@ -25,6 +25,8 @@ import { createSlots } from './slots.mjs';
 import { watchEarly } from './early.mjs';
 import { batchAndTest, patchAreas, patchSweep } from './land.mjs';
 import { unitCostOf } from './unitCost.mjs';
+import { spendIn } from './usage.mjs';
+import { isPaidFor } from './dispatch.mjs';
 import { begin, localDate, plan, printPlan } from './plan.mjs';
 import { resume } from './resume.mjs';
 import { RESUMED } from './nightLog.mjs';
@@ -82,6 +84,7 @@ const runContext = ({ cfg, runner, root, p, args, status, frozen, say, setStep }
   let unavailable = { at: 0, nodes: new Set() };
   const counts = {};
   const spent = new Map();
+  const before = spendIn(status.nightDir);
   const fixingOutsideAreas = new Set();
   return {
     cfg, runner, root,
@@ -99,6 +102,10 @@ const runContext = ({ cfg, runner, root, p, args, status, frozen, say, setStep }
     stopped: () => stopRequested(p.round, cfg.state),
     /** What area `id`'s jobs have cost so far, a reused job's included as its area's mean counts it. */
     spentOn: (id) => spent.get(id) ?? 0,
+    /** What area `id`'s jobs cost before this run resumed the round. */
+    spentBefore: (id) => before.get(id) ?? 0,
+    /** Whether `area` would cost nothing more, every job of it having come home before a resume (`isPaidFor`). */
+    isPaidFor: (area) => isPaidFor(cfg, status.nightDir, area.id),
     /** Marks job `id`'s fixer, run outside any area (the sweep's), as running or finished, for {@link reservedUsd}. */
     fixingOutside: (id, running) => (running ? fixingOutsideAreas.add(id) : fixingOutsideAreas.delete(id)),
     /** What fixers running outside any area may still spend: each one's ceiling less what it has spent. */

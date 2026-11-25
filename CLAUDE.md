@@ -139,6 +139,10 @@ weasel cutover.
   - settling by the depletion fit (README "Depletion", 2026-11-25): an area settles when its 95% bound leaves under
     one defect, a next pass has under a 5% chance of finding any, and none of its lines changed since its last pass,
     in place of two passes that each found at most one; the map's area `depletion` and top-level `depletionP`.
+  - a resumed round's area expected to cost only what it had not spent before the resume, and one whose every model job
+    came home started past the dollar cap and `schedule.stopAt` (README "Limits"); a resume taking no pass from its own
+    round's record on an earlier attempt's batch; and an early landing that does not fast-forward `main` deleting its
+    batch branch, its report ending `; its branches wait for the round's batch` (2026-11-25).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

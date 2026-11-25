@@ -82,6 +82,41 @@ describe('startAreas, against the cap', () => {
   });
 });
 
+describe('startAreas on a resume', () => {
+  /** Eight areas, a round resumed at $29 spent of an $80 cap, each area having spent $4 of its $10 guess before. */
+  const resumed = (paid: Set<string>) => {
+    const h = harness({ costUsd: 29 });
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    const start = async (area: { id: string }) => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return { id: area.id, jobs: { costUsd: 3.6 } };
+    };
+    const ctx = { ...h.ctx, spentOn: () => 0, spentBefore: () => 4, isPaidFor: (area: { id: string }) => paid.has(area.id) };
+    return { ...h, ctx, start, args: { capUsd: 80 }, picked: ids.map((id) => ({ id })) };
+  };
+
+  it('counts what each area spent before the resume against what it is expected to cost', async () => {
+    const h = resumed(new Set());
+    const results: { id: string }[] = [];
+    await startAreas({ ...h, deadline: later, results, maxAreas: () => 8 });
+    expect(h.said).toEqual([]);
+    expect(results).toHaveLength(8);
+    const unknown = resumed(new Set());
+    await startAreas({ ...unknown, ctx: { ...unknown.ctx, spentBefore: undefined }, deadline: later, results: [], maxAreas: () => 8 });
+    expect(unknown.said).toHaveLength(3);
+  });
+
+  it('starts an area whose every job came home past the dollar cap and the deadline, though not past a stop', async () => {
+    const h = resumed(new Set(['g', 'h']));
+    const results: { id: string }[] = [];
+    await startAreas({ ...h, status: { costUsd: 79 }, deadline: new Date(0), results, maxAreas: () => 8 });
+    expect(results.map((r) => r.id).sort()).toEqual(['g', 'h']);
+    const stopped = resumed(new Set(['g']));
+    await startAreas({ ...stopped, ctx: { ...stopped.ctx, stopped: () => true }, deadline: later, results: [], maxAreas: () => 8 });
+    expect(stopped.said).toContain('not starting g: stop requested');
+  });
+});
+
 describe('startAreas, beside a fixer outside any area', () => {
   it("counts what the sweep's fixer may still spend against the cap", async () => {
     const h = harness({ costUsd: 80 });

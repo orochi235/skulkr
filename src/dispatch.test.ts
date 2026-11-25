@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cameHome, dispatch, earlierMinutes, earlierReview, limitResetOf } from './dispatch.mjs';
+import { cameHome, dispatch, earlierMinutes, earlierReview, isPaidFor, limitResetOf } from './dispatch.mjs';
 
 const dirs: string[] = [];
 const job = (files: Record<string, string>) => {
@@ -243,5 +243,39 @@ describe('earlierReview', () => {
     expect(earlierReview(ctx, area, 'review-A', spec)).toBeDefined();
     expect(cameHome(spec, 'review-A')).toBeDefined();
     expect(earlierReview({ ...ctx, earlierNights: ctx.earlierNights.slice(0, 2) }, area, 'review-A', { to: join(night('', false), 'jobs', 'x', 'B') })).toBeUndefined();
+  });
+});
+
+describe('isPaidFor', () => {
+  const done = { exit: '0', 'claude.json': ok, 'findings.md': '## one\n<!-- done: 1 finding -->\n' };
+  const ran = { exit: '0', 'claude.json': ok };
+  const fixed = { ...ran, 'fix.mbox': '' };
+  /** A night directory holding area `x`'s job directories and record files. */
+  const night = (jobs: Record<string, Record<string, string>>, record: Record<string, string> = {}) => {
+    const dir = mkdtempSync(join(tmpdir(), 'skulkr-night-'));
+    dirs.push(dir);
+    for (const [name, files] of Object.entries(jobs)) {
+      mkdirSync(join(dir, 'jobs', 'x', name), { recursive: true });
+      for (const [file, text] of Object.entries(files)) writeFileSync(join(dir, 'jobs', 'x', name, file), text);
+    }
+    mkdirSync(join(dir, 'areas', 'x'), { recursive: true });
+    for (const [file, text] of Object.entries(record)) writeFileSync(join(dir, 'areas', 'x', file), text);
+    return dir;
+  };
+
+  it('holds an area whose reviews, matcher, fixer and repairs all came home, whatever its verify jobs left', () => {
+    expect(isPaidFor({}, night({ A: done, B: done, match: ran, fix: fixed, 'repair-1': fixed, 'verify-fix-gui': {} }), 'x')).toBe(true);
+  });
+
+  it('holds an area with nothing to fix once its reviews came home empty', () => {
+    expect(isPaidFor({}, night({ A: done, B: done }, { 'match.json': '{"pairs":[],"a":[],"b":[]}' }), 'x')).toBe(true);
+    expect(isPaidFor({}, night({ A: done, B: done }, { 'match.json': '{"pairs":[],"a":["one"],"b":[]}' }), 'x')).toBe(false);
+  });
+
+  it('does not hold an area with a job still to run: a review, its fixer, or a repair', () => {
+    expect(isPaidFor({}, night({}), 'none')).toBe(false);
+    expect(isPaidFor({}, night({ A: done, B: ran }), 'x')).toBe(false);
+    expect(isPaidFor({}, night({ A: done, B: done, match: ran }, { 'match.json': '{"pairs":[],"a":["one"],"b":["two"]}' }), 'x')).toBe(false);
+    expect(isPaidFor({}, night({ A: done, B: done, fix: fixed, 'repair-1': ran }), 'x')).toBe(false);
   });
 });

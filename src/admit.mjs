@@ -18,7 +18,9 @@ const pause = (ms) => new Promise((resolve) => { setTimeout(resolve, ms).unref?.
  * Starts each of `picked` with `start(area, { reviewed })`, at most `maxAreas()` at once, asked again before each area
  * and every `recheckMs` while it waits, so a change to `limits.json` reaches a run already going, each only while the run has no stop
  * request, is before `deadline`, and has the dollars for one more area; resolves when every started one has finished,
- * its summary pushed to `results`. What a fixer outside any area (the sweep's) may still spend counts as spent. An area
+ * its summary pushed to `results`. What a fixer outside any area (the sweep's) may still spend counts as spent. A
+ * resumed area costs only what it has not spent before the resume (`ctx.spentBefore`), and one whose every job came home
+ * (`ctx.isPaidFor`) costs nothing, so it starts past the cap and the deadline. An area
  * holds its place until it finishes, or until it calls `reviewed()` where `releaseReviewed` is set: then the next area
  * starts while its fixer runs, the fix slots alone bounding the fixers.
  */
@@ -26,13 +28,18 @@ export const startAreas = async ({ ctx, picked, args, status, deadline, results,
   const inFlight = new Map();
   const holding = new Set();
   const cfg = ctx.cfg;
+  const paid = new Set();
+  /** What area `id` has spent, before a resume or since: a reused job's record repeats what it cost before. */
+  const spent = (id) => Math.max(ctx.spentOn?.(id) ?? 0, ctx.spentBefore?.(id) ?? 0);
   for (const area of picked) {
     while (holding.size >= maxAreas()) await Promise.race([...holding, pause(recheckMs)]);
-    const running = [...inFlight.values()].map((id) => ctx.spentOn?.(id) ?? 0);
-    const affordable = mayStartArea({ used: status.costUsd + (ctx.reservedUsd?.() ?? 0), finished: results.map((r) => r.jobs.costUsd), running, cap: args.capUsd, guess: cfg.budget.areaGuessUsd });
+    if (ctx.isPaidFor?.(area)) paid.add(area.id);
+    const running = [...inFlight.values()].filter((id) => !paid.has(id)).map(spent);
+    const affordable = paid.has(area.id) || mayStartArea({ used: status.costUsd + (ctx.reservedUsd?.() ?? 0), finished: results.map((r) => r.jobs.costUsd), running, cap: args.capUsd, guess: cfg.budget.areaGuessUsd, before: ctx.spentBefore?.(area.id) ?? 0 });
     const why = ctx.stopped() ? 'stop requested'
-      : new Date() >= deadline ? `past ${cfg.schedule.stopAt}`
-        : !affordable ? `the next area would cross the ${usd(args.capUsd)} cap (${usd(status.costUsd)} used)` : '';
+      : paid.has(area.id) ? ''
+        : new Date() >= deadline ? `past ${cfg.schedule.stopAt}`
+          : !affordable ? `the next area would cross the ${usd(args.capUsd)} cap (${usd(status.costUsd)} used)` : '';
     if (why) {
       ctx.say(`not starting ${area.id}: ${why}`);
       continue;
