@@ -88,7 +88,20 @@ project's `.skulkr/`, never from one machine's state directory.
   (2026-11-25).
 - **ask's rulings route back into the pipeline**: "fix it" returns the defect to triage, "not a defect" sends it to
   close; what needs a person leaves the pipeline, logged and listed on the Scour page as "needs you" (2026-11-25).
+- **A finding carries what triage needs**, written by the reviewer that found it (2026-11-25), a first set expected to
+  grow:
+
+  | Field | The reviewer writes | Triage uses it for |
+  |---|---|---|
+  | `scenario` | the triggering input or state and what happens, as today; the ledger and registry now keep it | the fixer's starting point |
+  | `fix` | the files a fix would touch, where they differ from `where` | batching: fixes touching the same files go to one fixer; batches sharing no files run in parallel |
+  | `size` | `line`, `function` or `design` | `design` goes to ask, not a fixer; the rest size the batches |
+  | `cause` | a short phrase for the root cause, when seen | grouping one cause's defects for one fixer, across files |
+  | `confidence` | `sure` or `likely` | ordering, `likely` later; the `not a defect` rate is tracked against it |
+
+  A defect sighted more than once takes the highest severity, the union of `fix` files, the largest size, and its
+  first sighting's scenario.
 
 ## Open
 
-- **Which fields a finding carries for triage**, beyond today's claim, where, scenario, evidence and severity.
+Nothing; the plan is ready to build.
