@@ -225,12 +225,12 @@ const rejoinLedger = (git, tree, main, ledger) => {
  * Moves `main` to `tip` when that is a fast-forward and the main checkout is on `main` and clean.
  * Answers what happened, in a sentence for the report.
  */
-export const fastForwardMain = (root, tip, main = 'main') => {
+export const fastForwardMain = (root, tip, main = 'main', { retryMs = LOCK_RETRY_MS, wait = sleep } = {}) => {
   const git = gitIn(root);
   if (git('rev-parse', '--abbrev-ref', 'HEAD') !== main) return `not fast-forwarded: the main checkout is not on ${main}`;
   if (git('status', '--porcelain', '--untracked-files=no')) return 'not fast-forwarded: the main checkout has uncommitted changes';
-  const run = tryGit(git, 'merge', '--ff-only', tip);
-  return run.ok ? `${main} fast-forwarded to ${tip.slice(0, 10)}` : `not fast-forwarded: ${run.out.split('\n')[0]}`;
+  const run = mergeIn(git, ['--ff-only', tip], { retryMs, wait });
+  return run.ok ? `${main} fast-forwarded to ${tip.slice(0, 10)}` : `not fast-forwarded: ${run.error ?? run.conflict.join(', ')}`;
 };
 
 /** Pushes `main` to `remote`. Answers what happened, in a clause for the report; a failure leaves `main` as it is. */

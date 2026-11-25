@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { catchUpWithMain, commitRecord, gitIn, makeBatch, runGate } from './batch.mjs';
+import { catchUpWithMain, commitRecord, fastForwardMain, gitIn, makeBatch, runGate } from './batch.mjs';
 import { leftOutIn, leftOutWhy, recordLeftOut } from './leftOut.mjs';
 import { resolveConfig } from './config.mjs';
 
@@ -32,6 +32,25 @@ const repo = (mainFile: string, batchFile: string) => {
   git('checkout', '-q', 'batch');
   return { dir, git };
 };
+
+describe('fastForwardMain', () => {
+  it("waits out another git's index lock on the main checkout and fast-forwards once it clears", () => {
+    const { dir, git } = repo('main.txt', 'batch.txt');
+    git('checkout', '-q', 'main');
+    git('checkout', '-q', '-b', 'tip');
+    writeFileSync(join(dir, 'tip.txt'), 'tip');
+    git('add', 'tip.txt');
+    git('commit', '-q', '-m', 'tip');
+    const tip = git('rev-parse', 'HEAD');
+    git('checkout', '-q', 'main');
+    const lock = join(dir, '.git', 'index.lock');
+    writeFileSync(lock, '');
+    const waits: number[] = [];
+    const said = fastForwardMain(dir, tip, 'main', { retryMs: [5, 10], wait: (ms: number) => (waits.push(ms), rmSync(lock)) });
+    expect(waits).toEqual([5]);
+    expect(said).toBe(`main fast-forwarded to ${tip.slice(0, 10)}`);
+  });
+});
 
 describe('catchUpWithMain', () => {
   it('merges a moved main into the batch and answers the new tip', () => {
