@@ -30,6 +30,7 @@ import { SNAPSHOT, areaUrlFor, eventsUrlFor, logUrlFor, mapUrl, pinUrlFor, tailU
 import { AppTitle } from '@dash/AppTitle';
 import { TenantTitle } from '@dash/tenants/TenantTitle';
 import { titleFor } from '@dash/title';
+import { PageSwitch } from '@dash/pageView';
 import { useTenantChoice, useTenants } from '@dash/tenants/useTenants';
 import { readSize, useViewerPref } from './viewerPref';
 import { useDashPref } from './dashPrefs';
@@ -269,7 +270,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
     : tenants.status === 'ready' && !names.length ? 'The dev server reads no tenant: register one with skulkr tenants add.'
     : state.status === 'failed' ? `Couldn't read the audit map: ${state.error}` : null;
   return (
-    <Shell title={titleFor(tenant ?? map?.project ?? null)} heading={heading ?? <AppTitle />} header={header}>
+    <Shell title={titleFor(tenant ?? map?.project ?? null)} heading={heading ?? <AppTitle />} nav={dev && !SNAPSHOT ? <PageSwitch tenant={tenant} current="audits" /> : null} header={header}>
       <div ref={paletteRoot} className={`${palette.palette} ${s.root}`}>
         {!noServer && !failed && state.status === 'loading' && <p className={s.note}>Reading the audit map…</p>}
         {noServer && (

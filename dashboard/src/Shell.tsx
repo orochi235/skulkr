@@ -3,10 +3,10 @@ import { ColorModeControl } from '@weasel-js/ui/components/ColorModeControl';
 import { useColorModeChoice } from './colorMode';
 import s from './Shell.module.css';
 
-/** The page's frame: a header with its title, `header`'s controls, and the viewer's color mode at its far right, over a
- *  body that fills the rest. `title` also names the document while the shell is mounted; `heading`, when given, is
- *  drawn in its place. */
-export function Shell({ title, heading, header, children }: { title: string; heading?: ReactNode; header?: ReactNode; children: ReactNode }) {
+/** The page's frame: a header with its title, `nav` beside it, `header`'s controls, and the viewer's color mode at its far
+ *  right, over a body that fills the rest. `title` also names the document while the shell is mounted; `heading`, when
+ *  given, is drawn in its place. */
+export function Shell({ title, heading, nav, header, children }: { title: string; heading?: ReactNode; nav?: ReactNode; header?: ReactNode; children: ReactNode }) {
   useEffect(() => {
     const previous = document.title;
     document.title = title;
@@ -19,6 +19,7 @@ export function Shell({ title, heading, header, children }: { title: string; hea
     <div className={s.shell}>
       <header className={s.header}>
         <h1 className={s.title}>{heading ?? title}</h1>
+        {nav && <nav className={s.nav}>{nav}</nav>}
         {(header || colorMode) && (
           <div className={s.actions}>
             {header}

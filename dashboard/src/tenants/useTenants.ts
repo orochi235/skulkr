@@ -79,7 +79,8 @@ export function useTenants({ url, dev, everyMs = TENANTS_POLL_MS }: { url: strin
 
 /**
  * Which of `names` the page shows, and how to change it: the one the URL hash names, else the one this viewer chose
- * last, else the first. Choosing one puts it in the hash, in place of any round the map was shown after, and remembers it.
+ * last, else the first. Choosing one puts it in the hash, in place of any round the map was shown after or area picked, on the same page,
+ * and remembers it.
  */
 export function useTenantChoice(names: readonly string[]): [string | null, (name: string) => void] {
   const [stored, , keep] = useViewerPref('tenant', '', (s) => s);
@@ -95,7 +96,7 @@ export function useTenantChoice(names: readonly string[]): [string | null, (name
     setPicked(name);
     setHash(name);
     keep(name);
-    window.location.hash = hashFor({ tenant: name, round: null });
+    window.location.hash = hashFor({ tenant: name, round: null, view: readHash().view });
   };
   return [choice, choose];
 }

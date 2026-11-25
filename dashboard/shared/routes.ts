@@ -19,14 +19,17 @@ export const tenantLogPath = (name: string): string => `api/t/${encodeURICompone
 /** Where it pushes tenant `name`'s map, and the areas a running round touches, as server-sent events. */
 export const tenantEventsPath = (name: string): string => `api/t/${encodeURIComponent(name)}/events`;
 
+/** Where it serves tenant `name`'s saturation ledgers, each summed up with its defects (`skulkr saturate ls --json`). */
+export const tenantSaturationPath = (name: string): string => `api/t/${encodeURIComponent(name)}/saturation`;
+
 /** The header a map answer carries, URI-encoded, when the builds since that map failed: why the last one did. */
 export const STALE_HEADER = 'X-Skulkr-Build-Error';
 
 /** What a tenant route serves. */
-export type TenantRoute = 'map' | 'area' | 'pin' | 'tail' | 'log' | 'events';
+export type TenantRoute = 'map' | 'area' | 'pin' | 'tail' | 'log' | 'events' | 'saturation';
 
-/** A tenant route's parts: `{ tenant, what }` for `…/api/t/<name>/<map|area|pin|tail|log|events>`, else null. */
+/** A tenant route's parts: `{ tenant, what }` for `…/api/t/<name>/<map|area|pin|tail|log|events|saturation>`, else null. */
 export function parseTenantPath(path: string): { readonly tenant: string; readonly what: TenantRoute } | null {
-  const m = /\/api\/t\/([^/]+)\/(map|area|pin|tail|log|events)$/.exec(path);
+  const m = /\/api\/t\/([^/]+)\/(map|area|pin|tail|log|events|saturation)$/.exec(path);
   return m ? { tenant: decodeURIComponent(m[1]!), what: m[2] as TenantRoute } : null;
 }

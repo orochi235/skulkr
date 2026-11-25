@@ -1,0 +1,44 @@
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wzl-space-2);
+  min-height: 0;
+  min-width: 0;
+}
+
+.head { flex: none; }
+
+.title {
+  margin: 0;
+  font-family: var(--wzl-font-mono);
+  font-size: var(--wzl-font-size-lg);
+  font-weight: var(--wzl-font-weight-bold);
+}
+
+.facts {
+  margin: var(--wzl-space-1) 0 0;
+  font-size: var(--wzl-font-size-sm);
+  color: var(--wzl-fg-muted);
+}
+
+.num { font-variant-numeric: tabular-nums; }
+
+.scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.id {
+  font-family: var(--wzl-font-mono);
+  white-space: nowrap;
+}
+
+.claim { min-width: 24ch; }
+
+.where {
+  font-family: var(--wzl-font-mono);
+  font-size: var(--wzl-font-size-xs);
+  overflow-wrap: anywhere;
+  max-width: 40ch;
+}

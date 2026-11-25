@@ -181,14 +181,16 @@ export async function listTenants(run: SkulkrRunner): Promise<DashTenant[]> {
   return [{ name: cfg.name, registered: false }];
 }
 
-/** What a tenant route asks the CLI: its map (from the fleet listings `skulkr fetch` keeps), one area's defects, or to pin
- *  or unpin one; null for a tenant there is none of. */
-export function tenantArgs(tenants: readonly DashTenant[], name: string, what: 'map' | 'area' | 'pin' | 'unpin', area: string | null): string[] | null {
+/** What a tenant route asks the CLI: its map (from the fleet listings `skulkr fetch` keeps), one area's defects, to pin
+ *  or unpin one, or its saturation ledgers; null for a tenant there is none of. */
+export function tenantArgs(tenants: readonly DashTenant[], name: string, what: 'map' | 'area' | 'pin' | 'unpin' | 'saturation', area: string | null): string[] | null {
   const t = tenants.find((x) => x.name === name);
   if (!t) return null;
   // Options first, so an area id the CLI would read as a flag is never placed before them.
   const pick = t.registered ? ['--tenant', t.name] : [];
-  return what === 'map' ? ['map', ...pick, '--cached-jobs'] : [what === 'area' ? 'defects' : what, ...pick, area ?? ''];
+  if (what === 'map') return ['map', ...pick, '--cached-jobs'];
+  if (what === 'saturation') return ['saturate', ...pick, 'ls', '--json'];
+  return [what === 'area' ? 'defects' : what, ...pick, area ?? ''];
 }
 
 /** A request the routes refuse, told to the client as it is. */
@@ -279,6 +281,7 @@ export function createRoutes(options: SkulkrRunnerOptions, cli: SkulkrRunner = c
     void json(res, tenants.then(async (list) => {
       const mapArgs = tenantArgs(list, tenant, 'map', null);
       if (!mapArgs) throw new Refusal(400, `no tenant ${tenant}; this dashboard reads ${list.map((t) => t.name).join(', ')}`);
+      if (what === 'saturation') return run(tenantArgs(list, tenant, 'saturation', null)!);
       const map = mapOf(tenant, mapArgs);
       if (what === 'map') return map.kept();
       if (what === 'log') {

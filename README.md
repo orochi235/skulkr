@@ -486,6 +486,7 @@ calibration, the queue, or the map.
     skulkr saturate ingest <area> <report.md> --source <name> [--at <sha>]
     skulkr saturate import <area> <dir> --at <sha> [--fresh]
     skulkr saturate land <area>… | --all
+    skulkr saturate ls [--json]
     skulkr saturate report <area>
     skulkr saturate rm <area>
 
@@ -512,7 +513,8 @@ A review that never finishes is kept beside the ledger as `unfinished-…` and n
 
 `ingest` folds in a report written elsewhere, in any Markdown shape, as one occasion: the matcher reads it whole and
 lists its findings itself. A multi-pass audit whose passes shared context counts as one occasion, not one per pass,
-since its passes were not independent. `report` rewrites the report file from the ledger; `rm` deletes the ledger.
+since its passes were not independent. `ls` lists every ledger with its estimates, cost and defects (`--json` for the
+dashboard's saturation page); `report` rewrites the report file from the ledger; `rm` deletes the ledger.
 
 `import` builds a new ledger, at `--at`, from a saturation experiment run by hand, every occasion a Claude review.
 Its directory holds:

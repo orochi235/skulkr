@@ -1,4 +1,4 @@
-import { TENANTS_PATH, tenantAreaPath, tenantEventsPath, tenantMapPath, tenantPinPath, tenantTailPath, tenantLogPath } from '@shared/routes';
+import { TENANTS_PATH, tenantAreaPath, tenantSaturationPath, tenantEventsPath, tenantMapPath, tenantPinPath, tenantTailPath, tenantLogPath } from '@shared/routes';
 
 /**
  * Whether this build reads a snapshot written by `scripts/snapshot.mjs` instead of the dev server: static files a
@@ -32,3 +32,7 @@ export const logUrlFor = (base: string, name: string): string | null => (SNAPSHO
 
 /** Where the dev server pushes tenant `name`'s map as it changes; null for a snapshot, which never changes. */
 export const eventsUrlFor = (base: string, name: string): string | null => (SNAPSHOT ? null : `${base}${tenantEventsPath(name)}`);
+
+/** Where it reads tenant `name`'s saturation ledgers. */
+export const saturationUrl = (base: string, name: string): string =>
+  SNAPSHOT ? `${base}snapshot/${enc(name)}/saturation.json` : `${base}${tenantSaturationPath(name)}`;

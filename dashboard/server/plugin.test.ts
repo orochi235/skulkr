@@ -65,6 +65,7 @@ describe('tenants', () => {
     expect(tenantArgs(list, 'weasel', 'area', 'core.ops')).toEqual(['defects', '--tenant', 'weasel', 'core.ops']);
     expect(tenantArgs(list, 'solo', 'map', null)).toEqual(['map', '--cached-jobs']);
     expect(tenantArgs(list, 'weasel', 'unpin', 'core.ops')).toEqual(['unpin', '--tenant', 'weasel', 'core.ops']);
+    expect(tenantArgs(list, 'weasel', 'saturation', null)).toEqual(['saturate', '--tenant', 'weasel', 'ls', '--json']);
     expect(tenantArgs(list, 'nope', 'map', null)).toBeNull();
   });
 

@@ -7,7 +7,8 @@ the pipeline's CLI (`../bin/skulkr.mjs tenants ls`, `map` and `defects <area>`),
 area panel's pin toggle POSTs to `api/t/<name>/pin?id=<area>&on=1|0`, which runs `pin` or `unpin`. The job-log callout
 over a running round's lane reads `api/t/<name>/tail?id=<area>` every 3 seconds, which the plugin answers itself from the
 area's newest job log (`server/jobTail.ts`), adding `onto logs --tail` for a job it handed to the fleet; the log tab reads `api/t/<name>/log`, the end of the
-running round's `night.log`, the same way.
+running round's `night.log`, the same way. `api/t/<name>/saturation` serves `skulkr saturate ls --json`, every
+saturation ledger with its defects, for the saturation page.
 `api/t/<name>/events` (`server/feed.ts`) streams server-sent events: `map`, on connecting and after each build that
 changed it, and `areas`, the areas whose files a running round wrote. While a page listens, the server looks at the
 running rounds' night directories and the state's `runs/` every second (by size and change time: FSEvents reports
@@ -20,7 +21,9 @@ order, open findings, lines changed since a pass, rounds since a pass, rounds re
 the prefs (the defects-left ramp also colors the charts). Under the map, the jobs feed, the queue's head and the pinned
 areas (tabs), and the running round's `night.log`, raw, beside the issues (what the gate fails, failed steps, left-out
 branches, open findings; tabs) sit side by side, their seams dragged to resize them. A reload starts from the tenant list and map this browser read last.
-The title's menu switches tenants; the URL hash names the one shown. A slider above the treemap shows it as it stood
+The title's menu switches tenants; the URL hash names the one shown. The switch beside it moves to the saturation page
+(`#weasel/saturation`): every saturation ledger, sortable, beside the picked one's distinct defects, the area in the
+hash after it (`#weasel/saturation/core.animation`). A slider above the treemap shows it as it stood
 after an earlier round, shaded only by what was left then (settling, changes and live runs are known only of now);
 the hash carries the round after an `@` (`#weasel@41`), so the view survives a reload and can be shared. Maps without
 `lastByRound`, the demo's among them, show no slider. Reaching a round whose record recut the partition (the map's

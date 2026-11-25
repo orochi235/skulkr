@@ -41,6 +41,11 @@
   text-overflow: ellipsis;
 }
 
+.nav {
+  flex: none;
+  align-self: center;
+}
+
 .actions {
   flex: none;
   margin-left: auto;

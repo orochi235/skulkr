@@ -10,7 +10,7 @@ import { WeaselProvider } from '@weasel-js/core';
 import { IconRegistryProvider } from '@weasel-js/icons/react';
 import { defineTheme } from '@weasel-js/theme';
 import { ThemeProvider } from '@weasel-js/theme/react';
-import { AuditsPage } from '@dash/audits/AuditsPage';
+import { Pages } from '@dash/Pages';
 import { ColorModeProvider } from '@dash/colorMode';
 import { ICONS } from '@dash/icons';
 
@@ -30,7 +30,7 @@ createRoot(container).render(
         {(mode) => (
           <ThemeProvider theme={theme} selection={{ mode }} className="app-theme">
             <WeaselProvider>
-              <AuditsPage />
+              <Pages />
             </WeaselProvider>
           </ThemeProvider>
         )}

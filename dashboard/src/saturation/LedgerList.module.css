@@ -1,0 +1,17 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wzl-space-2);
+  min-height: 0;
+  min-width: 0;
+}
+
+.scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.area { font-family: var(--wzl-font-mono); }
+
+.picked { background: var(--wzl-surface-raised); font-weight: var(--wzl-font-weight-bold); }
