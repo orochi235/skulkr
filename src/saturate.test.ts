@@ -132,6 +132,22 @@ describe('skulkr saturate', () => {
     expect(existsSync(join(cfg.state, 'saturation', `src.${first.slice(0, 10)}`, 'lock'))).toBe(false);
   });
 
+  it('freezes a new ledger at --at, and refuses an existing one at another commit unless --fresh', async () => {
+    const { root, cfg, git } = project();
+    const first = git('rev-parse', 'main');
+    writeFileSync(join(root, 'src/y.ts'), 'export const y = 2;\n');
+    git('add', '.');
+    git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'more');
+    await saturateCommand(cfg, fakeRunner([['A']]), root, ['src', '--max', '1', '--at', first.slice(0, 7)], () => {});
+    expect(ledgerOf(cfg, 'src')).toMatchObject({ commit: first, files: ['src/x.ts'] });
+    // Resuming at its own commit, named or not, is fine.
+    await saturateCommand(cfg, fakeRunner([['B']]), root, ['src', '--max', '2', '--at', first], () => {});
+    await expect(saturateCommand(cfg, fakeRunner([['C']]), root, ['src', '--max', '3', '--at', 'main'], () => {})).rejects.toThrow(/not main; --fresh/);
+    await expect(saturateCommand(cfg, fakeRunner([]), root, ['src', '--at', 'nope'], () => {})).rejects.toThrow(/no commit nope/);
+    await saturateCommand(cfg, fakeRunner([['C']]), root, ['src', '--max', '1', '--at', 'main', '--fresh'], () => {});
+    expect(ledgerOf(cfg, 'src')).toMatchObject({ commit: git('rev-parse', 'main'), files: ['src/x.ts', 'src/y.ts'] });
+  });
+
   it('stops the ledger matcher at budget.ledgerMatch', async () => {
     const { root, cfg } = project();
     const runner = fakeRunner([['A'], ['B']]);

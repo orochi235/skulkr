@@ -44,7 +44,7 @@ const defectTable = (ledger) => {
   const sources = [...new Set(ledger.occasions.map((o) => o.source))];
   return table(
     ['id', 'defect', 'where', 'first', ...sources, 'severity'],
-    ledger.defects.map((d) => [d.id, d.claim, d.where, d.firstOccasion, ...sources.map((s) => d.sources?.[s]?.length ?? 0), d.severity || '–']),
+    ledger.defects.map((d) => [d.id, d.source ? `${d.claim} (found only by ${d.source})` : d.claim, d.where, d.firstOccasion ?? '–', ...sources.map((s) => d.sources?.[s]?.length ?? 0), d.severity || '–']),
     [false, false, false, true, ...sources.map(() => true), false],
   );
 };

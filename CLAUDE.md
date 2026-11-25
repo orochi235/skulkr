@@ -9,8 +9,8 @@ weasel cutover.
 
 - `bin/skulkr.mjs` — the one command (`init`, `night`, `partition`, `map`, `defects`, `pin`, `unpin`, `saturate` or
   `sat`, `service`, `config`, `tenants`).
-- `src/saturate.mjs` — `skulkr saturate` (README "Saturation"): its jobs in `saturateJobs.mjs`, the ledger in
-  `ledger.mjs`, the statistics in `saturation.mjs`, the report in `saturationReport.mjs`. Nothing in rounds reads them.
+- `src/saturate.mjs` — `skulkr saturate` (README "Saturation"): its jobs in `saturateJobs.mjs`, `import` in
+  `saturateImport.mjs`, the ledger in `ledger.mjs`, the statistics in `saturation.mjs`, the report in `saturationReport.mjs`. Nothing in rounds reads them.
 - `src/` — the pipeline, plain Node ESM `.mjs` with no build. `config.mjs` holds every default and derives the
   names and regexes the rest reads; no other file may hold a project-specific value.
 - `src/runner/` — the runner interface (documented in `onto.mjs`): `local.mjs`, the default, runs every job on this

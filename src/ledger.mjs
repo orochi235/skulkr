@@ -3,10 +3,13 @@
  * `<state>/saturation/<area>/ledger.json`, each occasion's raw report beside it under `reviews/`. The ledger is the
  * only state; every statistic is recomputed from it (`saturation.mjs`).
  */
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { gitIn } from './batch.mjs';
 import { firstJson } from './findings.mjs';
+import { partitionAt } from './partition.mjs';
 import { readJson, writeJson } from './json.mjs';
+import { takeLease } from './lease.mjs';
 
 /** The directory holding `area`'s ledger. */
 export const ledgerDirOf = (cfg, area) => join(cfg.state, 'saturation', area);
@@ -17,6 +20,33 @@ export const ledgerOf = (cfg, area) => readJson(join(ledgerDirOf(cfg, area), 'le
 /** An empty ledger for `area` at `commit` over `files`. */
 export const emptyLedger = (area, commit, files) => ({ area, commit, files, occasions: [], defects: [] });
 
+/** The full sha a new ledger freezes at: `at`, else `main`'s tip, in the checkout at `root`. */
+export const freezeCommitOf = (cfg, root, at) => {
+  const ref = at ?? cfg.git.main;
+  try {
+    return gitIn(root)('rev-parse', '--verify', '--quiet', `${ref}^{commit}`);
+  } catch {
+    throw new Error(`no commit ${ref} in ${root}`);
+  }
+};
+
+/** `area`'s files in the partition at `commit`; throws when no area has that id there. */
+export const requireAreaFilesAt = (cfg, root, area, commit) => {
+  const found = partitionAt(cfg, root, commit).find((a) => a.id === area);
+  if (!found) throw new Error(`no area named ${area} at ${commit.slice(0, 10)}; see ${cfg.partition.path}`);
+  return found.files;
+};
+
+/**
+ * Throws when an existing `ledger` is at another commit than `--at` asks for: its occasions and the new ones would
+ * review different code. Starting over takes `--fresh`.
+ */
+export const requireSameCommit = (ledger, at, commit) => {
+  if (ledger && at !== undefined && ledger.commit !== commit) {
+    throw new Error(`${ledger.area}'s ledger is at ${ledger.commit.slice(0, 10)}, not ${at}; --fresh sets it aside and starts a new one there`);
+  }
+};
+
 /** Writes `ledger` atomically. */
 export const writeLedger = (cfg, ledger) => writeJson(join(ledgerDirOf(cfg, ledger.area), 'ledger.json'), ledger, 1);
 
@@ -26,6 +56,33 @@ export const removeLedger = (cfg, area) => {
   const had = existsSync(dir);
   rmSync(dir, { recursive: true, force: true });
   return had;
+};
+
+/**
+ * Runs `work(ledger)` with `area`'s ledger (undefined when it has none) held by this process alone, letting it go
+ * however `work` ends. With `fresh`, an existing ledger is first moved aside to `<area>.<its commit>`, so `work` starts
+ * a new one.
+ */
+export const withLedgerHeld = async (cfg, area, { fresh = false } = {}, work) => {
+  const lock = () => {
+    const unlock = takeLease(join(ledgerDirOf(cfg, area), 'lock'), { saturate: area });
+    if (!unlock) throw new Error(`another skulkr saturate is working on ${area}`);
+    return unlock;
+  };
+  let release = lock();
+  try {
+    let ledger = ledgerOf(cfg, area);
+    if (ledger && fresh) {
+      const aside = ledgerDirOf(cfg, `${area}.${ledger.commit.slice(0, 10)}`);
+      release();
+      renameSync(ledgerDirOf(cfg, area), existsSync(aside) ? `${aside}-${Date.now()}` : aside);
+      release = lock();
+      ledger = undefined;
+    }
+    return await work(ledger);
+  } finally {
+    release();
+  }
 };
 
 /** The file an occasion's raw report is kept in, relative to the ledger's directory. */

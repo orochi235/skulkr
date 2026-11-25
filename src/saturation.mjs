@@ -72,6 +72,9 @@ export const yieldRows = (ledger) => {
   });
 };
 
+/** The stop rule `stopReason` takes: `max` occasions, and the config's `saturate.stopNextNew`. */
+export const stopRuleOf = (cfg, max) => ({ max, stopNextNew: cfg.saturate.stopNextNew });
+
 /**
  * Why saturation should stop, given the combined estimate `stats`, the occasion limit `max`, and `stopNextNew`, the
  * chance of a new finding below which the next occasion is not worth running; null to go on.

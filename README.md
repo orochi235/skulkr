@@ -466,13 +466,14 @@ question harder for one area: blind reviews of it, again and again, at one froze
 until capture–recapture says further reviews would find little new. Nothing it records feeds a round: not history,
 calibration, the queue, or the map.
 
-    skulkr saturate <area> [--sources claude,codex] [--max 40] [--fresh]
-    skulkr saturate ingest <area> <report.md> --source <name>
+    skulkr saturate <area> [--sources claude,codex] [--max 40] [--at <sha>] [--fresh]
+    skulkr saturate ingest <area> <report.md> --source <name> [--at <sha>]
+    skulkr saturate import <area> <dir> --at <sha> [--fresh]
     skulkr saturate report <area>
     skulkr saturate rm <area>
 
-Each **occasion** is one report. `skulkr saturate <area>` freezes a detached worktree of the ledger's commit, which
-is `main`'s tip when the ledger starts (`.worktrees/audit-saturate-<area>`, removed when it ends), and runs one review per source in `--sources` at once,
+Each **occasion** is one report. `skulkr saturate <area>` freezes a detached worktree of the ledger's commit
+(`.worktrees/audit-saturate-<area>`, removed when it ends) and runs one review per source in `--sources` at once,
 each exactly the job a round's reviewer runs on that agent (`claude` or `codex`, see "Agents"): the same brief, its
 files preloaded where `review.preload` and the agent allow, through the configured runner. Each report then goes
 to the **ledger matcher**, which says which of its findings are defects the ledger already holds and which are new.
@@ -481,15 +482,33 @@ After each occasion skulkr prints a line, rewrites the report, and checks the st
     7/40 claude: 3 findings, 1 new; distinct 19; unseen ≈ 6.1; next-new 18%; $0.62; $1.84/defect
 
 It stops once the combined estimate puts fewer than one defect unseen, the chance that the next occasion's finding
-is new falls under `saturate.stopNextNew` (15%), or `--max` occasions (`saturate.max`, 40) are in the ledger. Run
-it again to go on from where it stopped: it resumes the ledger at the ledger's own commit, however far `main` has
-moved since, so every occasion reviews the same code. `--fresh` moves the ledger aside to
-`<state>/saturation/<area>.<commit>` and starts a new one at `main`'s tip; `skulkr saturate rm <area>.<commit>`
-deletes an old one. A review that never finishes is kept beside the ledger as `unfinished-…` and not counted.
+is new falls under `saturate.stopNextNew` (15%), or `--max` occasions (`saturate.max`, 40) are in the ledger.
+
+**Which commit.** A new ledger freezes at `--at <sha>`, else at `main`'s tip. Give `--at` when reports already made
+elsewhere were made at a fixed commit: every occasion must review the same code for the cross-source estimates to
+mean anything. Run it again to go on from where it stopped: it resumes the ledger at its own commit, however far
+`main` has moved since, and refuses an `--at` naming another one. `--fresh` moves the ledger aside to
+`<state>/saturation/<area>.<commit>` and starts a new one; `skulkr saturate rm <area>.<commit>` deletes an old one.
+A review that never finishes is kept beside the ledger as `unfinished-…` and not counted.
 
 `ingest` folds in a report written elsewhere, in any Markdown shape, as one occasion: the matcher reads it whole and
 lists its findings itself. A multi-pass audit whose passes shared context counts as one occasion, not one per pass,
 since its passes were not independent. `report` rewrites the report file from the ledger; `rm` deletes the ledger.
+
+`import` builds a new ledger, at `--at`, from a saturation experiment run by hand, every occasion a Claude review.
+Its directory holds:
+
+| File | Holds |
+|---|---|
+| `reviews/NN.md` | occasion NN's raw report, copied into the ledger's `reviews/` |
+| `occasions.json` | `{ "1": [findings, costUsd, minutes], … }`, occasions numbered 1 up with no gap |
+| `sightings.json` | `{ "1": ["V1", "V2"], … }`, the defects each occasion reported |
+| `defects.json` | `[{ "id": "V1", "claim", "where", "severity", "source"? }, …]` |
+
+The defects become `D1`, `D2`, … in the order of their ids' numbers (`V2` before `V10`), each keeping its old id as
+`imported`. A defect no occasion sighted, found only by another source, is kept with no sightings and that `source`;
+it counts in no estimate, and the defect table marks it `found only by <source>`. `import` refuses over an existing
+ledger unless `--fresh`.
 
 **The ledger matcher** is a Claude job on `claude.models.ledgerMatch` (Opus by default), stopped at `budget.ledgerMatch` dollars (3), with
 its own brief, `briefs/ledgerMatch.md` (the config's `briefs.ledgerMatch` replaces it). Its rule: the same defect is
