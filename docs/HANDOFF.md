@@ -16,7 +16,7 @@ commits of the day. Built today, all described in README.md:
   after changes that matter to rounds.
 
 - Scour, built 2026-11-25 on `main`: ledgers under `scour/` (state and `.skulkr/`, `saturation/` still read),
-  `scour trawl` and `scour fold` as separate commands, the triage fields from reviewer to registry, `scour ls --ids`
+  `scour delve` and `scour fold` as separate commands, the triage fields from reviewer to registry, `scour ls --ids`
   for the Codex skill, and the Scour page's left panel as a tree of every map area.
 
 ## Next: build the fix stage
