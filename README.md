@@ -103,7 +103,7 @@ export default {
   claude: {
     configDir: undefined,             // CLAUDE_CONFIG_DIR for every job; unset, the CLI's default account
     denied: [],                       // tools refused to every job; local mode adds WebFetch and WebSearch
-    models: { match: 'haiku' },       // per role (review, match, fix); unset takes what the job's settings give
+    models: { match: 'haiku', ledgerMatch: 'opus' }, // per role (review, match, fix); unset takes what the job's settings give; ledgerMatch: see "Saturation"
     effort: {},                       // per role, `--effort`; unset likewise
     settingSources: 'project,local',  // `--setting-sources`: the node account's own settings stay out; null omits it
     cacheTtl: { review: '5m', match: '5m', fix: '5m' }, // per role, the prompt cache's lifetime; unset takes Claude Code's default
@@ -116,6 +116,7 @@ export default {
   schedule: { startAt: '23:00', stopAt: '07:00', continuous: false }, // the service's start; when a run stops dispatching
   state: undefined,                   // default ~/.local/state/skulkr/<name>
   sweep: null,                        // an extra check beside the reviews; see "A sweep"
+  saturate: { max: 40, sources: ['claude'], stopNextNew: 0.10 }, // `skulkr saturate`; see "Saturation"
   icons: null,                        // the map's area icons; see "Area icons"
 };
 ```
@@ -458,6 +459,59 @@ documented in `src/agent/index.mjs`.
 
 Running one reviewer of each pair on each agent, `agent: { review: … }` aside, is not built yet.
 
+## Saturation
+
+A round's two reviews estimate what an area holds from one overlap. `skulkr saturate` (alias `sat`) asks the
+question harder for one area: blind reviews of it, again and again, at one frozen commit with no fixes between them,
+until capture–recapture says further reviews would find little new. Nothing it records feeds a round: not history,
+calibration, the queue, or the map.
+
+    skulkr saturate <area> [--sources claude,codex] [--max 40] [--fresh]
+    skulkr saturate ingest <area> <report.md> --source <name>
+    skulkr saturate report <area>
+    skulkr saturate rm <area>
+
+Each **occasion** is one report. `skulkr saturate <area>` freezes a detached worktree of `main`'s tip
+(`.worktrees/audit-saturate-<area>`, removed when it ends) and runs one review per source in `--sources` at once,
+each exactly the job a round's reviewer runs on that agent (`claude` or `codex`, see "Agents"): the same brief, its
+files preloaded where `review.preload` and the agent allow, through the configured runner. Each report then goes
+to the **ledger matcher**, which says which of its findings are defects the ledger already holds and which are new.
+After each occasion skulkr prints a line, rewrites the report, and checks the stop rule:
+
+    7/40 claude: 3 findings, 1 new; distinct 19; unseen ≈ 6.1; next-new 18%; $0.62
+
+It stops once the combined estimate puts fewer than one defect unseen, the chance that the next occasion's finding
+is new falls under `saturate.stopNextNew` (10%), or `--max` occasions (`saturate.max`, 40) are in the ledger. Run
+it again to go on from where it stopped: it resumes the ledger as long as `main` has not moved, and refuses
+otherwise; `--fresh` discards the ledger and starts again at `main`'s tip. A review that never finishes is kept
+beside the ledger as `unfinished-…` and not counted.
+
+`ingest` folds in a report written elsewhere, in any Markdown shape, as one occasion: the matcher reads it whole and
+lists its findings itself. A multi-pass audit whose passes shared context counts as one occasion, not one per pass,
+since its passes were not independent. `report` rewrites the report file from the ledger; `rm` deletes the ledger.
+
+**The ledger matcher** is a Claude job on `claude.models.ledgerMatch` (Opus by default) under `budget.match`, with
+its own brief, `briefs/ledgerMatch.md` (the config's `briefs.ledgerMatch` replaces it). Its rule: the same defect is
+the same wrong behavior at the same code, however worded; a finding that covers two ledger defects sights both; a
+different trigger needing a different fix is a new defect. A reply that does not account for every finding exactly
+once, or names a defect the ledger lacks, is asked for once more; a second bad reply fails the occasion loudly, its
+report kept beside the ledger as `unmatched-…` and nothing recorded, and the run stops. The first review of an empty
+ledger needs no matcher: all its findings are new.
+
+**The ledger** lives in `<state>/saturation/<area>/`: `ledger.json` (the commit, the area's files, each occasion's
+source, kind, findings, cost and minutes, and each distinct defect with the occasions and sources that saw it) and
+`reviews/<NN>-<source>.md`, each raw report as it came. Every figure is recomputed from these, never stored.
+
+**The report**, `<area>-saturation.md` at the project checkout's root (uncommitted), holds the yield by occasion
+(findings, new, distinct, the running estimate), the estimates, and the merged defect table. Its three estimates
+answer different questions:
+
+| Estimate | What it is | When to trust it |
+|---|---|---|
+| Chao2 per source | Chao2 over one source's occasions alone: from how many defects it found once (Q1) and twice (Q2) | A floor for what that reviewer can find, never the area's total: reviews by one model resemble each other, so they miss the same defects every time and the estimate runs low |
+| Chao2 combined | The same over every occasion; drives the stop rule | Better than either source's alone, still low while one source dominates the occasions |
+| Chapman across sources | Each source's union of defects as one list, and their overlap; every pair with more than two sources | Better while the sources find different kinds of defect, since they then err independently; meaningless while one source has only an occasion or two |
+
 ## The service
 
 `skulkr service` runs nights as a long-running service, for the project its config names or, with none named, for
@@ -630,6 +684,7 @@ LaunchAgent, so install from a shell where `node` and `onto` resolve, and set ei
 | A run's log, job outputs, and runner logs | `<state>/nights/<start>-round<N>/` | the newest `keepNights`, and any a run's status or summary still names; older ones are deleted when a run starts |
 | A run's claim, status, stop request, and summary | `<state>/runs/<N>/`: the directory is the claim; `status.json` (with its pid) while it runs, `stop` when asked, `summary.json` when it ends | the newest `keepNights`, never a live one nor one started in the last day; pruned when a run starts |
 | Each commit's lines changed, for `staleLines` and calibration's `lines` | `~/.cache/skulkr/<name>/churn.json` | only the commits after the oldest pass asked about: any area's last pass, or the first of a pair of passes; rewritten without the rest on each build that adds one, and dropped when the partition's `roots`, `extensions` or `exclude` change |
+| A saturation ledger | `<state>/saturation/<area>/`: `ledger.json`, `reviews/`, and `jobs/` while an occasion runs | `saturate.max` occasions; each occasion's job outputs deleted once it is recorded; `skulkr saturate rm <area>` deletes the lot |
 | Node tree leases | `<state>/slots/<node>/<tree>` | deleted as each job ends; one whose pid is dead is taken back |
 | The local runner's clones | `<state>/trees/t<k>` and a lease beside each | one per job running at once; reused, never more than the most jobs ever run at once (local fixers' included) |
 | The local runner's job records, for the dashboard | `<state>/local-jobs/`, a file per job | deleted after 7 days, as each job starts and as `jobs()` reads them |
