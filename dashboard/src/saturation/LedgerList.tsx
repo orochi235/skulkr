@@ -1,44 +1,64 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '@weasel-js/ui/components/Input';
-import { estimate, percent, usd } from './format';
+import { Tree, filterTree, treeBranchIds, type TreeNode } from '@weasel-js/ui/components/Tree';
+import { estimate, usd } from './format';
+import { ancestorIdsOf, ledgerTreeOf, type LedgerTreeNode } from './ledgerTree';
 import type { SaturationLedger } from './saturation.types';
 import s from './LedgerList.module.css';
 
-/** An area id that wraps only after its dots. */
-const areaName = (id: string) => id.split('.').map((part, i) => <Fragment key={i}>{i > 0 && <>.<wbr /></>}{part}</Fragment>);
+const treeNodeOf = (n: LedgerTreeNode): TreeNode => ({
+  id: n.id,
+  label: n.label,
+  textValue: n.label,
+  muted: !n.ledger,
+  className: s.row,
+  tooltip: `${n.ledger ? n.id : `everything under ${n.id}`}: ${n.defects} defects, ${estimate(n.unseen)} unseen, ${usd(n.costUsd)}`,
+  trailing: (
+    <span className={s.figures}>
+      <span className={s.defects}>{n.defects}</span>
+      <span className={s.unseen}>{estimate(n.unseen)}</span>
+    </span>
+  ),
+  ...(n.children.length ? { children: n.children.map(treeNodeOf) } : {}),
+});
 
-const COLUMNS: readonly DataGridColumn<SaturationLedger>[] = [
-  { id: 'id', header: 'Area', className: s.area, render: (l) => areaName(l.id) },
-  { id: 'occasions', header: 'Occ.', numeric: true },
-  { id: 'distinct', header: 'Defects', numeric: true },
-  { id: 'unseen', header: 'Unseen', numeric: true, render: (l) => estimate(l.unseen) },
-  { id: 'nextNew', header: 'Next new', numeric: true, render: (l) => percent(l.nextNew) },
-  { id: 'costUsd', header: 'Cost', numeric: true, render: (l) => usd(l.costUsd) },
-];
-
-/** Every ledger, filtered by name and sortable by any column; picking one shows its defects. */
+/** Every ledger as a tree by area, filtered by name; picking one shows its defects. */
 export function LedgerList({ ledgers, picked, onPick }: { ledgers: readonly SaturationLedger[]; picked: string | null; onPick: (id: string) => void }) {
   const [query, setQuery] = useState('');
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return q ? ledgers.filter((l) => l.id.toLowerCase().includes(q)) : ledgers;
-  }, [ledgers, query]);
-  // A pick made elsewhere, on the map, brings its row into view.
+  const tree = useMemo(() => ledgerTreeOf(ledgers), [ledgers]);
+  const ids = useMemo(() => new Set(ledgers.map((l) => l.id)), [ledgers]);
+  const all = useMemo(() => tree.map(treeNodeOf), [tree]);
+  const q = query.trim().toLowerCase();
+  const nodes = useMemo(() => (q ? filterTree(all, (n) => n.id.toLowerCase().includes(q)) : all), [all, q]);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(picked ? ancestorIdsOf(tree, picked) : []));
+  // A pick made elsewhere, on the map, opens the tree down to its row and brings it into view.
+  useEffect(() => {
+    if (!picked) return;
+    setExpanded((open) => {
+      const missing = ancestorIdsOf(tree, picked).filter((id) => !open.has(id));
+      return missing.length ? new Set([...open, ...missing]) : open;
+    });
+  }, [picked, tree]);
   const scroll = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    scroll.current?.querySelector(`.${s.picked}`)?.scrollIntoView?.({ block: 'nearest' });
-  }, [picked]);
+    scroll.current?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest' });
+  }, [picked, expanded]);
   return (
     <section className={s.list} aria-label="Ledgers">
       <Input
         type="search" size="sm" aria-label="Filter ledgers by area" placeholder="filter areas"
         value={query} onChange={setQuery} spellCheck={false} autoCapitalize="off"
       />
+      <div className={s.head} aria-hidden="true">
+        <span>Area</span>
+        <span className={s.figures}><span className={s.defects}>Defects</span><span className={s.unseen}>Unseen</span></span>
+      </div>
       <div ref={scroll} className={s.scroll}>
-        <DataGrid
-          rows={rows} columns={COLUMNS} defaultSort={{ columnId: 'unseen', direction: 'desc' }} empty="No ledger matches."
-          onRowClick={(l) => onPick(l.id)} rowClassName={(l) => (l.id === picked ? s.picked : undefined)} rowLabel={(l) => l.id}
+        <Tree
+          aria-label="Ledgers by area" nodes={nodes} empty="No ledger matches." guides pressFolds={false}
+          expandedIds={q ? treeBranchIds(nodes) : expanded} onExpandedChange={q ? undefined : setExpanded}
+          selectionMode="single" selectedIds={picked ? [picked] : []}
+          onAction={(id) => { if (ids.has(id)) onPick(id); }}
         />
       </div>
     </section>

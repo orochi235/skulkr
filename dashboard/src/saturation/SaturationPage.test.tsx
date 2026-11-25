@@ -43,11 +43,13 @@ describe('SaturationPage', () => {
     renderWithIcons(<WeaselProvider><SaturationPage base="/test/" /></WeaselProvider>);
     expect(await screen.findByText('2 ledgers · 2 defects · $46.56')).toBeInTheDocument();
     const list = screen.getByRole('region', { name: 'Ledgers' });
-    const rows = within(list).getAllByRole('row').slice(1);
-    expect(rows.map((r) => within(r).getAllByRole('cell')[0]!.textContent)).toEqual(['core.animation', 'geom.booleans']);
+    const rows = within(list).getAllByRole('treeitem');
+    expect(rows.map((r) => r.getAttribute('aria-level'))).toEqual(['1', '1']);
+    expect(rows[0]).toHaveTextContent('core.animation');
+    expect(rows[1]).toHaveTextContent('geom.booleans');
     expect(screen.getByText('Pick an area for its defects.')).toBeInTheDocument();
 
-    fireEvent.click(rows[0]!);
+    fireEvent.click(within(rows[0]!).getByText('core.animation'));
     const detail = screen.getByRole('region', { name: "core.animation's defects" });
     expect(within(detail).getByText('A rejected tween still records its pose')).toBeInTheDocument();
     expect(within(detail).getByText('codex only')).toBeInTheDocument();

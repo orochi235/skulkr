@@ -12,6 +12,27 @@
   overflow: auto;
 }
 
-.area { font-family: var(--wzl-font-mono); }
+.row { font-family: var(--wzl-font-mono); }
 
-.picked { background: var(--wzl-surface-raised); font-weight: var(--wzl-font-weight-bold); }
+.head {
+  display: flex;
+  justify-content: space-between;
+  padding-inline: var(--wzl-space-2);
+  color: var(--wzl-fg-muted);
+  font-size: var(--wzl-font-size-sm);
+}
+
+.figures {
+  display: inline-flex;
+  gap: var(--wzl-space-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.defects,
+.unseen {
+  text-align: end;
+}
+
+.defects { min-width: 7ch; }
+
+.unseen { min-width: 6ch; }
