@@ -483,6 +483,7 @@ calibration, the queue, or the map.
     skulkr saturate <area> [--sources claude,codex] [--max 40] [--at <sha>] [--fresh] [--fleet]
     skulkr saturate ingest <area> <report.md> --source <name> [--at <sha>]
     skulkr saturate import <area> <dir> --at <sha> [--fresh]
+    skulkr saturate land <area>
     skulkr saturate report <area>
     skulkr saturate rm <area>
 
@@ -537,6 +538,15 @@ ledger needs no matcher: all its findings are new.
 **The ledger** lives in `<state>/saturation/<area>/`: `ledger.json` (the commit, the area's files, each occasion's
 source, kind, findings, cost and minutes, and each distinct defect with the occasions and sources that saw it) and
 `reviews/<NN>-<source>.md`, each raw report as it came. Every figure is recomputed from these, never stored.
+
+**Landing a ledger.** The ledger lives in the state directory, on one machine. `skulkr saturate land <area>` (or a
+set-aside `<area>.<commit>`) commits it to the project's `main` as `<record.dir>/saturation/<area>/<commit>/`, holding
+`ledger.json` and the raw reports its occasions name under `reviews/`, on a branch `<prefix>-saturation-<area>` from
+`main` that `main` fast-forwards to under the merge lock, then pushed as `git.push` says. Landing the same ledger again
+replaces that directory, so it can land part way and land again when it stops; a ledger already landed unchanged
+commits nothing. When `main` cannot fast-forward (the main checkout off `main`, or with uncommitted changes), the
+branch is kept and named. Nothing reads a landed ledger yet: rounds, the map and fix-only rounds see none of it
+(2026-11-25).
 
 **The report**, `<area>-saturation.md` at the project checkout's root (uncommitted), holds the yield by occasion
 (findings, new, distinct, the running estimate, and the cost so far per distinct defect, `$/defect`), the estimates, and the merged defect table. Its three estimates
@@ -721,6 +731,7 @@ LaunchAgent, so install from a shell where `node` and `onto` resolve, and set ei
 | A run's claim, status, stop request, and summary | `<state>/runs/<N>/`: the directory is the claim; `status.json` (with its pid) while it runs, `stop` when asked, `summary.json` when it ends | the newest `keepNights`, never a live one nor one started in the last day; pruned when a run starts |
 | Each commit's lines changed, for `staleLines` and calibration's `lines` | `~/.cache/skulkr/<name>/churn.json` | only the commits after the oldest pass asked about: any area's last pass, or the first of a pair of passes; rewritten without the rest on each build that adds one, and dropped when the partition's `roots`, `extensions` or `exclude` change |
 | A saturation ledger | `<state>/saturation/<area>/`: `ledger.json`, `reviews/`, and `jobs/` while an occasion runs | `saturate.max` occasions; each occasion's job outputs deleted once it is recorded; `skulkr saturate rm <area>` deletes the lot. `--fresh` moves an old ledger aside to `<area>.<commit>`, kept until `rm <area>.<commit>` |
+| A landed saturation ledger | `<record.dir>/saturation/<area>/<commit>/` in the project, committed to `main` | one directory per area and frozen commit, replaced by each landing of it; at most `saturate.max` reviews |
 | Node tree leases | `<state>/slots/<node>/<tree>` | deleted as each job ends; one whose pid is dead is taken back |
 | The local runner's clones | `<state>/trees/t<k>` and a lease beside each | one per job running at once; reused, never more than the most jobs ever run at once (local fixers' included) |
 | The local runner's job records, for the dashboard | `<state>/local-jobs/`, a file per job | deleted after 7 days, as each job starts and as `jobs()` reads them |

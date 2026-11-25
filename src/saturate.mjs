@@ -5,6 +5,7 @@
  *   skulkr saturate <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh]
  *   skulkr saturate ingest <area> <report.md> --source <name> [--at <sha>]
  *   skulkr saturate import <area> <dir> --at <sha> [--fresh]
+ *   skulkr saturate land <area>
  *   skulkr saturate report <area>
  *   skulkr saturate rm <area>
  */
@@ -17,11 +18,12 @@ import {
 } from './ledger.mjs';
 import { takeLease } from './lease.mjs';
 import { importLedger } from './saturateImport.mjs';
+import { landLedger } from './saturateLand.mjs';
 import { chao2, stopReason, stopRuleOf, yieldRows } from './saturation.mjs';
 import { writeReport } from './saturationReport.mjs';
 import { createSaturateContext, matchReport, occasionJobsOf, requireSources, runReview } from './saturateJobs.mjs';
 
-export const SATURATE_USAGE = 'usage: skulkr saturate <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh] [--fleet] | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | report <area> | rm <area>';
+export const SATURATE_USAGE = 'usage: skulkr saturate <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh] [--fleet] | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | land <area> | report <area> | rm <area>';
 
 /** `argv`'s positional words and flags. */
 export const saturateArgsOf = (cfg, argv) => {
@@ -176,6 +178,11 @@ export const saturateCommand = async (cfg, runner, root, argv, say = (line) => c
     const [id, dir] = rest;
     if (!id || !dir) throw new Error(SATURATE_USAGE);
     return importLedger(cfg, root, id, dir, args, say);
+  }
+  if (first === 'land') {
+    if (!rest[0]) throw new Error(SATURATE_USAGE);
+    say(await landLedger(cfg, root, rest[0], say));
+    return ledgerOf(cfg, rest[0]);
   }
   if (first === 'report') {
     const ledger = rest[0] && ledgerOf(cfg, rest[0]);
