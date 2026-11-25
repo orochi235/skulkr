@@ -60,7 +60,8 @@ export const resume = async (cfg, root, args, say) => {
     clearStop(round, state);
     const byId = new Map(partitionAt(cfg, root, commit).map((a) => [a.id, a]));
     if (prior.args?.fixOnly) args.fixOnly = prior.args.fixOnly;
-    const records = recordsFor(cfg, git, root);
+    // An earlier attempt's batch holds this round's own record, which is no earlier pass of its areas.
+    const records = recordsFor(cfg, git, root).filter((r) => r.round < round);
     const p = {
       commit, round, picked: ids.flatMap((id) => (byId.has(id) ? [byId.get(id)] : [])), passes: inheritPasses([...byId.values()], passesIn(cfg, git, root, records)).history,
       running, open: openFindingsIn(cfg, git, root, records, [...byId.values()]), ...(landedEarly ? { landedEarly } : {}),

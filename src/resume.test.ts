@@ -60,4 +60,35 @@ describe('resume', () => {
     expect(resumed).toEqual({ p: { round: 7 } });
     expect(said).toEqual([`resume: round 7 already landed on main at ${tip.slice(0, 10)}; nothing to resume`]);
   });
+
+  it("takes no pass from the record an earlier attempt at the round left on its batch", async () => {
+    const root = temp('skulkr-resume-');
+    const git = gitIn(root);
+    git('init', '-q', '-b', 'main');
+    git('config', 'user.email', 'skulkr@example.invalid');
+    git('config', 'user.name', 'skulkr');
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(join(root, 'src', 'a.ts'), 'export const a = 1;\n');
+    const record = (round: number, unfound: number) => {
+      const dir = join(root, 'docs', 'audits', `round-${round}`, 'src');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'area.json'), JSON.stringify({ id: 'src', files: ['src/a.ts'], a: 1, b: 1, m: 1, distinct: 1, chapman: 1, unfound }));
+    };
+    record(6, 4);
+    git('add', '-A');
+    git('commit', '-q', '-m', 'round 6');
+    const tip = git('rev-parse', 'HEAD');
+    git('checkout', '-q', '-b', 'batch/2026-11-21-audit7');
+    record(7, 1);
+    git('add', '-A');
+    git('commit', '-q', '-m', 'round 7');
+    git('checkout', '-q', 'main');
+    const cfg = resolveConfig({ state: temp('skulkr-state-') });
+    const dir = join(cfg.state, 'runs', '7');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'summary.json'), JSON.stringify({ round: 7, commit: tip, started: '2026-11-21T00:00:00Z', nightDir: temp('skulkr-night-'), planned: ['src'] }));
+    const { p } = await resume(cfg, root, { resume: 7 }, () => {});
+    if (!('passes' in p)) throw new Error('round 7 resumed nothing');
+    expect([...p.passes.values()].flat().map((pass: { round: number }) => pass.round)).toEqual([6]);
+  });
 });
