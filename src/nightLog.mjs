@@ -75,10 +75,12 @@ const readLog = (log, names) => {
     return steps.get(id);
   };
   const reviews = new Map();
+  let resumed = false;
   for (const line of log.split('\n')) {
     let m;
     let done;
-    if ((m = /^review \d+\/\d+ (\S+) ([AB]) /.exec(line))) {
+    if (line.startsWith(RESUMED)) resumed = true;
+    else if ((m = /^review \d+\/\d+ (\S+) ([AB]) /.exec(line))) {
       const n = (reviews.get(m[1]) ?? 0) + 1;
       reviews.set(m[1], n);
       stages.set(m[1], n >= 2 ? 'reviewed' : 'reviewing');
@@ -93,6 +95,13 @@ const readLog = (log, names) => {
     } else if ((m = /^fix \d+\/\d+ (\S+) on /.exec(line))) {
       stages.set(m[1], 'fixed');
       if ((done = /^fix \d+\/\d+ \S+ on (\S+): (\d+) commits, ([\d.]+) min/.exec(line))) {
+        // A fix a resumed run did again: the earlier run's verify, repairs and patch were of the commits it replaced.
+        if (resumed && done[1] !== 'earlier') {
+          const lane = at(m[1]);
+          lane.fix = { state: 'waiting' };
+          delete lane.repair;
+          lane.patch = { state: 'waiting' };
+        }
         doneFrom(at(m[1]).fix, { state: 'done', node: done[1], commits: Number(done[2]), minutes: Number(done[3]) });
       }
     } else if ((m = /^patch (\S+): /.exec(line))) {

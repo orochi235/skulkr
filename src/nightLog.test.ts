@@ -185,6 +185,17 @@ describe('nightLanes repair step', () => {
     expect(nightLanes(log.slice(0, 5).join('\n'), ['a'], running)[0]!.steps.fix).toMatchObject({ state: 'done', commits: 0 });
   });
 
+  it("clears the earlier run's verify, repairs and patch once a resumed run's own fix comes home", () => {
+    const log = ['fix 1/1 a on local: 9 commits, 28.9 min, 1.0M weighted tokens', 'verify a: failed: 1 of 9 test files failed (x.test.ts)',
+      'repair a 1/2 on local: 0 commits, 8.5 min; verify failed: 1 of 9 test files failed (x.test.ts)',
+      'verify a: still failing after 2 repairs; left out of the batch', 'patch a: left out: verify still failing after 2 repairs (1 of 9 test files failed)',
+      'resumed: 2026-11-24T23:52:58Z', 'fix 1/1 a on local: 10 commits, 27.6 min, 1.19M weighted tokens', 'verify a: passed (9 test files)'];
+    const { steps } = nightLanes(log.join('\n'), ['a'])[0]!;
+    expect(steps.fix).toMatchObject({ state: 'done', commits: 10, minutes: 27.6 });
+    expect(steps.repair).toMatchObject({ state: 'done', outcome: 'passed', attempts: 0 });
+    expect(steps.patch.state).toBe('waiting');
+  });
+
   it("keeps a step's first node and minutes over a resumed round's replay of it", () => {
     const log = ['review 1/2 a A on local: 3 findings, 9/9 files read, 2.6 min, 0.4M weighted tokens', 'fix 1/1 a on local: 4 commits, 27.3 min, 0.5M weighted tokens',
       'review 1/2 a A on earlier: 3 findings, 9/9 files read, 0.0 min, 0.4M weighted tokens', 'fix 1/1 a on earlier: 4 commits, 0.0 min, 0.5M weighted tokens'];
