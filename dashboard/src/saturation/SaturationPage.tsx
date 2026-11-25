@@ -2,7 +2,8 @@ import { useLayoutEffect, useMemo, useRef } from 'react';
 import { ResizeHandle } from '@weasel-js/ui/components/ResizeHandle';
 import { Shell } from '@dash/Shell';
 import { AppTitle } from '@dash/AppTitle';
-import { SNAPSHOT, saturationUrl, tenantsUrl } from '@dash/dataSource';
+import { SNAPSHOT, mapUrl, saturationUrl, tenantsUrl } from '@dash/dataSource';
+import { useSkulkrMap } from '@dash/audits/useSkulkrMap';
 import { PageSwitch } from '@dash/pageView';
 import { TenantTitle } from '@dash/tenants/TenantTitle';
 import { useTenantChoice, useTenants } from '@dash/tenants/useTenants';
@@ -11,11 +12,13 @@ import { readSize, useViewerPref } from '@dash/audits/viewerPref';
 import { usd } from './format';
 import { LedgerDetail } from './LedgerDetail';
 import { LedgerList } from './LedgerList';
+import { SaturationMap } from './SaturationMap';
 import { useSaturation } from './useSaturation';
 import { useSaturationArea } from './useSaturationArea';
 import s from './SaturationPage.module.css';
 
 const LIST = { min: 280, max: 900, initial: 460 } as const;
+const MAP = { min: 160, max: 1200, initial: 360 } as const;
 
 /** Each saturation ledger of a tenant beside the picked one's distinct defects. */
 export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: { base?: string; dev?: boolean } = {}) {
@@ -24,11 +27,14 @@ export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: 
   const [tenant, choose] = useTenantChoice(names);
   const state = useSaturation(tenant === null ? null : saturationUrl(base, tenant));
   const [picked, pick] = useSaturationArea(tenant);
+  const map = useSkulkrMap({ url: tenant === null ? null : mapUrl(base, tenant), dev });
   const [listWidth, setListWidth, keepListWidth] = useViewerPref('saturation.list', LIST.initial, readSize);
+  const [mapHeight, setMapHeight, keepMapHeight] = useViewerPref('saturation.map', MAP.initial, readSize);
   const root = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     root.current?.style.setProperty('--saturation-list-width', `${listWidth}px`);
-  }, [listWidth]);
+    root.current?.style.setProperty('--saturation-map-height', `${mapHeight}px`);
+  }, [listWidth, mapHeight]);
 
   const ledgers = state.status === 'ready' ? state.ledgers : [];
   const ledger = ledgers.find((l) => l.id === picked) ?? null;
@@ -56,7 +62,17 @@ export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: 
           <div className={s.main}>
             <LedgerList ledgers={ledgers} picked={picked} onPick={(id) => pick(id === picked ? null : id)} />
             <ResizeHandle value={listWidth} min={LIST.min} max={LIST.max} onInput={setListWidth} onChange={keepListWidth} aria-label="Resize the ledger list" />
-            {ledger ? <LedgerDetail ledger={ledger} /> : <p className={s.note}>Pick an area for its defects.</p>}
+            <div className={s.right}>
+              {map.status === 'ready' && <SaturationMap areas={map.map.areas} ledgers={ledgers} picked={picked} onPick={pick} />}
+              {map.status === 'ready' && (
+                <ResizeHandle
+                  orientation="horizontal" value={mapHeight} min={MAP.min} max={MAP.max}
+                  onInput={setMapHeight} onChange={keepMapHeight} aria-label="Resize the map"
+                />
+              )}
+              {ledger ? <LedgerDetail ledger={ledger} />
+                : <p className={s.note}>{picked ? `${picked} has no saturation ledger.` : 'Pick an area for its defects.'}</p>}
+            </div>
           </div>
         )}
       </div>

@@ -4,7 +4,11 @@ import type { HeatScheme } from './heatSchemes';
 import type { AuditArea } from './skulkrMap.types';
 
 export const HEAT_METRICS = ['left', 'density', 'fixed', 'found', 'queue', 'open', 'stale', 'age', 'rounds', 'files'] as const;
-export type HeatMetric = (typeof HEAT_METRICS)[number];
+/** What the saturation page's map can shade by besides: its areas' saturation ledgers, which the audit map lacks. */
+export const SATURATION_METRICS = ['saturationOpen', 'saturationUnseen'] as const;
+export type HeatMetric = (typeof HEAT_METRICS)[number] | (typeof SATURATION_METRICS)[number];
+/** Every metric: the menu's on the saturation page. */
+export const ALL_METRICS: readonly HeatMetric[] = [...SATURATION_METRICS, ...HEAT_METRICS];
 
 /** One metric: its name in the menu, what the legend says before its bar, what an area with no value is called, the
  *  scheme it starts in, and its value for each area (null where it has none). */
@@ -60,6 +64,14 @@ export const HEAT_METRIC_SPECS: Readonly<Record<HeatMetric, HeatMetricSpec>> = {
   },
   rounds: { name: 'rounds read', legend: 'rounds that read it', none: 'never audited', scheme: 'viridis', floor: 5, valuesIn: (areas) => each(areas, (a) => (a.passes.length ? roundCountOf(a) : null)) },
   files: { name: 'files', legend: 'source files', none: 'no files', scheme: 'ice', floor: 20, valuesIn: (areas) => each(areas, (a) => a.files) },
+  saturationOpen: {
+    name: 'saturation defects open', legend: 'saturation defects no fixer has resolved', none: 'no saturation ledger', scheme: 'ember', floor: 5,
+    valuesIn: (areas) => each(areas, (a) => a.saturation?.open ?? null),
+  },
+  saturationUnseen: {
+    name: 'saturation unseen', legend: 'defects saturation estimates no review found', none: 'no estimate yet', scheme: 'magma', floor: 5,
+    valuesIn: (areas) => each(areas, (a) => a.saturation?.unseen ?? null),
+  },
 };
 
 /** The scale metric `metric` shades `values` on. */

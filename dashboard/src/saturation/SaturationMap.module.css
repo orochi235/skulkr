@@ -1,0 +1,14 @@
+.map {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  color: var(--audit-ink);
+}
+
+/* The treemap's chart, after the palette's probes, fills the pane the page gives the map. */
+.map > :last-child {
+  flex: 1 1 0;
+  min-height: 0;
+}

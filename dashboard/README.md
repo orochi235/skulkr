@@ -22,8 +22,10 @@ the prefs (the defects-left ramp also colors the charts). Under the map, the job
 areas (tabs), and the running round's `night.log`, raw, beside the issues (what the gate fails, failed steps, left-out
 branches, open findings; tabs) sit side by side, their seams dragged to resize them. A reload starts from the tenant list and map this browser read last.
 The title's menu switches tenants; the URL hash names the one shown. The switch beside it moves to the saturation page
-(`#weasel/saturation`): every saturation ledger, sortable, beside the picked one's distinct defects, the area in the
-hash after it (`#weasel/saturation/core.animation`). A slider above the treemap shows it as it stood
+(`#weasel/saturation`): every saturation ledger, sortable, beside the audit map and the picked one's distinct
+defects, the area in the hash after it (`#weasel/saturation/core.animation`). Its map shades areas by their saturation
+defects not yet resolved, or by unseen ones, or by any metric the audit map has, kept apart from the audit map's
+choice; picking an area on the map or in the list picks it in both. A slider above the treemap shows it as it stood
 after an earlier round, shaded only by what was left then (settling, changes and live runs are known only of now);
 the hash carries the round after an `@` (`#weasel@41`), so the view survives a reload and can be shared. Maps without
 `lastByRound`, the demo's among them, show no slider. Reaching a round whose record recut the partition (the map's

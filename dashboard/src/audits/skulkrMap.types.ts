@@ -67,6 +67,9 @@ export interface AuditArea {
   readonly openFindings?: number;
   /** Those findings, oldest first, each with the round that first reported it. */
   readonly open?: readonly OpenFinding[];
+  /** What its saturation ledger says, set by the saturation page alone (never by `skulkr map`): its defects no fixer
+   *  has resolved, and the estimate of those no review found yet (null under two occasions). */
+  readonly saturation?: { readonly open: number; readonly unseen: number | null };
 }
 
 /** What an area's run of rounds says it still holds, at the detection rate pooled over every area. */

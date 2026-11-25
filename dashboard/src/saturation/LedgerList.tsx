@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
 import { Input } from '@weasel-js/ui/components/Input';
 import { estimate, percent, usd } from './format';
@@ -24,13 +24,18 @@ export function LedgerList({ ledgers, picked, onPick }: { ledgers: readonly Satu
     const q = query.trim().toLowerCase();
     return q ? ledgers.filter((l) => l.id.toLowerCase().includes(q)) : ledgers;
   }, [ledgers, query]);
+  // A pick made elsewhere, on the map, brings its row into view.
+  const scroll = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    scroll.current?.querySelector(`.${s.picked}`)?.scrollIntoView?.({ block: 'nearest' });
+  }, [picked]);
   return (
     <section className={s.list} aria-label="Ledgers">
       <Input
         type="search" size="sm" aria-label="Filter ledgers by area" placeholder="filter areas"
         value={query} onChange={setQuery} spellCheck={false} autoCapitalize="off"
       />
-      <div className={s.scroll}>
+      <div ref={scroll} className={s.scroll}>
         <DataGrid
           rows={rows} columns={COLUMNS} defaultSort={{ columnId: 'unseen', direction: 'desc' }} empty="No ledger matches."
           onRowClick={(l) => onPick(l.id)} rowClassName={(l) => (l.id === picked ? s.picked : undefined)} rowLabel={(l) => l.id}

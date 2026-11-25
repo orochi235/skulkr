@@ -16,6 +16,17 @@
   gap: var(--wzl-space-2);
 }
 
+.right {
+  display: grid;
+  grid-template-rows: var(--saturation-map-height, 360px) auto minmax(0, 1fr);
+  gap: var(--wzl-space-2);
+  min-height: 0;
+  min-width: 0;
+}
+
+/* With no map yet, the detail takes the column. */
+.right > :only-child { grid-row: 1 / -1; }
+
 .note {
   margin: 0;
   color: var(--wzl-fg-muted);

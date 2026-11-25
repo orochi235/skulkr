@@ -49,6 +49,9 @@ export interface TreemapProps {
   readonly header?: ReactNode;
   /** The theme's own ramp, for a metric whose scheme is `thermal`; by default `palette`'s. */
   readonly thermal?: AuditPalette['depth'];
+  /** The pref holding what the map shades by, and the metrics its menu offers: each page keeps its own choice. */
+  readonly colorByPref?: 'map.colorBy' | 'saturation.colorBy';
+  readonly metrics?: readonly HeatMetric[];
 }
 
 /** Every audit area as a cell of a treemap drawn on the scene graph: hover and click pick through the canvas's
@@ -58,7 +61,7 @@ const NO_GLYPHS: Readonly<Record<string, string>> = {};
 const RECUT_FADE_MS = 1800;
 const HALF_STOPS = Array.from({ length: MAX_HALVES + 1 }, (_, i) => i);
 
-export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, inColor = null, heat: heatGiven, recut = null, header, thermal }: TreemapProps) {
+export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, inColor = null, heat: heatGiven, recut = null, header, thermal, colorByPref = 'map.colorBy', metrics = HEAT_METRICS }: TreemapProps) {
   // How many half-rounds of the queue's head to number on the map, each in its area's corner.
   const [halves, setHalves] = useDashPref('map.upcoming');
   const [gray] = useDashPref('map.gray');
@@ -105,7 +108,7 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
   const heatOwn = useMemo(() => heatScaleOf(areas), [areas]);
   const leftHeat = heatGiven ?? heatOwn;
   // Shaded by another metric, the map takes that metric's values, its scale, and the ramp its pref names.
-  const [colorBy, setColorBy] = useDashPref('map.colorBy');
+  const [colorBy, setColorBy] = useDashPref(colorByPref);
   const [scheme] = useDashPref(colorBy === 'left' ? 'map.scheme' : `map.schemes.${colorBy}`) as [HeatScheme, unknown];
   const values = useMemo(() => (colorBy === 'left' ? null : HEAT_METRIC_SPECS[colorBy].valuesIn(areas)), [colorBy, areas]);
   const heat = useMemo(() => (values ? metricScaleOf(colorBy, values) : leftHeat), [values, colorBy, leftHeat]);
@@ -179,7 +182,7 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
       </div>
       <div className={s.legend}>
         <select className={s.colorBy} aria-label="Color the map by" value={colorBy} onChange={(e) => setColorBy(e.currentTarget.value as HeatMetric)}>
-          {HEAT_METRICS.map((m) => <option key={m} value={m}>{HEAT_METRIC_SPECS[m].name}</option>)}
+          {metrics.map((m) => <option key={m} value={m}>{HEAT_METRIC_SPECS[m].name}</option>)}
         </select>
         <HeatLegend heat={heat} stops={colorBy === 'left' ? null : shades.depth} />
         <span>· passes: ● five, ○ one</span>

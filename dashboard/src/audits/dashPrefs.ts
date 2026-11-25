@@ -2,7 +2,7 @@
 import { pref, type PrefPath } from '@weasel-js/prefs';
 import { usePref, usePrefsStore } from '@weasel-js/prefs/react';
 import { localStorageAdapter } from '@weasel-js/storage';
-import { HEAT_METRIC_SPECS, HEAT_METRICS, type HeatMetric } from './heatMetrics';
+import { ALL_METRICS, HEAT_METRIC_SPECS, HEAT_METRICS, type HeatMetric } from './heatMetrics';
 import { HEAT_SCHEMES, type HeatScheme } from './heatSchemes';
 
 /** The most the map numbers: eight rounds of the queue, in half rounds. */
@@ -10,7 +10,7 @@ export const MAX_HALVES = 16;
 
 /** A ramp to choose for each metric the map can shade by but defects left, whose ramp the charts share (`map.scheme`). */
 function schemePrefs() {
-  const others = HEAT_METRICS.filter((m): m is Exclude<HeatMetric, 'left'> => m !== 'left');
+  const others = ALL_METRICS.filter((m): m is Exclude<HeatMetric, 'left'> => m !== 'left');
   return Object.fromEntries(others.map((m) => [m, pref.enum<HeatScheme>(HEAT_METRIC_SPECS[m].name, HEAT_METRIC_SPECS[m].scheme, HEAT_SCHEMES, {
     description: `The ramp the map shades ${HEAT_METRIC_SPECS[m].legend} along.`,
   })])) as Record<Exclude<HeatMetric, 'left'>, ReturnType<typeof pref.enum<HeatScheme>>>;
@@ -41,6 +41,11 @@ export const DASH_PREFS = pref.group('Dashboard', {
     upcoming: pref.number('Number the queue', 6, {
       description: 'How many half rounds of the queue to number on the map.',
       min: 0, max: MAX_HALVES, step: 1, control: 'slider',
+    }),
+  }),
+  saturation: pref.group('Saturation', {
+    colorBy: pref.enum<HeatMetric>('Color by', 'saturationOpen', ALL_METRICS, {
+      description: "What the saturation page's map shades its areas by; the legend under the map switches it too.",
     }),
   }),
   lanes: pref.group('Lanes', {

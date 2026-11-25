@@ -4,6 +4,8 @@ import { WeaselProvider } from '@weasel-js/core';
 import { renderWithIcons } from '@dash/test/icons';
 import { SaturationPage } from './SaturationPage';
 import type { SaturationLedger } from './saturation.types';
+import { saturationByArea } from './SaturationMap';
+import fixture from '@dash/audits/fixture.map.json';
 
 const ledger = (id: string, unseen: number, defects: SaturationLedger['defects']): SaturationLedger => ({
   id, area: id, commit: '9c4522d63555ec5f264441bcef4cd6a1917eac02', files: 26, occasions: 24, sources: { codex: 1, claude: 23 },
@@ -22,7 +24,9 @@ const LEDGERS = [
 function serve() {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => (String(url).endsWith('api/tenants')
     ? new Response('[{"name":"weasel"}]', { status: 200 })
-    : new Response(JSON.stringify(LEDGERS), { status: 200 }))));
+    : String(url).endsWith('/map')
+      ? new Response(JSON.stringify(fixture), { status: 200 })
+      : new Response(JSON.stringify(LEDGERS), { status: 200 }))));
 }
 
 afterEach(() => {
@@ -50,6 +54,20 @@ describe('SaturationPage', () => {
     expect(within(detail).getByText('96c86df9c8')).toBeInTheDocument();
     expect(within(detail).getByText('not landed')).toBeInTheDocument();
     expect(window.location.hash).toBe('#weasel/saturation/core.animation');
+  });
+
+  it('shades the map by each own ledger’s unresolved defects, by the registry where it has landed', () => {
+    expect([...saturationByArea([...LEDGERS, { ...LEDGERS[1]!, id: 'geom.booleans.9c4522d635' }])]).toEqual([
+      ['core.animation', { open: 1, unseen: 9.6 }], ['geom.booleans', { open: 0, unseen: 1.2 }],
+    ]);
+  });
+
+  it('draws the map above the defects', async () => {
+    serve();
+    window.location.hash = '#weasel/saturation';
+    renderWithIcons(<WeaselProvider><SaturationPage base="/test/" /></WeaselProvider>);
+    expect(await screen.findByRole('img', { name: /Treemap of every audit area/ })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Color the map by' })).toHaveValue('saturationOpen');
   });
 
   it('opens on the area the hash names', async () => {
