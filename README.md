@@ -176,9 +176,10 @@ the config names one, gets a row.
 **Which areas.** Never-audited areas go first, in partition order. Then the due ones, by the defects their last
 pass left, corrected (see "Calibration"), in whole defects; an area whose files changed since counts at least 1, so
 code changed under a zero estimate still competes. Ties go to the most lines changed since the last pass, then to the
-longest since that pass (`rankOf` and `pickAreas` in `src/rounds.mjs`). An area is *settled*, and skipped, after
-two consecutive passes that each found at most one distinct defect, on the same file list, with nothing but those
-passes' own fixes changing its files since. What is due comes only from the `area.json` files of earlier rounds and
+longest since that pass (`rankOf` and `pickAreas` in `src/rounds.mjs`). An area is *settled*, and skipped, when its depletion
+fit (see "Depletion") says that, at the 95% bound, it holds under one defect a pass could find and a next pass has
+under a 5% chance of finding any, and no lines of its files changed since its last pass, that pass's fixes aside
+(2026-11-25; it was two passes that each found at most one). What is due comes only from the `area.json` files of earlier rounds and
 git: on disk, and on batches `main` has not merged, less those of a round abandoned for good (its latest night holds an
 `abandoned` file); the rounds chart marks a round read from a batch `pending: 'unmerged'`. An area a live run holds, or an unmerged `audit<N>-<area>` branch, is skipped, and the map's queue numbers skip it
 too.
@@ -228,6 +229,18 @@ bound on what pass k left, since pass k's fixes came in between, and it counts d
 Neither is corrected for. Every figure is recomputed from the records on each map build: the map carries
 `leftCorrected` on each pass and a top-level `calibration` with the pairs, the factors, and a per-round series of
 predicted, found, and the running factor.
+
+**Depletion.** Each pass finds some fraction of what an area holds and its fixer removes what it fixed, so an area's
+passes find fewer as it empties (a removal, or depletion, model; `src/depletion.mjs`). An area's *run* is its latest
+covering rounds with its file list as it is now and no lines of its files changed between one and the next but their
+own fixes; each round counts the defects its fixer fixed, listed or extra (else its distinct findings), by its share.
+The rate `p` a pass finds defects at is fitted once over every area's run of two or more rounds, and each area's run is
+then fitted at that rate by maximum likelihood: `n0`, what the area held before its run, `left`, what it holds now,
+`leftUpper`, the 95% profile-likelihood bound on that, and `next`, the chance a further pass finds at least one at the
+bound. Its assumptions run its numbers low: two runs of one model miss the same defects, so `p` is an average over
+easy and hard ones, and a fix can add a defect the model does not count. The map gives each area with a run
+`depletion` (`{ rounds, n0, p, left, leftUpper, next }`, or `unbounded` where its finds do not fall) and a top-level
+`depletionP`; the dashboard's area panel shows it (2026-11-25).
 
 **Reuse and holds.** A reviewer whose area, file list, and commit match a finished review of an earlier run (a
 stopped round, say) is not run again: that review is copied in, and the log says so. While any gate holds the fleet

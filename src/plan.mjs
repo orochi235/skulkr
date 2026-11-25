@@ -36,7 +36,7 @@ export const plan = (cfg, root, args) => {
   const round = nextRound({ roundDirs, hardening, branches, claimed: claimedRounds(cfg.state), roundIn: cfg.names.roundIn, batchRoundOf: cfg.names.batchRoundOf });
   const areas = partitionAt(cfg, root, commit);
   const records = recordsFor(cfg, git, root);
-  const { history: passes, covered, staleLines, touched } = areaStats(cfg, git, areas, passesIn(cfg, git, root, records), root);
+  const { history: passes, covered, staleLines, depletion } = areaStats(cfg, git, areas, passesIn(cfg, git, root, records), root);
   const running = liveRuns(cfg.state);
   const held = new Set(running.flatMap((r) => r.areas ?? []));
   const byId = new Map(areas.map((a) => [a.id, a]));
@@ -56,7 +56,7 @@ export const plan = (cfg, root, args) => {
   const { picked, unpin: settledPins } = args.only
     ? { picked: args.only.slice(0, args.areas), unpin: [] }
     : pickAreas({
-      areas, passes, covered, staleLines, touched, count: args.areas,
+      areas, passes, covered, staleLines, depletion: depletion.byArea, count: args.areas,
       inFlight: new Set([...inFlight, ...held]), pinned: pins,
     });
   return { commit, round, picked: picked.map((id) => byId.get(id)), passes, staleLines, running, open, pins, settledPins };

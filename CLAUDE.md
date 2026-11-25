@@ -134,6 +134,9 @@ weasel cutover.
     log, and the heartbeat's `now` cut to 100 characters (README "Watching a run", 2026-11-24).
   - a fixer's report read with a summary ahead of its first finding that names no reviewer left out, so it no longer
     counts as a finding the fixer dismissed (2026-11-24).
+  - settling by the depletion fit (README "Depletion", 2026-11-25): an area settles when its 95% bound leaves under
+    one defect, a next pass has under a 5% chance of finding any, and none of its lines changed since its last pass,
+    in place of two passes that each found at most one; the map's area `depletion` and top-level `depletionP`.
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

@@ -120,6 +120,7 @@ export function AreaDetail({ area, holder, asOf = null, onPin }: {
             {area.queue !== null && <DetailRow label="queue position">{area.queue}</DetailRow>}
             {area.stage && <DetailRow label="this run">{stageLabelOf(area.stage)}</DetailRow>}
             {last && <DetailRow label={`left after round ${last.round}`}>{last.left.toFixed(1)}{correctionShows(last.left, last.leftCorrected) && ` (${correctedText(last.leftCorrected!)} corrected)`}</DetailRow>}
+            {area.depletion && <DetailRow label={`left by depletion, ${area.depletion.rounds} ${area.depletion.rounds === 1 ? 'round' : 'rounds'}`}>{area.depletion.unbounded ? 'unbounded' : `${area.depletion.left} (≤${area.depletion.leftUpper}, ${Math.round((area.depletion.next ?? 0) * 100)}% next)`}</DetailRow>}
             {area.staleLines ? <DetailRow label="lines changed since">{area.staleLines.toLocaleString()}</DetailRow> : null}
             {area.openFindings ? <DetailRow label="open findings">{area.openFindings}</DetailRow> : null}
           </DetailList>

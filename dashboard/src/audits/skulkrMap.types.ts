@@ -55,6 +55,8 @@ export interface AuditArea {
   readonly stage: string | null;
   /** Lines of its files changed since its last pass, that pass's own fixes aside; absent when none. */
   readonly staleLines?: number;
+  /** Its depletion fit over its covering rounds since code last changed under it; absent with none (maps before 2026-11-25). */
+  readonly depletion?: Depletion;
   /** Its icon's name, a key of the map's `icons`; absent when the config gives it none. */
   readonly icon?: string;
   /** The round whose unmerged branch holds it, which keeps it out of the queue; absent when none does, or a live run does. */
@@ -65,6 +67,19 @@ export interface AuditArea {
   readonly openFindings?: number;
   /** Those findings, oldest first, each with the round that first reported it. */
   readonly open?: readonly OpenFinding[];
+}
+
+/** What an area's run of rounds says it still holds, at the detection rate pooled over every area. */
+export interface Depletion {
+  readonly rounds: number;
+  readonly n0: number | null;
+  readonly p: number | null;
+  /** The best fit's defects left, and the 95% bound on them; null when the finds do not bound it. */
+  readonly left: number | null;
+  readonly leftUpper: number | null;
+  /** The chance a next pass finds at least one, at the bound. */
+  readonly next: number | null;
+  readonly unbounded?: true;
 }
 
 export interface OpenFinding {
@@ -248,6 +263,8 @@ export interface SkulkrMap {
    *  before 2026-11-22. */
   readonly leftOut?: readonly AuditLeftOut[];
   readonly calibration?: AuditCalibration;
+  /** The detection rate a pass has, pooled over every area's depletion run; null with no run of two rounds. */
+  readonly depletionP?: number | null;
 }
 
 export interface AuditRecut {

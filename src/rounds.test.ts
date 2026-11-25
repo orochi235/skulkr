@@ -5,7 +5,7 @@ import { gitIn } from './batch.mjs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { weaselConfig } from '../test/weaselConfig.ts';
-import { areaLocksIn, areaStats, areasInFlight, areasInFlightFor, calibrationFor, chapman, drawnRoundOf, inheritPasses, lastByRoundIn, lastDrawnPassIn, lastPassIn, isSettled, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf } from './rounds.mjs';
+import { areaLocksIn, areaStats, areasInFlight, areasInFlightFor, calibrationFor, chapman, depletionsFor, drawnRoundOf, inheritPasses, lastByRoundIn, lastDrawnPassIn, lastPassIn, nextRound, pickAreas, readPasses, incompleteByRound, scaledOf } from './rounds.mjs';
 import { diskRecords } from './recordFiles.mjs';
 
 const dirs: string[] = [];
@@ -45,21 +45,21 @@ describe('nextRound', () => {
 
 describe('pickAreas', () => {
   const area = (id: string, files = [`${id}.ts`]) => ({ id, files });
-  const never = () => false;
+  const settledFit = { rounds: 5, n0: 4, p: 0.5, left: 0, leftUpper: 0, next: 0 };
 
   it('takes never-audited areas first in partition order, then the longest since their last pass', () => {
     const root = fixture([
       { round: 31, id: 'b', distinct: 5, files: ['b.ts'] },
       { round: 32, id: 'a', distinct: 5, files: ['a.ts'] },
     ]);
-    const picked = pickAreas({ areas: ['a', 'b', 'c', 'd'].map((id) => area(id)), passes: readPasses(root, 'docs/audits'), touched: never, count: 3 }).picked;
+    const picked = pickAreas({ areas: ['a', 'b', 'c', 'd'].map((id) => area(id)), passes: readPasses(root, 'docs/audits'), count: 3 }).picked;
     expect(picked).toEqual(['c', 'd', 'b']);
   });
 
   it('skips an area an unlanded round still holds on an audit branch', () => {
     const inFlight = areasInFlight(['audit37-b', 'audit37-core.animation', 'batch/2026-11-18-audit37', 'feature-x'], weaselConfig().names.branchOf);
     expect([...inFlight].sort()).toEqual(['b', 'core.animation']);
-    const picked = pickAreas({ areas: ['a', 'b', 'c'].map((id) => area(id)), passes: new Map(), touched: never, count: 3, inFlight }).picked;
+    const picked = pickAreas({ areas: ['a', 'b', 'c'].map((id) => area(id)), passes: new Map(), count: 3, inFlight }).picked;
     expect(picked).toEqual(['a', 'c']);
   });
 
@@ -83,7 +83,7 @@ describe('pickAreas', () => {
     ]);
     const passes = readPasses(root, 'docs/audits');
     expect(passes.has('b')).toBe(false);
-    expect(pickAreas({ areas: [area('a'), area('b')], passes, touched: never, count: 1 }).picked).toEqual(['b']);
+    expect(pickAreas({ areas: [area('a'), area('b')], passes, count: 1 }).picked).toEqual(['b']);
   });
 
   it('reads no pass from a fix-only round, which ran no reviewers', () => {
@@ -94,14 +94,12 @@ describe('pickAreas', () => {
     expect(readPasses(root, 'docs/audits').get('a')!.map((p: any) => p.round)).toEqual([31]);
   });
 
-  it('skips an area settled by two quiet passes on unchanged files, until its files change', () => {
-    const root = fixture([
-      { round: 31, id: 'a', distinct: 1, files: ['a.ts'] },
-      { round: 32, id: 'a', distinct: 0, files: ['a.ts'] },
-    ]);
-    const passes = readPasses(root, 'docs/audits');
-    expect(pickAreas({ areas: [area('a')], passes, touched: never, count: 5 })).toEqual({ picked: [], settled: ['a'], unpin: [] });
-    expect(pickAreas({ areas: [area('a')], passes, touched: () => true, count: 5 }).picked).toEqual(['a']);
+  it('skips an area its depletion fit settles, until its lines change', () => {
+    const passes = readPasses(fixture([{ round: 31, id: 'a', distinct: 1, files: ['a.ts'] }]), 'docs/audits');
+    const depletion = new Map([['a', settledFit]]);
+    expect(pickAreas({ areas: [area('a')], passes, depletion, count: 5 })).toEqual({ picked: [], settled: ['a'], unpin: [] });
+    expect(pickAreas({ areas: [area('a')], passes, depletion, staleLines: new Map([['a', 3]]), count: 5 }).picked).toEqual(['a']);
+    expect(pickAreas({ areas: [area('a')], passes, depletion: new Map([['a', { ...settledFit, leftUpper: 2, next: 0.6 }]]), count: 5 }).picked).toEqual(['a']);
   });
 
   it('picks pinned areas first, by rank among themselves, and names the settled ones to unpin', () => {
@@ -113,36 +111,27 @@ describe('pickAreas', () => {
     ]);
     const passes = readPasses(root, 'docs/audits');
     const areas = ['a', 'b', 'c', 'd', 's'].map((id) => area(id));
-    expect(pickAreas({ areas, passes, touched: never, count: 3 }).picked).toEqual(['c', 'd', 'a']);
-    expect(pickAreas({ areas, passes, touched: never, count: 3, pinned: new Set(['b', 'd', 's']) })).toEqual({ picked: ['d', 'b', 'c'], settled: ['s'], unpin: ['s'] });
-    expect(pickAreas({ areas, passes, touched: never, count: 3, pinned: new Set(['b', 'a']), inFlight: new Set(['a']) }).picked).toEqual(['b', 'c', 'd']);
+    expect(pickAreas({ areas, passes, count: 3 }).picked).toEqual(['c', 'd', 'a']);
+    expect(pickAreas({ areas, passes, depletion: new Map([['s', settledFit]]), count: 3, pinned: new Set(['b', 'd', 's']) })).toEqual({ picked: ['d', 'b', 'c'], settled: ['s'], unpin: ['s'] });
+    expect(pickAreas({ areas, passes, count: 3, pinned: new Set(['b', 'a']), inFlight: new Set(['a']) }).picked).toEqual(['b', 'c', 'd']);
   });
 
-  it('does not settle on one quiet pass, a loud pass, or a changed file list', () => {
-    const passes = readPasses(fixture([
-      { round: 31, id: 'one', distinct: 0, files: ['one.ts'] },
-      { round: 31, id: 'loud', distinct: 2, files: ['loud.ts'] },
-      { round: 32, id: 'loud', distinct: 0, files: ['loud.ts'] },
-      { round: 31, id: 'moved', distinct: 0, files: ['moved.ts'] },
-      { round: 32, id: 'moved', distinct: 0, files: ['moved.ts'] },
-    ]), 'docs/audits');
-    const areas = [area('one'), area('loud'), area('moved', ['moved.ts', 'new.ts'])];
-    expect(pickAreas({ areas, passes, touched: never, count: 5 }).settled).toEqual([]);
-  });
-
-  it('does not settle, or throw, on two quiet passes that recorded no file list', () => {
-    const passes = new Map([['a', [{ round: 31, id: 'a', distinct: 0 }, { round: 32, id: 'a', distinct: 0 }]]]);
-    expect(pickAreas({ areas: [area('a')], passes, touched: never, count: 5 })).toEqual({ picked: ['a'], settled: [], unpin: [] });
-  });
-
-  it('ignores the passes\' own fix commits when asking whether files changed', () => {
-    const passes = readPasses(fixture([
-      { round: 31, id: 'a', distinct: 1, files: ['a.ts'], commit: 'base', fixCommits: ['fix1'] },
-      { round: 32, id: 'a', distinct: 0, files: ['a.ts'] },
-    ]), 'docs/audits');
-    const seen: unknown[] = [];
-    isSettled(area('a'), passes.get('a'), (files: string[], from: string, exclude: string[]) => (seen.push({ files, from, exclude }), false));
-    expect(seen).toEqual([{ files: ['a.ts'], from: 'base', exclude: ['fix1'] }]);
+  it("fits each area's run of covering rounds at the rate pooled over every area", () => {
+    const pass = (round: number, id: string, fixed: number, files = [`${id}.ts`]) => ({ round, id, distinct: fixed, fixed, files, commit: `c${round}` });
+    const history = new Map([
+      ['a', [pass(1, 'a', 8), pass(2, 'a', 4), pass(3, 'a', 2)]],
+      ['b', [pass(1, 'b', 6), pass(2, 'b', 3)]],
+      ['moved', [pass(1, 'moved', 5), pass(2, 'moved', 0)]],
+    ]);
+    const areas = [{ id: 'a', files: ['a.ts'] }, { id: 'b', files: ['b.ts'] }, { id: 'moved', files: ['moved.ts', 'new.ts'] }];
+    const lines = new Map([['a\n1', 0], ['a\n2', 0], ['b\n1', 12]]);
+    const { p, byArea } = depletionsFor(areas, history, lines);
+    expect(p).toBeGreaterThan(0.45);
+    expect(p).toBeLessThan(0.75);
+    expect(byArea.get('a')!.rounds).toBe(3);
+    // b's code changed between its rounds, so only its last counts; moved's file list differs from both its passes'.
+    expect(byArea.get('b')!.rounds).toBe(1);
+    expect(byArea.has('moved')).toBe(false);
   });
 });
 
@@ -181,7 +170,7 @@ describe('pickAreas with churn', () => {
     const passes = new Map([['a', [pass(3, 'a')]], ['b', [pass(1, 'b')]], ['c', [pass(2, 'c')]], ['d', [pass(4, 'd')]], ['e', [pass(5, 'e')]]]);
     const covered = new Map([['e', 0.2]]);
     const staleLines = new Map([['a', 40], ['d', 400]]);
-    const { picked } = pickAreas({ areas: ['a', 'b', 'c', 'd', 'e', 'f'].map(area), passes, covered, staleLines, touched: () => true, count: 9 });
+    const { picked } = pickAreas({ areas: ['a', 'b', 'c', 'd', 'e', 'f'].map(area), passes, covered, staleLines, count: 9 });
     expect(picked).toEqual(['e', 'f', 'd', 'a', 'b', 'c']);
   });
 });
@@ -200,7 +189,7 @@ describe('pickAreas by corrected defects left', () => {
       ['v', [pass(3, 'v', 2, 2, 2, 2)]],
     ]);
     const staleLines = new Map([['y', 300]]);
-    const { picked } = pickAreas({ areas: ['v', 'w', 'x', 'y', 'z', 'new'].map(area), passes, staleLines, touched: () => true, count: 9 });
+    const { picked } = pickAreas({ areas: ['v', 'w', 'x', 'y', 'z', 'new'].map(area), passes, staleLines, count: 9 });
     expect(picked).toEqual(['new', 'x', 'y', 'z', 'w', 'v']);
   });
 
@@ -208,8 +197,8 @@ describe('pickAreas by corrected defects left', () => {
     const passes = new Map([['q', [pass(1, 'q', 2, 2, 1, 3)]], ['r', [pass(1, 'r', 6, 6, 3, 9)]]]); // left 0.5 and 2.3
     const bucket = (factor: number) => ({ pairs: 9, predicted: 1, found: factor, factor });
     const calibration = { minPairs: 5, pairs: [], series: [], factors: { overall: bucket(1), byShared: { '0': bucket(1), '1–2': bucket(10), '3+': bucket(1) } } };
-    expect(pickAreas({ areas: [area('r'), area('q')], passes, calibration, touched: () => true, count: 2 }).picked).toEqual(['q', 'r']);
-    expect(pickAreas({ areas: [area('r'), area('q')], passes, touched: () => true, count: 2 }).picked).toEqual(['r', 'q']);
+    expect(pickAreas({ areas: [area('r'), area('q')], passes, calibration, count: 2 }).picked).toEqual(['q', 'r']);
+    expect(pickAreas({ areas: [area('r'), area('q')], passes, count: 2 }).picked).toEqual(['r', 'q']);
   });
 });
 
@@ -226,7 +215,7 @@ describe('history by round', () => {
     const areas = [{ id: 'x', files: ['x/1.ts', 'x/2.ts', 'x/3.ts', 'y/4.ts'] }, { id: 'z', files: ['z/1.ts'] }];
     const { history, covered } = inheritPasses(areas, raw);
     expect(history.get('x')!.map((p) => p.round)).toEqual([10, 11]);
-    expect(pickAreas({ areas, passes: history, covered, touched: () => true, count: 2 }).picked).toEqual(['x', 'z']);
+    expect(pickAreas({ areas, passes: history, covered, count: 2 }).picked).toEqual(['x', 'z']);
     expect(calibrationFor(history).pairs).toEqual([]);
     expect(lastPassIn(history.get('x'))!.round).toBe(10);
   });
@@ -300,14 +289,10 @@ describe('areaStats', () => {
         { round: 2, id: 'a', a: 1, b: 1, m: 1, distinct: 1, files: ['a.ts'], commit: second, fixCommits: [] },
       ]]]);
       const cfg = { name: 'stats-test', partition: { isSource: () => true } };
-      const { staleLines, pairLines, touched } = areaStats(cfg, gitIn(root), [{ id: 'a', files: ['a.ts'] }], raw, root);
+      const { staleLines, pairLines } = areaStats(cfg, gitIn(root), [{ id: 'a', files: ['a.ts'] }], raw, root);
       // From the first pass: 2 deleted and 4 added by the second's commit; the fix's 5 lines are left out.
       expect(Object.fromEntries(pairLines)).toEqual({ 'a\n1': 6 });
       expect(Object.fromEntries(staleLines)).toEqual({ a: 5 });
-      // isSettled asks whether anything but the two passes' fixes touched its files since the first: the second's
-      // commit did. It is answered from the same walk, so a range the walk did not take is refused.
-      expect(touched(['a.ts'], first, [fix])).toBe(true);
-      expect(() => touched(['a.ts'], second, [])).toThrow(/did not walk/);
     } finally {
       process.env.HOME = home;
     }

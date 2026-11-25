@@ -4,11 +4,9 @@
  */
 import { calibrationOf, correctedLeftOf } from './calibration.mjs';
 import { churnCacheOf, churnSince } from './churn.mjs';
+import { depletionOf, depletionRunOf, pooledPOf, settlesBy } from './depletion.mjs';
 import { fixTallyOf } from './findings.mjs';
 import { ROUND_DIR, diskRecords, recordsFor } from './recordFiles.mjs';
-
-/** A pass that found at most this many distinct defects counts toward settling its area. */
-export const QUIET_PASS = 1;
 
 /** Chapman's estimate of how many defects the area held, from two lists of `a` and `b` sharing `m`. */
 export const chapman = (a, b, m) => (a + 1) * (b + 1) / (m + 1) - 1;
@@ -162,6 +160,7 @@ export const combinedOf = (passes) => {
   return {
     ...passes[0], a: sum((p) => p.a ?? 0), b: sum((p) => p.b ?? 0), m: sum((p) => p.m ?? 0), distinct: sum((p) => p.distinct ?? 0),
     chapman: sum((p) => (p.chapman ?? 0) * (p.share ?? 1)), unfound: sum((p) => (p.unfound ?? 0) * (p.share ?? 1)), share: 1,
+    ...(passes.every((p) => p.fixed !== undefined) ? { fixed: sum((p) => p.fixed) } : { fixed: undefined }),
     fixCommits: [...new Set(passes.flatMap((p) => p.fixCommits ?? []))], files: [...new Set(passes.flatMap((p) => p.files ?? []))].sort(),
   };
 };
@@ -253,36 +252,24 @@ export const nextRound = ({ roundDirs = [], hardening = '', branches = [], claim
   return Math.max(...used) + 1;
 };
 
-const sameFiles = (a, b) => {
-  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
-  const set = new Set(b);
-  return a.every((f) => set.has(f));
-};
-
 /**
- * Whether an area's two latest covering rounds (`coveringRounds`, each `combinedOf` its passes) settle it: each found at
- * most QUIET_PASS distinct defects, both read the same file list as the area has now, and nothing but the passes' own
- * fixes changed those files since the first of them. `touched(files, from, exclude)` answers whether a commit after
- * `from` and not in `exclude` changed any of `files`.
+ * Each area's depletion fit (`depletion.mjs`) from its covering rounds since code last changed under it: the rate a
+ * pass finds defects at, pooled over every area (`pooledPOf`), then each area's fit at that rate. `pairLines` is
+ * `areaStats`'; a pair of rounds it does not know ends the run there. Answers `{ p, byArea }`, `byArea` a Map by id.
  */
-export const isSettled = (area, passes, touched) => {
-  const quiet = settlingOf(passes);
-  if (!quiet) return false;
-  const { first, last, from, exclude } = quiet;
-  if (first.distinct > QUIET_PASS || last.distinct > QUIET_PASS) return false;
-  if (!sameFiles(first.files, area.files) || !sameFiles(last.files, area.files)) return false;
-  return !touched(area.files, from, exclude);
-};
-
-/**
- * The two latest covering rounds `isSettled` weighs, each `combinedOf` its passes, with the range it asks `touched`
- * about: from the first's commit, both rounds' fixes aside. Undefined for an area with fewer than two.
- */
-export const settlingOf = (passes) => {
-  const rounds = coveringRounds(passes);
-  if (rounds.length < 2) return undefined;
-  const [first, last] = rounds.slice(-2).map((r) => combinedOf(r.passes));
-  return { first, last, from: first.commit, exclude: [...(first.fixCommits ?? []), ...(last.fixCommits ?? [])] };
+export const depletionsFor = (areas, history, pairLines = new Map()) => {
+  const runs = new Map();
+  for (const area of areas) {
+    const rounds = coveringRounds(history.get(area.id) ?? []).map((r) => combinedOf(r.passes));
+    if (rounds.length) runs.set(area.id, depletionRunOf(rounds, area.files, (round) => pairLines.get(`${area.id}\n${round}`)));
+  }
+  const p = pooledPOf([...runs.values()]);
+  const byArea = new Map();
+  for (const [id, run] of runs) {
+    const fit = depletionOf(run, p ?? undefined);
+    if (fit) byArea.set(id, fit);
+  }
+  return { p, byArea };
 };
 
 /**
@@ -318,12 +305,13 @@ export const rankOf = (left, stale) => Math.max(Math.round(left), stale > 0 ? 1 
 /**
  * Tonight's areas: pinned ones first (`pinned`, from `pins.mjs`), then never audited, in partition order, then the due
  * ones by `rankOf`, then most lines changed since their last pass (`staleLines`, by id), then the longest since their
- * last pass; among the pinned, the same order. Settled areas, and areas an unlanded round still holds (`inFlight`), are
+ * last pass; among the pinned, the same order. An area is settled when its `depletion` fit (`depletionsFor`' `byArea`)
+ * settles it (`settlesBy`) and no lines of it changed since its last pass. Settled areas, and areas an unlanded round still holds (`inFlight`), are
  * skipped, pinned or not. An area counts as never audited when its `covered` share is under COVERED. `passes` is each
  * area's history (`inheritPasses`'); `calibration` is `calibrationFor`'s over it, computed when not given. Answers
  * `{ picked, settled, unpin }`, each a list of ids: `unpin` the pinned areas that are settled.
  */
-export const pickAreas = ({ areas, passes, touched, count, inFlight = new Set(), covered = new Map(), staleLines = new Map(), calibration = calibrationFor(passes), pinned = new Set() }) => {
+export const pickAreas = ({ areas, passes, depletion = new Map(), count, inFlight = new Set(), covered = new Map(), staleLines = new Map(), calibration = calibrationFor(passes), pinned = new Set() }) => {
   const settled = [];
   const fresh = [];
   const seen = [];
@@ -334,7 +322,7 @@ export const pickAreas = ({ areas, passes, touched, count, inFlight = new Set(),
       fresh.push(area.id);
       continue;
     }
-    if (isSettled(area, history, touched)) {
+    if (settlesBy(depletion.get(area.id)) && !(staleLines.get(area.id) > 0)) {
       settled.push(area.id);
       continue;
     }
@@ -363,30 +351,21 @@ export const changedSince = (cfg, git, root, files, from, exclude) => {
   return changed;
 };
 
-const touchedKey = (files, from, exclude) => JSON.stringify([from ?? null, exclude, files]);
-
 /**
  * What the plan and the map read of each area's past for `cfg`'s project: its inherited `history` and `covered`
  * share (`inheritPasses`), `staleLines`, the lines of its files changed since its last pass (`lastPassIn`), its fixes
  * aside, `pairLines`, keyed `<area>\n<round>`, the lines of its files changed from each covering round to the next,
- * that round's fixes aside: what changed since the first less what changed since the second, and `touched`, the
- * answer `isSettled` asks of each area (`settlingOf`), true where git does not know the commit.
+ * that round's fixes aside: what changed since the first less what changed since the second, and `depletion`, each
+ * area's fit (`depletionsFor`).
  */
 export const areaStats = (cfg, git, areas, raw, root) => {
   const { history, covered } = inheritPasses(areas, raw);
   const entries = [];
   const pairs = [];
-  const settling = new Map();
   for (const area of areas) {
     const list = history.get(area.id) ?? [];
     const last = lastPassIn(list);
     if (last?.commit) entries.push({ id: area.id, files: area.files, commit: last.commit, exclude: last.fixCommits ?? [] });
-    const quiet = settlingOf(list);
-    if (quiet) {
-      const id = `${area.id}\nsettle`;
-      settling.set(touchedKey(area.files, quiet.from, quiet.exclude), id);
-      entries.push({ id, files: area.files, commit: quiet.from, exclude: quiet.exclude });
-    }
     const rounds = coveringRounds(list).map((r) => combinedOf(r.passes));
     rounds.forEach((k, i) => {
       const next = rounds[i + 1];
@@ -400,13 +379,5 @@ export const areaStats = (cfg, git, areas, raw, root) => {
   const { lines, touched: changed } = churnSince(git, entries, churnOptionsFor(cfg, root));
   const staleLines = new Map(areas.flatMap((a) => (lines.has(a.id) ? [[a.id, lines.get(a.id)]] : [])));
   const pairLines = new Map(pairs.map((key) => [key, Math.max(0, lines.get(`${key}\nfrom`) - lines.get(`${key}\nto`))]));
-  /** @type {(files: string[], from: string, exclude: string[]) => boolean} */
-  const touched = (files, from, exclude) => {
-    if (files.length === 0) return false;
-    const id = settling.get(touchedKey(files, from, exclude));
-    if (id === undefined) throw new Error(`areaStats: touched asked of a range it did not walk (from ${from})`);
-    const paths = changed.get(id);
-    return !paths || paths.length > 0;
-  };
-  return { history, covered, staleLines, pairLines, touched };
+  return { history, covered, staleLines, pairLines, depletion: depletionsFor(areas, history, pairLines) };
 };

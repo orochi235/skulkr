@@ -186,12 +186,12 @@ export const buildMap = (cfg, root, runner) => {
   const head = git('rev-parse', '--short', 'HEAD');
   const areas = partitionAt(cfg, root, 'HEAD');
   const records = recordsFor(cfg, git, root);
-  const { history: passes, covered, staleLines, pairLines, touched } = areaStats(cfg, git, areas, passesIn(cfg, git, root, records), root);
+  const { history: passes, covered, staleLines, pairLines, depletion } = areaStats(cfg, git, areas, passesIn(cfg, git, root, records), root);
   const calibration = calibrationFor(passes, pairLines);
   const corrected = (p) => ({ ...p, leftCorrected: correctedLeftOf(p, calibration) });
   const locks = areaLocksFor(cfg, git);
   const pins = pinsOf(cfg);
-  const { picked, settled } = pickAreas({ areas, passes, covered, staleLines, calibration, touched, count: Infinity, inFlight: new Set(locks.keys()), pinned: pins });
+  const { picked, settled } = pickAreas({ areas, passes, covered, staleLines, calibration, depletion: depletion.byArea, count: Infinity, inFlight: new Set(locks.keys()), pinned: pins });
   const settledSet = new Set(settled);
   const merged = mergedIn(cfg, git);
   const runs = readRuns(cfg.state, null, { listJobs: (since) => runner.jobs(since), listProgress: () => runner.progress?.() ?? new Map(), names: cfg.names, sweepId: cfg.sweep?.id, gate: cfg.gate, fixAgent: agentFor(cfg, 'fix') })
@@ -221,6 +221,7 @@ export const buildMap = (cfg, root, runner) => {
       ...lastByRoundOf(own, area.files, calibration),
       stage: run ? run.stages[area.id] ?? 'queued' : null,
       ...(stale ? { staleLines: stale } : {}),
+      ...(depletion.byArea.has(area.id) ? { depletion: depletion.byArea.get(area.id) } : {}),
       // Held by an earlier round's unmerged branch, rather than by a live run, which `status` already says.
       ...(locks.has(area.id) && !run ? { locked: locks.get(area.id) } : {}),
       ...(pins.has(area.id) ? { pinned: true } : {}),
@@ -280,6 +281,7 @@ export const buildMap = (cfg, root, runner) => {
     leftOut: retryable(git, leftOutIn(cfg.state), cfg.git.main).map((e) => ({ area: cfg.names.idOf(e.branch), round: e.round, why: e.why }))
       .filter((e) => !merged(e.round, e.area)),
     calibration,
+    depletionP: depletion.p,
   };
 };
 
