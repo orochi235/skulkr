@@ -1,6 +1,7 @@
-/** `<area>-saturation.md`, the saturation report: written from the ledger alone, so it can always be written again. */
+/** `report.md` beside the ledger, the saturation report: written from the ledger alone, so it can always be written again. */
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { ledgerDirOf } from './ledger.mjs';
 import { estimatesOf, stopReason, yieldRows } from './saturation.mjs';
 
 /** A Markdown table whose columns line up in the raw text too; `right` marks the right-aligned (numeric) columns. */
@@ -87,9 +88,9 @@ export const reportText = (ledger, rule) => {
   ].join('\n');
 };
 
-/** Writes `ledger`'s report to `<root>/<area>-saturation.md`. Answers its path. */
-export const writeReport = (root, ledger, rule) => {
-  const path = join(root, `${ledger.area}-saturation.md`);
+/** Writes `ledger`'s report to `report.md` in `id`'s ledger directory. Answers its path. */
+export const writeReport = (cfg, id, ledger, rule) => {
+  const path = join(ledgerDirOf(cfg, id), 'report.md');
   writeFileSync(path, reportText(ledger, rule));
   return path;
 };

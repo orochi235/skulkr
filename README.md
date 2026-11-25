@@ -485,7 +485,7 @@ calibration, the queue, or the map.
     skulkr saturate <area> [--sources claude,codex] [--max 40] [--at <sha>] [--fresh] [--fleet]
     skulkr saturate ingest <area> <report.md> --source <name> [--at <sha>]
     skulkr saturate import <area> <dir> --at <sha> [--fresh]
-    skulkr saturate land <area>
+    skulkr saturate land <area>… | --all
     skulkr saturate report <area>
     skulkr saturate rm <area>
 
@@ -543,14 +543,15 @@ source, kind, findings, cost and minutes, and each distinct defect with the occa
 
 **Landing a ledger.** The ledger lives in the state directory, on one machine. `skulkr saturate land <area>` (or a
 set-aside `<area>.<commit>`) commits it to the project's `main` as `<record.dir>/saturation/<area>/<commit>/`, holding
-`ledger.json` and the raw reports its occasions name under `reviews/`, on a branch `<prefix>-saturation-<area>` from
-`main` that `main` fast-forwards to under the merge lock, then pushed as `git.push` says. Landing the same ledger again
-replaces that directory, so it can land part way and land again when it stops; a ledger already landed unchanged
-commits nothing. When `main` cannot fast-forward (the main checkout off `main`, or with uncommitted changes), the
-branch is kept and named. Nothing reads a landed ledger yet: rounds, the map and fix-only rounds see none of it
-(2026-11-25).
+`ledger.json`, `report.md`, and the raw reports its occasions name under `reviews/`, on a branch
+`<prefix>-saturation-<area>` from `main` that `main` fast-forwards to under the merge lock, then pushed as `git.push`
+says. Several areas, or `--all` for every ledger with occasions, land in one commit on `<prefix>-saturation`
+(2026-11-25). Landing the same ledger again replaces that directory, so it can land part way and land again when it
+stops; a ledger already landed unchanged commits nothing. When `main` cannot fast-forward (the main checkout off
+`main`, or with uncommitted changes), the branch is kept and named. Nothing reads a landed ledger yet: rounds, the map
+and fix-only rounds see none of it (2026-11-25); its defects are to be fixed eventually, by a mechanism not yet chosen.
 
-**The report**, `<area>-saturation.md` at the project checkout's root (uncommitted), holds the yield by occasion
+**The report**, `report.md` in the ledger's directory, holds the yield by occasion
 (findings, new, distinct, the running estimate, and the cost so far per distinct defect, `$/defect`), the estimates, and the merged defect table. Its three estimates
 answer different questions:
 

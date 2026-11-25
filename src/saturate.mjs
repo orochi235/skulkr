@@ -5,7 +5,7 @@
  *   skulkr saturate <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh]
  *   skulkr saturate ingest <area> <report.md> --source <name> [--at <sha>]
  *   skulkr saturate import <area> <dir> --at <sha> [--fresh]
- *   skulkr saturate land <area>
+ *   skulkr saturate land <area>… | --all
  *   skulkr saturate report <area>
  *   skulkr saturate rm <area>
  */
@@ -18,12 +18,12 @@ import {
 } from './ledger.mjs';
 import { takeLease } from './lease.mjs';
 import { importLedger } from './saturateImport.mjs';
-import { landLedger } from './saturateLand.mjs';
+import { landableIdsOf, landLedgers } from './saturateLand.mjs';
 import { chao2, stopReason, stopRuleOf, yieldRows } from './saturation.mjs';
 import { writeReport } from './saturationReport.mjs';
 import { createSaturateContext, matchReport, occasionJobsOf, requireSources, runReview } from './saturateJobs.mjs';
 
-export const SATURATE_USAGE = 'usage: skulkr saturate <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh] [--fleet] | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | land <area> | report <area> | rm <area>';
+export const SATURATE_USAGE = 'usage: skulkr saturate <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh] [--fleet] | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | land <area>… | land --all | report <area> | rm <area>';
 
 /** `argv`'s positional words and flags. */
 export const saturateArgsOf = (cfg, argv) => {
@@ -31,14 +31,14 @@ export const saturateArgsOf = (cfg, argv) => {
   const words = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--fresh') flags.fresh = true;
+    if (a === '--fresh' || a === '--all') flags[a.slice(2)] = true;
     else if (a.startsWith('--')) flags[a.slice(2)] = argv[++i];
     else words.push(a);
   }
   const max = flags.max === undefined ? cfg.saturate.max : Number(flags.max);
   if (!Number.isInteger(max) || max < 1) throw new Error(`--max wants a whole number of occasions, not ${flags.max}`);
   const sources = flags.sources ? flags.sources.split(',').map((s) => s.trim()).filter(Boolean) : cfg.saturate.sources;
-  return { words, max, sources, fresh: Boolean(flags.fresh), source: flags.source, at: flags.at };
+  return { words, max, sources, fresh: Boolean(flags.fresh), all: Boolean(flags.all), source: flags.source, at: flags.at };
 };
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -139,11 +139,11 @@ export const saturateArea = async (cfg, runner, root, id, args, say) => {
         ledger = await foldIn(ctx, ledger, { key: keys[i], source: batch[i], kind: 'review', text: r.text, findings: r.findings, costUsd: r.costUsd, minutes: r.minutes });
         counted += 1;
         say(occasionLine(ledger, ledger.occasions.at(-1), rule.max));
-        writeReport(root, ledger, rule);
+        writeReport(cfg, id, ledger, rule);
       }
       if (counted === 0) throw new Error(`saturate ${id}: no review of this iteration finished; stopping`);
     }
-    say(`saturate ${id}: report at ${writeReport(root, ledger, rule)}`);
+    say(`saturate ${id}: report at ${writeReport(cfg, id, ledger, rule)}`);
     return ledger;
   });
 };
@@ -159,7 +159,7 @@ export const ingestReport = async (cfg, runner, root, id, path, source, args, sa
     const key = `${pad(ledger.occasions.length + 1)}-${source}`;
     const next = await foldIn(ctx, ledger, { key, source, kind: 'ingest', text, findings: [], costUsd: 0, minutes: 0 });
     say(occasionLine(next, next.occasions.at(-1), rule.max));
-    say(`saturate ${id}: report at ${writeReport(root, next, rule)}`);
+    say(`saturate ${id}: report at ${writeReport(cfg, id, next, rule)}`);
     return next;
   });
 };
@@ -180,14 +180,15 @@ export const saturateCommand = async (cfg, runner, root, argv, say = (line) => c
     return importLedger(cfg, root, id, dir, args, say);
   }
   if (first === 'land') {
-    if (!rest[0]) throw new Error(SATURATE_USAGE);
-    say(await landLedger(cfg, root, rest[0], say));
-    return ledgerOf(cfg, rest[0]);
+    const ids = args.all ? landableIdsOf(cfg) : rest;
+    if (ids.length === 0 && !args.all) throw new Error(SATURATE_USAGE);
+    say(await landLedgers(cfg, root, ids, say));
+    return ids.map((id) => ledgerOf(cfg, id));
   }
   if (first === 'report') {
     const ledger = rest[0] && ledgerOf(cfg, rest[0]);
     if (!ledger) throw new Error(rest[0] ? `${rest[0]} has no saturation ledger` : SATURATE_USAGE);
-    say(`wrote ${writeReport(root, ledger, stopRuleOf(cfg, args.max))}`);
+    say(`wrote ${writeReport(cfg, rest[0], ledger, stopRuleOf(cfg, args.max))}`);
     return ledger;
   }
   if (first === 'rm') {

@@ -32,11 +32,11 @@ const project = () => {
 };
 
 /** A ledger for `src` at `main`'s tip with one occasion per list of claims, each claim a defect the first time it is seen. */
-const seed = (cfg: any, commit: string, occasions: string[][]) => {
-  let ledger = emptyLedger('src', commit, ['src/x.ts']);
+const seed = (cfg: any, commit: string, occasions: string[][], area = 'src') => {
+  let ledger = emptyLedger(area, commit, ['src/x.ts']);
   for (const [i, claims] of occasions.entries()) {
     const n = i + 1;
-    const file = keepReview(cfg, 'src', n, 'claude', `review ${n}\n`);
+    const file = keepReview(cfg, area, n, 'claude', `review ${n}\n`);
     const known = new Map(ledger.defects.map((d: any) => [d.claim, d.id]));
     ledger = withOccasion(ledger, { n, source: 'claude', kind: 'review', file, costUsd: 1, minutes: 1 }, {
       findings: claims.map((claim) => ({ claim, where: 'src/x.ts:1' })),
@@ -65,6 +65,7 @@ describe('skulkr saturate land', () => {
     expect(git('log', '-1', '--format=%s')).toBe(`record src's saturation ledger: 3 defects from 2 occasions at ${commit.slice(0, 10)}`);
     expect(JSON.parse(readFileSync(join(root, dir, 'ledger.json'), 'utf8'))).toEqual(ledger);
     expect(readFileSync(join(root, dir, 'reviews/02-claude.md'), 'utf8')).toBe('review 2\n');
+    expect(readFileSync(join(root, dir, 'report.md'), 'utf8')).toContain('saturation');
     expect(git('branch', '--list', 'audit-saturation-*')).toBe('');
     expect(git('worktree', 'list')).not.toMatch(/saturation/);
   });
@@ -89,6 +90,22 @@ describe('skulkr saturate land', () => {
     const said = await land(cfg, root);
     expect(said.at(-1)).toMatch(/on audit-saturation-src, not fast-forwarded: the main checkout has uncommitted changes$/);
     expect(git('log', '-1', '--format=%s', 'audit-saturation-src')).toMatch(/^record src's saturation ledger/);
+  });
+
+  it('lands every ledger in one commit with --all', async () => {
+    const { root, cfg, git } = project();
+    const commit = git('rev-parse', 'HEAD');
+    seed(cfg, commit, [['A', 'B']]);
+    seed(cfg, commit, [['C']], 'lib');
+    const said: string[] = [];
+    await saturateCommand(cfg, null, root, ['land', '--all'], (line: string) => said.push(line));
+    expect(said.at(-1)).toMatch(/^landed 2 ledgers under docs\/audits\/saturation; main fast-forwarded to/);
+    expect(git('log', '-1', '--format=%B')).toMatch(/^record 2 areas' saturation ledgers: 3 defects\n\n- lib's saturation ledger: 1 defects/);
+    expect(git('rev-list', '--count', 'HEAD')).toBe('2');
+    for (const area of ['src', 'lib']) {
+      expect(readFileSync(join(root, 'docs/audits/saturation', area, commit.slice(0, 10), 'report.md'), 'utf8')).toContain(area);
+    }
+    expect(git('branch', '--list', 'audit-saturation*')).toBe('');
   });
 
   it('refuses an area with no ledger', async () => {

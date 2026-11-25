@@ -84,7 +84,7 @@ describe('skulkr saturate', () => {
     expect(lines.some((l) => /stopped, reached the limit of 5/.test(l))).toBe(true);
     expect(readdirSync(join(cfg.state, 'saturation/src/reviews'))).toEqual(['01-claude.md', '02-claude.md', '03-claude.md', '04-claude.md', '05-claude.md']);
     expect(existsSync(join(cfg.state, 'saturation/src/jobs/05-claude'))).toBe(false);
-    const report = readFileSync(join(root, 'src-saturation.md'), 'utf8');
+    const report = readFileSync(join(cfg.state, 'saturation/src/report.md'), 'utf8');
     expect(report).toContain('Stopped: reached the limit of 5 occasions.');
     expect(report).toMatch(/\|\s+5 \| claude\s+\|\s+5 \|\s+2 \|\s+13 \|\s+8 \|\s+2 \|\s+25\.8 \|\s+12\.8 \|\s+32\.3% \|/);
     expect(existsSync(join(root, '.worktrees/audit-saturate-src'))).toBe(false);
@@ -101,7 +101,7 @@ describe('skulkr saturate', () => {
     const ledger = ledgerOf(cfg, 'src');
     expect(ledger.occasions.map((o: { source: string }) => o.source)).toEqual(['claude', 'codex', 'claude']);
     expect(ledger.defects.map((d: { claim: string }) => d.claim)).toEqual(['A', 'B', 'C', 'D']);
-    expect(readFileSync(join(root, 'src-saturation.md'), 'utf8')).toContain('claude × codex');
+    expect(readFileSync(join(cfg.state, 'saturation/src/report.md'), 'utf8')).toContain('claude × codex');
   });
 
   it("resumes at the ledger's own commit after main moves, and --fresh sets it aside for a new one at the tip", async () => {
@@ -189,9 +189,9 @@ describe('skulkr saturate', () => {
   it('rewrites the report from the ledger, and removes the ledger', async () => {
     const { root, cfg } = project();
     await saturateCommand(cfg, fakeRunner([['A']]), root, ['src', '--max', '1'], () => {});
-    rmSync(join(root, 'src-saturation.md'));
+    rmSync(join(cfg.state, 'saturation/src/report.md'));
     await saturateCommand(cfg, fakeRunner([]), root, ['report', 'src'], () => {});
-    expect(existsSync(join(root, 'src-saturation.md'))).toBe(true);
+    expect(existsSync(join(cfg.state, 'saturation/src/report.md'))).toBe(true);
     const lines: string[] = [];
     await saturateCommand(cfg, fakeRunner([]), root, ['rm', 'src'], (l) => lines.push(l));
     await saturateCommand(cfg, fakeRunner([]), root, ['rm', 'src'], (l) => lines.push(l));
