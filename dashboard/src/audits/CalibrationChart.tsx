@@ -35,15 +35,22 @@ function BucketTable({ cal }: { cal: AuditCalibration }) {
   );
 }
 
-/** Per round, the defects its passes predicted were left beside what their areas' next passes found, with the
- *  factor pooled over that round and every earlier one. */
+/** A round's predicted and found as means over its areas, so a round that audited more areas draws no taller. */
+export const perAreaOf = (p: { pairs: number; predicted: number; found: number }) => {
+  const n = Math.max(1, p.pairs);
+  return { predicted: p.predicted / n, found: p.found / n };
+};
+
+/** Per round, the defects per area its passes predicted were left beside what their areas' next passes found, with
+ *  the factor pooled over that round and every earlier one. */
 export function CalibrationChart({ calibration: cal }: { calibration?: AuditCalibration | undefined }) {
   const box = useRef<HTMLDivElement>(null);
   const measured = useElementSize(box);
   const W = measured.width > 0 ? measured.width : FALLBACK_W;
   const H = measured.height > 0 ? measured.height : FALLBACK_H;
   const series = (cal?.series ?? []).slice(-CHART_ROUNDS);
-  const ticks = ticksFor(Math.max(0, ...series.map((p) => Math.max(p.predicted, p.found))));
+  const each = series.map(perAreaOf);
+  const ticks = ticksFor(Math.max(0, ...each.map((p) => Math.max(p.predicted, p.found))));
   const top = ticks.at(-1) || 1;
   const fTicks = ticksFor(Math.max(1, ...series.map((p) => p.factor ?? 0)), 3);
   const fTop = fTicks.at(-1) || 1;
@@ -59,8 +66,8 @@ export function CalibrationChart({ calibration: cal }: { calibration?: AuditCali
     <div className={s.frame}>
       <div ref={box} className={s.box}>
         {series.length === 0 ? <p className={s.hint}>No area has had two passes yet.</p> : (
-          <svg className={s.chart} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Defects predicted left against found by the next pass, by round">
-            <text className={s.title} transform={`translate(11 ${(M.top + H - M.bottom) / 2}) rotate(-90)`} textAnchor="middle">defects</text>
+          <svg className={s.chart} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Defects per area predicted left against found by the next pass, by round">
+            <text className={s.title} transform={`translate(11 ${(M.top + H - M.bottom) / 2}) rotate(-90)`} textAnchor="middle">defects per area</text>
             {ticks.map((t) => (
               <g key={t}>
                 <line className={s.grid} x1={M.left} x2={W - M.right} y1={y(t)} y2={y(t)} />
@@ -70,9 +77,9 @@ export function CalibrationChart({ calibration: cal }: { calibration?: AuditCali
             {fTicks.map((t) => <text key={t} className={s.factorAxis} x={W - M.right + 4} y={fy(t) + 3} textAnchor="start">{`${t}×`}</text>)}
             {series.map((p, i) => (
               <g key={p.round}>
-                <rect className={s.predicted} x={x(i)} width={bar} y={y(p.predicted)} height={y(0) - y(p.predicted)} />
-                <rect className={s.found} x={x(i) + bar + band * 0.04} width={bar} y={y(p.found)} height={y(0) - y(p.found)}>
-                  <title>{`round ${p.round}: ${p.predicted.toFixed(1)} predicted left over ${p.pairs} ${p.pairs === 1 ? 'area' : 'areas'}, ${p.found.toFixed(1)} found by their next pass; ${factorText(p.factor)} pooled to here`}</title>
+                <rect className={s.predicted} x={x(i)} width={bar} y={y(each[i]!.predicted)} height={y(0) - y(each[i]!.predicted)} />
+                <rect className={s.found} x={x(i) + bar + band * 0.04} width={bar} y={y(each[i]!.found)} height={y(0) - y(each[i]!.found)}>
+                  <title>{`round ${p.round}, over ${p.pairs} ${p.pairs === 1 ? 'area' : 'areas'}: ${each[i]!.predicted.toFixed(1)} predicted left per area, ${each[i]!.found.toFixed(1)} found by their next pass; ${factorText(p.factor)} pooled to here`}</title>
                 </rect>
                 <text className={s.axis} x={mid(i)} y={H - 8} textAnchor="middle">{p.round}</text>
               </g>
@@ -90,8 +97,8 @@ export function CalibrationChart({ calibration: cal }: { calibration?: AuditCali
             <Popover placement="bottom end" offset={6}>
               <PopoverDialog aria-label="What the calibration chart shows" className={s.aboutText}>
                 <p className={s.para}>
-                  Dashed: the defects a round&apos;s passes estimated were left. Solid: the distinct defects the next pass
-                  of each of those areas found. Line: found over predicted, pooled over that round and every earlier one.
+                  Dashed: the defects a round&apos;s passes estimated were left, per area. Solid: the distinct defects the
+                  next pass of each of those areas found, per area. Line: found over predicted, pooled over that round and every earlier one.
                   The next pass came after the fixes and counts defects added since, so it is only a rough check.
                 </p>
                 <BucketTable cal={cal} />

@@ -21,12 +21,12 @@ describe('CalibrationChart', () => {
   it('draws, per round, what was predicted left beside what the next passes found, and the running factor', () => {
     renderWithIcons(<CalibrationChart calibration={calibration} />);
     const chart = screen.getByRole('img');
-    expect(chart.getAttribute('aria-label')).toBe('Defects predicted left against found by the next pass, by round');
+    expect(chart.getAttribute('aria-label')).toBe('Defects per area predicted left against found by the next pass, by round');
     expect(chart.querySelectorAll('rect')).toHaveLength(4);
     expect(chart.querySelectorAll('circle')).toHaveLength(2);
     expect([...chart.querySelectorAll('title')].map((t) => t.textContent)).toEqual([
-      'round 35: 3.0 predicted left over 2 areas, 12.0 found by their next pass; 4.00× pooled to here',
-      'round 37: 1.0 predicted left over 1 area, 2.0 found by their next pass; 3.50× pooled to here',
+      'round 35, over 2 areas: 1.5 predicted left per area, 6.0 found by their next pass; 4.00× pooled to here',
+      'round 37, over 1 area: 1.0 predicted left per area, 2.0 found by their next pass; 3.50× pooled to here',
     ]);
   });
 
