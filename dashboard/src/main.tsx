@@ -5,6 +5,7 @@ import '@weasel-js/ui/style.css';
 import './app.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import * as weaselCore from '@weasel-js/core';
 import { WeaselProvider } from '@weasel-js/core';
 import { IconRegistryProvider } from '@weasel-js/icons/react';
 import { defineTheme } from '@weasel-js/theme';
@@ -12,6 +13,10 @@ import { ThemeProvider } from '@weasel-js/theme/react';
 import { AuditsPage } from '@dash/audits/AuditsPage';
 import { ColorModeProvider } from '@dash/colorMode';
 import { ICONS } from '@dash/icons';
+
+// Before React renders and the snapshot loads, so the map's shaders compile meanwhile. Unreleased (weasel 06adf720cf):
+// absent from the pinned 2.0.0, so a no-op there, and live through the alpo link.
+(weaselCore as { warmPrograms?: () => void }).warmPrograms?.();
 
 const theme = defineTheme({ name: 'skulkr-dashboard' });
 
