@@ -183,9 +183,9 @@ describe('the batch with conflict repair', () => {
     const { r, outcomes, report, state } = await land((root) => keepBoth(root, scratch()));
     expect(report).toMatch(/^main fast-forwarded/);
     expect(outcomes.part2).toBe('`audit5-part2`, merged after a conflict repair');
-    const record = JSON.parse(readFileSync(join(r.root, 'docs/audits/round-5/part2/area.json'), 'utf8'));
+    const record = JSON.parse(readFileSync(join(r.root, '.skulkr/round-5/part2/area.json'), 'utf8'));
     expect(record.conflictRepaired).toBe(true);
-    expect(readFileSync(join(r.root, 'docs/audits/round-5/README.md'), 'utf8')).toContain('merged after a conflict repair');
+    expect(readFileSync(join(r.root, '.skulkr/round-5/README.md'), 'utf8')).toContain('merged after a conflict repair');
     expect(readFileSync(join(r.root, 'src/api.test.ts'), 'utf8')).toBe('one\npart1 test\npart2 test\n');
     expect(leftOutIn(state)).toEqual([]);
   });

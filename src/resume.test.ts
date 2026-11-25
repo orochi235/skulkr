@@ -70,7 +70,7 @@ describe('resume', () => {
     mkdirSync(join(root, 'src'), { recursive: true });
     writeFileSync(join(root, 'src', 'a.ts'), 'export const a = 1;\n');
     const record = (round: number, unfound: number) => {
-      const dir = join(root, 'docs', 'audits', `round-${round}`, 'src');
+      const dir = join(root, '.skulkr', `round-${round}`, 'src');
       mkdirSync(dir, { recursive: true });
       writeFileSync(join(dir, 'area.json'), JSON.stringify({ id: 'src', files: ['src/a.ts'], a: 1, b: 1, m: 1, distinct: 1, chapman: 1, unfound }));
     };
