@@ -112,13 +112,16 @@ export const ontoOnce = (args, cwd, log) =>
     child.on('close', (status) => done({ status: status ?? 1, ...out.result() }));
   });
 
-/** Each task's first progress counter anywhere in `onto top --json`'s answer, by task. */
+/**
+ * Each task's first progress counter anywhere in `onto top --json`'s answer, by task: one the job counted itself, never
+ * onto's time bar (seconds against the timeout or an expectation, marked by its `estimate`).
+ */
 export const progressOfTop = (top) => {
   const found = new Map();
   const walk = (o) => {
     if (Array.isArray(o)) return o.forEach(walk);
     if (!o || typeof o !== 'object') return;
-    const first = Array.isArray(o.progress) ? o.progress[0] : null;
+    const first = Array.isArray(o.progress) ? o.progress.find((p) => p && p.estimate === undefined) : null;
     if (typeof o.task === 'string' && first && Number.isFinite(first.done) && Number.isFinite(first.total)) {
       found.set(o.task, { done: first.done, total: first.total });
     }

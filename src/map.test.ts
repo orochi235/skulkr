@@ -224,6 +224,11 @@ describe('gate outcomes and reruns', () => {
     const top = { nodes: [{ name: 'studio', jobs: [{ task: 'audit50-a-A', progress: [{ done: 4, total: 9 }, { done: 1, total: 2 }] }, { task: 'x' }] }] };
     expect([...progressOfTop(top)]).toEqual([['audit50-a-A', { done: 4, total: 9 }]]);
   });
+
+  it("takes no time bar for a count: a repair onto shows as seconds against its timeout has none", () => {
+    const repair = { task: 'audit85-a-repair', progress: [{ label: '', done: 200, total: 5400, estimate: 'none', share: true }] };
+    expect([...progressOfTop({ nodes: [{ name: 'studio', jobs: [repair] }] })]).toEqual([]);
+  });
 });
 
 describe('buildMap', () => {
