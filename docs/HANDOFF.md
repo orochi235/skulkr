@@ -1,6 +1,6 @@
 # Handoff
 
-For the next session in skulkr. Written 2026-11-25, evening. Check each claim against the tree before acting on it.
+For the next session in skulkr. Written 2026-11-25, late evening. Check each claim against the tree before acting on it.
 
 ## State
 
@@ -15,31 +15,35 @@ commits of the day. Built today, all described in README.md:
 - The orochi service (`onto service`, tree `skulkr`) runs current skulkr; re-sync it with `onto sync --in skulkr orochi`
   after changes that matter to rounds.
 
-## Next: plan the scour pipeline, then build it
+- Scour, built 2026-11-25 on `main`: ledgers under `scour/` (state and `.skulkr/`, `saturation/` still read),
+  `scour trawl` and `scour fold` as separate commands, the triage fields from reviewer to registry, `scour ls --ids`
+  for the Codex skill, and the Scour page's left panel as a tree of every map area.
 
-The user wants to plan the pipeline further before anything is built. The plan is `docs/scour.md`: the stages (pick,
-trawl, collect, judge, land, triage, fix, ask, close, compare), what each hands the next, what is decided, what is open.
-Its stage table's middle columns (core action, UI, user sees) are the user's own wording; keep them unless asked.
+## Next: build the fix stage
 
-Points the user has not settled, raised in conversation and not all in the doc:
+`docs/scour.md` is the plan; its status line says what is built, and "Building the fix stage" is the design for the
+rest. Order: landing as a shared library (names from a prefix, `record` and the left-out store passed in), then
+triage, fix, ask and close, then the Scour page's fix queue and "needs you" list. The user said go on building all of
+it (2026-11-25). Its stage table's middle columns (core action, UI, user sees) are the user's own wording.
 
-- In the stage table: `ask` reads Implicit but writes "a list for a person to rule on", and its UI cell repeats scan's
-  progress bar; `triage` has no UI though it decides what fixers get; `compare`'s "Ambient" is undefined; `land`'s
-  "User sees" mixes now ("currently explicit") with intent; `judge` is closer to "configured" than "implicit?".
-- Collect's verb: `fold` or `pool` (one syllable) against `collect`.
-- Whether triage checks each defect with a model, whether fix goes through the round pipeline (proposed, not decided),
-  where the fix plan lives, and whether to rename the `saturation/` paths on disk.
+weasel's parity rule in CLAUDE.md applies to every landing change: rounds must keep the same names, record and map.
 
 ## Decisions made in conversation (2026-11-25)
 
 All are in `docs/scour.md` "Decided" or README.md except these:
 
-- Landing ledgers and moving weasel's record pushes weasel's `main`; both were done with the user's go-ahead. Pushing
-  weasel needs that each time.
-- Saturation defects found only by a scour are never handed to a round's fixer until triage and fix exist.
+- Pushing weasel's `main` needs the user's go-ahead each time.
+- Scour defects are never handed to a round's fixer; they wait for scour's own fix stage.
 
 ## Loose ends
 
+- **weasel `758e1efac7`, local and unpushed**: moves its landed ledgers from `.skulkr/saturation/` to `.skulkr/scour/`
+  (530 renames; the registry rebuilds identically from it). The user has not yet said to push it; skulkr reads both
+  paths, so nothing breaks while it waits. A round or landing on weasel would push it along with its own commit.
+- Asked the user, unanswered: whether to add a map lens counting every agent review of an area (two per round read,
+  plus scour occasions), and whether to reword the "saturation unseen" lens's legend (`dashboard/src/audits/heatMetrics.ts`).
+- `~/.local/state/weasel-skulkr/saturation-hand/` holds the hand-run viewport experiment's inputs, already imported
+  into the viewport ledger; nothing reads it.
 - A stray onto tree `skulkr-weasel` on orochi, made by a mistaken sync, is unused.
 - kouhai's ledger still holds older open work for this repo (`owed`): t-543, t-545, t-546, t-547.
 

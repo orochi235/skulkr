@@ -1,6 +1,8 @@
 # Scour, in stages
 
-**Status: designed 2026-11-25, mostly unbuilt.** What runs today is the README's "Saturation" section: one
+**Status: designed 2026-11-25, part built.** Built: the `scour/` paths, `trawl` and `fold` as separate commands, the
+triage fields, and the Scour page's tree. Unbuilt: landing as a shared library, then triage, fix, ask and close, then
+the page's fix queue and "needs you" list; "Building the fix stage" below is the design for them. What runs today is the README's "Saturation" section: one
 `skulkr scour` command that trawls and folds in a loop, plus `ingest`, `import`, `land` and `ls`. This document is
 the plan for splitting it into stages that run on their own. The table under "Stages" says which parts exist.
 
@@ -58,6 +60,26 @@ project's `.skulkr/`, never from one machine's state directory.
 | land → triage | `.skulkr/scour/…/ledger.json` and `.skulkr/defects/<area>.jsonl` |
 | triage → fix | the fix plan, computed when a fix run starts and never stored: batches of registry ids, each with the files they touch |
 | fix → close | scour's own fix record: the fixers' verdicts, naming registry ids |
+
+## Building the fix stage
+
+Unbuilt (2026-11-25). Every landing step reads its names from `cfg.names`, which `config.mjs` derives from
+`naming.prefix` (`audit<N>-<area>` branches, `batch/<date>-audit<N>`, `audit<N>-am-<area>` trees, the gate's job
+pattern, `branchOf`, `idOf`). A round number runs through all of them: `applyFix`, `makeBatch`, `gateOnFleet`,
+`repairCapstone`'s test of which branches are this run's, and the map's parsing of the log.
+
+- **Names.** Make the name set a function of its prefix (`namesFor(prefix)`), `cfg.names` being `namesFor(naming.prefix)`
+  as now. A fix run calls the landing code with `{ ...cfg, names: namesFor('scour') }`, numbered by its own counter
+  (`scour<N>-<area>`, `batch/<date>-scour<N>`), so no landing function changes its signature and rounds see no change.
+- **What `batchAndTest` must be told rather than assume.** Its record commit (`commitRecord`, the round's
+  `round-<N>/`) becomes a `record(tree)` it is passed; a fix run commits its own record there and rewrites
+  `.skulkr/defects/`. Its left-out store (`leftOutIn(cfg.state)`, which later rounds retry) becomes one it is passed, so
+  a fix run neither retries round branches nor leaves branches for rounds to retry.
+- **Fix.** Per triage batch, a fixer job like a round's (`fixer.md`), handed registry ids with each defect's claim,
+  where, scenario and triage fields, its verify as a round fixer's; verdicts name registry ids, which `close` writes
+  as statuses.
+- **Where it runs.** `skulkr scour fix [<area>…]`, state under `<state>/scour/fix-<N>/`, the record under
+  `.skulkr/scour/fix-<N>/`.
 
 ## Decided
 
