@@ -1,4 +1,5 @@
 enlist: 6
 plugin: node
-runner: vitest
-run: node_modules/.bin/vitest run
+# Both packages' suites: the root's, then the dashboard's, which has its own vitest and deps
+# and cannot run as a project of the root's. Chained, so no runner: line.
+run: npm run test:all

@@ -13,6 +13,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "test:all": "vitest run && npm --prefix dashboard test",
     "typecheck": "tsc --noEmit",
     "menubar:install": "mkdir -p ~/.local/bin && ln -sf \"$PWD/bin/skulkr.mjs\" ~/.local/bin/skulkr && cd menubar && ${PERCH:-perch} install",
     "menubar:uninstall": "cd menubar && ${PERCH:-perch} uninstall"
