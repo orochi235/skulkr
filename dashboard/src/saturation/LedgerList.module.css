@@ -12,6 +12,13 @@
   overflow: auto;
 }
 
+/* A leaf keeps the room a branch's disclosure mark takes, so every label at one depth starts at one x. */
+.tree {
+  --wzl-tree-fold-size: 13px;
+  --wzl-tree-leaf-indent: calc(var(--wzl-tree-fold-size) + var(--wzl-space-2));
+  --wzl-tree-root-leaf-indent: var(--wzl-tree-leaf-indent);
+}
+
 .row { font-family: var(--wzl-font-mono); }
 
 .head {

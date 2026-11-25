@@ -55,7 +55,7 @@ export function LedgerList({ ledgers, picked, onPick }: { ledgers: readonly Satu
       </div>
       <div ref={scroll} className={s.scroll}>
         <Tree
-          aria-label="Ledgers by area" nodes={nodes} empty="No ledger matches." guides pressFolds={false}
+          aria-label="Ledgers by area" className={s.tree} nodes={nodes} empty="No ledger matches." guides pressFolds={false}
           expandedIds={q ? treeBranchIds(nodes) : expanded} onExpandedChange={q ? undefined : setExpanded}
           selectionMode="single" selectedIds={picked ? [picked] : []}
           onAction={(id) => { if (ids.has(id)) onPick(id); }}
