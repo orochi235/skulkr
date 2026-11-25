@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { recordsIn } from './carryRecords.mjs';
 import { defectGraphOf } from './defectGraph.mjs';
 import { diskRecords } from './recordFiles.mjs';
+import { landedLedgersUnder } from './scourPaths.mjs';
 
 /** The registry's directory, relative to the project's root. */
 export const registryDirOf = (cfg) => `${cfg.record.dir}/defects`;
@@ -42,8 +43,8 @@ export const entryOf = (o) => ({
  * its commit (`before`; Infinity for none), as `defectGraphOf` reads them.
  */
 export const landedLedgersIn = (cfg, git, root, records) => {
-  const dir = join(root, cfg.record.dir, 'saturation');
-  if (!existsSync(dir)) return [];
+  const landed = landedLedgersUnder(cfg, root);
+  if (landed.length === 0) return [];
   const commits = [...new Map(records.filter((r) => r.area?.commit).map((r) => [r.round, r.area.commit]))].sort(([x], [y]) => x - y);
   const after = new Map();
   const isAfter = (base, commit) => {
@@ -58,13 +59,10 @@ export const landedLedgersIn = (cfg, git, root, records) => {
     }
     return after.get(key);
   };
-  return readdirSync(dir).flatMap((area) => readdirSync(join(dir, area)).flatMap((short) => {
-    const file = join(dir, area, short, 'ledger.json');
-    if (!existsSync(file)) return [];
-    const ledger = JSON.parse(readFileSync(file, 'utf8'));
+  return landed.map(({ short, ledger }) => {
     const before = commits.find(([, commit]) => isAfter(ledger.commit, commit))?.[0] ?? Infinity;
-    return [{ key: `${ledger.area}@${short}`, area: ledger.area, commit: ledger.commit, before, defects: ledger.defects }];
-  }));
+    return { key: `${ledger.area}@${short}`, area: ledger.area, commit: ledger.commit, before, defects: ledger.defects };
+  });
 };
 
 /** Every registry line the project's record under `root` gives, by id. */

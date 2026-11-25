@@ -91,9 +91,9 @@ describe('on disk', () => {
     expect(ledgerOf(cfg, 'a')).toEqual(two());
     const file = keepReview(cfg, 'a', 3, 'gpt 5', 'raw');
     expect(file).toBe('reviews/03-gpt-5.md');
-    expect(readFileSync(join(cfg.state, 'saturation/a', file), 'utf8')).toBe('raw');
+    expect(readFileSync(join(cfg.state, 'scour/a', file), 'utf8')).toBe('raw');
     expect(removeLedger(cfg, 'a')).toBe(true);
-    expect(existsSync(join(cfg.state, 'saturation/a'))).toBe(false);
+    expect(existsSync(join(cfg.state, 'scour/a'))).toBe(false);
     expect(removeLedger(cfg, 'a')).toBe(false);
   });
 

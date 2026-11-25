@@ -67,9 +67,9 @@ describe('skulkr saturate import', () => {
     expect(ledger.defects[2]).toMatchObject({ firstOccasion: null, sources: {}, source: 'codex' });
     expect(ledger.defects[3]).toMatchObject({ severity: 'high', firstOccasion: 1, sources: { claude: [1] } });
     expect(chao2(ledger.occasions, ledger.defects)).toMatchObject({ m: 3, S: 3, Q1: 2, Q2: 0 });
-    expect(readdirSync(join(cfg.state, 'saturation/src/reviews'))).toEqual(['01-claude.md', '02-claude.md', '03-claude.md']);
-    expect(readFileSync(join(cfg.state, 'saturation/src/reviews/02-claude.md'), 'utf8')).toBe('review 02\n');
-    expect(readFileSync(join(cfg.state, 'saturation/src/report.md'), 'utf8')).toContain('four (found only by codex)');
+    expect(readdirSync(join(cfg.state, 'scour/src/reviews'))).toEqual(['01-claude.md', '02-claude.md', '03-claude.md']);
+    expect(readFileSync(join(cfg.state, 'scour/src/reviews/02-claude.md'), 'utf8')).toBe('review 02\n');
+    expect(readFileSync(join(cfg.state, 'scour/src/report.md'), 'utf8')).toContain('four (found only by codex)');
     expect(lines[0]).toMatch(/^imported 3 occasions and 4 defects into src's ledger at /);
   });
 

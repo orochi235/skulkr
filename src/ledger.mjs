@@ -1,6 +1,6 @@
 /**
  * A saturation ledger: one area's occasions at one frozen commit and the distinct defects they found, on disk at
- * `<state>/saturation/<area>/ledger.json`, each occasion's raw report beside it under `reviews/`. The ledger is the
+ * `<state>/scour/<area>/ledger.json`, each occasion's raw report beside it under `reviews/`. The ledger is the
  * only state; every statistic is recomputed from it (`saturation.mjs`).
  */
 import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -10,9 +10,10 @@ import { firstJson, severityOf } from './findings.mjs';
 import { partitionAt } from './partition.mjs';
 import { readJson, writeJson } from './json.mjs';
 import { takeLease } from './lease.mjs';
+import { scourStateDirOf } from './scourPaths.mjs';
 
 /** The directory holding `area`'s ledger. */
-export const ledgerDirOf = (cfg, area) => join(cfg.state, 'saturation', area);
+export const ledgerDirOf = (cfg, area) => join(scourStateDirOf(cfg), area);
 
 /** `area`'s ledger, or undefined when it has none. */
 export const ledgerOf = (cfg, area) => readJson(join(ledgerDirOf(cfg, area), 'ledger.json'));

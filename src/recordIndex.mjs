@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { diskRecords } from './recordFiles.mjs';
 import { readRegistry } from './registry.mjs';
+import { landedLedgersUnder } from './scourPaths.mjs';
 
 /** Bumped when the tables change, so an index built by an older skulkr is built again. */
 const SCHEMA = 1;
@@ -87,17 +88,11 @@ const fill = (cfg, root, db) => {
       });
     }
   }
-  const saturation = join(root, cfg.record.dir, 'saturation');
-  for (const area of existsSync(saturation) ? readdirSync(saturation) : []) {
-    for (const short of readdirSync(join(saturation, area))) {
-      const file = join(saturation, area, short, 'ledger.json');
-      if (!existsSync(file)) continue;
-      const l = JSON.parse(readFileSync(file, 'utf8'));
-      const key = `${l.area}@${short}`;
-      insert('ledgers', { key, area: l.area, commit: l.commit, files: l.files.length, occasions: l.occasions.length, distinct: l.defects.length });
-      for (const o of l.occasions) {
-        insert('occasions', { ledger: key, n: o.n, source: o.source, kind: o.kind, findings: o.findings, cost_usd: o.costUsd, minutes: o.minutes, at: o.at });
-      }
+  for (const { short, ledger: l } of landedLedgersUnder(cfg, root)) {
+    const key = `${l.area}@${short}`;
+    insert('ledgers', { key, area: l.area, commit: l.commit, files: l.files.length, occasions: l.occasions.length, distinct: l.defects.length });
+    for (const o of l.occasions) {
+      insert('occasions', { ledger: key, n: o.n, source: o.source, kind: o.kind, findings: o.findings, cost_usd: o.costUsd, minutes: o.minutes, at: o.at });
     }
   }
   for (const d of readRegistry(cfg, root)) {

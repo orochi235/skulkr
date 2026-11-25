@@ -4,11 +4,9 @@ Open work on skulkr. Each entry says when it closes.
 
 - [ ] (P1) Build saturation as stages, `docs/scour.md` (designed 2026-11-25, mostly unbuilt). Closes when its
   stages run on their own and the doc is folded into the README and deleted.
-- [ ] (P2) Saturation ledgers' defects reach no fixer: landed ledgers under `<record.dir>/saturation/` are read by
-  nothing. They are to be fixed eventually; the mechanism is undecided (2026-11-25). A defect was found at the ledger's
-  frozen commit, so whatever hands it to a fixer has it re-checked against the current tree first. The dashboard's
-  saturation page is the likely place to start and watch those fixes (2026-11-25). Closes when a landed
-  ledger's open defects reach a fixer and its verdicts are recorded against the ledger's defect ids.
+- [ ] (P2) Scour ledgers' defects reach no fixer: landed ledgers under `<record.dir>/scour/` are read by no fixer
+  yet. The mechanism is scour's triage and fix stages, `docs/scour.md` (decided 2026-11-25). Closes when a landed
+  ledger's open defects reach a fixer and its verdicts are recorded against the registry's ids.
 - [ ] (P1) Review the whole state flow end to end (asked for 2026-11-23): every state an area, lane, batch, and round
   can be in, which log line or job moves it, and what the map and dashboard show for each. The pieces were built
   one step at a time (verify, repair, early landings, capstone cycles, left-out retries), and the dashboard has

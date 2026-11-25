@@ -82,9 +82,9 @@ describe('skulkr saturate', () => {
     expect(runner.tasks[0]).toBe('proj-saturate-src-01-claude-claude');
     expect(lines).toContain('5/5 claude: 5 findings, 2 new; distinct 13; unseen ≈ 12.8; next-new 32%; $0.60; $0.22/defect');
     expect(lines.some((l) => /stopped, reached the limit of 5/.test(l))).toBe(true);
-    expect(readdirSync(join(cfg.state, 'saturation/src/reviews'))).toEqual(['01-claude.md', '02-claude.md', '03-claude.md', '04-claude.md', '05-claude.md']);
-    expect(existsSync(join(cfg.state, 'saturation/src/jobs/05-claude'))).toBe(false);
-    const report = readFileSync(join(cfg.state, 'saturation/src/report.md'), 'utf8');
+    expect(readdirSync(join(cfg.state, 'scour/src/reviews'))).toEqual(['01-claude.md', '02-claude.md', '03-claude.md', '04-claude.md', '05-claude.md']);
+    expect(existsSync(join(cfg.state, 'scour/src/jobs/05-claude'))).toBe(false);
+    const report = readFileSync(join(cfg.state, 'scour/src/report.md'), 'utf8');
     expect(report).toContain('Stopped: reached the limit of 5 occasions.');
     expect(report).toMatch(/\|\s+5 \| claude\s+\|\s+5 \|\s+2 \|\s+13 \|\s+8 \|\s+2 \|\s+25\.8 \|\s+12\.8 \|\s+32\.3% \|/);
     expect(existsSync(join(root, '.worktrees/audit-saturate-src'))).toBe(false);
@@ -109,7 +109,7 @@ describe('skulkr saturate', () => {
     const ledger = ledgerOf(cfg, 'src');
     expect(ledger.occasions.map((o: { source: string }) => o.source)).toEqual(['claude', 'codex', 'claude']);
     expect(ledger.defects.map((d: { claim: string }) => d.claim)).toEqual(['A', 'B', 'C', 'D']);
-    expect(readFileSync(join(cfg.state, 'saturation/src/report.md'), 'utf8')).toContain('claude × codex');
+    expect(readFileSync(join(cfg.state, 'scour/src/report.md'), 'utf8')).toContain('claude × codex');
   });
 
   it("resumes at the ledger's own commit after main moves, and --fresh sets it aside for a new one at the tip", async () => {
@@ -137,7 +137,7 @@ describe('skulkr saturate', () => {
     expect(ledger.defects.map((d: { claim: string }) => d.claim)).toEqual(['C']);
     const aside = ledgerOf(cfg, `src.${first.slice(0, 10)}`);
     expect(aside.defects.map((d: { claim: string }) => d.claim)).toEqual(['A', 'B']);
-    expect(existsSync(join(cfg.state, 'saturation', `src.${first.slice(0, 10)}`, 'lock'))).toBe(false);
+    expect(existsSync(join(cfg.state, 'scour', `src.${first.slice(0, 10)}`, 'lock'))).toBe(false);
   });
 
   it('freezes a new ledger at --at, and refuses an existing one at another commit unless --fresh', async () => {
@@ -190,16 +190,16 @@ describe('skulkr saturate', () => {
     await expect(saturateCommand(cfg, runner, root, ['src', '--max', '3'], (l) => lines.push(l))).rejects.toThrow(/no usable answer/);
     expect(runner.tasks.filter((t) => /match/.test(t))).toEqual(['proj-saturate-src-02-claude-match1', 'proj-saturate-src-02-claude-match2']);
     expect(ledgerOf(cfg, 'src').occasions).toHaveLength(1);
-    expect(readdirSync(join(cfg.state, 'saturation/src/reviews')).some((f) => f.startsWith('unmatched-02-claude'))).toBe(true);
+    expect(readdirSync(join(cfg.state, 'scour/src/reviews')).some((f) => f.startsWith('unmatched-02-claude'))).toBe(true);
     expect(existsSync(join(root, '.worktrees/audit-saturate-src'))).toBe(false);
   });
 
   it('rewrites the report from the ledger, and removes the ledger', async () => {
     const { root, cfg } = project();
     await saturateCommand(cfg, fakeRunner([['A']]), root, ['src', '--max', '1'], () => {});
-    rmSync(join(cfg.state, 'saturation/src/report.md'));
+    rmSync(join(cfg.state, 'scour/src/report.md'));
     await saturateCommand(cfg, fakeRunner([]), root, ['report', 'src'], () => {});
-    expect(existsSync(join(cfg.state, 'saturation/src/report.md'))).toBe(true);
+    expect(existsSync(join(cfg.state, 'scour/src/report.md'))).toBe(true);
     const lines: string[] = [];
     await saturateCommand(cfg, fakeRunner([]), root, ['rm', 'src'], (l) => lines.push(l));
     await saturateCommand(cfg, fakeRunner([]), root, ['rm', 'src'], (l) => lines.push(l));

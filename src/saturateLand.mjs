@@ -1,6 +1,6 @@
 /**
  * `skulkr scour land <area>… | --all`: commits saturation ledgers to the project's `main`, each under
- * `<record.dir>/saturation/<area>/<commit>/`, so their defects outlive the state directory. README "Scour",
+ * `<record.dir>/scour/<area>/<commit>/`, so their defects outlive the state directory. README "Scour",
  * "Landing a ledger", is its documentation.
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -12,23 +12,23 @@ import { mergeLock } from './runs.mjs';
 import { stopRuleOf } from './saturation.mjs';
 import { reportText } from './saturationReport.mjs';
 import { writeRegistry } from './registry.mjs';
+import { formerLandedDirOf, landedDirOf, scourStateDirOf } from './scourPaths.mjs';
 
-/** Where `ledger` lands, relative to the project's root: one directory per area and frozen commit. */
-export const landedDirOf = (cfg, ledger) => `${cfg.record.dir}/saturation/${ledger.area}/${ledger.commit.slice(0, 10)}`;
+export { landedDirOf };
 
 /** The landing commit's subject, for the ledgers it lands. */
 export const landSubjectOf = (ledgers) => {
   if (ledgers.length > 1) {
     const defects = ledgers.reduce((n, l) => n + l.defects.length, 0);
-    return `record ${ledgers.length} areas' saturation ledgers: ${defects} defects`;
+    return `record ${ledgers.length} areas' scour ledgers: ${defects} defects`;
   }
   const [ledger] = ledgers;
-  return `record ${ledger.area}'s saturation ledger: ${ledger.defects.length} defects from ${ledger.occasions.length} occasions at ${ledger.commit.slice(0, 10)}`;
+  return `record ${ledger.area}'s scour ledger: ${ledger.defects.length} defects from ${ledger.occasions.length} occasions at ${ledger.commit.slice(0, 10)}`;
 };
 
 /** Every ledger id in the state directory with occasions to land, set-aside ones included. */
 export const landableIdsOf = (cfg) => {
-  const dir = join(cfg.state, 'saturation');
+  const dir = scourStateDirOf(cfg);
   if (!existsSync(dir)) return [];
   return readdirSync(dir).filter((id) => ledgerOf(cfg, id)?.occasions.length > 0).sort();
 };
@@ -47,8 +47,8 @@ const withLedgersHeld = (cfg, ids, work) =>
   ids.length === 0 ? work() : withLedgerHeld(cfg, ids[0], {}, () => withLedgersHeld(cfg, ids.slice(1), work));
 
 /**
- * Commits the ledgers `ids` (areas, or set-aside `<area>.<commit>`s) in one commit on a `<prefix>-saturation-<area>`
- * branch (`<prefix>-saturation` for several) from `main` and fast-forwards `main` to it, holding the ledgers and the
+ * Commits the ledgers `ids` (areas, or set-aside `<area>.<commit>`s) in one commit on a `<prefix>-scour-<area>`
+ * branch (`<prefix>-scour` for several) from `main` and fast-forwards `main` to it, holding the ledgers and the
  * merge lock. The branch is deleted once `main` holds it and kept, named in the answer, when it does not. Answers what
  * happened, a sentence.
  */
@@ -65,20 +65,21 @@ export const landLedgers = async (cfg, root, ids, say = () => {}) => {
     });
     const what = ids.length === 1 ? ids[0] : `${ids.length} ledgers`;
     const release = await waitForLease(mergeLock(cfg.state), { saturate: what }, { onWait: () => say(`land ${what}: waiting for the merge lock`) });
-    const branch = `${cfg.naming.prefix}-saturation${ids.length === 1 ? `-${ledgers[0].area}` : ''}`;
+    const branch = `${cfg.naming.prefix}-scour${ids.length === 1 ? `-${ledgers[0].area}` : ''}`;
     const tree = addWorktree(root, branch, cfg.git.main, branch);
     let keep = false;
     try {
       const dirs = ledgers.map((ledger, i) => {
         const dir = landedDirOf(cfg, ledger);
         writeLanded(cfg, ids[i], ledger, join(tree, dir));
+        rmSync(join(tree, formerLandedDirOf(cfg, ledger)), { recursive: true, force: true });
         return dir;
       });
       const git = gitIn(tree);
-      git('add', '-A', '--', ...dirs);
+      git('add', '-A', '--', ...dirs, ...ledgers.map((l) => formerLandedDirOf(cfg, l)).filter((d) => git('ls-files', '--', d)));
       const changed = ledgers.filter((_, i) => git('status', '--porcelain', '--', dirs[i]));
       if (changed.length) git('add', '-A', '--', writeRegistry(cfg, git, tree));
-      const where = dirs.length === 1 ? dirs[0] : `${dirs.length} ledgers under ${cfg.record.dir}/saturation`;
+      const where = dirs.length === 1 ? dirs[0] : `${dirs.length} ledgers under ${cfg.record.dir}/scour`;
       if (changed.length === 0) return `${where} already ${dirs.length === 1 ? 'holds this ledger' : 'hold these ledgers'}; nothing to land`;
       const trailer = cfg.record.trailer ? `\n\n${cfg.record.trailer}` : '';
       const body = changed.length > 1 ? `\n\n${changed.map((l) => `- ${landSubjectOf([l]).replace(/^record /, '')}`).join('\n')}` : '';

@@ -3,11 +3,11 @@
  * saturation page (`--json`) or a terminal.
  */
 import { existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
 import { gitIn } from './batch.mjs';
 import { ledgerOf } from './ledger.mjs';
 import { queryIndex } from './recordIndex.mjs';
 import { chao2, sourcesOf, stopReason, stopRuleOf } from './saturation.mjs';
+import { landedLedgersUnder, scourStateDirOf } from './scourPaths.mjs';
 
 /**
  * One ledger's summary and defects; `id` is its directory, an area or a set-aside `<area>.<commit>`. `registered`
@@ -61,7 +61,7 @@ const registeredIn = (cfg, root) => {
 
 /** Every ledger in `cfg`'s state directory, summed up, by id; each landed one's defects with their registry lines from `root`'s record. */
 export const ledgerListOf = (cfg, root) => {
-  const dir = join(cfg.state, 'saturation');
+  const dir = scourStateDirOf(cfg);
   if (!existsSync(dir)) return [];
   const registered = root ? registeredIn(cfg, root) : undefined;
   return readdirSync(dir).sort().flatMap((id) => {
@@ -79,4 +79,19 @@ export const ledgerListLines = (list) => {
     `${'area'.padEnd(width)}  occ  distinct  unseen  next-new     cost`,
     ...list.map((l) => `${l.id.padEnd(width)}  ${String(l.occasions).padStart(3)}  ${String(l.distinct).padStart(8)}  ${fixed(l.unseen, 1).padStart(6)}  ${(l.nextNew === null ? '–' : `${(l.nextNew * 100).toFixed(1)}%`).padStart(8)}  ${`$${l.costUsd.toFixed(2)}`.padStart(7)}`),
   ];
+};
+
+/**
+ * The areas with a ledger, in the state directory or landed under `root`, holding an occasion from `source` (any
+ * source when it is undefined). Names only: a reviewer that must stay blind to a ledger can ask it.
+ */
+export const scouredAreasOf = (cfg, root, source) => {
+  const has = (ledger) => ledger.occasions.some((o) => source === undefined || o.source === source);
+  const dir = scourStateDirOf(cfg);
+  const kept = existsSync(dir) ? readdirSync(dir).flatMap((id) => {
+    const ledger = ledgerOf(cfg, id);
+    return ledger && has(ledger) ? [ledger.area] : [];
+  }) : [];
+  const landed = root ? landedLedgersUnder(cfg, root).filter(({ ledger }) => has(ledger)).map(({ ledger }) => ledger.area) : [];
+  return [...new Set([...kept, ...landed])].sort();
 };

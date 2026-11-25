@@ -72,7 +72,8 @@ project's `.skulkr/`, never from one machine's state directory.
 - Collect's verb is **fold**: sightings fold into defects; `skulkr scour fold <area>` reruns it after the matcher
   changes (2026-11-25).
 - The names on disk follow: `saturation/` becomes `scour/` in the state directory and in `.skulkr/`, with the old path
-  still read, as `record.dir` reads `formerDirs`; weasel's landed ledgers move with it (2026-11-25).
+  still read, as `record.dir` reads `formerDirs`; weasel's landed ledgers move with it (2026-11-25). Built 2026-11-25
+  (`src/scourPaths.mjs`).
 - **fix is its own process, not a round.** It has its own triage, batches and record, and never takes a round number
   or enters the rounds' history. Only the landing is shared: verify, batch with conflict repair, gate and capstone with
   blame, and the fast-forward of `main` move out of the round code into a library both call (2026-11-25).

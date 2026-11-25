@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { resolveConfig } from './config.mjs';
 import { emptyLedger, keepReview, withOccasion, writeLedger } from './ledger.mjs';
 import { saturateCommand } from './saturate.mjs';
+import { scouredAreasOf } from './saturationList.mjs';
+import { moveFormerScourState } from './scourPaths.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -60,14 +62,14 @@ describe('skulkr saturate land', () => {
     const commit = git('rev-parse', 'HEAD');
     const ledger = seed(cfg, commit, [['A', 'B'], ['B', 'C']]);
     const said = await land(cfg, root);
-    const dir = `.skulkr/saturation/src/${commit.slice(0, 10)}`;
+    const dir = `.skulkr/scour/src/${commit.slice(0, 10)}`;
     expect(said.at(-1)).toMatch(new RegExp(`^landed ${dir}; main fast-forwarded to`));
-    expect(git('log', '-1', '--format=%s')).toBe(`record src's saturation ledger: 3 defects from 2 occasions at ${commit.slice(0, 10)}`);
+    expect(git('log', '-1', '--format=%s')).toBe(`record src's scour ledger: 3 defects from 2 occasions at ${commit.slice(0, 10)}`);
     expect(JSON.parse(readFileSync(join(root, dir, 'ledger.json'), 'utf8'))).toEqual(ledger);
     expect(readFileSync(join(root, dir, 'reviews/02-claude.md'), 'utf8')).toBe('review 2\n');
     expect(readFileSync(join(root, dir, 'report.md'), 'utf8')).toContain('saturation');
-    expect(git('branch', '--list', 'audit-saturation-*')).toBe('');
-    expect(git('worktree', 'list')).not.toMatch(/saturation/);
+    expect(git('branch', '--list', 'audit-scour-*')).toBe('');
+    expect(git('worktree', 'list')).not.toMatch(/scour/);
   });
 
   it('replaces an earlier landing of the same ledger, and lands nothing when it has not changed', async () => {
@@ -88,8 +90,8 @@ describe('skulkr saturate land', () => {
     seed(cfg, git('rev-parse', 'HEAD'), [['A']]);
     writeFileSync(join(root, 'src/x.ts'), 'export const x = 2;\n');
     const said = await land(cfg, root);
-    expect(said.at(-1)).toMatch(/on audit-saturation-src, not fast-forwarded: the main checkout has uncommitted changes$/);
-    expect(git('log', '-1', '--format=%s', 'audit-saturation-src')).toMatch(/^record src's saturation ledger/);
+    expect(said.at(-1)).toMatch(/on audit-scour-src, not fast-forwarded: the main checkout has uncommitted changes$/);
+    expect(git('log', '-1', '--format=%s', 'audit-scour-src')).toMatch(/^record src's scour ledger/);
   });
 
   it('lands every ledger in one commit with --all', async () => {
@@ -99,13 +101,13 @@ describe('skulkr saturate land', () => {
     seed(cfg, commit, [['C']], 'lib');
     const said: string[] = [];
     await saturateCommand(cfg, null, root, ['land', '--all'], (line: string) => said.push(line));
-    expect(said.at(-1)).toMatch(/^landed 2 ledgers under \.skulkr\/saturation; main fast-forwarded to/);
-    expect(git('log', '-1', '--format=%B')).toMatch(/^record 2 areas' saturation ledgers: 3 defects\n\n- lib's saturation ledger: 1 defects/);
+    expect(said.at(-1)).toMatch(/^landed 2 ledgers under \.skulkr\/scour; main fast-forwarded to/);
+    expect(git('log', '-1', '--format=%B')).toMatch(/^record 2 areas' scour ledgers: 3 defects\n\n- lib's scour ledger: 1 defects/);
     expect(git('rev-list', '--count', 'HEAD')).toBe('2');
     for (const area of ['src', 'lib']) {
-      expect(readFileSync(join(root, '.skulkr/saturation', area, commit.slice(0, 10), 'report.md'), 'utf8')).toContain(area);
+      expect(readFileSync(join(root, '.skulkr/scour', area, commit.slice(0, 10), 'report.md'), 'utf8')).toContain(area);
     }
-    expect(git('branch', '--list', 'audit-saturation*')).toBe('');
+    expect(git('branch', '--list', 'audit-scour*')).toBe('');
     const registry = git('show', '--name-only', '--format=', 'HEAD').split('\n').filter((p: string) => p.startsWith('.skulkr/defects/'));
     expect(registry.sort()).toEqual(['.skulkr/defects/lib.jsonl', '.skulkr/defects/src.jsonl']);
   });
@@ -113,6 +115,42 @@ describe('skulkr saturate land', () => {
   it('refuses an area with no ledger', async () => {
     const { root, cfg } = project();
     await expect(land(cfg, root)).rejects.toThrow('src has no saturation ledger');
-    expect(existsSync(join(cfg.state, 'saturation/src'))).toBe(false);
+    expect(existsSync(join(cfg.state, 'scour/src'))).toBe(false);
+  });
+
+  it('moves a ledger landed under the former saturation/ to scour/ when it lands again', async () => {
+    const { root, cfg, git } = project();
+    const commit = git('rev-parse', 'HEAD');
+    seed(cfg, commit, [['A']]);
+    await land(cfg, root);
+    const short = commit.slice(0, 10);
+    git('mv', '.skulkr/scour', '.skulkr/saturation');
+    git('commit', '-qm', 'as landed before the rename');
+    expect(scouredAreasOf(cfg, root, 'claude')).toEqual(['src']);
+    seed(cfg, commit, [['A'], ['B']]);
+    await land(cfg, root);
+    expect(git('ls-files', '.skulkr/saturation')).toBe('');
+    expect(existsSync(join(root, `.skulkr/scour/src/${short}/ledger.json`))).toBe(true);
+  });
+});
+
+describe('the scour directories', () => {
+  it('moves the state directory\'s saturation/ to scour/ once', () => {
+    const { cfg } = project();
+    mkdirSync(join(cfg.state, 'saturation/src'), { recursive: true });
+    moveFormerScourState(cfg);
+    expect(existsSync(join(cfg.state, 'scour/src'))).toBe(true);
+    expect(existsSync(join(cfg.state, 'saturation'))).toBe(false);
+  });
+
+  it('names the areas holding an occasion from a source, landed or not', async () => {
+    const { root, cfg, git } = project();
+    const commit = git('rev-parse', 'HEAD');
+    seed(cfg, commit, [['A']]);
+    await land(cfg, root);
+    rmSync(join(cfg.state, 'scour'), { recursive: true });
+    seed(cfg, commit, [['B']], 'lib');
+    expect(scouredAreasOf(cfg, root, 'claude')).toEqual(['lib', 'src']);
+    expect(scouredAreasOf(cfg, root, 'codex')).toEqual([]);
   });
 });

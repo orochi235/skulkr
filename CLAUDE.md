@@ -161,6 +161,8 @@ weasel cutover.
     (README "Adopting it", 2026-11-25).
   - weasel's record commit and each saturation landing writing `.skulkr/defects/` (README "The defect registry",
     2026-11-25); open findings unchanged.
+  - weasel's scour ledgers landing under `.skulkr/scour/` on a `<prefix>-scour` branch, those under `.skulkr/saturation/`
+    still read and moved by their next landing, and `scour ls --ids` (README "Scour", 2026-11-25).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

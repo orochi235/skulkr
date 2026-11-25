@@ -531,7 +531,7 @@ calibration, the queue, or the map.
     skulkr scour ingest <area> <report.md> --source <name> [--at <sha>]
     skulkr scour import <area> <dir> --at <sha> [--fresh]
     skulkr scour land <area>… | --all
-    skulkr scour ls [--json]
+    skulkr scour ls [--json] | ls --ids [--source <name>]
     skulkr scour report <area>
     skulkr scour rm <area>
 
@@ -553,14 +553,15 @@ is new falls under `saturate.stopNextNew` (15%), or `--max` occasions (`saturate
 elsewhere were made at a fixed commit: every occasion must review the same code for the cross-source estimates to
 mean anything. Run it again to go on from where it stopped: it resumes the ledger at its own commit, however far
 `main` has moved since, and refuses an `--at` naming another one. `--fresh` moves the ledger aside to
-`<state>/saturation/<area>.<commit>` and starts a new one; `skulkr scour rm <area>.<commit>` deletes an old one.
+`<state>/scour/<area>.<commit>` and starts a new one; `skulkr scour rm <area>.<commit>` deletes an old one.
 A review that never finishes is kept beside the ledger as `unfinished-…` and not counted.
 
 `ingest` folds in a report written elsewhere, in any Markdown shape, as one occasion (Codex's
 `skills/skulkr-review-saturation`, linked into `~/.codex/skills/`, ends each area this way): the matcher reads it whole and
 lists its findings itself. A multi-pass audit whose passes shared context counts as one occasion, not one per pass,
 since its passes were not independent. `ls` lists every ledger with its estimates, cost and defects (`--json` for the
-dashboard's saturation page); `report` rewrites the report file from the ledger; `rm` deletes the ledger.
+dashboard's saturation page); `ls --ids` prints only the names of areas with a ledger, in the state directory or landed,
+holding an occasion from `--source` (any, without it), so a reviewer that must stay blind to the ledgers can skip areas already done; `report` rewrites the report file from the ledger; `rm` deletes the ledger.
 
 `import` builds a new ledger, at `--at`, from a saturation experiment run by hand, every occasion a Claude review.
 Its directory holds:
@@ -585,16 +586,17 @@ once, or names a defect the ledger lacks, is asked for once more; a second bad r
 report kept beside the ledger as `unmatched-…` and nothing recorded, and the run stops. The first review of an empty
 ledger needs no matcher: all its findings are new.
 
-**The ledger** lives in `<state>/saturation/<area>/`: `ledger.json` (the commit, the area's files, each occasion's
+**The ledger** lives in `<state>/scour/<area>/` (`saturation/` before 2026-11-25, moved there by the first `skulkr scour` command run after): `ledger.json` (the commit, the area's files, each occasion's
 source, kind, findings, cost and minutes, and each distinct defect with the occasions and sources that saw it) and
 `reviews/<NN>-<source>.md`, each raw report as it came. Every figure is recomputed from these, never stored.
 
 **Landing a ledger.** The ledger lives in the state directory, on one machine. `skulkr scour land <area>` (or a
-set-aside `<area>.<commit>`) commits it to the project's `main` as `<record.dir>/saturation/<area>/<commit>/`, holding
+set-aside `<area>.<commit>`) commits it to the project's `main` as `<record.dir>/scour/<area>/<commit>/`, holding
 `ledger.json`, `report.md`, and the raw reports its occasions name under `reviews/`, on a branch
-`<prefix>-saturation-<area>` from `main` that `main` fast-forwards to under the merge lock, then pushed as `git.push`
-says. Several areas, or `--all` for every ledger with occasions, land in one commit on `<prefix>-saturation`
-(2026-11-25). Landing the same ledger again replaces that directory, so it can land part way and land again when it
+`<prefix>-scour-<area>` from `main` that `main` fast-forwards to under the merge lock, then pushed as `git.push`
+says. Several areas, or `--all` for every ledger with occasions, land in one commit on `<prefix>-scour`
+(2026-11-25). A ledger landed under `<record.dir>/saturation/`, as every one was before 2026-11-25, is still read there, and moves to
+`scour/` in the commit that next lands it. Landing the same ledger again replaces that directory, so it can land part way and land again when it
 stops; a ledger already landed unchanged commits nothing. When `main` cannot fast-forward (the main checkout off
 `main`, or with uncommitted changes), the branch is kept and named. Nothing reads a landed ledger yet: rounds, the map
 and fix-only rounds see none of it (2026-11-25); its defects are to be fixed eventually, by a mechanism not yet chosen.
@@ -785,8 +787,8 @@ LaunchAgent, so install from a shell where `node` and `onto` resolve, and set ei
 | A run's log, job outputs, and runner logs | `<state>/nights/<start>-round<N>/` | the newest `keepNights`, and any a run's status or summary still names; older ones are deleted when a run starts |
 | A run's claim, status, stop request, and summary | `<state>/runs/<N>/`: the directory is the claim; `status.json` (with its pid) while it runs, `stop` when asked, `summary.json` when it ends | the newest `keepNights`, never a live one nor one started in the last day; pruned when a run starts |
 | Each commit's lines changed, for `staleLines` and calibration's `lines` | `~/.cache/skulkr/<name>/churn.json` | only the commits after the oldest pass asked about: any area's last pass, or the first of a pair of passes; rewritten without the rest on each build that adds one, and dropped when the partition's `roots`, `extensions` or `exclude` change |
-| A saturation ledger | `<state>/saturation/<area>/`: `ledger.json`, `reviews/`, and `jobs/` while an occasion runs | `saturate.max` occasions; each occasion's job outputs deleted once it is recorded; `skulkr scour rm <area>` deletes the lot. `--fresh` moves an old ledger aside to `<area>.<commit>`, kept until `rm <area>.<commit>` |
-| A landed saturation ledger | `<record.dir>/saturation/<area>/<commit>/` in the project, committed to `main` | one directory per area and frozen commit, replaced by each landing of it; at most `saturate.max` reviews |
+| A scour ledger | `<state>/scour/<area>/`: `ledger.json`, `reviews/`, and `jobs/` while an occasion runs | `saturate.max` occasions; each occasion's job outputs deleted once it is recorded; `skulkr scour rm <area>` deletes the lot. `--fresh` moves an old ledger aside to `<area>.<commit>`, kept until `rm <area>.<commit>` |
+| A landed scour ledger | `<record.dir>/scour/<area>/<commit>/` in the project, committed to `main` | one directory per area and frozen commit, replaced by each landing of it; at most `saturate.max` reviews |
 | The defect registry | `<record.dir>/defects/<area>.jsonl` in the project, committed | one line per defect, rewritten whole at each record commit and landing |
 | The index | `<record.dir>/cache/skulkr.db` in the checkout, ignored by git | one file, replaced whenever the record changes |
 | Node tree leases | `<state>/slots/<node>/<tree>` | deleted as each job ends; one whose pid is dead is taken back |

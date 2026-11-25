@@ -20,12 +20,13 @@ import {
 import { takeLease } from './lease.mjs';
 import { importLedger } from './saturateImport.mjs';
 import { landableIdsOf, landLedgers } from './saturateLand.mjs';
-import { ledgerListLines, ledgerListOf } from './saturationList.mjs';
+import { ledgerListLines, ledgerListOf, scouredAreasOf } from './saturationList.mjs';
+import { moveFormerScourState } from './scourPaths.mjs';
 import { chao2, stopReason, stopRuleOf, yieldRows } from './saturation.mjs';
 import { writeReport } from './saturationReport.mjs';
 import { createSaturateContext, matchReport, occasionJobsOf, requireSources, runReview } from './saturateJobs.mjs';
 
-export const SATURATE_USAGE = 'usage: skulkr scour <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh] [--fleet] | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | land <area>… | land --all | ls [--json] | report <area> | rm <area>';
+export const SATURATE_USAGE = 'usage: skulkr scour <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh] [--fleet] | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | land <area>… | land --all | ls [--json] | ls --source <name> --ids | report <area> | rm <area>';
 
 /** `argv`'s positional words and flags. */
 export const saturateArgsOf = (cfg, argv) => {
@@ -33,14 +34,14 @@ export const saturateArgsOf = (cfg, argv) => {
   const words = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--fresh' || a === '--all' || a === '--json') flags[a.slice(2)] = true;
+    if (a === '--fresh' || a === '--all' || a === '--json' || a === '--ids') flags[a.slice(2)] = true;
     else if (a.startsWith('--')) flags[a.slice(2)] = argv[++i];
     else words.push(a);
   }
   const max = flags.max === undefined ? cfg.saturate.max : Number(flags.max);
   if (!Number.isInteger(max) || max < 1) throw new Error(`--max wants a whole number of occasions, not ${flags.max}`);
   const sources = flags.sources ? flags.sources.split(',').map((s) => s.trim()).filter(Boolean) : cfg.saturate.sources;
-  return { words, max, sources, fresh: Boolean(flags.fresh), all: Boolean(flags.all), json: Boolean(flags.json), source: flags.source, at: flags.at };
+  return { words, max, sources, fresh: Boolean(flags.fresh), all: Boolean(flags.all), json: Boolean(flags.json), ids: Boolean(flags.ids), source: flags.source, at: flags.at };
 };
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -171,6 +172,7 @@ export const saturateCommand = async (cfg, runner, root, argv, say = (line) => c
   const args = saturateArgsOf(cfg, argv);
   const [first, ...rest] = args.words;
   if (!first) throw new Error(SATURATE_USAGE);
+  moveFormerScourState(cfg);
   if (first === 'ingest') {
     const [id, path] = rest;
     if (!id || !path) throw new Error(SATURATE_USAGE);
@@ -186,6 +188,11 @@ export const saturateCommand = async (cfg, runner, root, argv, say = (line) => c
     if (ids.length === 0 && !args.all) throw new Error(SATURATE_USAGE);
     say(await landLedgers(cfg, root, ids, say));
     return ids.map((id) => ledgerOf(cfg, id));
+  }
+  if (first === 'ls' && args.ids) {
+    const ids = scouredAreasOf(cfg, root, args.source);
+    for (const id of ids) say(id);
+    return ids;
   }
   if (first === 'ls') {
     const list = ledgerListOf(cfg, root);

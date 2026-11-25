@@ -5,7 +5,13 @@ description: Run sequential review passes over a named Skulkr audit area or a ba
 
 Find the target repository and resolve area IDs and exact file lists from its configured Skulkr partition. Check the relevant repository instructions and use Skulkr's reviewer brief as the standard for what constitutes a finding. Record the commit and any in-scope working-tree changes. Read adjacent files or tests for evidence and report only defects located in the named area.
 
-Stay blind to other reviews of the area. Do not read its saturation ledger (`<state>/saturation/<area>/`, or the landed copy under `<record.dir>/saturation/<area>/` in the repository, `.skulkr/saturation/` in weasel), other reports on it, or `skulkr scour ls`: the ledger's estimates assume each occasion found its defects independently.
+Stay blind to other reviews of the area. Do not read its ledger (`<state>/scour/<area>/`, or the landed copy under `<record.dir>/scour/<area>/` in the repository, `.skulkr/scour/` in weasel; `saturation/` in older trees), other reports on it, or `skulkr scour ls` without `--ids`: the ledger's estimates assume each occasion found its defects independently.
+
+Before starting, list the areas that already hold a Codex occasion, landed or not:
+
+    node ~/src/skulkr/bin/skulkr.mjs scour ls --ids --source codex [--tenant <name>]
+
+It prints area names only, so it does not break blindness. Skip every area it names: its Codex report is already in the ledger, and another would count Codex twice. An area with an unfinished report in the scratch directory below is not listed; resume it.
 
 Run one area at a time in the requested priority order. For each area, perform sequential passes, varying the review lens and keeping a pass ledger. Start with the files and contracts, then trace callers, state transitions, numeric boundaries, error handling, or other relevant paths. Each pass needs a fresh search for defects. Verification and deduplication alone do not constitute a pass. Keep prior findings available for deduplication and describe the passes as context-sharing.
 
