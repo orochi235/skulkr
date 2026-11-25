@@ -157,6 +157,8 @@ weasel cutover.
   - weasel's record moved from `docs/audits/` to `.skulkr/` (`record.dir`, with `formerDirs: ['docs/audits']` so
     recuts and unmerged batches still find rounds recorded there), and its ledger row naming `.skulkr/round-<N>/`
     (docs/skulkr-dir.md, 2026-11-25).
+  - weasel's record commit and each saturation landing writing `.skulkr/defects/` (README "The defect registry",
+    2026-11-25); open findings unchanged.
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

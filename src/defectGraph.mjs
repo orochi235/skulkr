@@ -74,7 +74,7 @@ const severitiesIn = (rec) => new Map(['A', 'B'].flatMap((side) => parseSections
  * but a defect only a ledger reported is never handed to a fixer nor counted among a fixer's findings, so with or
  * without ledgers the round defects come out the same.
  */
-export const defectGraphOf = (records, { cited, areas, ledgers = [] } = {}) => {
+export const defectGraphOf = (records, { cited, areas, ledgers = /** @type {any[]} */ ([]) } = {}) => {
   const holder = areas && createHolderLookup(areas);
   const filesOf = (rec) => rec.files ?? rec.area?.files;
   const roundAreas = new Map();
@@ -100,7 +100,8 @@ export const defectGraphOf = (records, { cited, areas, ledgers = [] } = {}) => {
       const ledger = pending.shift();
       for (const d of ledger.defects) {
         const sighting = { ledger: ledger.key, defect: d.id, occasions: d.sightings, sources: Object.keys(d.sources ?? {}).filter((s) => d.sources[s].length) };
-        const known = all.find((o) => !o.acted && sameDefect(o, d, cited));
+        // Within its own area only: a ledger's `where` may name a bare file, which shares a path with anything.
+        const known = all.find((o) => !o.acted && (o.area === ledger.area || o.to === ledger.area) && sameDefect(o, d, cited));
         if (known) {
           known.saturation.push(sighting);
           continue;
@@ -146,7 +147,7 @@ export const defectGraphOf = (records, { cited, areas, ledgers = [] } = {}) => {
         all.push(known);
         given.push({ ...known, known });
       }
-      const ledgered = unclaimed.findIndex((o) => sameDefect(o, f, cited));
+      const ledgered = unclaimed.findIndex((o) => (o.area === rec.id || held(o.paths, o) === rec.id) && sameDefect(o, f, cited));
       if (ledgered !== -1) known.saturation.push(...unclaimed.splice(ledgered, 1)[0].saturation);
     }
     for (const c of carried) {

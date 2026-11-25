@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { configBaseOf } from './config.mjs';
 import { partitionAt, writePartition } from './partition.mjs';
 import { appendRecordRow, roundReadme } from './record.mjs';
+import { writeRegistry } from './registry.mjs';
 
 export const gitIn = (cwd) => (...args) => execFileSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
@@ -123,7 +124,7 @@ export const makeBatch = (cfg, root, { round, date, commit, branches, suffix = '
   return { name, tree, merged, conflicted, failed };
 };
 
-/** Writes the round's raw lists, README, partition and ledger row into the batch, and commits them. */
+/** Writes the round's raw lists, README, partition, defect registry and ledger row into the batch, and commits them. */
 export const commitRecord = (cfg, tree, { round, commit, date, nightDir, areas, sweep, outcomes }) => {
   const recordDir = cfg.record.dir;
   const dir = join(tree, recordDir, `round-${round}`);
@@ -149,15 +150,16 @@ export const commitRecord = (cfg, tree, { round, commit, date, nightDir, areas, 
   writeFileSync(join(dir, 'README.md'), roundReadme(cfg, { round, commit, date, areas, sweep, outcomes }));
   // The batch's own tree, not the round's commit: it holds whatever landed on main while the round ran.
   writePartition(cfg, tree, partitionAt(cfg, tree, 'HEAD'));
-  const paths = [recordDir];
+  const git = gitIn(tree);
+  // Named one by one: the record directory may be `.skulkr`, where a job's untracked `in/` and `out/` also live.
+  const paths = [`${recordDir}/round-${round}`, cfg.partition.path, writeRegistry(cfg, git, tree)];
   const ledger = cfg.record.ledger;
   if (ledger) {
     const at = join(tree, ledger.path);
     writeFileSync(at, appendRecordRow(readFileSync(at, 'utf8'), ledger.row({ round, date, areas }), ledger));
     paths.push(ledger.path);
   }
-  const git = gitIn(tree);
-  git('add', '--', ...paths);
+  git('add', '-A', '--', ...paths);
   const trailer = cfg.record.trailer ? `\n\n${cfg.record.trailer}` : '';
   git('commit', '-q', '-m', `record audit round ${round}: ${areas.length} areas' raw findings, estimates and fixes${trailer}`);
   return git('rev-parse', 'HEAD');

@@ -106,6 +106,8 @@ describe('skulkr saturate land', () => {
       expect(readFileSync(join(root, '.skulkr/saturation', area, commit.slice(0, 10), 'report.md'), 'utf8')).toContain(area);
     }
     expect(git('branch', '--list', 'audit-saturation*')).toBe('');
+    const registry = git('show', '--name-only', '--format=', 'HEAD').split('\n').filter((p: string) => p.startsWith('.skulkr/defects/'));
+    expect(registry.sort()).toEqual(['.skulkr/defects/lib.jsonl', '.skulkr/defects/src.jsonl']);
   });
 
   it('refuses an area with no ledger', async () => {

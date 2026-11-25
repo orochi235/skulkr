@@ -5,6 +5,7 @@
  * directory). README.md says what each does.
  *
  *   skulkr init                 writes a starter .skulkr/config.mjs for the repository here
+ *   skulkr registry             writes the defect registry, .skulkr/defects/, from the record, uncommitted
  *   skulkr night [flags]        one run (a round); `--dry` prints its plan
  *   skulkr partition [--ref R]  rewrites the partition file
  *   skulkr map [--out FILE] [--cached-jobs]   the dashboard's JSON
@@ -20,12 +21,13 @@
  *   skulkr tenants add <config> [--name n] [--read-only]
  *   skulkr tenants rm <name>
  */
-import { mainCheckout } from '../src/batch.mjs';
+import { gitIn, mainCheckout } from '../src/batch.mjs';
 import { exitAfterFlush, tolerateClosedOutput } from '../src/exit.mjs';
 import { loadConfig } from '../src/config.mjs';
 import { defectsFor } from '../src/defects.mjs';
 import { fetchCommand } from '../src/fetch.mjs';
 import { initCommand } from '../src/init.mjs';
+import { readRegistry, writeRegistry } from '../src/registry.mjs';
 import { mapCommand } from '../src/map.mjs';
 import { runNight } from '../src/night.mjs';
 import { partitionAt, partitionCommand } from '../src/partition.mjs';
@@ -37,7 +39,7 @@ import { serve } from '../src/service.mjs';
 import { trialCommand } from '../src/trial.mjs';
 import { addTenant, readTenants, removeTenant, requireTenant, tenantsPath } from '../src/tenants.mjs';
 
-const USAGE = 'usage: skulkr <init|night|partition|map|fetch|defects|pin|unpin|saturate|sat|trial|service|config|tenants|menu> [--config <file> | --tenant <name>] [--root <dir>] [--local] …';
+const USAGE = 'usage: skulkr <init|night|partition|map|fetch|defects|registry|pin|unpin|saturate|sat|trial|service|config|tenants|menu> [--config <file> | --tenant <name>] [--root <dir>] [--local] …';
 
 /** `argv` less `--config`, `--tenant` and `--root` and their values, and those values. */
 const takeOptions = (argv) => {
@@ -144,6 +146,14 @@ const main = async () => {
     case 'defects':
       process.stdout.write(`${JSON.stringify(defectsFor(cfg, root(), rest[0] ?? ''))}\n`);
       return 0;
+    case 'registry': {
+      const at = root();
+      const dir = writeRegistry(cfg, gitIn(at), at);
+      const counts = new Map();
+      for (const e of readRegistry(cfg, at)) counts.set(e.status, (counts.get(e.status) ?? 0) + 1);
+      console.log(`wrote ${dir}: ${[...counts].sort((x, y) => y[1] - x[1]).map(([k, n]) => `${n} ${k}`).join(', ')}`);
+      return 0;
+    }
     case 'pin':
     case 'unpin':
       pinCommand(cfg, root(), command, rest[0]);

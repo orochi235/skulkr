@@ -347,7 +347,8 @@ null`, `--no-merge`, and a runner without `spare()` (the local one) turn it off.
 
 A fix job that never really ran (no node had room, a usage limit) leaves its area's findings unfixed, and the next
 round's reviewers need not report them again. skulkr derives which findings are still open from the records, and
-keeps no list of its own (`src/carry.mjs`, read by `src/carryRecords.mjs` from disk and unlanded batches).
+keeps no list of its own (`src/defectGraph.mjs` over `src/carry.mjs`'s reading of each record, read by
+`src/carryRecords.mjs` from disk and unlanded batches).
 
 | Term | Means |
 |---|---|
@@ -366,6 +367,26 @@ areas with open findings and not held by a live run or an unlanded branch, then 
 as any round. It takes a round number and a record of its own; its `area.json` says `fixOnly`, and gives no pass to
 an area's history. The map gives each area `openFindings`, a count, and `open`, the list, which the area panel
 shows with each one's round.
+
+## The defect registry
+
+Every defect the project's rounds and landed saturation ledgers found, one JSON line each, in
+`<record.dir>/defects/<area>.jsonl` under the area now holding its cited files. It is written from the record by the
+rule above, never by hand: a round's record commit and each `saturate land` write it again, and `skulkr registry`
+writes it in the checkout, uncommitted. A line:
+
+| Field | Holds |
+|---|---|
+| `id` | `d-` and 10 hex of a hash of its first sighting, so it never changes and parallel branches never collide |
+| `area`, `claim`, `where`, `files`, `severity` | as its first sighting gave them; `files` the paths `where` cites |
+| `status` | `open`, or what the fixer who last acted on it said: `fixed`, `dismissed` (not a defect), `duplicate`, `question`, `declined` (not fixed), or `closed` when no verdict line matches |
+| `resolved` | `{ round, area, verdict, sha }`: that fixer's round and area, and the commit its verdict names |
+| `first` | `{ round, commit, date }`, or `{ ledger, commit }` for one only a ledger found |
+| `sightings` | each round that reported it (the first with its area and reviewer), and each ledger defect that is it: `{ ledger: '<area>@<commit>', defect, occasions, sources }` |
+
+A ledger is read ahead of the first round reviewed at or after its commit. A round finding like one of its defects,
+in the same area, takes that defect over, and a later fixer's words close one; a defect only a ledger found is never
+handed to a fixer, so open findings and carried findings are the same with or without ledgers (2026-11-25).
 
 ## A sweep
 

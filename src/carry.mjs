@@ -55,7 +55,7 @@ export const givenIn = (rec) => {
  */
 export const fixOf = (rec) => {
   const report = rec.fix ?? '';
-  const items = report ? reportItems(report) : [];
+  const items = report ? reportItems(report, { shas: true }) : [];
   const commits = (rec.area?.patches ?? 0) + (rec.area?.fixCommits?.length ?? 0);
   const listed = items.filter((i) => i.from !== 'extra').length;
   return { worked: items.length > 0 || /^tally: /im.test(report) || commits > 0, items, listed, subjects: rec.subjects ?? [], text: report };

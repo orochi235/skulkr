@@ -11,6 +11,7 @@ import { waitForLease } from './lease.mjs';
 import { mergeLock } from './runs.mjs';
 import { stopRuleOf } from './saturation.mjs';
 import { reportText } from './saturationReport.mjs';
+import { writeRegistry } from './registry.mjs';
 
 /** Where `ledger` lands, relative to the project's root: one directory per area and frozen commit. */
 export const landedDirOf = (cfg, ledger) => `${cfg.record.dir}/saturation/${ledger.area}/${ledger.commit.slice(0, 10)}`;
@@ -76,6 +77,7 @@ export const landLedgers = async (cfg, root, ids, say = () => {}) => {
       const git = gitIn(tree);
       git('add', '-A', '--', ...dirs);
       const changed = ledgers.filter((_, i) => git('status', '--porcelain', '--', dirs[i]));
+      if (changed.length) git('add', '-A', '--', writeRegistry(cfg, git, tree));
       const where = dirs.length === 1 ? dirs[0] : `${dirs.length} ledgers under ${cfg.record.dir}/saturation`;
       if (changed.length === 0) return `${where} already ${dirs.length === 1 ? 'holds this ledger' : 'hold these ledgers'}; nothing to land`;
       const trailer = cfg.record.trailer ? `\n\n${cfg.record.trailer}` : '';

@@ -264,6 +264,24 @@ describe('commitRecord', () => {
     commitRecord(resolveConfig({ record: { dir: 'audit-log' } }), dir, { round: 3, commit: frozen, date: '2026-11-20', nightDir: night, areas: [area('x')], outcomes: {}, sweep: undefined });
     const files = JSON.parse(readFileSync(join(dir, 'audit-log/partition.json'), 'utf8')).flatMap((a: { files: string[] }) => a.files);
     expect(files).toContain('src/y/b.ts');
+    expect(git('show', '--name-only', '--format=', 'HEAD').split('\n')).toEqual(expect.arrayContaining(['audit-log/round-3/README.md', 'audit-log/partition.json']));
+  });
+
+  it('commits the round and the registry by name, never a job’s scratch beside them in the record directory', () => {
+    const { dir, git } = repo('main.txt', 'batch.txt');
+    mkdirSync(join(dir, '.skulkr/in/x'), { recursive: true });
+    writeFileSync(join(dir, '.skulkr/in/x/prompt.md'), 'scratch');
+    const night = mkdtempSync(join(tmpdir(), 'skulkr-night-'));
+    dirs.push(night);
+    mkdirSync(join(night, 'areas/x'), { recursive: true });
+    writeFileSync(join(night, 'areas/x/A.md'), '## A leak\n- where: src/x.ts:1\n');
+    writeFileSync(join(night, 'areas/x/match.json'), JSON.stringify({ pairs: [], a: ['A leak'], b: [] }));
+    commitRecord(resolveConfig({}), dir, { round: 3, commit: git('rev-parse', 'HEAD'), date: '2026-11-20', nightDir: night, areas: [area('x')], outcomes: {}, sweep: undefined });
+    const committed = git('show', '--name-only', '--format=', 'HEAD').split('\n');
+    expect(committed).not.toContain('.skulkr/in/x/prompt.md');
+    const registry = committed.filter((p: string) => p.startsWith('.skulkr/defects/'));
+    expect(registry).toHaveLength(1);
+    expect(JSON.parse(readFileSync(join(dir, registry[0]!), 'utf8'))).toMatchObject({ claim: 'A leak', status: 'open', first: { round: 3 } });
   });
 });
 
