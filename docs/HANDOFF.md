@@ -1,20 +1,17 @@
 # Handoff
 
-For the next session in skulkr. Written 2026-11-24, late evening; check each claim against the tree before acting on it.
+For the next session in skulkr. Written 2026-11-24, late evening, pruned the same night; check each claim against the tree before acting on it.
 
 ## State
 
-On `main`, pushed (`git log --oneline @{u}..HEAD` to check). README.md and CLAUDE.md's weasel parity list describe
+On `main` (`git log --oneline @{u}..HEAD` shows what is unpushed). README.md and CLAUDE.md's weasel parity list describe
 everything landed on 2026-11-24: local mode, fleet verify and preflight, the usage-limit retry, resumed-round lanes,
 pins, the dashboard changes.
 
-**Round 83 of weasel is running locally** (started 2026-11-24 21:39 UTC, resumed 23:52 UTC after the usage limit cut
-off six fixers and two repairs). It was started with
-`node ~/src/skulkr/bin/skulkr.mjs night --local --resume 83 --config <scratchpad config>` from `~/src/weasel`; the
-scratchpad is gone, and the same config is now at `~/.local/state/weasel-skulkr/weasel-local.config.mjs` — use it for
-any further resume or round. Its log is `~/.local/state/weasel-skulkr/nights/2026-11-24T21-39-55-824Z-round83/night.log`.
-`pgrep -fl "skulkr.mjs night"` shows whether it still runs. When it ends: if green, weasel's `main` is fast-forwarded
-locally (local mode never pushes); if red, the standing rule is to fix the batch and land it.
+**Round 85 of weasel is running on the fleet** (started 2026-11-24 ~22:00 local with `skulkr night --tenant weasel`
+from `~/src/weasel`; log under `~/.local/state/weasel-skulkr/nights/2026-11-25T02-59-57-769Z-round85/`). Outside local
+mode a green round pushes weasel's `main`. Rounds 83 and 84 landed. For a local round, the config is at
+`~/.local/state/weasel-skulkr/weasel-local.config.mjs`.
 
 ## Decisions made in conversation (2026-11-24)
 
@@ -30,10 +27,8 @@ locally (local mode never pushes); if red, the standing rule is to fix the batch
 
 ## Open
 
-- kouhai's ledger holds the open work for this repo (`owed`): t-543 #calibration-per-area-round, t-544
-  #local-verify-to-fleet (built; settle it), t-545 #next-round-criteria (pins are its first criterion), t-546
-  #stale-local-job-records, t-547 #killed-fixer-reads-done, t-548 #usage-limit-reads-as-done (built in `4285645`;
-  settle it).
+- kouhai's ledger holds the open work for this repo (`owed`): t-543 #calibration-per-area-round, t-545
+  #next-round-criteria (pins are its first criterion), t-546 #stale-local-job-records, t-547 #killed-fixer-reads-done.
 - Fleet verifies run from skulkr's local job trees (`~/.local/state/weasel-skulkr/trees/tN`), which onto names as
   repositories `t1`, `t2`, …, so each needs a cold setup per node and they pile onto whichever node set one up. Proposed,
   not decided: present them to onto as weasel so they use its warm pooled trees.
