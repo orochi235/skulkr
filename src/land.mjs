@@ -251,6 +251,9 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
       const kept = unrepaired.filter(unproven);
       for (const b of [...batch.merged, batch.name, ...(cycle?.dropped ?? []), ...unrepaired.filter((b) => !kept.includes(b))]) tryDelete(git, b);
       for (const b of (cycle?.skipped ?? []).filter((b) => kept.includes(b))) left.push({ branch: b, round, why: 'its capstone repair never started, and every failure laid at it is one main already has' });
+    } else if (early) {
+      tryDelete(git, batch.name);
+      return `${result}${tried}; its branches wait for the round's batch`;
     }
     return `${result}${tried}`;
   } finally {

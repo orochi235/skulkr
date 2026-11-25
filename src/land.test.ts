@@ -214,6 +214,19 @@ describe('an early landing', () => {
     expect(git('branch', '--list', 'batch/*')).toBe('');
     expect(git('worktree', 'list')).not.toMatch(/-early/);
   });
+
+  it('green but not fast-forwarded, leaves main, keeps its branches for the round, and deletes its own batch', async () => {
+    const { root, git, branch, night } = project();
+    const before = git('rev-parse', 'main');
+    const a = branch(3, 'a', 'a.txt');
+    writeFileSync(join(root, 'shared.txt'), 'edited by hand');
+    const three = await night(3, [a], true);
+    expect(three.report).toBe("not fast-forwarded: the main checkout has uncommitted changes; its branches wait for the round's batch");
+    expect(git('rev-parse', 'main')).toBe(before);
+    expect(three.landed).toEqual([]);
+    expect(git('branch', '--list', a)).not.toBe('');
+    expect(git('branch', '--list', 'batch/*')).toBe('');
+  });
 });
 
 describe('freshLog', () => {
