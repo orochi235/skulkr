@@ -58,3 +58,8 @@ Open work on skulkr. Each entry says when it closes.
   2026-11-22. Model, effort and timeout live only in the config, so they stay out unless `start` learns them. No cap on
   a reviewer's findings: Chapman's estimate reads the overlap of two complete lists, so a truncated list breaks it.
   Closes when the dashboard can start a round with those settings.
+- [ ] (P2) A model job can come home with an empty `claude.json` beside a whole `exit` and `findings.md` (round 86,
+  2026-11-25: renderer.cache's match and routing.interactions.actions' B, the onto fetch noting `working tree ... is
+  busy: a sync is updating it`). `cameHome` then refuses it, so a resume reruns and pays for it again, and a rerun
+  review replaces the report its area's reused fixer was given (likely why cursor A reran on the first resume). Closes when a
+  job's result file coming home empty is fetched again or refused at fetch, not discovered on resume.
