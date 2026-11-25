@@ -33,6 +33,12 @@ describe('withOccasion', () => {
     expect(l.defects.at(-1)).toMatchObject({ id: 'D3', firstOccasion: 2, sources: { codex: [2] } });
     expect(l.occasions.at(-1)).toMatchObject({ n: 2, source: 'codex', findings: 3 });
   });
+
+  it('gives a defect no occasion had sighted (one imported from another source) its first occasion when one does', () => {
+    const unseen = { ...emptyLedger('a', 'c0ffee', ['a/x.ts']), defects: [{ id: 'D1', claim: 'x', where: 'y', firstOccasion: null, sightings: [], sources: {}, source: 'codex' }] };
+    const l = withOccasion(unseen, occ(1), { findings: [{}], sightings: [{ finding: 0, defect: 'D1' }], new: [] });
+    expect(l.defects[0]).toMatchObject({ firstOccasion: 1, sightings: [1] });
+  });
 });
 
 describe('matchOf', () => {

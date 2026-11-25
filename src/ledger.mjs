@@ -176,7 +176,7 @@ export const withOccasion = (ledger, occasion, match) => {
   const { n, source } = occasion;
   const sighted = new Set(match.sightings.map((s) => s.defect));
   const defects = ledger.defects.map((d) => (sighted.has(d.id)
-    ? { ...d, sightings: add(d.sightings, n), sources: { ...d.sources, [source]: add(d.sources?.[source], n) } }
+    ? { ...d, firstOccasion: d.firstOccasion ?? n, sightings: add(d.sightings, n), sources: { ...d.sources, [source]: add(d.sources?.[source], n) } }
     : d));
   for (const f of match.new) {
     defects.push({ id: nextId(defects), claim: f.claim, where: f.where, severity: f.severity, firstOccasion: n, sightings: [n], sources: { [source]: [n] } });
