@@ -88,8 +88,8 @@ describe('laneViewOf', () => {
   it('captions and shades the patch with the fixer\'s tally of what it fixed', () => {
     const fixed = { A: done({ findings: 3 }), B: done({ findings: 2 }), match: matched(3, 2, 1), fix: done({ minutes: 9, commits: 6, fixed: 3, of: 4, extra: 1 }) };
     const patchOf = (spans: { id: string }[]) => spans.find((s) => s.id === 'patch') as { label: string; ms: number; fill?: number } | undefined;
-    expect(patchOf(laneViewOf(lane(fixed), NOW, START).spans)?.label).toBe('3/4 fixed +1 extra');
-    expect(patchOf(laneStepsOf(lane({ ...fixed, patch: done({ commits: 6 }) }), NOW))?.label).toBe('3/4 fixed +1 extra');
+    expect(patchOf(laneViewOf(lane(fixed), NOW, START).spans)?.label).toBe('3/4 fixed ★1 extra');
+    expect(patchOf(laneStepsOf(lane({ ...fixed, patch: done({ commits: 6 }) }), NOW))?.label).toBe('3/4 fixed ★1 extra');
     expect(laneViewOf(lane({ ...fixed, fix: done({ minutes: 9, commits: 6 }) }), NOW, START).spans.at(-1)?.label).toBe('4 found');
   });
 

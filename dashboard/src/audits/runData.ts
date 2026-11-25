@@ -24,6 +24,8 @@ export const NODE_SEP = ' · ';
 /** What a bar's caption says for a check that passed and for one that failed: onto's own marks. */
 export const PASS = '✓';
 export const FAIL = '✗';
+/** The mark for a defect the fixer found itself, beyond the reviewers' lists. */
+export const EXTRA = '★';
 /** A verdict's caption: its mark, then its word. */
 export const PASSED = `${PASS} passed`;
 export const FAILED = `${FAIL} failed`;

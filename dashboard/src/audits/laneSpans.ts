@@ -2,6 +2,7 @@
  *  ink and caption. */
 import type { SpanState, SpanStripSpan } from '@weasel-js/ui/components/SpanStrip';
 import { phaseInkOf } from './phases';
+import { EXTRA } from './runData';
 import type { AuditLane, LaneStep } from './skulkrMap.types';
 
 export const MIN = 60_000;
@@ -62,7 +63,7 @@ export function tallyOf(lane: AuditLane): string {
   const { match, fix } = lane.steps;
   if (fix.state === 'done' && fix.fixed !== undefined) {
     const also = [fix.dismissed ? `${fix.dismissed} FP` : '', fix.deferred ? `${fix.deferred} filed` : ''].filter(Boolean);
-    return `${fix.fixed}/${fix.of ?? fix.fixed} fixed${also.map((a) => ` · ${a}`).join('')}${fix.extra ? ` +${fix.extra} extra` : ''}`;
+    return `${fix.fixed}/${fix.of ?? fix.fixed} fixed${also.map((a) => ` · ${a}`).join('')}${fix.extra ? ` ${EXTRA}${fix.extra} extra` : ''}`;
   }
   return match.state === 'done' ? `${(match.a ?? 0) + (match.b ?? 0) - (match.shared ?? 0)} found` : '';
 }
