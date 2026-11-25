@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changedSincePass, chapmanIn, correctionShows, fixedIn, foundIn, queuedFixesIn, heatScaleOverRounds, defectsVersionOf, heatScaleOf, labelIn, lastPassOf, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots } from './areaData';
+import { changedSincePass, chapmanIn, correctionShows, fixedIn, foundIn, queuedFixesIn, heatScaleOverRounds, defectsVersionOf, heatScaleOf, labelIn, lastPassOf, nextUpOf, runHolding, statsFor, toneOf, wrapAtDots, roundCountOf } from './areaData';
 import { continuousText, elapsedText, headlineOf, logTailsOf, parseJob, recentJobsOf, scrolledOf, spendOf, stepText } from './runData';
 import { stageCountsOf } from './phases';
 import { inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
@@ -441,5 +441,13 @@ describe('elapsedText', () => {
     expect(elapsedText({ started, ended: null, running: true }, Date.parse('2026-11-22T22:44:59.000Z'))).toBe('00:34 elapsed');
     expect(elapsedText({ started, ended: '2026-11-23T01:05:00.000Z', running: false }, Date.now())).toBe('02:55 elapsed');
     expect(elapsedText({ ended: null, running: true }, Date.now())).toBeNull();
+  });
+});
+
+describe('roundCountOf', () => {
+  it('counts a round once though the area holds two of its passes, over areas since recut into it', () => {
+    const pass = (round: number, share: number) => ({ round, date: '2026-11-20', a: 1, b: 1, shared: 0, distinct: 2, est: 2, left: 0, share });
+    const area = { id: 'diagram.part2', group: 'diagram', files: 9, status: 'due', queue: null, stage: null, passes: [pass(46, 0.22), pass(46, 0.46), pass(50, 1)] } as const;
+    expect(roundCountOf(area)).toBe(2);
   });
 });

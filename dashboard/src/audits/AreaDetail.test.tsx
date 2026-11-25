@@ -25,11 +25,11 @@ describe('AreaDetail', () => {
     expect([...document.querySelectorAll('tbody td')].map((td) => td.textContent).slice(-2)).toEqual(['6.7', '1.7']);
   });
 
-  it("gives a pass's share its own column, blank for a pass that holds all its files", () => {
+  it("shows no share column, and counts a round once though it holds two of the round's passes", () => {
     const a = area();
-    show({ ...a, passes: [a.passes[0]!, { ...pass, round: 41, share: 0.5 }] });
-    const rows = [...document.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].slice(0, 2).map((td) => td.textContent));
-    expect(rows).toEqual([['40', ''], ['41', '50%']]);
+    show({ ...a, passes: [a.passes[0]!, { ...pass, round: 40, share: 0.5 }, { ...pass, round: 41, share: 0.5 }] });
+    expect([...document.querySelectorAll('thead th')].map((th) => th.textContent)).not.toContain('share');
+    expect(screen.getByText('passes').closest('div')!.textContent).toContain('2');
   });
 });
 

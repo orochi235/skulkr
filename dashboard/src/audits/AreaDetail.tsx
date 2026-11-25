@@ -4,20 +4,18 @@ import { Button } from '@weasel-js/ui/components/Button';
 import { DetailList, DetailRow } from '@weasel-js/ui/components/DetailList';
 import { SidebarPanel } from '@weasel-js/ui/components/SidebarPanel';
 import type { Grade } from '@weasel-js/theme';
-import { STATUS_LABEL, chapmanIn, correctedEstOf, fixedIn, formatCount, foundIn, correctedLeftOf, correctedText, correctionShows, lastPassOf, stageLabelOf } from './areaData';
+import { STATUS_LABEL, chapmanIn, correctedEstOf, fixedIn, formatCount, foundIn, correctedLeftOf, correctedText, correctionShows, lastPassOf, roundCountOf, stageLabelOf } from './areaData';
 import type { AreaStatus, AuditArea, AuditPass, AuditRun } from './skulkrMap.types';
 import s from './AreaDetail.module.css';
 
 const GRADE: Readonly<Record<AreaStatus, Grade | undefined>> = { unaudited: undefined, due: 'info', settled: 'success', tonight: 'danger' };
 
-const SHARE_TITLE = "the part of that pass's files this area holds; est. and left are scaled by it";
 const CORRECTED_TITLE = 'corrected by how much later passes found';
 
-/** Every pass over the area, each figure in its own column so the decimal points line up: the share and the corrected
- *  figures each get one where any pass has them. */
+/** Every pass over the area, each figure in its own column so the decimal points line up: the corrected figures get
+ *  one where any pass has them. */
 function Passes({ area }: { area: AuditArea }) {
   if (area.passes.length === 0) return <p className={s.hint}>No round has read it yet.</p>;
-  const shared = area.passes.some((p) => p.share !== undefined);
   const showsEst = (p: AuditPass) => p.leftCorrected !== undefined && correctionShows(p.est, correctedEstOf(p));
   const showsLeft = (p: AuditPass) => correctionShows(p.left, p.leftCorrected);
   const corrected = area.passes.some((p) => showsEst(p) || showsLeft(p));
@@ -28,7 +26,6 @@ function Passes({ area }: { area: AuditArea }) {
       <thead>
         <tr>
           <th>round</th>
-          {shared && <th className={s.side}><abbr className={s.muted} title={SHARE_TITLE}>share</abbr></th>}
           <th className={s.vennCell}><Venn a="A" both={<span className={s.cap} role="img" aria-label="found by both">∩</span>} b="B" /></th>
           <th>found</th>{fixes && <th>fixed</th>}
           <th>est.</th>{corrected && <th className={s.side}><abbr className={s.muted} title={CORRECTED_TITLE}>≈</abbr></th>}
@@ -39,7 +36,6 @@ function Passes({ area }: { area: AuditArea }) {
         {area.passes.map((p, i) => (
           <tr key={`${p.round}-${i}`}>
             <td>{p.round}</td>
-            {shared && <td className={`${s.side} ${s.muted}`}>{p.share === undefined ? '' : `${Math.round(p.share * 100)}%`}</td>}
             <td className={s.vennCell}><Venn a={p.a - p.shared} both={p.shared} b={p.b - p.shared} /></td>
             <td>{p.distinct}</td>{fixes && <td>{p.fixed ?? ''}</td>}
             <td>{p.est.toFixed(1)}</td>{corrected && <td className={`${s.side} ${s.muted}`}>{fix(showsEst(p), correctedEstOf(p))}</td>}
@@ -117,7 +113,7 @@ export function AreaDetail({ area, holder, asOf = null, onPin }: {
           </div>
           <DetailList values="figures" columns="auto">
             <DetailRow label="source files">{area.files}</DetailRow>
-            <DetailRow label="passes">{area.passes.length}</DetailRow>
+            <DetailRow label="passes">{roundCountOf(area)}</DetailRow>
             {area.passes.length > 0 && <DetailRow label="total found">{formatCount(Math.round(foundIn(area)))}</DetailRow>}
             {chapman && <DetailRow label="total by Chapman's estimate">{formatCount(Math.round(chapman.est))}{correctionShows(chapman.est, chapman.corrected) && ` (${correctedText(chapman.corrected)} corrected)`}</DetailRow>}
             {fixed && <DetailRow label={fixed.reported < area.passes.length ? `total fixed, ${fixed.reported} of ${area.passes.length} passes` : 'total fixed'}>{formatCount(Math.round(fixed.fixed))}</DetailRow>}

@@ -16,7 +16,7 @@ import { Input } from '@weasel-js/ui/components/Input';
 import { SidebarPanel } from '@weasel-js/ui/components/SidebarPanel';
 import { NextUp } from './NextUp';
 import { useAsOfRound } from './useAsOfRound';
-import { NEXT_UP_ROUNDS, defectsVersionOf, heatScaleOverRounds, nextUpOf, runHolding, statsFor } from './areaData';
+import { NEXT_UP_ROUNDS, defectsVersionOf, heatScaleOverRounds, nextUpOf, roundCountOf, runHolding, statsFor } from './areaData';
 import { heatColorOf } from './heat';
 import { createAuditScene } from './auditScene';
 import { liveEstimatesOf, phasesOf, withLivePasses, type AuditPhase } from './phases';
@@ -113,7 +113,7 @@ function Chart({ map, areaUrl, view, asOf, pinArea }: { map: SkulkrMap; areaUrl:
   const picked = selection.current[0] ?? null;
   const shownId = hovered ?? picked;
   const areas = useMemo(() => withLivePasses(map.areas, map.runs), [map.areas, map.runs]);
-  const passCounts = useMemo(() => new Map(areas.map((a) => [a.id, a.passes.length])), [areas]);
+  const passCounts = useMemo(() => new Map(areas.map((a) => [a.id, roundCountOf(a)])), [areas]);
   const fileCounts = useMemo(() => new Map(areas.map((a) => [a.id, a.files])), [areas]);
   const pastRounds = useMemo(() => pastRoundsOf(map), [map]);
   const past = asOf.round !== null && pastRounds.includes(asOf.round) ? asOf.round : null;

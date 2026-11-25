@@ -3,6 +3,7 @@ import { icon } from '@dash/icons.gen';
 import type { AuditArea } from './skulkrMap.types';
 import s from './NextUp.module.css';
 import { ordinal } from './ordinal';
+import { roundCountOf } from './areaData';
 
 /** A list of areas, by default the ones a run would pick next, numbered by their queue places; each picks its cell on
  *  the map, and lights it while hovered. */
@@ -27,8 +28,8 @@ export function NextUp({ areas, onPick, onLight, note, numbered = true }: {
               <span className={s.id}>{a.id}</span>
               <span className={s.files} title={`${a.files} source files`}>
                 {a.files}<Icon name={icon('ui:page')} size={11} className={s.page} />
-                <span className={s.fresh} title={a.passes.length === 0 ? 'never audited' : `its ${ordinal(a.passes.length + 1)} pass`}>
-                  {a.passes.length === 0 ? 'new' : ordinal(a.passes.length + 1)}
+                <span className={s.fresh} title={a.passes.length === 0 ? 'never audited' : `its ${ordinal(roundCountOf(a) + 1)} pass`}>
+                  {a.passes.length === 0 ? 'new' : ordinal(roundCountOf(a) + 1)}
                 </span>
               </span>
             </button>

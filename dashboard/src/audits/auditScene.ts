@@ -3,7 +3,7 @@ import { asNodeId, contrastRatio, createScene, nodeShapesOf, type NodeId, type R
 import { deepEqual } from '@weasel-js/registry';
 import { AUDIT_PAINTER, pipCountOf, pipsPerRowIn, type AuditCellData, type AuditFrameData, type AuditNodeData } from './auditPainter';
 import { glyphPathsOf } from './glyph';
-import { changedSincePass, heatScaleOf, labelIn, toneOf, wrapAtDots, type HeatScale } from './areaData';
+import { changedSincePass, heatScaleOf, roundCountOf, labelIn, toneOf, wrapAtDots, type HeatScale } from './areaData';
 import { grayOf, heatColorOf, rampAt } from './heat';
 import type { MapCell, MapFrame } from './mapLayout';
 import type { AuditPhase } from './phases';
@@ -109,7 +109,7 @@ function labelLines(area: AuditArea, cell: MapCell, font: string): string[] {
   const room = cell.height - 6 - (area.queue !== null ? 17 : 0);
   const label = labelIn(area.id, cell.parent);
   const perChar = textWidth(label, font, 12) / Math.max(1, label.length);
-  return wrapAtDots(label, Math.floor((cell.width - 8 - dotsRoom(pipCountOf(area.passes.length, area.locked !== undefined, area.pinned ?? false), cell.width)) / perChar), Math.max(1, Math.floor(room / LINE)));
+  return wrapAtDots(label, Math.floor((cell.width - 8 - dotsRoom(pipCountOf(roundCountOf(area), area.locked !== undefined, area.pinned ?? false), cell.width)) / perChar), Math.max(1, Math.floor(room / LINE)));
 }
 
 function cellData(
@@ -143,7 +143,7 @@ function cellData(
     numericFont: palette.font.numeric,
     ...(showsQueue ? { queue: area.queue! } : {}),
     ...(tone === 'settled' ? { settled: true } : {}),
-    dots: area.passes.length,
+    dots: roundCountOf(area),
     ...(area.locked !== undefined ? { locked: true } : {}),
     ...(area.pinned ? { pinned: true } : {}),
     ...(lit ? { glow: palette.live } : {}),

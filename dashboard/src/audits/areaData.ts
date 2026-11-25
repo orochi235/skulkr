@@ -242,3 +242,7 @@ export function wrapAtDots(text: string, maxChars: number, maxLines: number): st
   if (lines.length >= maxLines) kept.push(lines.slice(maxLines - 1).join(''));
   return kept.map((line) => clip(line, maxChars));
 }
+
+/** How many rounds have read `area`: its passes, counting once a round whose passes over areas since recut into it
+ *  it holds several of. */
+export const roundCountOf = (area: AuditArea): number => new Set(area.passes.map((p) => p.round)).size;
