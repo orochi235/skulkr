@@ -7,6 +7,7 @@ import { projectVars } from '../src/brief.mjs';
 const FILLED: Record<string, string[]> = {
   reviewer: ['round', 'area', 'commit', 'out', 'files'],
   matcher: [],
+  ledgerMatch: [],
   fixer: ['round', 'area', 'commit', 'source'],
   repair: ['round', 'area', 'attempt', 'command', 'failures', 'baseline', 'log'],
   conflict: ['round', 'area', 'branch', 'batch', 'paths', 'ours', 'theirs', 'command'],
