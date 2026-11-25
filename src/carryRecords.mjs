@@ -2,7 +2,7 @@
  * Every round's per-area record that `carry.mjs` reads: under `<record.dir>/round-<N>/<area>/` on disk, and on the
  * batches `main` has not merged, for rounds not on disk.
  */
-import { openFindings } from './carry.mjs';
+import { openFindings } from './defectGraph.mjs';
 import { recordsFor } from './recordFiles.mjs';
 
 const json = (text) => {

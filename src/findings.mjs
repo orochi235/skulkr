@@ -9,6 +9,9 @@ export const parseSections = (text) => text.split(/^## /m).slice(1).map((section
   return { claim: claim.trim(), where, body };
 });
 
+/** A finding's severity from its `severity:` line, or ''. */
+export const severityOf = (finding) => /^[-*]\s*(?:\*\*)?severity(?::\*\*|\*\*:|:)\s*(\w+)/im.exec(finding.body ?? '')?.[1].toLowerCase() ?? '';
+
 /** The findings of a findings file: its `##` sections that cite a `where:`; a summary or the files-read list is not one. */
 export const parseFindings = (text) => parseSections(text).filter((f) => f.claim.length > 0 && f.where.length > 0);
 

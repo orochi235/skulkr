@@ -6,7 +6,7 @@
 import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gitIn } from './batch.mjs';
-import { firstJson } from './findings.mjs';
+import { firstJson, severityOf } from './findings.mjs';
 import { partitionAt } from './partition.mjs';
 import { readJson, writeJson } from './json.mjs';
 import { takeLease } from './lease.mjs';
@@ -97,8 +97,7 @@ export const keepReview = (cfg, area, n, source, text) => {
   return file;
 };
 
-/** A finding's severity from its `severity:` line, or ''. */
-export const severityOf = (finding) => /^[-*]\s*(?:\*\*)?severity(?::\*\*|\*\*:|:)\s*(\w+)/im.exec(finding.body ?? '')?.[1].toLowerCase() ?? '';
+export { severityOf };
 
 /**
  * The ledger matcher's prompt: its brief, the ledger's defects, then the new report, either as its parsed `findings`

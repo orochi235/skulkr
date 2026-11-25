@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fixOf, givenIn, likeness, openFindings } from './carry.mjs';
+import { fixOf, givenIn, likeness } from './carry.mjs';
+import { openFindings } from './defectGraph.mjs';
 
 const section = (claim: string, where: string) => `## ${claim}\n- where: ${where}\n- severity: low\n`;
 /** One area's record for a round in which reviewer A alone reported `claims`, each at its `where`. */
