@@ -13,7 +13,7 @@ import { matchShell, reviewShell } from './jobs.mjs';
 import { agentFor, requireAgents } from './agent/index.mjs';
 import { ledgerDirOf, ledgerMatchPrompt, matchOf } from './ledger.mjs';
 import { recentlyChanged, reviewFileList } from './reviewFiles.mjs';
-import { createSlots } from './slots.mjs';
+import { LOCAL_NODE, createSlots } from './slots.mjs';
 import { sleep } from './after.mjs';
 import { readIf } from './text.mjs';
 
@@ -44,7 +44,8 @@ export const requireSources = (cfg, sources) => {
 
 /** What every saturation job reads: the config, runner, frozen tree, and the slots it takes jobs in. */
 export const createSaturateContext = ({ cfg, runner, frozen, base, commit, area, say }) => {
-  const slots = createSlots(cfg, undefined, { about: { saturate: area }, places: Boolean(runner.places) });
+  // A runner that keeps its jobs on this machine leases this machine's slots, whatever nodes the config lists for its own runner.
+  const slots = createSlots(cfg, runner.routesLocal ? [LOCAL_NODE] : undefined, { about: { saturate: area }, places: Boolean(runner.places) });
   let unavailable = { at: 0, nodes: new Set() };
   return {
     cfg, runner, frozen, base, commit, say,

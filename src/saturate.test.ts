@@ -90,6 +90,14 @@ describe('skulkr saturate', () => {
     expect(existsSync(join(root, '.worktrees/audit-saturate-src'))).toBe(false);
   });
 
+  it("takes this machine's slots under a runner that keeps jobs local, though the config lists no nodes", async () => {
+    const { root, cfg } = project();
+    const placing = { ...cfg, nodes: { ...cfg.nodes, list: [] } };
+    const runner = { ...fakeRunner([['A'], ['B']]), routesLocal: true };
+    await saturateCommand(placing, runner, root, ['src', '--max', '2'], () => {});
+    expect(ledgerOf(cfg, 'src').occasions).toHaveLength(2);
+  });
+
   it('runs one review per source each iteration and resumes a ledger at the same commit', async () => {
     const { root, cfg } = project();
     const sourcesCfg = { ...cfg, codex: { ...cfg.codex, models: { review: 'gpt' }, prices: { gpt: { input: 1, cachedInput: 0.1, output: 4 } } } };
