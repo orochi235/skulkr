@@ -11,6 +11,8 @@ export interface LedgerTreeNode {
   readonly area: boolean;
   /** How many ledgers this row and the rows beneath it hold. */
   readonly ledgers: number;
+  /** How many areas the rows beneath it are, at any depth. */
+  readonly within: number;
   readonly children: readonly LedgerTreeNode[];
   /** Distinct defects in this row's ledger and every ledger beneath it. */
   readonly defects: number;
@@ -33,7 +35,7 @@ const addUnseen = (a: number | null, b: number | null) => (a === null ? b : b ==
 const finish = (path: string, label: string, d: Draft): LedgerTreeNode => {
   const kids = [...d.kids].sort(([a], [b]) => a.localeCompare(b)).map(([part, k]) => finish(path ? `${path}.${part}` : part, part, k));
   const aside = d.aside.map((l): LedgerTreeNode => ({
-    id: l.id, label: `@${l.commit.slice(0, 10)}`, ledger: l, area: false, ledgers: 1, children: [], defects: l.distinct, unseen: l.unseen, costUsd: l.costUsd,
+    id: l.id, label: `@${l.commit.slice(0, 10)}`, ledger: l, area: false, ledgers: 1, within: 0, children: [], defects: l.distinct, unseen: l.unseen, costUsd: l.costUsd,
   }));
   const children = [...kids, ...aside];
   // A row that is no area and has one row beneath it says nothing: it merges into that row.
@@ -44,6 +46,7 @@ const finish = (path: string, label: string, d: Draft): LedgerTreeNode => {
   return {
     id: path, label, ledger: d.ledger, area: d.area || d.ledger !== null, children,
     ledgers: (d.ledger ? 1 : 0) + children.reduce((n, c) => n + c.ledgers, 0),
+    within: children.reduce((n, c) => n + (c.area ? 1 : 0) + c.within, 0),
     defects: (d.ledger?.distinct ?? 0) + children.reduce((n, c) => n + c.defects, 0),
     unseen: children.reduce((n, c) => addUnseen(n, c.unseen), d.ledger?.unseen ?? null),
     costUsd: (d.ledger?.costUsd ?? 0) + children.reduce((n, c) => n + c.costUsd, 0),

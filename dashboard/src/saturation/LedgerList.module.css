@@ -35,10 +35,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+.within,
 .defects,
 .unseen {
   text-align: end;
 }
+
+.within { min-width: 5ch; }
 
 .defects { min-width: 7ch; }
 

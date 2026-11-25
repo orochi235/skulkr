@@ -20,6 +20,7 @@ describe('ledgerTreeOf', () => {
       ['core.canvas.nodeShapes', 10, 8.3, [['@9c4522d635', 4, null]]],
     ]);
     expect(tree[0]!.id).toBe('apps.chart');
+    expect([tree[0]!.within, tree[0]!.children[0]!.within, tree[1]!.within]).toEqual([2, 2, 0]);
     expect(ancestorIdsOf(tree, 'apps.chart.src.part2')).toEqual(['apps.chart', 'apps.chart.src']);
     expect(ancestorIdsOf(tree, 'core.canvas.nodeShapes.9c4522d635')).toEqual(['core.canvas.nodeShapes']);
   });
@@ -28,5 +29,6 @@ describe('ledgerTreeOf', () => {
     const tree = ledgerTreeOf([ledger('core.canvas', 2, 1)], ['core.canvas', 'core.canvas.deps', 'geom.paths']);
     expect(tree.map((n) => [n.id, n.label, n.ledgers, n.area])).toEqual([['core.canvas', 'core.canvas', 1, true], ['geom.paths', 'geom.paths', 0, true]]);
     expect(tree[0]!.children.map((n) => [n.id, n.ledgers, n.ledger])).toEqual([['core.canvas.deps', 0, null]]);
+    expect(tree.map((n) => n.within)).toEqual([1, 0]);
   });
 });

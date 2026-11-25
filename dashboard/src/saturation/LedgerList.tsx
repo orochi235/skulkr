@@ -12,10 +12,11 @@ const treeNodeOf = (n: LedgerTreeNode): TreeNode => ({
   textValue: n.label,
   muted: !n.ledger,
   className: s.row,
-  tooltip: n.ledgers === 0 ? `${n.id}: no ledger yet`
+  tooltip: n.ledgers === 0 ? `${n.id}: no ledger yet${n.within ? `, nor any of the ${n.within} areas within it` : ''}`
     : `${n.ledger ? n.id : `everything under ${n.id}`}: ${n.defects} defects, ${estimate(n.unseen)} unseen, ${usd(n.costUsd)}`,
   trailing: (
     <span className={s.figures}>
+      <span className={s.within}>{n.within || ''}</span>
       <span className={s.defects}>{n.ledgers === 0 ? '–' : n.defects}</span>
       <span className={s.unseen}>{estimate(n.unseen)}</span>
     </span>
@@ -58,7 +59,7 @@ export function LedgerList({ ledgers, areas, picked, onPick }: {
       />
       <div className={s.head} aria-hidden="true">
         <span>Area</span>
-        <span className={s.figures}><span className={s.defects}>Defects</span><span className={s.unseen}>Unseen</span></span>
+        <span className={s.figures}><span className={s.within}>Areas</span><span className={s.defects}>Defects</span><span className={s.unseen}>Unseen</span></span>
       </div>
       <div ref={scroll} className={s.scroll}>
         <Tree
