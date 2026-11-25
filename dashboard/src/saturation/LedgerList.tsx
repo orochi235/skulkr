@@ -12,21 +12,28 @@ const treeNodeOf = (n: LedgerTreeNode): TreeNode => ({
   textValue: n.label,
   muted: !n.ledger,
   className: s.row,
-  tooltip: `${n.ledger ? n.id : `everything under ${n.id}`}: ${n.defects} defects, ${estimate(n.unseen)} unseen, ${usd(n.costUsd)}`,
+  tooltip: n.ledgers === 0 ? `${n.id}: no ledger yet`
+    : `${n.ledger ? n.id : `everything under ${n.id}`}: ${n.defects} defects, ${estimate(n.unseen)} unseen, ${usd(n.costUsd)}`,
   trailing: (
     <span className={s.figures}>
-      <span className={s.defects}>{n.defects}</span>
+      <span className={s.defects}>{n.ledgers === 0 ? '–' : n.defects}</span>
       <span className={s.unseen}>{estimate(n.unseen)}</span>
     </span>
   ),
   ...(n.children.length ? { children: n.children.map(treeNodeOf) } : {}),
 });
 
-/** Every ledger as a tree by area, filtered by name; picking one shows its defects. */
-export function LedgerList({ ledgers, picked, onPick }: { ledgers: readonly SaturationLedger[]; picked: string | null; onPick: (id: string) => void }) {
+/** Every area and ledger as a tree by area, filtered by name; picking one shows its defects. */
+export function LedgerList({ ledgers, areas, picked, onPick }: {
+  ledgers: readonly SaturationLedger[];
+  /** The partition's areas, each listed whether it has a ledger or not. */
+  areas: readonly string[];
+  picked: string | null;
+  onPick: (id: string) => void;
+}) {
   const [query, setQuery] = useState('');
-  const tree = useMemo(() => ledgerTreeOf(ledgers), [ledgers]);
-  const ids = useMemo(() => new Set(ledgers.map((l) => l.id)), [ledgers]);
+  const tree = useMemo(() => ledgerTreeOf(ledgers, areas), [ledgers, areas]);
+  const ids = useMemo(() => new Set([...ledgers.map((l) => l.id), ...areas]), [ledgers, areas]);
   const all = useMemo(() => tree.map(treeNodeOf), [tree]);
   const q = query.trim().toLowerCase();
   const nodes = useMemo(() => (q ? filterTree(all, (n) => n.id.toLowerCase().includes(q)) : all), [all, q]);

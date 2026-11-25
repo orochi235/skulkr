@@ -38,6 +38,7 @@ export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: 
 
   const ledgers = state.status === 'ready' ? state.ledgers : [];
   const ledger = ledgers.find((l) => l.id === picked) ?? null;
+  const areaIds = useMemo(() => (map.status === 'ready' ? map.map.areas.map((a) => a.id) : []), [map]);
   const totals = useMemo(() => ({
     defects: ledgers.reduce((n, l) => n + l.distinct, 0),
     costUsd: ledgers.reduce((n, l) => n + l.costUsd, 0),
@@ -60,7 +61,7 @@ export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: 
         )}
         {state.status === 'ready' && ledgers.length > 0 && (
           <div className={s.main}>
-            <LedgerList ledgers={ledgers} picked={picked} onPick={(id) => pick(id === picked ? null : id)} />
+            <LedgerList ledgers={ledgers} areas={areaIds} picked={picked} onPick={(id) => pick(id === picked ? null : id)} />
             <ResizeHandle value={listWidth} min={LIST.min} max={LIST.max} onInput={setListWidth} onChange={keepListWidth} aria-label="Resize the ledger list" />
             <div className={s.right}>
               {map.status === 'ready' && <SaturationMap areas={map.map.areas} ledgers={ledgers} picked={picked} onPick={pick} />}

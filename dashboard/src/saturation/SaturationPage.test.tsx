@@ -37,19 +37,19 @@ afterEach(() => {
 });
 
 describe('SaturationPage', () => {
-  it('lists every ledger, most unseen first, and shows the picked one’s defects with the area in the hash', async () => {
+  it('lists every area on the map and every ledger as a tree, and shows the picked one’s defects with the area in the hash', async () => {
     serve();
     window.location.hash = '#weasel/saturation';
     renderWithIcons(<WeaselProvider><SaturationPage base="/test/" /></WeaselProvider>);
     expect(await screen.findByText('2 ledgers · 2 defects · $46.56')).toBeInTheDocument();
     const list = screen.getByRole('region', { name: 'Ledgers' });
-    const rows = within(list).getAllByRole('treeitem');
-    expect(rows.map((r) => r.getAttribute('aria-level'))).toEqual(['1', '1']);
-    expect(rows[0]).toHaveTextContent('core.animation');
-    expect(rows[1]).toHaveTextContent('geom.booleans');
+    await within(list).findByText('ui');
+    const top = within(list).getAllByRole('treeitem').filter((r) => r.getAttribute('aria-level') === '1');
+    expect(top.map((r) => within(r).getAllByText(/./)[0]!.textContent)).toEqual(['core', 'geom', 'ui']);
     expect(screen.getByText('Pick an area for its defects.')).toBeInTheDocument();
 
-    fireEvent.click(within(rows[0]!).getByText('core.animation'));
+    fireEvent.change(within(list).getByRole('searchbox'), { target: { value: 'core.animation' } });
+    fireEvent.click(await within(list).findByText('animation'));
     const detail = screen.getByRole('region', { name: "core.animation's defects" });
     expect(within(detail).getByText('A rejected tween still records its pose')).toBeInTheDocument();
     expect(within(detail).getByText('codex only')).toBeInTheDocument();
