@@ -5,3 +5,4 @@ dist/
 .alpo.local.json
 .playwright-mcp/
 .claude/worktrees/
+.worktrees/
