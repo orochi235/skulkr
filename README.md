@@ -519,7 +519,7 @@ Running one reviewer of each pair on each agent, `agent: { review: … }` aside,
 
 ## Saturation
 
-Splitting this into stages (pick, scan, collect, judge, land, sort, fix) is designed, mostly unbuilt, in
+Splitting this into stages (pick, scan, collect, judge, land, triage, fix) is designed, mostly unbuilt, in
 `docs/saturation.md`.
 
 A round's two reviews estimate what an area holds from one overlap. `skulkr saturate` (alias `sat`) asks the

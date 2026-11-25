@@ -18,15 +18,15 @@ Separate stages let each step run where and when it is cheapest:
 
 - scans can run overnight on the fleet;
 - collecting can be run again after the matcher changes;
-- fixing can drain the queue in round-sized pieces.
+- fixing can work through the fix plan in round-sized pieces.
 
 Each stage reads only what the stage before it wrote, so any stage can be rerun alone.
 
 ## The flow
 
 ```
-pick → [scan → collect → judge]* → land → sort → fix (→ verify → batch → merge) → close
-                                                        ↘ ask
+pick → [scan → collect → judge]* → land → triage → fix (→ verify → batch → merge) → close
+                                                          ↘ ask
                                    compare (any time after land)
 ```
 
@@ -35,18 +35,18 @@ project's `.skulkr/`, never from one machine's state directory.
 
 ## Stages
 
-| Stage | Takes | Writes | Exists today |
-|---|---|---|---|
-| **pick** | the partition, the registry, a budget | the areas to saturate, the frozen commit, the sources | only as `--at` and `--sources` on one area |
-| **scan** | a picked area | one raw report per occasion, unmatched, under the ledger's `reviews/` | inside `saturate <area>`'s loop; the Codex skill and `ingest` bring outside reports |
-| **collect** | reports not yet in the ledger | the ledger's distinct defects and sightings (the ledger matcher) | inside the same loop, as `foldIn` |
-| **judge** | the ledger | whether to scan again: the stop rule, and which source to add next from the per-source estimates | inside the loop |
-| **land** | a stopped ledger | `.skulkr/saturation/<area>/<commit>/` and the registry lines it adds, committed to `main` | `saturate land` |
-| **sort** | the registry's open saturation defects | a fix queue: each defect checked against today's `main`, linked to round defects, ranked, and grouped into fix-sized batches by file | no |
-| **fix** | a queue batch | fixer commits, handed to the round pipeline's verify, batch, gate and merge | `--fix-only` rounds fix open round findings; they do not take saturation defects |
-| **ask** | `question` verdicts and declined defects | a list for a person to rule on | no; rounds leave these in `fix.md` |
-| **close** | the landed fix | each defect's registry status, against its ledger id | partly: the record commit rewrites the registry, but a fixer's verdicts are not yet tied to saturation defects |
-| **compare** | landed ledgers and the rounds' estimates | how far each round's Chapman estimate, and each calibration factor, was from the saturated total for the same area | no |
+| Stage | Takes | Writes | Core action | UI expression(s) | User sees? | Exists today |
+|---|---|---|---|---|---|---|
+| **pick** | the partition, the registry, a budget | the areas to saturate, the frozen commit, the sources | The user (or a script) specifies a job | Whatever interface we use to pick an area from the map | Explicit | only as `--at` and `--sources` on one area |
+| **scan** | a picked area | one raw report per occasion, unmatched, under the ledger's `reviews/` | We run the job | Updates: progress bar and frequent log events/status updates | Explicit | inside `saturate <area>`'s loop; the Codex skill and `ingest` bring outside reports |
+| **collect** | reports not yet in the ledger | the ledger's distinct defects and sightings (the ledger matcher) | Job results binned in the ledger | Items in various results lists | Implicit? | inside the same loop, as `foldIn` |
+| **judge** | the ledger | whether to scan again: the stop rule, and which source to add next from the per-source estimates | Flow control over scanning process | Prefs that govern batch flow control | Implicit? | inside the loop |
+| **land** | a stopped ledger | `.skulkr/saturation/<area>/<commit>/` and the registry lines it adds, committed to `main` | Saves results from recent scans to the database | | Currently explicit, should be automatic | `saturate land` |
+| **triage** | the registry's open saturation defects | a fix plan: groups similar defects and decides how/whether to assign them to fixers | Selects, batches, and prepares defects for fixing | | Implicit | no |
+| **fix** | a fix plan | fixer commits, handed to the round pipeline's verify, batch, gate and merge | Writes, commits, and tests fixes. The kernel of the use case | | Implicit | `--fix-only` rounds fix open round findings; they do not take saturation defects |
+| **ask** | `question` verdicts and declined defects | a list for a person to rule on | Happens automatically; deferred questions are logged and diverted from the pipeline for now | Updates: progress bar and frequent log events/status updates | Implicit | no; rounds leave these in `fix.md` |
+| **close** | the landed fix | each defect's registry status, against its ledger id | Database changes and state updates visible on site | | Implicit | partly: the record commit rewrites the registry, but a fixer's verdicts are not yet tied to saturation defects |
+| **compare** | landed ledgers and the rounds' estimates | how far each round's Chapman estimate, and each calibration factor, was from the saturated total for the same area | Update analytics in database | Charts and readouts in the app | Ambient | no |
 
 ## What each hand-off holds
 
@@ -55,14 +55,14 @@ project's `.skulkr/`, never from one machine's state directory.
 | pick → scan | `<state>/saturation/<area>/ledger.json` with its frozen `commit` and `files`, and no occasions yet |
 | scan → collect | `reviews/<NN>-<source>.md` beside the ledger, listed in an `unfolded` list until collect takes them |
 | collect → judge | the ledger's `occasions` and `defects`; every estimate is computed from these |
-| land → sort | `.skulkr/saturation/…/ledger.json` and `.skulkr/defects/<area>.jsonl` |
-| sort → fix | a queue file under `.skulkr/` (to design): batches of registry ids, each with the files they touch |
+| land → triage | `.skulkr/saturation/…/ledger.json` and `.skulkr/defects/<area>.jsonl` |
+| triage → fix | the fix plan, under `.skulkr/` (to design): batches of registry ids, each with the files they touch |
 | fix → close | the round record's `fix.md` verdicts, naming registry ids |
 
 ## Decided
 
-- Saturation runs as stages that each run on their own: scan, collect, sort, fix (2026-11-25).
-- A defect only saturation found is not handed to a round's fixers until sort and fix exist (2026-11-25).
+- Saturation runs as stages that each run on their own: scan, collect, triage, fix (2026-11-25; `sort` renamed `triage` the same day).
+- A defect only saturation found is not handed to a round's fixers until triage and fix exist (2026-11-25).
 
 ## Open
 
@@ -70,7 +70,7 @@ project's `.skulkr/`, never from one machine's state directory.
   gate and merge, as a `--fix-only` round does, rather than building its own.
 - **The name.** "Saturation" describes the stop rule, not the work. Offered: trawl, census, comb, prowl. Undecided.
 - **Collect's verb.** `fold` or `pool` would keep commands to one syllable; `collect` was the first suggestion.
-- **Does sort check each defect with a model?** A cheap read-only job per batch would ask whether it still reproduces
-  at `HEAD`. It costs money and keeps fixers from chasing defects already gone. Without it, sort ranks from the
+- **Does triage check each defect with a model?** A cheap read-only job per batch would ask whether it still reproduces
+  at `HEAD`. It costs money and keeps fixers from chasing defects already gone. Without it, triage ranks from the
   registry and from what changed since the ledger's commit, and the fixer's `not a defect` verdict does the checking.
-- **Where the fix queue lives,** and whether it is a file or a view over the registry and the index.
+- **Where the fix plan lives,** and whether it is a file or a view over the registry and the index.
