@@ -187,7 +187,8 @@ export const nightLanes = (log, areas, jobs = [], reports = new Map(), names = N
   for (const [key, ran] of finished) {
     const [id, name] = key.split('\n');
     const step = at(id, name);
-    if (step.state !== 'done') continue;
+    // A step a resumed round cleared, as it redoes the one before it, takes no earlier run's times.
+    if (step?.state !== 'done') continue;
     const job = bestFinished(ran, step.minutes);
     const ended = Date.parse(job.finished);
     const started = step.minutes === undefined ? Date.parse(job.started) : ended - step.minutes * 60_000;

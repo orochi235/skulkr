@@ -174,7 +174,9 @@ describe('nightLanes repair step', () => {
       'match 1/1 a: 1 shared of 3 + 2', 'fix 1/1 a on local: 0 commits, 12.1 min, 0.00M weighted tokens', 'verify a: failed: 1 of 9 test files failed (x.test.ts)',
       'resumed: 2026-11-24T20:35:06Z',
       'review 1/2 a A on earlier: 3 findings, 9/9 files read, 0.0 min, 0.4M weighted tokens', 'review 2/2 a B on earlier: 2 findings, 9/9 files read, 0.0 min, 0.4M weighted tokens', 'match 1/1 a: 1 shared of 3 + 2'];
-    const running = [{ task: 'audit9-a-fix', node: 'local', started: '2026-11-24T20:36:18Z', progress: { done: 1, total: 4 } }];
+    const running = [{ task: 'audit9-a-fix', node: 'local', started: '2026-11-24T20:36:18Z', progress: { done: 1, total: 4 } },
+      // The earlier run's verify, finished: its step is cleared, so it gives no times.
+      { task: 'audit9-a-verify', node: 'local', started: '2026-11-24T20:20:00Z', finished: '2026-11-24T20:25:00Z' }];
     const { steps } = nightLanes(log.join('\n'), ['a'], running)[0]!;
     expect(steps.fix).toEqual({ state: 'running', node: 'local', since: '2026-11-24T20:36:18Z', done: 1, total: 4 });
     expect(steps.repair).toBeUndefined();
