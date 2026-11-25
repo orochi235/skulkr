@@ -294,7 +294,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
         <p className={s.foot}>
           <AreaNote map={map} /> Two reviewers read it
           blind; the overlap of their lists gives Chapman&apos;s estimate of what it held, and &ldquo;left&rdquo; is that estimate
-          less what they found. An area settles after two quiet passes on unchanged files. Data from <code>skulkr map</code>.
+          less what they found. An area settles once the fall of its finds over rounds bounds what it holds under one defect. Data from <code>skulkr map</code>.
         </p>
       </div>
     </Shell>
