@@ -99,8 +99,8 @@ describe('laneViewOf', () => {
     const fixed = { A: done({ findings: 3 }), B: done({ findings: 2 }), match: matched(3, 2, 1), fix: done({ minutes: 9, commits: 6, fixed: 2, of: 4, deferred: 1 }) };
     for (const spans of [laneStepsOf(lane(fixed), NOW), laneStepsOf(lane({ ...fixed, patch: done({ commits: 6 }) }), NOW)]) {
       const [kept, filed] = spans.slice(-2);
-      expect([kept!.id, kept!.ms, kept!.fill]).toEqual(['patch', 0.6 * 0.75, 1]);
-      expect([filed!.id, filed!.ms, filed!.state, filed!.color, filed!.label]).toEqual(['patch-unfixed', 0.6 * 0.25, 'failed', 'var(--audit-filed)', '']);
+      expect([kept!.id, kept!.ms, kept!.fill]).toEqual(['patch', 1.1 * 0.75, 1]);
+      expect([filed!.id, filed!.ms, filed!.state, filed!.color, filed!.label]).toEqual(['patch-unfixed', 1.1 * 0.25, 'failed', 'var(--audit-filed)', '']);
     }
     // A finding found sound is settled, not left: no hatch where nothing was deferred.
     const sound = { ...fixed, fix: done({ minutes: 9, commits: 6, fixed: 3, of: 4, deferred: 0, dismissed: 1 }) };
@@ -112,7 +112,7 @@ describe('laneViewOf', () => {
     expect(laneViewOf(lane(sound), NOW, START).spans.find((s) => s.id === 'patch')?.fill).toBe(1);
     // A tally line alone says nothing of why, so everything unfixed is left.
     const tallied = { ...fixed, fix: done({ minutes: 9, commits: 6, fixed: 3, of: 4 }) };
-    expect(laneStepsOf(lane(tallied), NOW).find((s) => s.id === 'patch-unfixed')?.ms).toBeCloseTo(0.6 * 0.25);
+    expect(laneStepsOf(lane(tallied), NOW).find((s) => s.id === 'patch-unfixed')?.ms).toBeCloseTo(1.1 * 0.25);
   });
 
   it('counts an area\'s pass done once its fixer is, and gives the map that pass, provisionally', () => {
@@ -168,7 +168,7 @@ describe('runClockOf', () => {
 describe('laneStepsOf', () => {
   it('gives every step one equal column, filled by its state, a running one by its share of the typical time', () => {
     const spans = laneStepsOf(lane({ A: done({ findings: 5, minutes: 3 }), B: running(at(27.5)), match: W }), NOW);
-    expect(spans.map((s) => [s.id, s.ms, s.fill])).toEqual([['A', 1, 1], ['B', 1, 0.5], ['match', 1, 0], ['fix', 1, 0], ['checks', 0.5, 0], ['verify', 0.5, 0], ['repair', 0.5, 0], ['patch', 0.6, 0]]);
+    expect(spans.map((s) => [s.id, s.ms, s.fill])).toEqual([['A', 1, 1], ['B', 1, 0.5], ['match', 1, 0], ['fix', 1, 0], ['checks', 0.5, 0], ['verify', 0.5, 0], ['patch', 1.1, 0]]);
     // The finished review is dark gray; the rest wear their phases.
     expect(spans.filter((s) => !['checks', 'verify', 'repair'].includes(s.id)).map((s) => s.color)).toEqual(['var(--audit-stage-done)', ...['reviewed', 'match', 'fix', 'patch'].map((p) => phaseColor(p as never))]);
     expect(spans[0]!.ink).toBe('var(--audit-stage-done-ink)');
@@ -208,7 +208,7 @@ describe('laneStepsOf', () => {
     const spans = laneStepsOf(lane({}), NOW);
     expect(spans.map((s) => [s.id, s.start, s.track, s.trackSpan])).toEqual([
       ['A', 0, undefined, undefined], ['B', 1, undefined, undefined], ['match', 2, undefined, undefined], ['fix', 3, undefined, undefined],
-      ['checks', 4, undefined, undefined], ['verify', 4.5, undefined, undefined], ['repair', 5, undefined, undefined], ['patch', 5.5, undefined, undefined],
+      ['checks', 4, undefined, undefined], ['verify', 4.5, undefined, undefined], ['patch', 5, undefined, undefined],
     ]);
     expect(STEP_COLUMN_COUNT).toBeCloseTo(6.1);
   });
@@ -235,31 +235,33 @@ describe('laneStepsOf', () => {
 describe('the repair step', () => {
   const fixed = { A: done({ findings: 2 }), B: done({ findings: 1 }), match: matched(2, 1, 1), fix: done({ commits: 2, minutes: 12 }) };
 
-  it('gives the fixer\'s checks, the verify and the repair a column each, always in place', () => {
+  it("gives the fixer's checks and the verify a column each, and the last column to a repair only while one is under way", () => {
     const ids = (repair?: LaneStep) => laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, ...(repair ? { repair } : {}) } }, NOW).map((s) => [s.id, s.start]);
-    const columns = [['A', 0], ['B', 1], ['match', 2], ['fix', 3], ['checks', 4], ['verify', 4.5], ['repair', 5], ['patch', 5.5]];
-    expect(ids()).toEqual(columns);
-    expect(ids({ ...running(at(25)), job: 'repair' })).toEqual(columns);
+    const before = [['A', 0], ['B', 1], ['match', 2], ['fix', 3], ['checks', 4], ['verify', 4.5]];
+    expect(ids()).toEqual([...before, ['patch', 5]]);
+    expect(ids({ ...running(at(25)), job: 'verify' })).toEqual([...before, ['patch', 5]]);
+    expect(ids({ ...running(at(25)), job: 'repair' })).toEqual([...before, ['repair', 5]]);
+    expect(ids({ state: 'running', outcome: 'failed' })).toEqual([...before, ['repair', 5]]);
+    expect(ids(done({ attempts: 1, outcome: 'passed' }))).toEqual([...before, ['patch', 5]]);
   });
 
-  it('lights the column of the job running, verify or repair, in magenta, and a failed one as a conflict', () => {
+  it('lights the job running, verify or repair, in magenta, a repair with its progress and which repair it is', () => {
     const spans = (repair: LaneStep) => laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, repair } }, NOW);
     const verifying = spans({ ...running(at(25)), job: 'verify' });
     expect(verifying.find((s) => s.id === 'verify')).toMatchObject({ state: 'active', color: 'var(--audit-repair)' });
-    expect(verifying.find((s) => s.id === 'repair')).toMatchObject({ state: 'pending', label: '' });
-    const repairing = spans({ ...running(at(25)), job: 'repair', attempts: 0 });
-    expect(repairing.find((s) => s.id === 'verify')).toMatchObject({ state: 'failed', color: phaseColor('conflict') });
-    expect(repairing.find((s) => s.id === 'repair')!.state).toBe('active');
+    const repairing = spans({ ...running(at(25)), job: 'repair', attempts: 1 });
+    expect(repairing.find((s) => s.id === 'verify')).toMatchObject({ label: '✗ failed' });
+    expect(repairing.find((s) => s.id === 'repair')).toMatchObject({ state: 'active', color: 'var(--audit-repair)' });
+    expect(repairing.find((s) => s.id === 'repair')!.fill).toBeGreaterThan(0);
+    expect(repairing.find((s) => s.id === 'repair')!.label).toMatch(/^repair 2 · studio · /);
+    expect(spans({ state: 'running', outcome: 'failed' }).find((s) => s.id === 'repair')!.label).toBe('waiting for a repair');
     expect(laneViewOf({ id: 'x', steps: { ...lane(fixed).steps, repair: running(at(25)) } }, NOW, START).spans.find((s) => s.id === 'repair')!.color).toBe('var(--audit-repair)');
   });
 
-  it('says how its verify ended and how many repairs ran, each in its own column', () => {
+  it('says how its verify ended', () => {
     const of = (repair: LaneStep, id: string) => laneStepsOf({ id: 'x', steps: { ...lane(fixed).steps, repair } }, NOW).find((s) => s.id === id)!;
     expect(of(done({ attempts: 0, outcome: 'passed' }), 'verify').label).toBe('✓ passed');
-    expect(of(done({ attempts: 0, outcome: 'passed' }), 'repair').label).toBe('');
-    expect(of(done({ attempts: 2, outcome: 'passed' }), 'repair').label).toBe('2 repairs');
     expect(of(done({ attempts: 2, outcome: 'passed' }), 'verify').label).toBe('✗ failed');
-    expect(of({ state: 'failed', attempts: 2, why: 'still failing after 2 repairs' }, 'repair')).toMatchObject({ label: 'still failing after 2 repairs', state: 'failed', color: phaseColor('conflict') });
   });
 
   it('counts the model agents running: reviewers, matchers, fixers short of their hand-back verify, and repairs', () => {
