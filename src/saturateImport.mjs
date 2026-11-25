@@ -1,5 +1,5 @@
 /**
- * `skulkr saturate import <area> <dir> --at <sha>`: a ledger built from a saturation experiment run by hand, every
+ * `skulkr scour import <area> <dir> --at <sha>`: a ledger built from a saturation experiment run by hand, every
  * occasion a Claude review. `<dir>` holds `reviews/NN.md`, `occasions.json` (`{ "1": [findings, costUsd, minutes] }`),
  * `sightings.json` (`{ "1": ["V1", …] }`, the defects each occasion reported) and `defects.json`
  * (`[{ id, claim, where, severity, source? }]`).

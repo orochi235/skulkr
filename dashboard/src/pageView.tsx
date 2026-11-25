@@ -3,7 +3,7 @@ import { SegmentedBar } from '@weasel-js/ui/components/Segmented';
 import { hashFor, readHash, type PageView } from './hash';
 
 /** The dashboard's pages, in the order the switch shows them: the one list every page's switch reads. */
-export const PAGES = [{ value: 'audits', label: 'Audits' }, { value: 'saturation', label: 'Saturation' }] as const satisfies readonly { value: PageView; label: string }[];
+export const PAGES = [{ value: 'audits', label: 'Audits' }, { value: 'saturation', label: 'Scour' }] as const satisfies readonly { value: PageView; label: string }[];
 
 /** The page the URL hash names, following it as it changes. */
 export function usePageView(): PageView {

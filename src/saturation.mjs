@@ -1,6 +1,6 @@
 /**
  * Capture–recapture over a saturation ledger (`ledger.mjs`): each occasion is one sample, each defect's sightings its
- * incidence. README "Saturation" says what each figure means and when to trust it.
+ * incidence. README "Scour" says what each figure means and when to trust it.
  */
 import { chapman } from './rounds.mjs';
 

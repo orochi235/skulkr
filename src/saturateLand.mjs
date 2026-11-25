@@ -1,6 +1,6 @@
 /**
- * `skulkr saturate land <area>… | --all`: commits saturation ledgers to the project's `main`, each under
- * `<record.dir>/saturation/<area>/<commit>/`, so their defects outlive the state directory. README "Saturation",
+ * `skulkr scour land <area>… | --all`: commits saturation ledgers to the project's `main`, each under
+ * `<record.dir>/saturation/<area>/<commit>/`, so their defects outlive the state directory. README "Scour",
  * "Landing a ledger", is its documentation.
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';

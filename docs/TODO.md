@@ -2,7 +2,7 @@
 
 Open work on skulkr. Each entry says when it closes.
 
-- [ ] (P1) Build saturation as stages, `docs/saturation.md` (designed 2026-11-25, mostly unbuilt). Closes when its
+- [ ] (P1) Build saturation as stages, `docs/scour.md` (designed 2026-11-25, mostly unbuilt). Closes when its
   stages run on their own and the doc is folded into the README and deleted.
 - [ ] (P2) Saturation ledgers' defects reach no fixer: landed ledgers under `<record.dir>/saturation/` are read by
   nothing. They are to be fixed eventually; the mechanism is undecided (2026-11-25). A defect was found at the ledger's

@@ -62,7 +62,7 @@ export const reportText = (ledger, rule) => {
     'Each occasion is one review, or one ingested report; its findings are matched against the ledger of distinct',
     'defects so far. Reviews stop once fewer than one defect is estimated unseen, the chance that the next occasion',
     `finds something new falls under ${Math.round(rule.stopNextNew * 100)}%, or ${rule.max} occasions have run.`,
-    `${stop ? `Stopped: ${stop}.` : 'Not stopped yet.'} \`skulkr saturate report ${ledger.area}\` rewrites this file from the ledger.`,
+    `${stop ? `Stopped: ${stop}.` : 'Not stopped yet.'} \`skulkr scour report ${ledger.area}\` rewrites this file from the ledger.`,
     '',
     '## Yield by occasion',
     '',

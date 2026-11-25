@@ -104,7 +104,7 @@ export default {
   claude: {
     configDir: undefined,             // CLAUDE_CONFIG_DIR for every job; unset, the CLI's default account
     denied: [],                       // tools refused to every job; local mode adds WebFetch and WebSearch
-    models: { match: 'haiku', ledgerMatch: 'opus' }, // per role (review, match, fix); unset takes what the job's settings give; ledgerMatch: see "Saturation"
+    models: { match: 'haiku', ledgerMatch: 'opus' }, // per role (review, match, fix); unset takes what the job's settings give; ledgerMatch: see "Scour"
     effort: {},                       // per role, `--effort`; unset likewise
     settingSources: 'project,local',  // `--setting-sources`: the node account's own settings stay out; null omits it
     cacheTtl: { review: '5m', match: '5m', fix: '5m' }, // per role, the prompt cache's lifetime; unset takes Claude Code's default
@@ -117,7 +117,7 @@ export default {
   schedule: { startAt: '23:00', stopAt: '07:00', continuous: false }, // the service's start; when a scheduled or continuous run stops dispatching
   state: undefined,                   // default ~/.local/state/skulkr/<name>
   sweep: null,                        // an extra check beside the reviews; see "A sweep"
-  saturate: { max: 40, sources: ['claude'], stopNextNew: 0.15 }, // `skulkr saturate`; see "Saturation"
+  saturate: { max: 40, sources: ['claude'], stopNextNew: 0.15 }, // `skulkr scour`; see "Scour"
   icons: null,                        // the map's area icons; see "Area icons"
 };
 ```
@@ -517,25 +517,25 @@ documented in `src/agent/index.mjs`.
 
 Running one reviewer of each pair on each agent, `agent: { review: … }` aside, is not built yet.
 
-## Saturation
+## Scour
 
 Splitting this into stages (pick, scan, collect, judge, land, triage, fix) is designed, mostly unbuilt, in
-`docs/saturation.md`.
+`docs/scour.md`.
 
-A round's two reviews estimate what an area holds from one overlap. `skulkr saturate` (alias `sat`) asks the
+A round's two reviews estimate what an area holds from one overlap. `skulkr scour` (aliases `saturate`, `sat`) asks the
 question harder for one area: blind reviews of it, again and again, at one frozen commit with no fixes between them,
 until capture–recapture says further reviews would find little new. Nothing it records feeds a round: not history,
 calibration, the queue, or the map.
 
-    skulkr saturate <area> [--sources claude,codex] [--max 40] [--at <sha>] [--fresh] [--fleet]
-    skulkr saturate ingest <area> <report.md> --source <name> [--at <sha>]
-    skulkr saturate import <area> <dir> --at <sha> [--fresh]
-    skulkr saturate land <area>… | --all
-    skulkr saturate ls [--json]
-    skulkr saturate report <area>
-    skulkr saturate rm <area>
+    skulkr scour <area> [--sources claude,codex] [--max 40] [--at <sha>] [--fresh] [--fleet]
+    skulkr scour ingest <area> <report.md> --source <name> [--at <sha>]
+    skulkr scour import <area> <dir> --at <sha> [--fresh]
+    skulkr scour land <area>… | --all
+    skulkr scour ls [--json]
+    skulkr scour report <area>
+    skulkr scour rm <area>
 
-Each **occasion** is one report. `skulkr saturate <area>` freezes a detached worktree of the ledger's commit
+Each **occasion** is one report. `skulkr scour <area>` freezes a detached worktree of the ledger's commit
 (`.worktrees/audit-saturate-<area>`, removed when it ends) and runs one review per source in `--sources` at once,
 each exactly the job a round's reviewer runs on that agent (`claude` or `codex`, see "Agents"): the same brief, its
 files preloaded where `review.preload` and the agent allow. Its jobs run on this machine under the local runner,
@@ -553,7 +553,7 @@ is new falls under `saturate.stopNextNew` (15%), or `--max` occasions (`saturate
 elsewhere were made at a fixed commit: every occasion must review the same code for the cross-source estimates to
 mean anything. Run it again to go on from where it stopped: it resumes the ledger at its own commit, however far
 `main` has moved since, and refuses an `--at` naming another one. `--fresh` moves the ledger aside to
-`<state>/saturation/<area>.<commit>` and starts a new one; `skulkr saturate rm <area>.<commit>` deletes an old one.
+`<state>/saturation/<area>.<commit>` and starts a new one; `skulkr scour rm <area>.<commit>` deletes an old one.
 A review that never finishes is kept beside the ledger as `unfinished-…` and not counted.
 
 `ingest` folds in a report written elsewhere, in any Markdown shape, as one occasion (Codex's
@@ -589,7 +589,7 @@ ledger needs no matcher: all its findings are new.
 source, kind, findings, cost and minutes, and each distinct defect with the occasions and sources that saw it) and
 `reviews/<NN>-<source>.md`, each raw report as it came. Every figure is recomputed from these, never stored.
 
-**Landing a ledger.** The ledger lives in the state directory, on one machine. `skulkr saturate land <area>` (or a
+**Landing a ledger.** The ledger lives in the state directory, on one machine. `skulkr scour land <area>` (or a
 set-aside `<area>.<commit>`) commits it to the project's `main` as `<record.dir>/saturation/<area>/<commit>/`, holding
 `ledger.json`, `report.md`, and the raw reports its occasions name under `reviews/`, on a branch
 `<prefix>-saturation-<area>` from `main` that `main` fast-forwards to under the merge lock, then pushed as `git.push`
@@ -785,7 +785,7 @@ LaunchAgent, so install from a shell where `node` and `onto` resolve, and set ei
 | A run's log, job outputs, and runner logs | `<state>/nights/<start>-round<N>/` | the newest `keepNights`, and any a run's status or summary still names; older ones are deleted when a run starts |
 | A run's claim, status, stop request, and summary | `<state>/runs/<N>/`: the directory is the claim; `status.json` (with its pid) while it runs, `stop` when asked, `summary.json` when it ends | the newest `keepNights`, never a live one nor one started in the last day; pruned when a run starts |
 | Each commit's lines changed, for `staleLines` and calibration's `lines` | `~/.cache/skulkr/<name>/churn.json` | only the commits after the oldest pass asked about: any area's last pass, or the first of a pair of passes; rewritten without the rest on each build that adds one, and dropped when the partition's `roots`, `extensions` or `exclude` change |
-| A saturation ledger | `<state>/saturation/<area>/`: `ledger.json`, `reviews/`, and `jobs/` while an occasion runs | `saturate.max` occasions; each occasion's job outputs deleted once it is recorded; `skulkr saturate rm <area>` deletes the lot. `--fresh` moves an old ledger aside to `<area>.<commit>`, kept until `rm <area>.<commit>` |
+| A saturation ledger | `<state>/saturation/<area>/`: `ledger.json`, `reviews/`, and `jobs/` while an occasion runs | `saturate.max` occasions; each occasion's job outputs deleted once it is recorded; `skulkr scour rm <area>` deletes the lot. `--fresh` moves an old ledger aside to `<area>.<commit>`, kept until `rm <area>.<commit>` |
 | A landed saturation ledger | `<record.dir>/saturation/<area>/<commit>/` in the project, committed to `main` | one directory per area and frozen commit, replaced by each landing of it; at most `saturate.max` reviews |
 | The defect registry | `<record.dir>/defects/<area>.jsonl` in the project, committed | one line per defect, rewritten whole at each record commit and landing |
 | The index | `<record.dir>/cache/skulkr.db` in the checkout, ignored by git | one file, replaced whenever the record changes |

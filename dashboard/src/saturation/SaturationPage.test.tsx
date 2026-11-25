@@ -53,7 +53,7 @@ describe('SaturationPage', () => {
     expect(within(detail).getByText('codex only')).toBeInTheDocument();
     expect(within(detail).getByText('96c86df9c8')).toBeInTheDocument();
     expect(within(detail).getByText('not landed')).toBeInTheDocument();
-    expect(window.location.hash).toBe('#weasel/saturation/core.animation');
+    expect(window.location.hash).toBe('#weasel/scour/core.animation');
   });
 
   it('shades the map by each own ledger’s unresolved defects, by the registry where it has landed', () => {

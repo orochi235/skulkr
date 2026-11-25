@@ -66,7 +66,7 @@ export const removeLedger = (cfg, area) => {
 export const withLedgerHeld = async (cfg, area, { fresh = false } = {}, work) => {
   const lock = () => {
     const unlock = takeLease(join(ledgerDirOf(cfg, area), 'lock'), { saturate: area });
-    if (!unlock) throw new Error(`another skulkr saturate is working on ${area}`);
+    if (!unlock) throw new Error(`another skulkr scour is working on ${area}`);
     return unlock;
   };
   let release = lock();

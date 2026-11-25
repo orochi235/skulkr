@@ -13,7 +13,7 @@
  *   skulkr fetch [--every S]    keeps the fleet listings `map --cached-jobs` reads fresh, until stdin closes
  *   skulkr defects <area>       one area's defects, every round's, as JSON
  *   skulkr pin|unpin <area>     forces an area into every round until it settles, or stops
- *   skulkr saturate <area> …    repeated blind reviews of one area into a ledger, until saturated (alias `sat`)
+ *   skulkr scour <area> …    repeated blind reviews of one area into a ledger, until saturated (alias `sat`)
  *   skulkr trial                the preload trials' digest (`night --trial preload` runs one)
  *   skulkr service              the long-running service (requests on stdin): the config's project, or with
  *                              none named, every registered tenant
@@ -41,7 +41,7 @@ import { serve } from '../src/service.mjs';
 import { trialCommand } from '../src/trial.mjs';
 import { addTenant, readTenants, removeTenant, requireTenant, tenantsPath } from '../src/tenants.mjs';
 
-const USAGE = 'usage: skulkr <init|night|partition|map|fetch|defects|registry|q|pin|unpin|saturate|sat|trial|service|config|tenants|menu> [--config <file> | --tenant <name>] [--root <dir>] [--local] …';
+const USAGE = 'usage: skulkr <init|night|partition|map|fetch|defects|registry|q|pin|unpin|scour|trial|service|config|tenants|menu> [--config <file> | --tenant <name>] [--root <dir>] [--local] …';
 
 /** `argv` less `--config`, `--tenant` and `--root` and their values, and those values. */
 const takeOptions = (argv) => {
@@ -169,6 +169,7 @@ const main = async () => {
     case 'unpin':
       pinCommand(cfg, root(), command, rest[0]);
       return 0;
+    case 'scour':
     case 'saturate':
     case 'sat':
       tolerateClosedOutput();

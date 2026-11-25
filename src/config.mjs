@@ -141,7 +141,7 @@ export const DEFAULTS = {
   briefs: { reviewer: undefined, matcher: undefined, fixer: undefined, repair: undefined, conflict: undefined, ledgerMatch: undefined },
 
   /**
-   * `skulkr saturate` (README "Saturation"): `max` occasions at most, one review per source in `sources` (agent names)
+   * `skulkr scour` (README "Scour"): `max` occasions at most, one review per source in `sources` (agent names)
    * each iteration, stopping once the chance of a new finding falls under `stopNextNew`.
    */
   saturate: { max: 40, sources: ['claude'], stopNextNew: 0.15 },

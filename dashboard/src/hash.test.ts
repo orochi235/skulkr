@@ -26,6 +26,7 @@ describe('the URL hash', () => {
       expect(readHash(hashFor(state))).toEqual(state);
     }
     expect(hashFor({ tenant: 'weasel', round: null })).toBe('#weasel');
-    expect(hashFor({ tenant: 'weasel', round: null, view: 'saturation', area: 'core.animation' })).toBe('#weasel/saturation/core.animation');
+    expect(hashFor({ tenant: 'weasel', round: null, view: 'saturation', area: 'core.animation' })).toBe('#weasel/scour/core.animation');
+    expect(readHash('#weasel/scour/x').view).toBe('saturation');
   });
 });

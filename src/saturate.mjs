@@ -1,14 +1,14 @@
 /**
- * `skulkr saturate` (alias `sat`): repeated blind reviews of one area at one frozen commit, folded into a ledger of
- * distinct defects until capture–recapture says the area is saturated. README "Saturation" is its documentation.
+ * `skulkr scour` (alias `sat`): repeated blind reviews of one area at one frozen commit, folded into a ledger of
+ * distinct defects until capture–recapture says the area is saturated. README "Scour" is its documentation.
  *
- *   skulkr saturate <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh]
- *   skulkr saturate ingest <area> <report.md> --source <name> [--at <sha>]
- *   skulkr saturate import <area> <dir> --at <sha> [--fresh]
- *   skulkr saturate land <area>… | --all
- *   skulkr saturate ls [--json]
- *   skulkr saturate report <area>
- *   skulkr saturate rm <area>
+ *   skulkr scour <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh]
+ *   skulkr scour ingest <area> <report.md> --source <name> [--at <sha>]
+ *   skulkr scour import <area> <dir> --at <sha> [--fresh]
+ *   skulkr scour land <area>… | --all
+ *   skulkr scour ls [--json]
+ *   skulkr scour report <area>
+ *   skulkr scour rm <area>
  */
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -25,7 +25,7 @@ import { chao2, stopReason, stopRuleOf, yieldRows } from './saturation.mjs';
 import { writeReport } from './saturationReport.mjs';
 import { createSaturateContext, matchReport, occasionJobsOf, requireSources, runReview } from './saturateJobs.mjs';
 
-export const SATURATE_USAGE = 'usage: skulkr saturate <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh] [--fleet] | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | land <area>… | land --all | ls [--json] | report <area> | rm <area>';
+export const SATURATE_USAGE = 'usage: skulkr scour <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh] [--fleet] | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | land <area>… | land --all | ls [--json] | report <area> | rm <area>';
 
 /** `argv`'s positional words and flags. */
 export const saturateArgsOf = (cfg, argv) => {
@@ -166,7 +166,7 @@ export const ingestReport = async (cfg, runner, root, id, path, source, args, sa
   });
 };
 
-/** `skulkr saturate …`; each line it prints goes to `say`. */
+/** `skulkr scour …`; each line it prints goes to `say`. */
 export const saturateCommand = async (cfg, runner, root, argv, say = (line) => console.log(line)) => {
   const args = saturateArgsOf(cfg, argv);
   const [first, ...rest] = args.words;
@@ -205,7 +205,7 @@ export const saturateCommand = async (cfg, runner, root, argv, say = (line) => c
       say(`${rest[0]} has no saturation ledger`);
       return undefined;
     }
-    if (!takeLease(join(ledgerDirOf(cfg, rest[0]), 'lock'), {})) throw new Error(`another skulkr saturate is working on ${rest[0]}`);
+    if (!takeLease(join(ledgerDirOf(cfg, rest[0]), 'lock'), {})) throw new Error(`another skulkr scour is working on ${rest[0]}`);
     removeLedger(cfg, rest[0]);
     say(`removed ${rest[0]}'s saturation ledger`);
     return undefined;

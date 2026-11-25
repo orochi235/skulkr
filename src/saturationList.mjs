@@ -1,5 +1,5 @@
 /**
- * `skulkr saturate ls`: every saturation ledger in the state directory, summed up with its defects, for the dashboard's
+ * `skulkr scour ls`: every saturation ledger in the state directory, summed up with its defects, for the dashboard's
  * saturation page (`--json`) or a terminal.
  */
 import { existsSync, readdirSync } from 'node:fs';

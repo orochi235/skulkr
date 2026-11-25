@@ -1,7 +1,7 @@
-# Saturation as stages
+# Scour, in stages
 
 **Status: designed 2026-11-25, mostly unbuilt.** What runs today is the README's "Saturation" section: one
-`skulkr saturate` command that scans and collects in a loop, plus `ingest`, `import`, `land` and `ls`. This document is
+`skulkr scour` command that scans and collects in a loop, plus `ingest`, `import`, `land` and `ls`. This document is
 the plan for splitting it into stages that run on their own. The table under "Stages" says which parts exist.
 
 It is for whoever builds the stages, and for deciding what each one owes the next. It answers how an area goes from
@@ -61,14 +61,17 @@ project's `.skulkr/`, never from one machine's state directory.
 
 ## Decided
 
-- Saturation runs as stages that each run on their own: scan, collect, triage, fix (2026-11-25; `sort` renamed `triage` the same day).
-- A defect only saturation found is not handed to a round's fixers until triage and fix exist (2026-11-25).
+- The workflow is called **scour**: it both searches an area thoroughly and scrubs it clean. `skulkr scour` is the
+  command, `saturate` and `sat` its aliases; "saturated" still names the stop rule's condition (2026-11-25).
+- Scour runs as stages that each run on their own: scan, collect, triage, fix (2026-11-25; `sort` renamed `triage` the same day).
+- A defect only a scour found is not handed to a round's fixers until triage and fix exist (2026-11-25).
 
 ## Open
 
+- **The names on disk and in code** still say saturation: `saturation/` in the state directory and in `.skulkr/`, the
+  `saturate*.mjs` modules, the ledger's fields. Renaming the paths moves weasel's landed ledgers again.
 - **Does fix go through the round pipeline?** Proposed: fix hands its commits to the round pipeline's verify, batch,
   gate and merge, as a `--fix-only` round does, rather than building its own.
-- **The name.** "Saturation" describes the stop rule, not the work. Offered: trawl, census, comb, prowl. Undecided.
 - **Collect's verb.** `fold` or `pool` would keep commands to one syllable; `collect` was the first suggestion.
 - **Does triage check each defect with a model?** A cheap read-only job per batch would ask whether it still reproduces
   at `HEAD`. It costs money and keeps fixers from chasing defects already gone. Without it, triage ranks from the
