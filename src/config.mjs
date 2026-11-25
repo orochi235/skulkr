@@ -138,7 +138,7 @@ export const DEFAULTS = {
    */
   review: { preload: true },
   /** Brief templates, paths relative to the config file; unset uses the shipped default. */
-  briefs: { reviewer: undefined, matcher: undefined, fixer: undefined, repair: undefined, conflict: undefined, ledgerMatch: undefined },
+  briefs: { reviewer: undefined, matcher: undefined, fixer: undefined, repair: undefined, conflict: undefined, ledgerMatch: undefined, scourTriage: undefined },
 
   /**
    * `skulkr scour` (README "Scour"): `max` occasions at most, one review per source in `sources` (agent names)

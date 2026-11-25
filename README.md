@@ -580,6 +580,13 @@ The defects become `D1`, `D2`, … in the order of their ids' numbers (`V2` befo
 it counts in no estimate, and the defect table marks it `found only by <source>`. `import` refuses over an existing
 ledger unless `--fresh`.
 
+**Triage fields.** A scour's reviewers are asked, by `briefs/scourTriage.md` after the reviewer brief (the config's
+`briefs.scourTriage` replaces it), to give each finding `fix:`, `size:`, `cause:` and `confidence:` lines beside its
+`scenario:` and `severity:`; the matcher takes the same from an ingested report where it states them. A ledger defect
+keeps them from its first report, and each later sighting merges in: the highest severity, the union of `fix` files,
+the largest size, the strongest confidence, and the first scenario and cause given. The registry carries them as a
+defect's `triage` (2026-11-25). Round reviewers are not asked for them.
+
 **The ledger matcher** is a Claude job on `claude.models.ledgerMatch` (Opus by default), stopped at `budget.ledgerMatch` dollars (3), with
 its own brief, `briefs/ledgerMatch.md` (the config's `briefs.ledgerMatch` replaces it). Its rule: the same defect is
 the same wrong behavior at the same code, however worded; a finding that covers two ledger defects sights both; a

@@ -101,7 +101,7 @@ project's `.skulkr/`, never from one machine's state directory.
   | `confidence` | `sure` or `likely` | ordering, `likely` later; the `not a defect` rate is tracked against it |
 
   A defect sighted more than once takes the highest severity, the union of `fix` files, the largest size, and its
-  first sighting's scenario.
+  first sighting's scenario. Built 2026-11-25 (`src/triageFields.mjs`, `briefs/scourTriage.md`).
 
 ## Open
 

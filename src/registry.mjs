@@ -29,6 +29,7 @@ export const entryOf = (o) => ({
   where: o.where,
   files: o.paths,
   severity: o.severity,
+  ...(o.triage ? { triage: o.triage } : {}),
   status: o.acted ? STATUS[o.resolved?.verdict] ?? 'closed' : 'open',
   ...(o.acted && o.resolved ? { resolved: o.resolved } : {}),
   first: o.first,

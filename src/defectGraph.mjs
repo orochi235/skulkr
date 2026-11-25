@@ -7,6 +7,7 @@
  */
 import { SAME_LIKENESS, VERDICT_LIKENESS, fixOf, givenIn, likeness, pathsOf } from './carry.mjs';
 import { parseSections, severityOf } from './findings.mjs';
+import { triageFieldsOf } from './triageFields.mjs';
 
 const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Whether `text` names `id`: a bare `r56-2` only where no area qualifies it, as `x/r56-2` does. */
@@ -104,13 +105,14 @@ export const defectGraphOf = (records, { cited, areas, ledgers = /** @type {any[
         const known = all.find((o) => !o.acted && (o.area === ledger.area || o.to === ledger.area) && sameDefect(o, d, cited));
         if (known) {
           known.saturation.push(sighting);
+          known.triage ??= triageFieldsOf(d);
           continue;
         }
         const paths = pathsOf(d.where, cited);
         unclaimed.push({
           id: `${ledger.key}/${d.id}`, area: ledger.area, to: holder?.(paths) ?? ledger.area, claim: d.claim, where: d.where, from: 'saturation',
           severity: d.severity ?? '', round: null, rounds: [], paths, acted: false, resolved: null,
-          first: { ledger: ledger.key, commit: ledger.commit }, saturation: [sighting],
+          first: { ledger: ledger.key, commit: ledger.commit }, saturation: [sighting], triage: triageFieldsOf(d),
         });
       }
     }
@@ -180,7 +182,7 @@ export const defectGraphOf = (records, { cited, areas, ledgers = /** @type {any[
  */
 export const openFindings = (records, { cited, areas } = {}) => {
   const open = new Map();
-  for (const { acted, paths, to, severity, resolved, first, saturation, ...o } of defectGraphOf(records, { cited, areas })) {
+  for (const { acted, paths, to, severity, resolved, first, saturation, triage, ...o } of defectGraphOf(records, { cited, areas })) {
     if (acted) continue;
     if (!open.has(to)) open.set(to, []);
     open.get(to).push({ ...o, id: idUnder(o, to) });

@@ -22,4 +22,7 @@ Reply with JSON only, no prose:
 
 Findings are numbered from 0 in the order given. When the report below comes whole rather than as a numbered list,
 first list its findings in order, each one a defect it reports with the place it cites, as
-`"findings": [{"claim": "...", "where": "..."}]` in the same reply, and number them from 0 in that list.
+`"findings": [{"claim": "...", "where": "..."}]` in the same reply, and number them from 0 in that list. Give each
+finding as well whichever of these the report states for it, leaving out any it does not: `severity`; `scenario`, the
+input or state that triggers it and what happens; `fix`, the files a fix would touch; `size`, `line`, `function` or
+`design`; `cause`, its root cause in a few words; `confidence`, `sure` or `likely`.

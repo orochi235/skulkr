@@ -80,7 +80,7 @@ export const runReview = async (ctx, area, key, source) => {
   const agent = agentFor(cfg, 'review');
   const preloading = Boolean(cfg.review?.preload && agent.stdin);
   const prompt = `saturate-review-${source}.md`;
-  writeFileSync(join(inDir, prompt), `${fill(brief(cfg, 'reviewer'), vars)}${preloading ? `\n\n${preloadedFiles(ctx.frozen, area.files)}` : ''}`);
+  writeFileSync(join(inDir, prompt), `${fill(brief(cfg, 'reviewer'), vars)}\n\n${readFileSync(cfg.briefPath('scourTriage'), 'utf8')}${preloading ? `\n\n${preloadedFiles(ctx.frozen, area.files)}` : ''}`);
   writeFileSync(join(inDir, 'files.txt'), `${area.files.join('\n')}\n`);
   const to = join(occasionJobsOf(cfg, area.id, key), 'review');
   const run = await dispatch({ ...ctx, cfg }, area, `review-${source}`, {

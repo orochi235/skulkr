@@ -11,6 +11,7 @@ import { partitionAt } from './partition.mjs';
 import { readJson, writeJson } from './json.mjs';
 import { takeLease } from './lease.mjs';
 import { scourStateDirOf } from './scourPaths.mjs';
+import { mergedTriage, triageFrom, triageOf } from './triageFields.mjs';
 
 /** The directory holding `area`'s ledger. */
 export const ledgerDirOf = (cfg, area) => join(scourStateDirOf(cfg), area);
@@ -155,15 +156,24 @@ export const matchOf = (reply, ledger, given) => {
   const missing = findings.map((_, i) => i).filter((i) => !sighted.has(i) && !isNew.has(i) && !repeated.has(i));
   if (missing.length) throw new Error(`findings ${missing.join(', ')} are not accounted for`);
   return {
-    findings: findings.map((f) => ({ claim: String(f.claim ?? ''), where: String(f.where ?? '') })),
+    findings: findings.map(findingOf),
     sightings: sightings.map((s) => ({ finding: s.finding, defect: s.defect })),
     new: fresh.map((f) => ({ finding: f.finding, claim: f.claim.trim(), where: String(f.where ?? '').trim(), severity: String(f.severity ?? '').toLowerCase() })),
   };
 };
 
+/**
+ * A report's finding as a match keeps it: claim and where, and the severity and triage fields it gives, from a parsed
+ * finding's body or a matcher's JSON.
+ */
+const findingOf = (f) => {
+  const severity = f.body !== undefined ? severityOf(f) : String(f.severity ?? '').toLowerCase();
+  return { claim: String(f.claim ?? ''), where: String(f.where ?? ''), ...(severity ? { severity } : {}), ...(f.body !== undefined ? triageOf(f) : triageFrom(f)) };
+};
+
 /** Every finding of a report new, for the first occasion of an empty ledger, which needs no matcher. */
 export const allNew = (findings) => ({
-  findings: findings.map((f) => ({ claim: f.claim, where: f.where })),
+  findings: findings.map(findingOf),
   sightings: [],
   new: findings.map((f, i) => ({ finding: i, claim: f.claim, where: f.where, severity: severityOf(f) })),
 });
@@ -174,12 +184,16 @@ const add = (list = [], n) => (list.includes(n) ? list : [...list, n]);
 /** `ledger` with `occasion` (its `n` the next number) and what `match` says it saw folded in. */
 export const withOccasion = (ledger, occasion, match) => {
   const { n, source } = occasion;
-  const sighted = new Set(match.sightings.map((s) => s.defect));
-  const defects = ledger.defects.map((d) => (sighted.has(d.id)
-    ? { ...d, firstOccasion: d.firstOccasion ?? n, sightings: add(d.sightings, n), sources: { ...d.sources, [source]: add(d.sources?.[source], n) } }
+  const seenBy = new Map();
+  for (const s of match.sightings) seenBy.set(s.defect, [...(seenBy.get(s.defect) ?? []), match.findings[s.finding] ?? {}]);
+  const defects = ledger.defects.map((d) => (seenBy.has(d.id)
+    ? seenBy.get(d.id).reduce((at, f) => mergedTriage(at, { ...triageFrom(f), severity: f.severity ?? '' }), {
+      ...d, firstOccasion: d.firstOccasion ?? n, sightings: add(d.sightings, n), sources: { ...d.sources, [source]: add(d.sources?.[source], n) },
+    })
     : d));
   for (const f of match.new) {
-    defects.push({ id: nextId(defects), claim: f.claim, where: f.where, severity: f.severity, firstOccasion: n, sightings: [n], sources: { [source]: [n] } });
+    const triage = triageFrom(match.findings[f.finding] ?? {});
+    defects.push({ id: nextId(defects), claim: f.claim, where: f.where, severity: f.severity, ...triage, firstOccasion: n, sightings: [n], sources: { [source]: [n] } });
   }
   return { ...ledger, occasions: [...ledger.occasions, { ...occasion, findings: match.findings.length }], defects };
 };
