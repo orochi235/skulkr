@@ -29,6 +29,7 @@ import { runNight } from '../src/night.mjs';
 import { partitionAt, partitionCommand } from '../src/partition.mjs';
 import { pin, pinsOf, unpin } from '../src/pins.mjs';
 import { loadRunner } from '../src/runner/index.mjs';
+import { createLocalRunner } from '../src/runner/local.mjs';
 import { saturateCommand } from '../src/saturate.mjs';
 import { serve } from '../src/service.mjs';
 import { trialCommand } from '../src/trial.mjs';
@@ -145,7 +146,8 @@ const main = async () => {
     case 'saturate':
     case 'sat':
       tolerateClosedOutput();
-      await saturateCommand(cfg, await loadRunner(cfg), root(), rest);
+      // Saturation is model jobs only, billed to whichever account runs them: this machine's unless --fleet says otherwise.
+      await saturateCommand(cfg, rest.includes('--fleet') ? await loadRunner(cfg) : createLocalRunner(cfg), root(), rest.filter((a) => a !== '--fleet'));
       return 0;
     case 'trial':
       trialCommand(cfg);

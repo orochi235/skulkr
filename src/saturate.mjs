@@ -21,7 +21,7 @@ import { chao2, stopReason, stopRuleOf, yieldRows } from './saturation.mjs';
 import { writeReport } from './saturationReport.mjs';
 import { createSaturateContext, matchReport, occasionJobsOf, requireSources, runReview } from './saturateJobs.mjs';
 
-export const SATURATE_USAGE = 'usage: skulkr saturate <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh] | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | report <area> | rm <area>';
+export const SATURATE_USAGE = 'usage: skulkr saturate <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh] [--fleet] | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | report <area> | rm <area>';
 
 /** `argv`'s positional words and flags. */
 export const saturateArgsOf = (cfg, argv) => {

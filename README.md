@@ -480,7 +480,7 @@ question harder for one area: blind reviews of it, again and again, at one froze
 until capture–recapture says further reviews would find little new. Nothing it records feeds a round: not history,
 calibration, the queue, or the map.
 
-    skulkr saturate <area> [--sources claude,codex] [--max 40] [--at <sha>] [--fresh]
+    skulkr saturate <area> [--sources claude,codex] [--max 40] [--at <sha>] [--fresh] [--fleet]
     skulkr saturate ingest <area> <report.md> --source <name> [--at <sha>]
     skulkr saturate import <area> <dir> --at <sha> [--fresh]
     skulkr saturate report <area>
@@ -489,7 +489,9 @@ calibration, the queue, or the map.
 Each **occasion** is one report. `skulkr saturate <area>` freezes a detached worktree of the ledger's commit
 (`.worktrees/audit-saturate-<area>`, removed when it ends) and runs one review per source in `--sources` at once,
 each exactly the job a round's reviewer runs on that agent (`claude` or `codex`, see "Agents"): the same brief, its
-files preloaded where `review.preload` and the agent allow, through the configured runner. Each report then goes
+files preloaded where `review.preload` and the agent allow. Its jobs run on this machine under the local runner,
+so they spend the account that started them; `--fleet` sends them through the configured runner instead, where each
+spends the account signed in on the node that takes it (2026-11-25). Each report then goes
 to the **ledger matcher**, which says which of its findings are defects the ledger already holds and which are new.
 After each occasion skulkr prints a line, rewrites the report, and checks the stop rule:
 
