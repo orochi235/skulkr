@@ -1,11 +1,11 @@
 /**
- * `skulkr init`: a starter `skulkr.config.mjs` for the repository in the working directory, guessed from its tracked
+ * `skulkr init`: a starter `.skulkr/config.mjs` for the repository in the working directory, guessed from its tracked
  * files and its package.json scripts. Every guess is a line to check, not a decision.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { CONFIG_FILE } from './config.mjs';
+import { CONFIG_FILE, DIR_CONFIG_FILE } from './config.mjs';
 
 /** Source extensions worth auditing, in the order a config lists them. */
 const SOURCE = ['ts', 'tsx', 'mts', 'js', 'jsx', 'mjs', 'py', 'go', 'rs', 'rb', 'java', 'kt', 'swift', 'c', 'cc', 'cpp', 'h', 'cs', 'php', 'css'];
@@ -45,7 +45,7 @@ export const guessConfig = (files, pkg, name) => {
 };
 
 /** The gate written when no test script was found: it fails, so no batch merges untested until it is replaced. */
-export const NO_GATE = ['sh', '-c', 'echo "skulkr: no gate command set; name your test command in skulkr.config.mjs gate.command" >&2; exit 1'];
+export const NO_GATE = ['sh', '-c', 'echo "skulkr: no gate command set; name your test command in .skulkr/config.mjs gate.command" >&2; exit 1'];
 
 /** `v` as config source: single-quoted strings, spaced arrays and objects, bare keys. */
 const js = (v) => {
@@ -92,11 +92,18 @@ export default {
 };
 `;
 
-/** Writes the starter config in `cwd`; refuses to overwrite one. Answers its path. */
+/** What `.skulkr/.gitignore` keeps out of the record: the query index. Never a job's `in/` or `out/`: onto syncs a
+ *  job's tree by `git ls-files`, which leaves ignored files behind. */
+export const SKULKR_GITIGNORE = 'cache/\n';
+
+/** Writes the starter config, `.skulkr/config.mjs`, and `.skulkr/.gitignore` in `cwd`'s repository; refuses to
+ *  overwrite a config there or at the root. Answers the config's path. */
 export const initCommand = (cwd = process.cwd()) => {
   const top = execFileSync('git', ['-C', cwd, 'rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
-  const path = join(top, CONFIG_FILE);
-  if (existsSync(path)) throw new Error(`${path} already exists`);
+  const path = join(top, DIR_CONFIG_FILE);
+  for (const p of [path, join(top, CONFIG_FILE)]) if (existsSync(p)) throw new Error(`${p} already exists`);
+  mkdirSync(join(top, '.skulkr'), { recursive: true });
+  if (!existsSync(join(top, '.skulkr/.gitignore'))) writeFileSync(join(top, '.skulkr/.gitignore'), SKULKR_GITIGNORE);
   const files = execFileSync('git', ['-C', top, 'ls-files'], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 }).split('\n').filter(Boolean);
   const pkgPath = join(top, 'package.json');
   const pkg = existsSync(pkgPath) ? JSON.parse(readFileSync(pkgPath, 'utf8')) : null;

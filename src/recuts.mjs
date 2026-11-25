@@ -9,15 +9,21 @@ const PART = /^(.*)\.part\d+$/;
 
 const escapeRe =(s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** The commit that recorded each round, by round: the one adding its `README.md`. */
-const recordCommitsIn = (git, recordDir) => {
-  const re = new RegExp(`^${escapeRe(recordDir)}/round-(\\d+)/README\\.md$`);
+/**
+ * The commit that recorded each round, by round: the one adding its `README.md` under any of `recordDirs` (the record
+ * directory, then those it was moved from). The oldest directory is read first and a round keeps its first commit,
+ * since under a pathspec git reads the commit moving the record as adding every round again.
+ */
+const recordCommitsIn = (git, recordDirs) => {
   const out = new Map();
-  for (const block of git('log', '--format=%x00%H', '--name-only', '--diff-filter=A', '--', `:(glob)${recordDir}/round-*/README.md`).split('\0').filter(Boolean)) {
-    const [sha, ...paths] = block.split('\n').filter(Boolean);
-    for (const p of paths) {
-      const round = Number(re.exec(p)?.[1]);
-      if (round && !out.has(round)) out.set(round, sha);
+  for (const recordDir of [...recordDirs].reverse()) {
+    const re = new RegExp(`^${escapeRe(recordDir)}/round-(\\d+)/README\\.md$`);
+    for (const block of git('log', '--format=%x00%H', '--name-only', '--diff-filter=A', '--', `:(glob)${recordDir}/round-*/README.md`).split('\0').filter(Boolean)) {
+      const [sha, ...paths] = block.split('\n').filter(Boolean);
+      for (const p of paths) {
+        const round = Number(re.exec(p)?.[1]);
+        if (round && !out.has(round)) out.set(round, sha);
+      }
     }
   }
   return out;
@@ -72,9 +78,12 @@ const nowHolding = (ids, before, after, areas) => {
 /** The map's `recuts`: `{ round, areas }` for each recorded round whose partition added an area to the last recorded
  *  round's, `areas` named as `areas` (the partition now) holds them; rounds ascending. */
 export const recutsIn = (cfg, git, root, areas) => {
-  const commits = [...recordCommitsIn(git, cfg.record.dir)].sort(([x], [y]) => x - y);
+  const commits = [...recordCommitsIn(git, cfg.record.dirs)].sort(([x], [y]) => x - y);
   if (commits.length < 2) return [];
-  const parts = jsonAt(root, commits.map(([, sha]) => `${sha}:${cfg.partition.path}`));
+  // A round recorded before the record moved holds its partition where the record was then.
+  const paths = cfg.record.dirs.map((d) => (d === cfg.record.dir ? cfg.partition.path : `${d}/partition.json`));
+  const found = jsonAt(root, commits.flatMap(([, sha]) => paths.map((p) => `${sha}:${p}`)));
+  const parts = commits.map((_, i) => found.slice(i * paths.length, (i + 1) * paths.length).find((p) => p !== null) ?? null);
   const out = [];
   for (let i = 1; i < commits.length; i++) {
     const before = parts[i - 1], after = parts[i];

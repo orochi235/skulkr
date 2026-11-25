@@ -33,7 +33,7 @@ const repo = (files: Record<string, string>) => {
 };
 
 const cfg = {
-  record: { dir: 'docs/audits' }, naming: { batchPrefix: 'batch' }, git: { main: 'main' }, citedRe: /([\w/.-]+\.ts)/g,
+  record: { dir: 'docs/audits', dirs: ['docs/audits'] }, naming: { batchPrefix: 'batch' }, git: { main: 'main' }, citedRe: /([\w/.-]+\.ts)/g,
   names: weaselConfig().names, state: join(tmpdir(), 'skulkr-records-no-state'),
 };
 const area = (id: string, extra: Record<string, unknown> = {}) => JSON.stringify({ id, a: 2, b: 1, m: 1, distinct: 2, ...extra });

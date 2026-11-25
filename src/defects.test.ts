@@ -23,7 +23,7 @@ describe('areaDefects', () => {
   it('refuses an id not in the partition, so a path in it reads nothing', () => {
     const root = tmp(), state = tmp();
     put(join(root, 'secret/fix.md'), 'A thing breaks (A): fixed 1a2b3c4d.');
-    const cfg = { ...weaselConfig(state), record: { dir: 'docs/audits' }, partition: { path: 'docs/audits/partition.json' } };
+    const cfg = { ...weaselConfig(state), record: { dir: 'docs/audits', dirs: ['docs/audits'] }, partition: { path: 'docs/audits/partition.json' } };
     expect(() => defectsFor(cfg, root, '../../secret', [{ id: 'x', files: [] }], () => '')).toThrow(/no area named/);
     expect(defectsFor(cfg, root, 'x', [{ id: 'x', files: [] }], () => '')).toEqual([]);
   });

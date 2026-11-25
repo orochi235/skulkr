@@ -106,5 +106,12 @@ export const recordsFor = (cfg, git, root) => {
   const disk = diskRecords(root, cfg.record.dir);
   const abandoned = abandonedRounds(cfg.state);
   const refs = unlandedBatches(git, cfg).filter((ref) => !abandoned.has(cfg.names.batchRoundOf(ref)));
-  return [...disk, ...refRecords(git, root, cfg.record.dir, refs, new Set(disk.map((r) => r.round)))];
+  const known = new Set(disk.map((r) => r.round));
+  // A batch cut before the record moved holds its round where the record was then.
+  const onRefs = cfg.record.dirs.flatMap((dir) => {
+    const found = refRecords(git, root, dir, refs, known);
+    for (const r of found) known.add(r.round);
+    return found;
+  });
+  return [...disk, ...onRefs];
 };

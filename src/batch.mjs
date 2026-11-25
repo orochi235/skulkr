@@ -5,7 +5,8 @@
  */
 import { execFileSync, spawn } from 'node:child_process';
 import { cpSync, createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
+import { configBaseOf } from './config.mjs';
 import { partitionAt, writePartition } from './partition.mjs';
 import { appendRecordRow, roundReadme } from './record.mjs';
 
@@ -17,7 +18,7 @@ export const gitIn = (cwd) => (...args) => execFileSync('git', args, { cwd, enco
  */
 export const mainCheckout = (cfg) => {
   if (cfg.root) return cfg.root;
-  const here = cfg.file ? dirname(cfg.file) : process.cwd();
+  const here = configBaseOf(cfg.file);
   return gitIn(here)('worktree', 'list', '--porcelain').split('\n')[0].replace(/^worktree /, '');
 };
 

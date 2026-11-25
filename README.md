@@ -16,8 +16,8 @@ call is a `claude -p` job. By default each job runs on the machine you start the
 
     git clone <this repository> skulkr && (cd skulkr && npm link)   # puts `skulkr` on PATH; there is nothing to build
     cd ~/src/myproject
-    skulkr init                 # writes skulkr.config.mjs, guessed from the repository; read it and fix what it got wrong
-    skulkr partition            # writes docs/audits/partition.json; check the areas look like units worth reading together
+    skulkr init                 # writes .skulkr/config.mjs, guessed from the repository; read it and fix what it got wrong
+    skulkr partition            # writes .skulkr/partition.json; check the areas look like units worth reading together
     skulkr night --dry          # the plan a run would make, and nothing else
     skulkr night --areas 1      # one real round of one area
 
@@ -29,7 +29,7 @@ The config `init` writes caps a run at $40 list price, 4 areas a round.
 ## Adopting it
 
 ```js
-// skulkr.config.mjs
+// .skulkr/config.mjs
 export default {
   name: 'myproject',                 // node tree names (myproject-skulkr-r1 …) and the default state directory
 
@@ -78,7 +78,8 @@ export default {
   review: { preload: true },          // the default: each reviewer's prompt carries its area's files
 
   record: {
-    dir: 'docs/audits',               // round-<N>/ and partition.json are committed here
+    dir: '.skulkr',                   // round-<N>/, partition.json and landed saturation ledgers are committed here
+    formerDirs: [],                   // where the record was before it moved, for readers of its git history
     ledger: null,                     // or { path, section, row({ round, date, areas }) }: a table row per round
     trailer: '',                      // lines ending the record commit's message
   },
@@ -121,8 +122,10 @@ export default {
 };
 ```
 
-Every command finds the config through `--config <file>`, else `SKULKR_CONFIG`, else `skulkr.config.mjs` in
-`--root`, `SKULKR_ROOT`, or the working directory. The project root is the main worktree of the repository holding
+Every command finds the config through `--config <file>`, else `SKULKR_CONFIG`, else `.skulkr/config.mjs`, then
+`skulkr.config.mjs`, in `--root`, `SKULKR_ROOT`, or the working directory. A config in `.skulkr/` resolves its relative
+paths from the project's root. `.skulkr/` is the project's own skulkr state, committed; its `.gitignore`, which `init`
+writes, keeps out `cache/` and never a job's `in/` or `out/`, since onto syncs a job's tree by `git ls-files`. The project root is the main worktree of the repository holding
 the config, unless the config's `root` or `--root` says otherwise. `skulkr config` prints the resolved config.
 
 **Briefs.** The shipped briefs in `briefs/` are generic and fill `{{project}}`, `{{rules}}`, `{{test}}`,
@@ -763,12 +766,12 @@ to the originals' (`project` aside, a field the map gained). Cutting over, with 
 
 | Step | Detail |
 |---|---|
-| Add the config | `examples/weasel.config.mjs` → weasel's `skulkr.config.mjs`; `examples/weasel/briefs/` and `examples/weasel/sweep.mjs` → weasel's `scripts/audit/`, and the config's `./weasel/` paths → `./scripts/audit/`. `examples/weasel/sweep.test.ts` goes with them (its imports then point at the skulkr checkout) or stays here. |
+| Add the config | `examples/weasel.config.mjs` → weasel's `.skulkr/config.mjs`; `examples/weasel/briefs/` and `examples/weasel/sweep.mjs` → weasel's `scripts/audit/`, and the config's `./weasel/` paths → `./scripts/audit/`. `examples/weasel/sweep.test.ts` goes with them (its imports then point at the skulkr checkout) or stays here. |
 | Delete from weasel | `scripts/skulk/` (code, tests, briefs, README); `apps/draw/src/dev/audits/`; `apps/draw/vite-plugin-skulk-map.ts` and its plugin in `apps/draw/vite.config.ts`; the `#/dev/audits` route in `apps/draw/src/main.tsx` and `apps/draw/src/dev/devRoutes.ts`, and its row in `RegistryInspector.test.tsx`; the `vite-plugin-skulk-map.ts` mention in `scripts/lib/fleet-triggers.mjs`. |
 | Repoint docs | `docs/fleet.md` cites `scripts/skulk/README.md` for the control sweep; the config's round README intro and ledger row say "run by `scripts/skulk`" and cite `scripts/skulk/usage.mjs` — change the text to skulkr if wanted. Rows already in `docs/hardening.md` stay as written. |
 | State | weasel's state is in `~/.local/state/weasel-skulk`; the config's `state` is `~/.local/state/weasel-skulkr`, so move the directory across. `runs/`, `nights/`, `limits.json`, and the locks keep their format; `slots/` names the old trees, and with no run live it can be emptied. Node trees are renamed (`weasel-skulkr-r<k>`, `weasel-skulkr-f<k>`), so each node syncs fresh ones and the old `weasel-skulk-r<k>`, `weasel-skulk-f<k>` can go. |
 | The onto service | It changes from weasel's tree and `WEASEL_ROOT` to skulkr's tree and `SKULKR_CONFIG`: `onto sync --in skulkr-weasel orochi` from `~/src/skulkr`, then `onto service up skulkr --in skulkr-weasel --here --prefer orochi --env SKULKR_CONFIG=$HOME/src/weasel/skulkr.config.mjs --env SKULKR_BIN=$HOME/src/skulkr/bin/skulkr.mjs --about "Runs the nightly blind-pair audit of weasel." -- bash -lc 'exec node bin/skulkr.mjs service'`, which writes `~/.config/onto/services/skulkr/`; then take down weasel's own `skulk` service, and its `weasel-skulk` service tree can go. Requests are unchanged; each reply also names its `tenant`. To host every tenant instead, leave out `SKULKR_CONFIG`: the service then reads the registry. |
-| The dashboard | Already reads weasel as a tenant; re-register it from its new config: `skulkr tenants rm weasel`, then `skulkr tenants add ~/src/weasel/skulkr.config.mjs` (no `--read-only`, now that this host runs its rounds). The config's `root: '~/src/weasel'` line goes: unset is the repository holding the config. |
+| The dashboard | Already reads weasel as a tenant; re-register it from its new config: `skulkr tenants rm weasel`, then `skulkr tenants add ~/src/weasel/.skulkr/config.mjs` (no `--read-only`, now that this host runs its rounds). The config's `root: '~/src/weasel'` line goes: unset is the repository holding the config. |
 | Log wording | The gate's log line reads `gate: test:batch passed` where weasel's read `fleet: test:batch passed`, and its log is `<batch>.test-batch.log` as before. Nothing parses it. |
 
 ## Developing

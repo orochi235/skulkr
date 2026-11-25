@@ -84,7 +84,8 @@ const config = {
   naming: { prefix: 'audit', batchPrefix: 'batch' },
 
   record: {
-    dir: 'docs/audits',
+    dir: '.skulkr',
+    formerDirs: ['docs/audits'],
     intro: [
       'Blind pairs at `{{commit}}` ({{date}}), run by skulkr. Each area\'s directory holds its file',
       'list (`files.txt`), both reviewers\' findings (`A.md`, `B.md`), the matching (`match.json`), the fixer\'s',
@@ -105,7 +106,7 @@ const config = {
         const fixed = areas.reduce((s, a) => s + a.patches, 0);
         const each = areas.map((a) => `${a.id} ${a.a}/${a.b}/${a.m}, ${a.chapman === undefined ? 'incomplete' : `est. ${a.chapman.toFixed(1)}`}`).join('; ');
         return `| ${date} | ${areas.map((a) => a.id).join(', ')} (audit round ${round}, nightly) | blind pairs | 0 | ${found} / ${fixed} commits | `
-          + `Run by skulkr with one file list per area; raw lists in \`docs/audits/round-${round}/\`. A/B/shared and Chapman's estimate per area: ${each}. |`;
+          + `Run by skulkr with one file list per area; raw lists in \`.skulkr/round-${round}/\`. A/B/shared and Chapman's estimate per area: ${each}. |`;
       },
     },
     trailer: 'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>',

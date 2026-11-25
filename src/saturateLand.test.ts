@@ -60,7 +60,7 @@ describe('skulkr saturate land', () => {
     const commit = git('rev-parse', 'HEAD');
     const ledger = seed(cfg, commit, [['A', 'B'], ['B', 'C']]);
     const said = await land(cfg, root);
-    const dir = `docs/audits/saturation/src/${commit.slice(0, 10)}`;
+    const dir = `.skulkr/saturation/src/${commit.slice(0, 10)}`;
     expect(said.at(-1)).toMatch(new RegExp(`^landed ${dir}; main fast-forwarded to`));
     expect(git('log', '-1', '--format=%s')).toBe(`record src's saturation ledger: 3 defects from 2 occasions at ${commit.slice(0, 10)}`);
     expect(JSON.parse(readFileSync(join(root, dir, 'ledger.json'), 'utf8'))).toEqual(ledger);
@@ -99,11 +99,11 @@ describe('skulkr saturate land', () => {
     seed(cfg, commit, [['C']], 'lib');
     const said: string[] = [];
     await saturateCommand(cfg, null, root, ['land', '--all'], (line: string) => said.push(line));
-    expect(said.at(-1)).toMatch(/^landed 2 ledgers under docs\/audits\/saturation; main fast-forwarded to/);
+    expect(said.at(-1)).toMatch(/^landed 2 ledgers under \.skulkr\/saturation; main fast-forwarded to/);
     expect(git('log', '-1', '--format=%B')).toMatch(/^record 2 areas' saturation ledgers: 3 defects\n\n- lib's saturation ledger: 1 defects/);
     expect(git('rev-list', '--count', 'HEAD')).toBe('2');
     for (const area of ['src', 'lib']) {
-      expect(readFileSync(join(root, 'docs/audits/saturation', area, commit.slice(0, 10), 'report.md'), 'utf8')).toContain(area);
+      expect(readFileSync(join(root, '.skulkr/saturation', area, commit.slice(0, 10), 'report.md'), 'utf8')).toContain(area);
     }
     expect(git('branch', '--list', 'audit-saturation*')).toBe('');
   });

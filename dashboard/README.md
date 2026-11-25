@@ -36,7 +36,7 @@ npm run serve # the same page built: one bundle, so it loads in a fraction of th
 ```
 
 With no tenant registered it reads the one project the CLI finds: `SKULKR_CONFIG` names its config and `SKULKR_ROOT`
-its root; with neither, `skulkr.config.mjs` in the directory the server starts in. Under emilia: `emilia up dev` from this directory.
+its root; with neither, `.skulkr/config.mjs` or `skulkr.config.mjs` in the directory the server starts in. Under emilia: `emilia up dev` from this directory.
 
 ## weasel
 

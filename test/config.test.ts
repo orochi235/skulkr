@@ -1,5 +1,8 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { configPath, merge, resolveConfig } from '../src/config.mjs';
+import { configBaseOf, configPath, merge, resolveConfig } from '../src/config.mjs';
 import { loadRunner } from '../src/runner/index.mjs';
 import { nodeOfLaunch, ontoArgs } from '../src/runner/onto.mjs';
 import weasel from '../examples/weasel.config.mjs';
@@ -32,7 +35,7 @@ describe('resolveConfig', () => {
   it('reproduces weasel\'s own constants', () => {
     const cfg = weaselConfig();
     expect(String(cfg.partition.rootRe)).toBe(String(/^(packages\/[^/]+\/src|apps\/[^/]+)\//));
-    expect(cfg.partition.path).toBe('docs/audits/partition.json');
+    expect(cfg.partition.path).toBe('.skulkr/partition.json');
     expect(cfg.names.trees).toEqual({ review: 'weasel-skulkr-r', fix: 'weasel-skulkr-f' });
     expect(cfg.state).toMatch(/\.local\/state\/weasel-skulkr$/);
   });
@@ -44,6 +47,22 @@ describe('configPath', () => {
     expect(configPath({ root: '/r' }, { SKULKR_CONFIG: '/e.mjs' })).toBe('/e.mjs');
     expect(configPath({ root: '/r' }, {})).toBe('/r/skulkr.config.mjs');
     expect(configPath({}, { SKULKR_ROOT: '/s' })).toBe('/s/skulkr.config.mjs');
+  });
+
+  it('takes .skulkr/config.mjs over skulkr.config.mjs, and resolves its paths from the project root', () => {
+    const root = mkdtempSync(join(tmpdir(), 'skulkr-cfgpath-'));
+    try {
+      mkdirSync(join(root, '.skulkr'));
+      writeFileSync(join(root, '.skulkr/config.mjs'), 'export default {};\n');
+      const file = configPath({ root }, {});
+      expect(file).toBe(join(root, '.skulkr/config.mjs'));
+      expect(configBaseOf(file)).toBe(root);
+      expect(configBaseOf(join(root, 'skulkr.config.mjs'))).toBe(root);
+      expect(resolveConfig({ name: 'p', briefs: { fixer: 'b/fixer.md' } }, { file }).briefPath('fixer')).toBe(join(root, 'b/fixer.md'));
+      expect(resolveConfig({ name: 'p' }).record).toMatchObject({ dir: '.skulkr', dirs: ['.skulkr'] });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

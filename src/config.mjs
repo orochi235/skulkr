@@ -5,10 +5,19 @@
  */
 import { existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const CONFIG_FILE = 'skulkr.config.mjs';
+/** Where a project keeps its config inside its `.skulkr/`, looked for before {@link CONFIG_FILE} at its root. */
+export const DIR_CONFIG_FILE = '.skulkr/config.mjs';
+
+/** What a config's relative paths are from: its directory, or the project's root for one in `.skulkr/`. */
+export const configBaseOf = (file) => {
+  if (!file) return process.cwd();
+  const dir = dirname(file);
+  return basename(dir) === '.skulkr' ? dirname(dir) : dir;
+};
 
 /** Inside the frozen tree and every node tree: what a job reads, and what it hands back. */
 export const JOB_IN = '.skulkr/in';
@@ -53,8 +62,10 @@ export const DEFAULTS = {
   },
 
   record: {
-    /** Where `round-<N>/` and `partition.json` are written, in the repository. */
-    dir: 'docs/audits',
+    /** Where `round-<N>/`, `partition.json` and landed saturation ledgers are written, in the repository. */
+    dir: '.skulkr',
+    /** Directories the record was moved from, newest first, so readers of its git history find earlier rounds. */
+    formerDirs: [],
     /** Lines of the round README above its table; `{{commit}}` and `{{date}}` are filled in. */
     intro: [
       'Blind pairs at `{{commit}}` ({{date}}). Each area\'s directory holds its file list (`files.txt`), both',
@@ -379,7 +390,7 @@ const expandHome = (p) => (p?.startsWith('~/') ? join(homedir(), p.slice(2)) : p
 export const resolveConfig = (user = {}, { file, root, local = false, env = process.env } = {}) => {
   const on = Boolean(local || user.local?.enabled);
   const c = merge(DEFAULTS, on ? localOf(user, env) : user);
-  const base = file ? dirname(file) : process.cwd();
+  const base = configBaseOf(file);
   const name = c.name ?? 'project';
   const p = c.partition;
   const rootRe = new RegExp(`^(${p.roots.map(globToRe).join('|')})/`);
@@ -412,6 +423,7 @@ export const resolveConfig = (user = {}, { file, root, local = false, env = proc
     concurrency: concurrencyFor(c.concurrency, nodesFor(c.nodes, c.runner, c.local?.agents)),
     root: root ?? (c.root ? resolve(base, expandHome(c.root)) : undefined),
     state: c.state ? resolve(base, expandHome(c.state)) : join(homedir(), '.local', 'state', 'skulkr', name),
+    record: { ...c.record, dirs: [c.record.dir, ...(c.record.formerDirs ?? [])] },
     partition: {
       ...p,
       rootRe,
@@ -510,7 +522,8 @@ export const noFixers = (cfg) => [...cfg.nodes.noFixers, ...(cfg.nodes.local && 
 export const configPath = ({ config, root } = {}, env = process.env) => {
   const at = config ?? env.SKULKR_CONFIG;
   if (at) return resolve(expandHome(at));
-  return join(resolve(expandHome(root ?? env.SKULKR_ROOT ?? process.cwd())), CONFIG_FILE);
+  const top = resolve(expandHome(root ?? env.SKULKR_ROOT ?? process.cwd()));
+  return existsSync(join(top, DIR_CONFIG_FILE)) ? join(top, DIR_CONFIG_FILE) : join(top, CONFIG_FILE);
 };
 
 /**
@@ -519,7 +532,7 @@ export const configPath = ({ config, root } = {}, env = process.env) => {
  */
 export const loadConfig = async ({ config, root, fresh = false, local = false } = {}, env = process.env) => {
   const file = configPath({ config, root }, env);
-  if (!existsSync(file)) throw new Error(`no config at ${file}; write a ${CONFIG_FILE} (README.md says how) or pass --config`);
+  if (!existsSync(file)) throw new Error(`no config at ${file}; write a ${DIR_CONFIG_FILE} (README.md says how) or pass --config`);
   const mod = await import(`${pathToFileURL(file).href}${fresh ? `?mtime=${statSync(file).mtimeMs}` : ''}`);
   const user = typeof mod.default === 'function' ? await mod.default() : mod.default;
   const rootAt = root ?? env.SKULKR_ROOT;
@@ -527,4 +540,4 @@ export const loadConfig = async ({ config, root, fresh = false, local = false } 
 };
 
 /** A path in the project as given in the config: absolute as is, else from the config's directory. */
-export const fromConfig = (cfg, path) => (isAbsolute(path) ? path : resolve(cfg.file ? dirname(cfg.file) : process.cwd(), path));
+export const fromConfig = (cfg, path) => (isAbsolute(path) ? path : resolve(configBaseOf(cfg.file), path));

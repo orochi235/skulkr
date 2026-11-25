@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
  * skulkr's one command. Every subcommand reads the project's config (`--config <file>`, or `--tenant <name>` for a
- * registered tenant's, else `SKULKR_CONFIG`, else `skulkr.config.mjs` in `--root`, `SKULKR_ROOT` or the working
+ * registered tenant's, else `SKULKR_CONFIG`, else `.skulkr/config.mjs` or `skulkr.config.mjs` in `--root`, `SKULKR_ROOT` or the working
  * directory). README.md says what each does.
  *
- *   skulkr init                 writes a starter skulkr.config.mjs for the repository here
+ *   skulkr init                 writes a starter .skulkr/config.mjs for the repository here
  *   skulkr night [flags]        one run (a round); `--dry` prints its plan
  *   skulkr partition [--ref R]  rewrites the partition file
  *   skulkr map [--out FILE] [--cached-jobs]   the dashboard's JSON

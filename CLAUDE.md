@@ -1,6 +1,6 @@
 # skulkr
 
-Nightly blind-pair audit rounds over any git repository, configured by that repository's `skulkr.config.mjs`;
+Nightly blind-pair audit rounds over any git repository, configured by that repository's `.skulkr/config.mjs` (or `skulkr.config.mjs` at its root);
 extracted from weasel's `scripts/skulk` on 2026-11-20.
 README.md is the documentation: how a project adopts it, a run's steps, the service, the dashboard, and the
 weasel cutover.
@@ -154,6 +154,9 @@ weasel cutover.
     `skulkr map --cached-jobs` and `skulkr fetch` (2026-11-25).
   - in local mode, a fixer refused `local.fleetOnly`'s commands run bare (weasel's `npm run checks:gate`) while
     `local.fleetChecks` holds (2026-11-25).
+  - weasel's record moved from `docs/audits/` to `.skulkr/` (`record.dir`, with `formerDirs: ['docs/audits']` so
+    recuts and unmerged batches still find rounds recorded there), and its ledger row naming `.skulkr/round-<N>/`
+    (docs/skulkr-dir.md, 2026-11-25).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.
