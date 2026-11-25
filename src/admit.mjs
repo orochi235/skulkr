@@ -38,7 +38,7 @@ export const startAreas = async ({ ctx, picked, args, status, deadline, results,
     const affordable = paid.has(area.id) || mayStartArea({ used: status.costUsd + (ctx.reservedUsd?.() ?? 0), finished: results.map((r) => r.jobs.costUsd), running, cap: args.capUsd, guess: cfg.budget.areaGuessUsd, before: ctx.spentBefore?.(area.id) ?? 0 });
     const why = ctx.stopped() ? 'stop requested'
       : paid.has(area.id) ? ''
-        : new Date() >= deadline ? `past ${cfg.schedule.stopAt}`
+        : deadline && new Date() >= deadline ? `past ${cfg.schedule.stopAt}`
           : !affordable ? `the next area would cross the ${usd(args.capUsd)} cap (${usd(status.costUsd)} used)` : '';
     if (why) {
       ctx.say(`not starting ${area.id}: ${why}`);

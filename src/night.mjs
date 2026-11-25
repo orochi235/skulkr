@@ -40,8 +40,11 @@ import { verifyLine, verifyOf } from './verify.mjs';
 const POLL_MS = 15_000;
 const UNAVAILABLE_TTL_MS = 5 * 60_000;
 
-/** When a run stops starting areas: the first `schedule.stopAt` after it started, or after it was resumed. */
-export const deadlineOf = (cfg, status) => nextClock(new Date(status.resumed ?? status.started), cfg.schedule.stopAt);
+/**
+ * When a run stops starting areas: for one the service's schedule or continuous mode started (`--scheduled`), the first
+ * `schedule.stopAt` after it started, or after it was resumed; null, never, for one started by hand.
+ */
+export const deadlineOf = (cfg, status, args) => (args.scheduled ? nextClock(new Date(status.resumed ?? status.started), cfg.schedule.stopAt) : null);
 
 /**
  * Deletes the oldest night directories past the newest `keepNights`, never one a run's status or summary still names:
@@ -223,7 +226,7 @@ export const runNight = async (cfg, runner, argv = [], say = (line) => console.l
     // The sweep is one job on one node; the reviews fill every other slot while it runs.
     const sweepFix = args.sweep ? startSweep(ctx, (s) => (sweep = s)) : Promise.resolve(undefined);
     setStep('review');
-    const deadline = deadlineOf(cfg, status);
+    const deadline = deadlineOf(cfg, status, args);
     // A job the usage limit stops waits for its reset only while the run would still start work.
     ctx.deadline = deadline;
     let sweepFixed;

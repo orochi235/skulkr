@@ -68,7 +68,7 @@ export const nodesLine = (cfg, args) => (args.places && !args.nodes
   : `${(args.nodes ?? nodesAt(cfg, new Date())).join(', ')}${args.nodes ? ' (pinned)' : ''}`);
 
 export const printPlan = (cfg, p, args, say) => {
-  say(`round ${p.round} at ${p.commit.slice(0, 10)}; nodes: ${nodesLine(cfg, args)}; stops dispatching at ${cfg.schedule.stopAt}`);
+  say(`round ${p.round} at ${p.commit.slice(0, 10)}; nodes: ${nodesLine(cfg, args)}${args.scheduled ? `; stops dispatching at ${cfg.schedule.stopAt}` : ''}`);
   say(`budget: ${usd(args.capUsd)} tonight; per job $${args.budget.review} review, $${args.budget.match} match, $${args.budget.fix} fix`);
   if (cfg.local.on) say(localLine(cfg));
   const local = localFixOf(cfg, args);

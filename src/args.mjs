@@ -44,6 +44,7 @@ export const parseArgs = (cfg, argv) => {
     merge: !argv.includes('--no-merge'),
     sweep: argv.includes('--sweep'),
     anyway: argv.includes('--anyway'),
+    scheduled: argv.includes('--scheduled'),
     trial: value('--trial'),
     localFix: argv.includes('--local-fix') || Boolean(cfg.localFix?.enabled),
     capUsd: number('--cap-usd', capFor(cfg.budget, areas)),

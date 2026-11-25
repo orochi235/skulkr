@@ -35,7 +35,8 @@ export const tenantFor = (req, tenants) => {
  * schedule and starts what the queue lets; `request(line)` answers one request line.
  */
 /** A continuous round's arguments: the night's budget left, under the per-run cap, is its cap. */
-const continuousArgs = (next) => ['--cap-usd', String(next.capUsd)];
+/** `--scheduled`: its run stops starting areas at `schedule.stopAt`, as one started by hand does not. */
+const continuousArgs = (next) => ['--cap-usd', String(next.capUsd), '--scheduled'];
 
 /** What `status` says of continuous mode and the two queues. */
 export const continuousStatus = ({ mode, next, budget, queues }) => ({
@@ -119,7 +120,7 @@ export const createHost = ({ tenants, now = () => new Date(), log = () => {}, bu
       // Continuous mode from the config starts the night's first round itself, under the budget.
       if (t.scheduledContinuous) continue;
       const due = shouldAutoStart({ now: at, running: t.running(), lastStarted: t.lastStarted(), startAt: t.startAt });
-      if (due && !queue.some((q) => q.tenant === t.name && q.auto)) queue.push({ tenant: t.name, args: [], auto: true, since: at.toISOString() });
+      if (due && !queue.some((q) => q.tenant === t.name && q.auto)) queue.push({ tenant: t.name, args: ['--scheduled'], auto: true, since: at.toISOString() });
     }
     if (ticked) for (const t of list) offerContinuous(t, at);
     ticked = true;

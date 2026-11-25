@@ -109,7 +109,7 @@ describe('createHost', () => {
     expect(a.starts).toEqual([]);
     clock.now = at('23:00', 17);
     h.tick();
-    expect(a.starts).toEqual([[]]);
+    expect(a.starts).toEqual([['--scheduled']]);
     // b comes due while a's round runs, and waits for it.
     clock.now = at('01:00', 18);
     h.tick();
@@ -118,7 +118,7 @@ describe('createHost', () => {
     a.live = [];
     clock.now = at('02:10', 18);
     h.tick();
-    expect(b.starts).toEqual([[]]);
+    expect(b.starts).toEqual([['--scheduled']]);
   });
 
   it('skips a scheduled start held behind another tenant until past its stopAt', () => {
@@ -153,7 +153,7 @@ describe('createHost', () => {
     expect(list[0]!.starts).toEqual([]);
     ro.live = [];
     h.tick();
-    expect(list[0]!.starts).toEqual([[]]);
+    expect(list[0]!.starts).toEqual([['--scheduled']]);
     expect(ro.starts).toEqual([]);
     expect(await h.request('{"id":2,"status":true,"tenant":"ro"}')).not.toHaveProperty('nextStart');
     expect(await h.request('{"id":3,"status":true,"tenant":"a"}')).toHaveProperty('nextStart');
@@ -199,7 +199,7 @@ describe('continuous rounds', () => {
     const a = continuous('a');
     const h = host([a]);
     expect(await h.request('{"id":1,"start":true,"continuous":true}')).toMatchObject({ tenant: 'a', continuous: true, started: true });
-    expect(a.starts).toEqual([['--cap-usd', '160']]);
+    expect(a.starts).toEqual([['--cap-usd', '160', '--scheduled']]);
     h.tick();
     expect(a.starts).toHaveLength(1);
     expect(await h.request('{"id":2,"status":true}')).toMatchObject({
@@ -208,7 +208,7 @@ describe('continuous rounds', () => {
     a.runs[0]!.step = 'batch';
     a.setSpent(120);
     h.tick();
-    expect(a.starts).toEqual([['--cap-usd', '160'], ['--cap-usd', '80']]);
+    expect(a.starts).toEqual([['--cap-usd', '160', '--scheduled'], ['--cap-usd', '80', '--scheduled']]);
     a.runs[1]!.step = 'fleet-wait';
     a.setSpent(160);
     h.tick();
@@ -223,7 +223,7 @@ describe('continuous rounds', () => {
     h.tick();
     expect(a.starts).toEqual([]);
     h.tick();
-    expect(a.starts).toEqual([['--cap-usd', '160']]);
+    expect(a.starts).toEqual([['--cap-usd', '160', '--scheduled']]);
   });
 
   it('ends with a bare stop, and refuses a read-only tenant or one with no nightly budget', async () => {

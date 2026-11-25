@@ -113,7 +113,7 @@ export default {
   areasPerRound: 16,
   maxUnmergedRounds: 0,               // stranded rounds allowed before a new one waits (see "Stranded rounds")
   budget: { review: 8, match: 1, ledgerMatch: 3, fix: 15, capUsd: 160, areaCapUsd: undefined, areaGuessUsd: 10, nightUsd: undefined }, // list-price dollars; areaCapUsd, when set, caps a run at that much per area in place of capUsd
-  schedule: { startAt: '23:00', stopAt: '07:00', continuous: false }, // the service's start; when a run stops dispatching
+  schedule: { startAt: '23:00', stopAt: '07:00', continuous: false }, // the service's start; when a scheduled or continuous run stops dispatching
   state: undefined,                   // default ~/.local/state/skulkr/<name>
   sweep: null,                        // an extra check beside the reviews; see "A sweep"
   saturate: { max: 40, sources: ['claude'], stopNextNew: 0.15 }, // `skulkr saturate`; see "Saturation"
@@ -167,10 +167,11 @@ the config names one, gets a row.
 | `--trial preload` | | beside each area's pair, run a second pair of the other kind (reading its files itself where the area's pair preloads them, and the reverse), recorded only at `<night>/trial/<area>.json` for `skulkr trial` to compare: cost per review and overlap. The area's own pair alone feeds the fix and the record |
 | `--anyway` | | start even though stranded rounds hold new ones back (see "Stranded rounds") |
 | `--sweep` | | run the configured sweep too |
+| `--scheduled` | | stop starting areas at the first `schedule.stopAt`; the service passes it to the runs its schedule and continuous mode start, and a run started without it has no deadline (2026-11-25) |
 | `--fix-only [a,b]` | | a fix-only round for these areas, or every area with open findings; see "Carried findings" |
 | `--local` | `local.enabled` | local mode: nothing leaves this machine but its model calls; see "Local mode". Any command takes it, so `skulkr config --local` prints the config as local mode runs it |
 | `--local-fix` | `localFix.enabled` | run fixers and repairs on this machine, as the account that started the run; see "Local fixers" |
-| `--resume N` | | pick round N back up, reusing every job whose result came home; it stops starting areas at the first `schedule.stopAt` after the resume. Under the plan lock, it leaves out the areas a live run holds. A round lands once: when its status or `summary.json` names a `landed` tip (set once `main` fast-forwards, with the areas it carried) that `main` still holds, it resumes nothing and says the round already landed. The record an earlier attempt committed on the round's batch is no earlier pass of its areas |
+| `--resume N` | | pick round N back up, reusing every job whose result came home; with `--scheduled`, it stops starting areas at the first `schedule.stopAt` after the resume. Under the plan lock, it leaves out the areas a live run holds. A round lands once: when its status or `summary.json` names a `landed` tip (set once `main` fast-forwards, with the areas it carried) that `main` still holds, it resumes nothing and says the round already landed. The record an earlier attempt committed on the round's batch is no earlier pass of its areas |
 | `--cap-usd N` | `budget.areaCapUsd` × `--areas`, else `budget.capUsd` | list-price dollars the run may spend |
 | `--budget-review`, `--budget-match`, `--budget-fix` | `budget.*` | each job's `--max-budget-usd` |
 
@@ -249,13 +250,13 @@ queue, no run starts a new review, since a gate is a suite-sized fleet run and t
 reviews already running, fixers, and verify steps go on.
 
 **Limits.** Each job's model is stopped at `claude.timeoutMin` and the runner stops the job ten minutes later, so
-what it wrote still comes home. A run starts no new area after `schedule.stopAt`, nor when what it has spent, plus
+what it wrote still comes home. A run started with `--scheduled` starts no new area after `schedule.stopAt`; none starts one when what it has spent, plus
 what each running area has left of its expected cost, plus one more area would pass the dollar cap, an area being
 expected to cost the mean of this run's finished areas (`budget.areaGuessUsd` before any has), nor once a stop is requested. A resumed round's area is expected to cost only what it had not spent before the resume, and one whose every model job came home, to be reused, costs nothing and starts past the cap and `schedule.stopAt` (2026-11-25); a fix-only round's fixers start under the same checks. While the sweep's fixer runs, what it may still spend (`budget.fix` less its spend so far) counts as spent. A capstone repair starts only while no stop is requested and what the run has spent, plus `budget.fix` for it and for each repair started before it, stays within the cap; a branch whose repair does not start is left out, as one whose repair failed is. An area whose reviewers ran always gets its matcher and fixer. Where skulkr picks
 nodes (a pinned run, or a runner that does not place jobs), a node the runner reports unavailable is skipped, and a
 dispatch a node refuses moves to another node and keeps that one out for `nodes.refusedCooldownMin`. Under a placing runner a refused job is launched again each minute, up to 120 times; a run with pinned nodes retries as each node's cooldown ends, for the same two hours. Then the job is given up, and a refusal after a stop request is not retried.
 A model job the account's usage limit stopped partway is run again, whole, once the limit resets (the time its
-refusal names, else 15 minutes on), unless the run is stopped or past `schedule.stopAt` first (2026-11-24).
+refusal names, else 15 minutes on), unless the run is stopped or past its `schedule.stopAt` first (2026-11-24).
 A job that failed before its model started is launched up to three times; one whose model started (it writes
 `started` first) and left no `exit` was cut off mid-run and is never launched again, since it was paid for.
 `<state>/limits.json` (`{ "review": n, "fix": n }`) changes the slots per node, or under a placing runner the jobs at
@@ -641,7 +642,7 @@ the last `status.json` of one that died without a summary (run directories from 
 finished area of the last five rounds, or `areasPerRound × budget.areaGuessUsd` before any. Each continuous round
 runs with `--cap-usd` set to the night's budget left or its own cap (`budget.areaCapUsd` × `areasPerRound`, else `budget.capUsd`), whichever is less. A continuous round that
 claims nothing, fails, or cannot start ends the chain for the night, noted in `<state>/continuous-idle.json` so a
-restart does not resume it; a request turning continuous mode on clears it. `stopAt` still stops every run dispatching, as before.
+restart does not resume it; a request turning continuous mode on clears it. `stopAt` still stops every continuous round dispatching.
 
 ## Tenants
 

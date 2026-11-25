@@ -263,7 +263,8 @@ export const DEFAULTS = {
    */
   budget: { review: 8, match: 1, ledgerMatch: 3, fix: 15, capUsd: 160, areaCapUsd: undefined, areaGuessUsd: 10, nightUsd: undefined },
   /**
-   * Local clock times: the service starts a run at `startAt`; a run stops dispatching at the first `stopAt`.
+   * Local clock times: the service starts a run at `startAt`; a run the schedule or continuous mode started
+   * (`--scheduled`) stops dispatching at the first `stopAt`; one started by hand has no deadline.
    * `continuous` keeps rounds coming between them, under `budget.nightUsd` (README "Continuous rounds").
    */
   schedule: { startAt: '23:00', stopAt: '07:00', continuous: false },
