@@ -145,6 +145,8 @@ weasel cutover.
     batch branch, its report ending `; its branches wait for the round's batch` (2026-11-25).
   - a run started by hand having no deadline: only one started with `--scheduled`, as the service's schedule and
     continuous mode start them, stops starting areas at `schedule.stopAt` (2026-11-25).
+  - in local mode, a fixer refused `local.fleetOnly`'s commands run bare (weasel's `npm run checks:gate`) while
+    `local.fleetChecks` holds (2026-11-25).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

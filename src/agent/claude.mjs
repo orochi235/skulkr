@@ -23,7 +23,7 @@ const roleFlags = (c, role) => {
   };
   if (role === 'review') return ['--allowedTools', q(c.reviewTools.join(',')), ...deny(c.reviewDenied), ...model(c.models.review), ...effort(c.effort?.review)];
   if (role === 'match') return [...deny(['Bash', 'Edit', 'Write', 'Task', 'Agent']), ...model(c.models.match), ...effort(c.effort?.match)];
-  return ['--dangerously-skip-permissions', ...deny([]), ...model(c.models.fix), ...effort(c.effort?.fix)];
+  return ['--dangerously-skip-permissions', ...deny(c.fixDenied ?? []), ...model(c.models.fix), ...effort(c.effort?.fix)];
 };
 
 /**

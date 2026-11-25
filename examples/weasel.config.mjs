@@ -194,6 +194,8 @@ const config = {
   areasPerRound: 8,
   budget: { review: 8, match: 1, fix: 15, areaCapUsd: 10, areaGuessUsd: 10 },
   schedule: { startAt: '23:00', stopAt: '07:00' },
+  // Local mode: the brief runs the whole gate through {{onFleet}}; run bare, several fixers' gates pegged this machine.
+  local: { fleetOnly: ['npm run checks:gate'] },
 
   sweep,
   icons,

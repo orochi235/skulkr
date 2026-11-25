@@ -173,8 +173,10 @@ export const DEFAULTS = {
   /**
    * `agents`: model jobs (reviews, matches, fixers, repairs) at once under the local runner, across every role.
    * `fleetChecks`: under the local runner, each verify on the onto fleet where onto can take it, else here.
+   * `fleetOnly`: commands a local fixer must run through its brief's `{{onFleet}}` while `fleetChecks` holds; run bare,
+   * Claude refuses them, since a project's whole gate run here by several fixers at once pegs the machine.
    */
-  local: { enabled: false, agents: 6, fleetChecks: true, override: {} },
+  local: { enabled: false, agents: 6, fleetChecks: true, fleetOnly: [], override: {} },
   /**
    * Jobs at once across every node, by role, under a runner that places jobs itself (onto). Unset: the per-node
    * slots times the nodes listed, or one node's slots when none are.
@@ -339,7 +341,10 @@ const localOf = (user, env) => {
     nodes: { reviewSlots: undefined, fixSlots: undefined, ...u.local?.override?.nodes, list: [], local: null },
     concurrency: {},
     git: { ...u.git, push: false },
-    claude: { ...u.claude, configDir: startingAccountOf(user, env), denied: [...new Set([...(u.claude?.denied ?? []), ...WEB_TOOLS])] },
+    claude: {
+      ...u.claude, configDir: startingAccountOf(user, env), denied: [...new Set([...(u.claude?.denied ?? []), ...WEB_TOOLS])],
+      fixDenied: u.local?.fleetChecks === false ? [] : (u.local?.fleetOnly ?? []).flatMap((cmd) => [`Bash(${cmd})`, `Bash(${cmd}:*)`]),
+    },
   };
 };
 
