@@ -519,7 +519,7 @@ Running one reviewer of each pair on each agent, `agent: { review: … }` aside,
 
 ## Scour
 
-Splitting this into stages (pick, trawl, collect, judge, land, triage, fix) is designed, mostly unbuilt, in
+Splitting this into stages (pick, trawl, fold, judge, land, triage, fix) is designed, mostly unbuilt, in
 `docs/scour.md`.
 
 A round's two reviews estimate what an area holds from one overlap. `skulkr scour` (aliases `saturate`, `sat`) asks the
@@ -527,7 +527,8 @@ question harder for one area: blind reviews of it, again and again, at one froze
 until capture–recapture says further reviews would find little new. Nothing it records feeds a round: not history,
 calibration, the queue, or the map.
 
-    skulkr scour <area> [--sources claude,codex] [--max 40] [--at <sha>] [--fresh] [--fleet]
+    skulkr scour [trawl] <area> [--sources claude,codex] [--max 40] [--at <sha>] [--fresh] [--fleet]
+    skulkr scour fold <area>
     skulkr scour ingest <area> <report.md> --source <name> [--at <sha>]
     skulkr scour import <area> <dir> --at <sha> [--fresh]
     skulkr scour land <area>… | --all
@@ -535,13 +536,14 @@ calibration, the queue, or the map.
     skulkr scour report <area>
     skulkr scour rm <area>
 
-Each **occasion** is one report. `skulkr scour <area>` freezes a detached worktree of the ledger's commit
+Each **occasion** is one report. `skulkr scour trawl <area>` (or `skulkr scour <area>`) freezes a detached worktree of the ledger's commit
 (`.worktrees/audit-saturate-<area>`, removed when it ends) and runs one review per source in `--sources` at once,
 each exactly the job a round's reviewer runs on that agent (`claude` or `codex`, see "Agents"): the same brief, its
 files preloaded where `review.preload` and the agent allow. Its jobs run on this machine under the local runner,
 so they spend the account that started them; `--fleet` sends them through the configured runner instead, where each
-spends the account signed in on the node that takes it (2026-11-25). Each report then goes
-to the **ledger matcher**, which says which of its findings are defects the ledger already holds and which are new.
+spends the account signed in on the node that takes it (2026-11-25). Each finished report is kept beside the ledger
+as `reviews/unfolded-<NN>-<source>.md` and listed in the ledger's `unfolded`; **fold** then takes them in the order
+they finished, each through the **ledger matcher**, which says which of its findings are defects the ledger already holds and which are new.
 After each occasion skulkr prints a line, rewrites the report, and checks the stop rule:
 
     7/40 claude: 3 findings, 1 new; distinct 19; unseen ≈ 6.1; next-new 18%; $0.62; $1.84/defect
@@ -582,8 +584,9 @@ ledger unless `--fresh`.
 its own brief, `briefs/ledgerMatch.md` (the config's `briefs.ledgerMatch` replaces it). Its rule: the same defect is
 the same wrong behavior at the same code, however worded; a finding that covers two ledger defects sights both; a
 different trigger needing a different fix is a new defect. A reply that does not account for every finding exactly
-once, or names a defect the ledger lacks, is asked for once more; a second bad reply fails the occasion loudly, its
-report kept beside the ledger as `unmatched-…` and nothing recorded, and the run stops. The first review of an empty
+once, or names a defect the ledger lacks, is asked for once more; a second bad reply stops the run loudly, the report
+left unfolded and nothing recorded from it. `skulkr scour fold <area>` folds what is left unfolded, and every trawl
+and ingest folds it first (2026-11-25). A landing leaves unfolded reports out. The first review of an empty
 ledger needs no matcher: all its findings are new.
 
 **The ledger** lives in `<state>/scour/<area>/` (`saturation/` before 2026-11-25, moved there by the first `skulkr scour` command run after): `ledger.json` (the commit, the area's files, each occasion's

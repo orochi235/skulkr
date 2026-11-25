@@ -2,7 +2,8 @@
  * `skulkr scour` (alias `sat`): repeated blind reviews of one area at one frozen commit, folded into a ledger of
  * distinct defects until capture–recapture says the area is saturated. README "Scour" is its documentation.
  *
- *   skulkr scour <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh]
+ *   skulkr scour [trawl] <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh]
+ *   skulkr scour fold <area>
  *   skulkr scour ingest <area> <report.md> --source <name> [--at <sha>]
  *   skulkr scour import <area> <dir> --at <sha> [--fresh]
  *   skulkr scour land <area>… | --all
@@ -10,7 +11,7 @@
  *   skulkr scour report <area>
  *   skulkr scour rm <area>
  */
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { addWorktree, gitIn, removeWorktree } from './batch.mjs';
 import {
@@ -26,7 +27,7 @@ import { chao2, stopReason, stopRuleOf, yieldRows } from './saturation.mjs';
 import { writeReport } from './saturationReport.mjs';
 import { createSaturateContext, matchReport, occasionJobsOf, requireSources, runReview } from './saturateJobs.mjs';
 
-export const SATURATE_USAGE = 'usage: skulkr scour <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh] [--fleet] | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | land <area>… | land --all | ls [--json] | ls --source <name> --ids | report <area> | rm <area>';
+export const SATURATE_USAGE = 'usage: skulkr scour [trawl] <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh] [--fleet] | fold <area> | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | land <area>… | land --all | ls [--json] | ls --source <name> --ids | report <area> | rm <area>';
 
 /** `argv`'s positional words and flags. */
 export const saturateArgsOf = (cfg, argv) => {
@@ -84,31 +85,59 @@ export const occasionLine = (ledger, o, max) => {
   return `${o.n}/${max} ${o.source}: ${o.findings} findings, ${r.new} new; distinct ${s.S}; unseen ≈ ${unseen}; next-new ${next}; $${o.costUsd.toFixed(2)}; ${perDefect}/defect`;
 };
 
+/** The file a report waits in until it is folded, relative to the ledger's directory. */
+const unfoldedFileOf = (key) => `reviews/unfolded-${key.replace(/[^\w.-]+/g, '-')}.md`;
+
 /**
- * Folds one report into the ledger as its next occasion, matched by the ledger matcher (or taken whole as new when
- * the ledger is empty), writes the ledger, and clears the occasion's job outputs. Answers the new ledger; throws, with
- * the raw report kept beside the ledger and nothing recorded, when the matcher fails.
+ * Keeps a finished report beside the ledger and lists it in the ledger's `unfolded`, where it waits for `foldPending`;
+ * clears the job outputs it came from. Answers the new ledger.
  */
-const foldIn = async (ctx, ledger, { key, source, kind, text, findings, costUsd, minutes }) => {
+const stageReport = (cfg, ledger, { key, source, kind, text, findings, costUsd, minutes }) => {
+  const file = unfoldedFileOf(key);
+  const path = join(ledgerDirOf(cfg, ledger.area), file);
+  mkdirSync(join(path, '..'), { recursive: true });
+  writeFileSync(path, text);
+  const next = { ...ledger, unfolded: [...(ledger.unfolded ?? []), { key, source, kind, file, findings, costUsd, minutes }] };
+  writeLedger(cfg, next);
+  rmSync(occasionJobsOf(cfg, ledger.area, key), { recursive: true, force: true });
+  return next;
+};
+
+/**
+ * Folds the ledger's first unfolded report in as its next occasion, matched by the ledger matcher (or taken whole as
+ * new when the ledger is empty), and writes the ledger. Answers the new ledger; throws, leaving the report unfolded,
+ * when the matcher fails.
+ */
+const foldNext = async (ctx, ledger) => {
+  const [entry, ...rest] = ledger.unfolded;
+  const { key, source, kind, file, findings, costUsd, minutes } = entry;
+  const dir = ledgerDirOf(ctx.cfg, ledger.area);
+  const text = readFileSync(join(dir, file), 'utf8');
   const area = { id: ledger.area, files: ledger.files };
-  const report = kind === 'ingest' ? { raw: text } : { findings };
-  let matched;
-  try {
-    matched = kind === 'review' && (ledger.defects.length === 0 || findings.length === 0)
-      ? { match: allNew(findings), costUsd: 0, minutes: 0 }
-      : await matchReport(ctx, area, key, ledger, report);
-  } catch (error) {
-    keepReview(ctx.cfg, ledger.area, `unmatched-${key}-${Date.now()}`, source, text);
-    throw error;
-  }
+  const matched = kind === 'review' && (ledger.defects.length === 0 || findings.length === 0)
+    ? { match: allNew(findings), costUsd: 0, minutes: 0 }
+    : await matchReport(ctx, area, key, ledger, kind === 'ingest' ? { raw: text } : { findings });
   const n = ledger.occasions.length + 1;
-  const file = keepReview(ctx.cfg, ledger.area, n, source, text);
-  const next = withOccasion(ledger, {
-    n, source, kind, file, costUsd: costUsd + matched.costUsd, minutes: minutes + matched.minutes, at: new Date().toISOString(),
+  const kept = keepReview(ctx.cfg, ledger.area, n, source, text);
+  const { unfolded: _, ...folded } = ledger;
+  const next = withOccasion(rest.length ? { ...folded, unfolded: rest } : folded, {
+    n, source, kind, file: kept, costUsd: costUsd + matched.costUsd, minutes: minutes + matched.minutes, at: new Date().toISOString(),
   }, matched.match);
   writeLedger(ctx.cfg, next);
+  rmSync(join(dir, file), { force: true });
   rmSync(occasionJobsOf(ctx.cfg, ledger.area, key), { recursive: true, force: true });
   return next;
+};
+
+/** Folds every unfolded report into the ledger, in the order they finished, printing a line for each. Answers the ledger. */
+const foldPending = async (ctx, ledger, rule) => {
+  let at = ledger;
+  while (at.unfolded?.length) {
+    at = await foldNext(ctx, at);
+    ctx.say(occasionLine(at, at.occasions.at(-1), rule.max));
+    writeReport(ctx.cfg, at.area, at, rule);
+  }
+  return at;
 };
 
 /** Reviews `id` until the stop rule holds, one review per source an iteration. Answers the ledger. */
@@ -121,6 +150,7 @@ export const saturateArea = async (cfg, runner, root, id, args, say) => {
     say(`saturate ${id} at ${commit.slice(0, 10)}: ${ledger.files.length} files, ${ledger.occasions.length} occasions so far, sources ${args.sources.join(', ')}`);
     const ctx = createSaturateContext({ cfg, runner, frozen, base, commit, area: id, say });
     const area = { id, files: ledger.files };
+    ledger = await foldPending(ctx, ledger, rule);
     for (;;) {
       const stop = stopReason(chao2(ledger.occasions, ledger.defects), rule);
       if (stop) {
@@ -131,7 +161,7 @@ export const saturateArea = async (cfg, runner, root, id, args, say) => {
       const at = ledger.occasions.length;
       const keys = batch.map((source, i) => `${pad(at + 1 + i)}-${source}`);
       const reviews = await Promise.all(batch.map((source, i) => runReview(ctx, area, keys[i], source)));
-      let counted = 0;
+      let finished = 0;
       for (const [i, r] of reviews.entries()) {
         if (!r.finished) {
           keepReview(cfg, id, `unfinished-${keys[i]}-${Date.now()}`, batch[i], r.text);
@@ -139,12 +169,11 @@ export const saturateArea = async (cfg, runner, root, id, args, say) => {
           say(`saturate ${id}: the ${batch[i]} review ${keys[i]} never finished; not counted`);
           continue;
         }
-        ledger = await foldIn(ctx, ledger, { key: keys[i], source: batch[i], kind: 'review', text: r.text, findings: r.findings, costUsd: r.costUsd, minutes: r.minutes });
-        counted += 1;
-        say(occasionLine(ledger, ledger.occasions.at(-1), rule.max));
-        writeReport(cfg, id, ledger, rule);
+        ledger = stageReport(cfg, ledger, { key: keys[i], source: batch[i], kind: 'review', text: r.text, findings: r.findings, costUsd: r.costUsd, minutes: r.minutes });
+        finished += 1;
       }
-      if (counted === 0) throw new Error(`saturate ${id}: no review of this iteration finished; stopping`);
+      ledger = await foldPending(ctx, ledger, rule);
+      if (finished === 0) throw new Error(`saturate ${id}: no review of this iteration finished; stopping`);
     }
     say(`saturate ${id}: report at ${writeReport(cfg, id, ledger, rule)}`);
     return ledger;
@@ -159,11 +188,24 @@ export const ingestReport = async (cfg, runner, root, id, path, source, args, sa
   const rule = stopRuleOf(cfg, args.max);
   return withFrozen(cfg, root, id, { fresh: false, at: args.at }, async ({ ledger, frozen, base, commit }) => {
     const ctx = createSaturateContext({ cfg, runner, frozen, base, commit, area: id, say });
-    const key = `${pad(ledger.occasions.length + 1)}-${source}`;
-    const next = await foldIn(ctx, ledger, { key, source, kind: 'ingest', text, findings: [], costUsd: 0, minutes: 0 });
-    say(occasionLine(next, next.occasions.at(-1), rule.max));
+    const key = `${pad(ledger.occasions.length + (ledger.unfolded?.length ?? 0) + 1)}-${source}`;
+    const next = await foldPending(ctx, stageReport(cfg, ledger, { key, source, kind: 'ingest', text, findings: [], costUsd: 0, minutes: 0 }), rule);
     say(`saturate ${id}: report at ${writeReport(cfg, id, next, rule)}`);
     return next;
+  });
+};
+
+/** Folds `id`'s unfolded reports into its ledger, as after a matcher failure. Answers the ledger. */
+export const foldReports = async (cfg, runner, root, id, args, say) => {
+  if (!ledgerOf(cfg, id)) throw new Error(`${id} has no scour ledger`);
+  const rule = stopRuleOf(cfg, args.max);
+  return withFrozen(cfg, root, id, { fresh: false }, async ({ ledger, frozen, base, commit }) => {
+    if (!ledger.unfolded?.length) {
+      say(`fold ${id}: nothing to fold`);
+      return ledger;
+    }
+    const ctx = createSaturateContext({ cfg, runner, frozen, base, commit, area: id, say });
+    return foldPending(ctx, ledger, rule);
   });
 };
 
@@ -216,6 +258,14 @@ export const saturateCommand = async (cfg, runner, root, argv, say = (line) => c
     removeLedger(cfg, rest[0]);
     say(`removed ${rest[0]}'s saturation ledger`);
     return undefined;
+  }
+  if (first === 'fold') {
+    if (!rest[0]) throw new Error(SATURATE_USAGE);
+    return foldReports(cfg, runner, root, rest[0], args, say);
+  }
+  if (first === 'trawl') {
+    if (!rest[0]) throw new Error(SATURATE_USAGE);
+    return saturateArea(cfg, runner, root, rest[0], args, say);
   }
   return saturateArea(cfg, runner, root, first, args, say);
 };

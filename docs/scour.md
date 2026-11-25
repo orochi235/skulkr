@@ -1,7 +1,7 @@
 # Scour, in stages
 
 **Status: designed 2026-11-25, mostly unbuilt.** What runs today is the README's "Saturation" section: one
-`skulkr scour` command that scans and collects in a loop, plus `ingest`, `import`, `land` and `ls`. This document is
+`skulkr scour` command that trawls and folds in a loop, plus `ingest`, `import`, `land` and `ls`. This document is
 the plan for splitting it into stages that run on their own. The table under "Stages" says which parts exist.
 
 It is for whoever builds the stages, and for deciding what each one owes the next. It answers how an area goes from
@@ -17,7 +17,7 @@ checks them against the current code, and nothing fixes them.
 Separate stages let each step run where and when it is cheapest:
 
 - trawls can run overnight on the fleet;
-- collecting can be run again after the matcher changes;
+- folding can be retried on its own after the matcher fails;
 - fixing can work through the fix plan in batches of its own size.
 
 Each stage reads only what the stage before it wrote, so any stage can be rerun alone.
@@ -25,12 +25,12 @@ Each stage reads only what the stage before it wrote, so any stage can be rerun 
 ## The flow
 
 ```
-pick → [trawl → collect → judge]* → land → triage → fix (→ verify → batch → merge) → close
+pick → [trawl → fold → judge]* → land → triage → fix (→ verify → batch → merge) → close
                                                           ↘ ask
                                    compare (any time after land)
 ```
 
-Trawl, collect and judge loop until the stop rule holds. Everything after `land` works from committed data in the
+Trawl, fold and judge loop until the stop rule holds. Everything after `land` works from committed data in the
 project's `.skulkr/`, never from one machine's state directory.
 
 ## Stages
@@ -38,8 +38,8 @@ project's `.skulkr/`, never from one machine's state directory.
 | Stage | Takes | Writes | Core action | UI expression(s) | User sees? | Exists today |
 |---|---|---|---|---|---|---|
 | **pick** | the partition, the registry, a budget | the areas to saturate, the frozen commit, the sources | The user (or a script) specifies a job | Whatever interface we use to pick an area from the map | Explicit | only as `--at` and `--sources` on one area |
-| **trawl** | a picked area | one raw report per occasion, unmatched, under the ledger's `reviews/` | We run the job | Updates: progress bar and frequent log events/status updates | Explicit | inside `scour <area>`'s loop; the Codex skill and `ingest` bring outside reports |
-| **collect** | reports not yet in the ledger | the ledger's distinct defects and sightings (the ledger matcher) | Job results binned in the ledger | Items in various results lists | Implicit? | inside the same loop, as `foldIn` |
+| **trawl** | a picked area | one raw report per occasion, unmatched, under the ledger's `reviews/` | We run the job | Updates: progress bar and frequent log events/status updates | Explicit | `scour trawl <area>`; the Codex skill and `ingest` bring outside reports |
+| **fold** | reports not yet in the ledger | the ledger's distinct defects and sightings (the ledger matcher) | Job results binned in the ledger | Items in various results lists | Implicit? | `scour fold <area>`, run by every trawl and ingest |
 | **judge** | the ledger | whether to scan again: the stop rule, and which source to add next from the per-source estimates | Flow control over scanning process | Prefs that govern batch flow control | Configured | inside the loop |
 | **land** | a stopped ledger | `.skulkr/scour/<area>/<commit>/` and the registry lines it adds, committed to `main` | Saves results from recent scans to the database | | Automatic | `scour land`, run by hand |
 | **triage** | the registry's open saturation defects | a fix plan: groups similar defects and decides how/whether to assign them to fixers | Selects, batches, and prepares defects for fixing | The fix queue on the Scour page: what the next fix run takes, in what batches, with a way to hold a defect back | Implicit | no |
@@ -53,8 +53,8 @@ project's `.skulkr/`, never from one machine's state directory.
 | From → to | The file |
 |---|---|
 | pick → trawl | `<state>/scour/<area>/ledger.json` with its frozen `commit` and `files`, and no occasions yet |
-| trawl → collect | `reviews/<NN>-<source>.md` beside the ledger, listed in an `unfolded` list until collect takes them |
-| collect → judge | the ledger's `occasions` and `defects`; every estimate is computed from these |
+| trawl → fold | `reviews/unfolded-<NN>-<source>.md` beside the ledger, listed in its `unfolded` until fold takes them |
+| fold → judge | the ledger's `occasions` and `defects`; every estimate is computed from these |
 | land → triage | `.skulkr/scour/…/ledger.json` and `.skulkr/defects/<area>.jsonl` |
 | triage → fix | the fix plan, computed when a fix run starts and never stored: batches of registry ids, each with the files they touch |
 | fix → close | scour's own fix record: the fixers' verdicts, naming registry ids |
@@ -63,7 +63,7 @@ project's `.skulkr/`, never from one machine's state directory.
 
 - The workflow is called **scour**: it both searches an area thoroughly and scrubs it clean. `skulkr scour` is the
   command, `saturate` and `sat` its aliases; "saturated" still names the stop rule's condition (2026-11-25).
-- Scour runs as stages that each run on their own: trawl, collect, triage, fix (2026-11-25; first drafted as scan and sort).
+- Scour runs as stages that each run on their own: trawl, fold, triage, fix (2026-11-25; first drafted as scan and sort).
 - The search stage is **trawl**: haul after haul over one frozen commit until the catch thins, each occasion a haul;
   `skulkr scour trawl <area>`, so the command never says "scour scan" (2026-11-25).
 - **ask** is agents reviewing other agents' work: a fixer's `question` verdicts and declined defects go to a
@@ -105,4 +105,6 @@ project's `.skulkr/`, never from one machine's state directory.
 
 ## Open
 
-Nothing; the plan is ready to build.
+- **Refolding a ledger from scratch** after the matcher changes. It would renumber the ledger's defects, and the
+  registry's ids for scour defects are built from those numbers, so a refold of a landed ledger would orphan every
+  registry line that has a status. Not built; it needs a way to carry ids across, or to refold only unlanded ledgers.

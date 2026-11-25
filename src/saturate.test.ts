@@ -182,7 +182,7 @@ describe('skulkr saturate', () => {
     expect(runner.tasks).toEqual(['proj-saturate-src-02-gpt-pro-match1']);
   });
 
-  it('tries an unusable matcher reply once more, then fails the occasion and records nothing', async () => {
+  it('tries an unusable matcher reply once more, then leaves the report unfolded for `fold` to take in', async () => {
     const { root, cfg } = project();
     await saturateCommand(cfg, fakeRunner([['A']]), root, ['src', '--max', '1'], () => {});
     const runner = fakeRunner([['B']], { matchReply: () => 'I could not decide.' });
@@ -190,8 +190,19 @@ describe('skulkr saturate', () => {
     await expect(saturateCommand(cfg, runner, root, ['src', '--max', '3'], (l) => lines.push(l))).rejects.toThrow(/no usable answer/);
     expect(runner.tasks.filter((t) => /match/.test(t))).toEqual(['proj-saturate-src-02-claude-match1', 'proj-saturate-src-02-claude-match2']);
     expect(ledgerOf(cfg, 'src').occasions).toHaveLength(1);
-    expect(readdirSync(join(cfg.state, 'scour/src/reviews')).some((f) => f.startsWith('unmatched-02-claude'))).toBe(true);
+    expect(ledgerOf(cfg, 'src').unfolded).toMatchObject([{ key: '02-claude', source: 'claude', file: 'reviews/unfolded-02-claude.md' }]);
     expect(existsSync(join(root, '.worktrees/audit-saturate-src'))).toBe(false);
+
+    const folded: string[] = [];
+    await saturateCommand(cfg, fakeRunner([]), root, ['fold', 'src'], (l) => folded.push(l));
+    const ledger = ledgerOf(cfg, 'src');
+    expect(ledger.unfolded).toBeUndefined();
+    expect(ledger.occasions.map((o: { file: string }) => o.file)).toEqual(['reviews/01-claude.md', 'reviews/02-claude.md']);
+    expect(ledger.defects.map((d: { claim: string }) => d.claim)).toEqual(['A', 'B']);
+    expect(readdirSync(join(cfg.state, 'scour/src/reviews'))).toEqual(['01-claude.md', '02-claude.md']);
+    expect(folded[0]).toMatch(/^2\/40 claude: 1 findings, 1 new/);
+    await saturateCommand(cfg, fakeRunner([]), root, ['fold', 'src'], (l) => folded.push(l));
+    expect(folded.at(-1)).toBe('fold src: nothing to fold');
   });
 
   it('rewrites the report from the ledger, and removes the ledger', async () => {

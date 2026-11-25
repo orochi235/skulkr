@@ -37,7 +37,8 @@ export const landableIdsOf = (cfg) => {
 const writeLanded = (cfg, id, ledger, to) => {
   rmSync(to, { recursive: true, force: true });
   mkdirSync(join(to, 'reviews'), { recursive: true });
-  writeFileSync(join(to, 'ledger.json'), `${JSON.stringify(ledger, null, 1)}\n`);
+  const { unfolded: _, ...folded } = ledger;
+  writeFileSync(join(to, 'ledger.json'), `${JSON.stringify(folded, null, 1)}\n`);
   writeFileSync(join(to, 'report.md'), reportText(ledger, stopRuleOf(cfg, cfg.saturate.max)));
   for (const { file } of ledger.occasions) if (file) cpSync(join(ledgerDirOf(cfg, id), file), join(to, file));
 };
