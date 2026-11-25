@@ -1,0 +1,76 @@
+/**
+ * Capture–recapture over a saturation ledger (`ledger.mjs`): each occasion is one sample, each defect's sightings its
+ * incidence. README "Saturation" says what each figure means and when to trust it.
+ */
+import { chapman } from './rounds.mjs';
+
+/** The occasion numbers of `occasions`, whether given as numbers or as the ledger's occasion records. */
+const numbersOf = (occasions) => new Set(occasions.map((o) => (typeof o === 'number' ? o : o.n)));
+
+/**
+ * Chao2 over `occasions` (numbers or records) and `defects` (each with `sightings`, occasion numbers): `m` samples,
+ * `S` defects seen, `Q1`/`Q2` those seen exactly once/twice, `U` all sightings, `f0` the unseen estimate (bias-corrected
+ * when Q2 is 0), `total` S + f0, `coverage` the sample coverage, and `nextNew` the chance the next occasion's finding is
+ * new. With fewer than two occasions, every estimate is undefined.
+ */
+export const chao2 = (occasions, defects) => {
+  const at = numbersOf(occasions);
+  const m = at.size;
+  const counts = defects.map((d) => new Set(d.sightings.filter((n) => at.has(n))).size).filter((y) => y > 0);
+  const S = counts.length;
+  const Q1 = counts.filter((y) => y === 1).length;
+  const Q2 = counts.filter((y) => y === 2).length;
+  const U = counts.reduce((s, y) => s + y, 0);
+  if (m < 2) return { m, S, Q1, Q2, U, f0: undefined, total: undefined, coverage: undefined, nextNew: undefined };
+  const k = (m - 1) / m;
+  const f0 = Q2 > 0 ? k * Q1 * Q1 / (2 * Q2) : k * Q1 * Math.max(0, Q1 - 1) / 2;
+  const coverage = Q1 === 0 ? 1 : 1 - (Q1 / U) * (((m - 1) * Q1) / ((m - 1) * Q1 + 2 * Q2));
+  return { m, S, Q1, Q2, U, f0, total: S + f0, coverage, nextNew: 1 - coverage };
+};
+
+/** The sources a ledger's occasions came from, in the order each first appears. */
+export const sourcesOf = (ledger) => [...new Set(ledger.occasions.map((o) => o.source))];
+
+/** Chao2 per source, over that source's occasions alone: `{ source: stats }`. */
+export const perSource = (ledger) => Object.fromEntries(sourcesOf(ledger).map((s) => [s, chao2(ledger.occasions.filter((o) => o.source === s), ledger.defects)]));
+
+/**
+ * Chapman between each pair of sources, each source's union of defects one list: `{ a, b, n1, n2, overlap, total }`.
+ * Empty with fewer than two sources.
+ */
+export const chapmanPairs = (ledger) => {
+  const sources = sourcesOf(ledger);
+  const seenBy = (s) => new Set(ledger.defects.filter((d) => d.sources?.[s]?.length).map((d) => d.id));
+  return sources.flatMap((a, i) => sources.slice(i + 1).map((b) => {
+    const [x, y] = [seenBy(a), seenBy(b)];
+    const overlap = [...x].filter((id) => y.has(id)).length;
+    return { a, b, n1: x.size, n2: y.size, overlap, total: chapman(x.size, y.size, overlap) };
+  }));
+};
+
+/** Every estimate over the whole ledger: `combined` Chao2, `perSource`, and `chapman` between sources. */
+export const estimatesOf = (ledger) => ({ combined: chao2(ledger.occasions, ledger.defects), perSource: perSource(ledger), chapman: chapmanPairs(ledger) });
+
+/**
+ * The yield table: one row per occasion, in order, with what it found (`findings`, `new`) and the combined estimate
+ * over the occasions up to it.
+ */
+export const yieldRows = (ledger) => {
+  const occasions = [...ledger.occasions].sort((a, b) => a.n - b.n);
+  return occasions.map((o, i) => ({
+    ...o,
+    new: ledger.defects.filter((d) => d.firstOccasion === o.n).length,
+    stats: chao2(occasions.slice(0, i + 1), ledger.defects),
+  }));
+};
+
+/**
+ * Why saturation should stop, given the combined estimate `stats`, the occasion limit `max`, and `stopNextNew`, the
+ * chance of a new finding below which the next occasion is not worth running; null to go on.
+ */
+export const stopReason = (stats, { max, stopNextNew }) => {
+  if (stats.m >= max) return `reached the limit of ${max} occasions`;
+  if (stats.f0 !== undefined && stats.f0 < 1) return `fewer than one defect estimated unseen (${stats.f0.toFixed(2)})`;
+  if (stats.nextNew !== undefined && stats.nextNew < stopNextNew) return `the next occasion's chance of a new finding is under ${Math.round(stopNextNew * 100)}% (${(stats.nextNew * 100).toFixed(1)}%)`;
+  return null;
+};
