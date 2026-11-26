@@ -113,6 +113,18 @@ describe('skulkr scour next', () => {
     await expect(scourNext(cfg, root, 'src', saturateArgsOf(cfg, []), () => {}, {})).rejects.toThrow(/Claude Code session/);
   });
 
+  it('releases an area it holds, dropping a review still out, and refuses one another live process holds', async () => {
+    const { root, cfg } = project();
+    const { env } = session();
+    const next = (...argv: string[]) => scourNext(cfg, root, 'src', saturateArgsOf(cfg, argv), () => {}, env);
+    await next();
+    expect(await next('--release')).toEqual({ released: 'src' });
+    for (const gone of ['scour/src/lock', 'scour/src/task.json', 'scour/src/jobs/01-claude']) expect(existsSync(join(cfg.state, gone))).toBe(false);
+    expect(existsSync(join(root, '.worktrees/audit-saturate-src'))).toBe(false);
+    writeFileSync(join(cfg.state, 'scour/src/lock'), JSON.stringify({ pid: process.ppid, at: new Date().toISOString() }));
+    await expect(next('--release')).rejects.toThrow(/another live process/);
+  });
+
   it('hands out nothing once the session looks metered, unless told --metered', async () => {
     const { root, cfg } = project();
     const { env } = session('5m');

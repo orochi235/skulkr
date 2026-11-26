@@ -527,7 +527,7 @@ question harder for one area: blind reviews of it, again and again, at one froze
 until capture–recapture says further reviews would find little new. Nothing it records feeds a round: not history,
 calibration, the queue, or the map.
 
-    skulkr scour next <area> [--agent <id>] [--metered] [--max 40] [--per-defect 4x|<$>] [--at <sha>]
+    skulkr scour next <area> [--agent <id>] [--metered] [--release] [--max 40] [--per-defect 4x|<$>] [--at <sha>]
     skulkr scour [delve] <area> [--fleet] [--account <config dir>] [--metered] [--sources claude,codex] [--max 40] [--per-defect 4x|<$>] [--usd <n>] [--at <sha>] [--fresh]
     skulkr scour run [areas…] [--fleet] [--account <config dir>] [--metered] [--by finish|cheapest|spread] [--usd <n>] [--passes 10] [--per-defect 4x|<$>]
     skulkr scour fold <area>
@@ -564,7 +564,7 @@ Code refuses a subagent's write of a report file (2026-11-26). Files are not pre
 itself. Once that subagent is done, `skulkr scour next <area> --agent <id>` reads that reply and prices it from its transcript (`<config dir>/projects/<project>/<session>/subagents/agent-<id>.jsonl`, each
 message's usage at `claude.prices`), folds what it can, and prints the next task, or `stop <area>: <reason>` once the
 stop rule holds, when it removes the worktree and lets the ledger go. `next` without `--agent` while a task is out
-prints that task again, which is how a restarted session picks up. A match whose reply does not check out is handed
+prints that task again, which is how a restarted session picks up; `--release` lets go of the area instead, dropping a task still out (a review already taken in stays unfolded), so a local or fleet `delve` can take it. A match whose reply does not check out is handed
 out once more, then left unfolded for `scour fold`. The per-job dollar ceilings in `budget` do not apply to subagents.
 
 **Never metered unasked.** `next` hands out a task only while the session is on its plan's usage, which it reads from the

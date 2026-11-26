@@ -45,6 +45,25 @@ const withSessionHold = async (cfg, id, pid, about, work) => {
   return work(true, () => rmSync(path, { force: true }));
 };
 
+/**
+ * `scour next <area> --release`: lets go of an area this session holds, or one whose holder has died, so a local or
+ * fleet `delve` can take it. A task handed out and not answered is dropped (its subagent's pass with it); a review
+ * already taken in stays unfolded in the ledger, for whoever folds next. Answers `{ released }`.
+ */
+const releaseSession = (cfg, root, id, pid, tell) => {
+  const path = join(ledgerDirOf(cfg, id), 'lock');
+  const held = leaseAt(path);
+  if (held && held.pid !== pid && heldAlive(held)) throw new Error(`${id} is held by another live process (pid ${held.pid}), not this session`);
+  const task = readJson(taskPathOf(cfg, id));
+  if (task?.kind === 'review') rmSync(occasionJobsOf(cfg, id, task.key), { recursive: true, force: true });
+  rmSync(taskPathOf(cfg, id), { force: true });
+  if (existsSync(treeOf(cfg, root, id))) removeWorktree(root, treeOf(cfg, root, id));
+  rmSync(path, { force: true });
+  const dropped = task ? `, dropping its ${task.kind} ${task.key} that was still out` : '';
+  tell(`released ${id}${dropped}`);
+  return { released: id };
+};
+
 /** What subagent `agent` cost and its final reply, from its transcript. */
 const agentAnswerOf = (cfg, agent, env) => {
   const path = transcriptAt(agent, { session: env.CLAUDE_CODE_SESSION_ID, env });
@@ -195,6 +214,7 @@ export const scourNext = async (cfg, root, id, args, tell, env = process.env) =>
   if (!(pid > 0)) {
     throw new Error('scour next hands its passes to the Claude Code session that runs it, and none is running this; use the skulkr-scour skill from a session, or delve with --fleet');
   }
+  if (args.release) return releaseSession(cfg, root, id, pid, tell);
   return withSessionHold(cfg, id, pid, { max: args.max, session: env.CLAUDE_CODE_SESSION_ID ?? null }, async (first, release) => {
     const say = loggingSay(cfg, id, tell, { keep: !first });
     const wanted = args.at === undefined ? undefined : freezeCommitOf(cfg, root, args.at);
@@ -243,6 +263,7 @@ export const scourNext = async (cfg, root, id, args, tell, env = process.env) =>
 
 /** The lines `scour next` prints for the session: what to hand which subagent, or that the area stopped or paused. */
 export const nextLines = (id, step) => {
+  if (step.released) return [];
   if (step.stop) return [`stop ${id}: ${step.stop}`];
   if (step.pause) return [`pause ${id}: ${step.pause}`];
   return [`task: ${step.task} ${step.key}`, `model: ${step.model ?? 'the session default'}`, `prompt: ${step.prompt}`];

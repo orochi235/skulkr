@@ -51,6 +51,8 @@ only when the user has approved metered spending for this run, in this conversat
 - **A subagent finished without a usable answer**: run `next --agent <id>` anyway. A review that never finished is
   kept aside and not counted; a match is tried once more.
 - **`another skulkr scour is working on <area>`**: another session or a `--fleet` run holds it. Skip the area and say so.
+- **An area should move to a local or fleet `delve`**: run `skulkr scour next <area> --release` once its subagent is
+  back. It lets the area go, dropping any task still out.
 - **The ledger matcher gave no usable answer**: the report waits unfolded. Say so; `skulkr scour fold <area>` folds it
   later.
 
