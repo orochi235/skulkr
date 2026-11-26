@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { SaturationDefect, SaturationLedger } from './saturation.types';
 import s from './DelveChart.module.css';
 
@@ -30,9 +31,15 @@ export const spanOf = (done: number, max: number | null, live: boolean): number 
   return Math.max(2, live ? Math.min(cap, Math.max(10, done + Math.ceil(done / 4) + 2)) : done);
 };
 
-function Tile({ x, y, className, title }: { x: number; y: number; className: string; title: string }) {
+/** A tile's hover text: which pass, which defect, and for a repeat sighting, the pass that found it first. */
+export const tileTitleOf = (d: SaturationDefect, pass: number, novelty: Novelty): string =>
+  `pass ${pass} · ${d.id}, ${LABEL[novelty]}${novelty === 'again' ? ` in pass ${d.firstOccasion}` : ''} · ${d.claim}`;
+
+type TileProps = { x: number; y: number; className: string; title: string; onEnter: () => void; onLeave: () => void };
+
+function Tile({ x, y, className, title, onEnter, onLeave }: TileProps) {
   return (
-    <g className={className}>
+    <g className={className} onPointerEnter={onEnter} onPointerLeave={onLeave}>
       <title>{title}</title>
       <rect className={s.front} x={x} y={y} width={TILE_W} height={TILE_H} />
       <polygon className={s.top} points={`${x},${y} ${x + DEPTH},${y - DEPTH} ${x + TILE_W + DEPTH},${y - DEPTH} ${x + TILE_W},${y}`} />
@@ -44,6 +51,7 @@ function Tile({ x, y, className, title }: { x: number; y: number; className: str
 /** A ledger's passes along the axis, each a stack of tiles, one per defect it reported, by whether it was new, and the
  *  count of defects the ledger is estimated to hold that no pass has found. */
 export function DelveChart({ ledger, max = null, live = false }: { ledger: SaturationLedger; max?: number | null; live?: boolean }) {
+  const [traced, setTraced] = useState<string | null>(null);
   const done = ledger.occasions;
   if (done === 0) return null;
   const stacks = stacksOf(ledger.defects, done);
@@ -57,7 +65,7 @@ export function DelveChart({ ledger, max = null, live = false }: { ledger: Satur
   const ticks = [1, ...Array.from({ length: Math.floor(span / 5) }, (_, i) => (i + 1) * 5)].filter((t) => t <= span);
   const colX = (pass: number) => (pass - 1) * PITCH;
   return (
-    <svg className={s.chart} viewBox={`0 0 ${width} ${height}`} width={width} role="img"
+    <svg className={traced ? `${s.chart} ${s.tracing}` : s.chart} viewBox={`0 0 ${width} ${height}`} width={width} role="img"
       aria-label={`${done} passes, ${ledger.distinct} defects found, about ${ghosts} not found yet`}>
       <line className={s.base} x1={0} x2={span * PITCH} y1={base} y2={base} />
       {ticks.map((t) => <text key={t} className={s.tick} x={colX(t) + TILE_W / 2} y={height - 1}>{t}</text>)}
@@ -68,8 +76,10 @@ export function DelveChart({ ledger, max = null, live = false }: { ledger: Satur
         </polygon>
       )))}
       {stacks.map((stack, i) => stack.map(({ defect, novelty }, k) => (
-        <Tile key={`${i}-${defect.id}`} x={colX(i + 1)} y={base - (k + 1) * TILE_H} className={s[novelty]!}
-          title={`pass ${i + 1} · ${defect.id}, ${LABEL[novelty]} · ${defect.claim}`} />
+        <Tile key={`${i}-${defect.id}`} x={colX(i + 1)} y={base - (k + 1) * TILE_H}
+          className={defect.id === traced ? `${s[novelty]} ${s.traced}` : s[novelty]!}
+          title={tileTitleOf(defect, i + 1, novelty)}
+          onEnter={() => setTraced(defect.id)} onLeave={() => setTraced((t) => (t === defect.id ? null : t))} />
       )))}
       {ghosts > 0 && <text className={s.ghostLabel} x={labelX} y={base - 2}>≈ {ghosts} not found yet</text>}
     </svg>

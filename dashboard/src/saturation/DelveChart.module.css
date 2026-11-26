@@ -22,6 +22,12 @@
 
 .lone { --tile: var(--wzl-warning); }
 
+/* Hovering a tile traces its defect: every sighting keeps its color, a repeat taking its first sighting's, and the rest
+   fade to the ground's tone (mixed solid, not alpha, for the same reason as `.again`). */
+.tracing g:not(.traced) { --tile: color-mix(in srgb, var(--wzl-fg) 18%, var(--wzl-surface)); }
+
+.tracing .traced.again { --tile: var(--wzl-accent); }
+
 .front,
 .top,
 .side { fill: var(--tile); stroke: var(--wzl-surface); stroke-width: 0.4; }

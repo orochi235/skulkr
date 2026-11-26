@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { DelveChart, spanOf, stacksOf } from './DelveChart';
 import type { SaturationLedger } from './saturation.types';
@@ -25,6 +25,19 @@ describe('DelveChart', () => {
     expect(screen.getByRole('img')).toHaveAccessibleName('3 passes, 3 defects found, about 2 not found yet');
     expect(container.querySelectorAll('title')).toHaveLength(5);
     expect(screen.getByText('≈ 2 not found yet')).toBeInTheDocument();
+  });
+
+  it("names a repeat sighting's first pass, and traces every sighting of a hovered defect", () => {
+    const { container } = render(<DelveChart ledger={ledger} />);
+    const titles = [...container.querySelectorAll('title')].map((t) => t.textContent);
+    expect(titles).toContain('pass 3 · D1, seen before in pass 1 · claim D1');
+    const tileOf = (title: string) => [...container.querySelectorAll('g')].find((g) => g.querySelector('title')?.textContent === title)!;
+    fireEvent.pointerEnter(tileOf('pass 3 · D1, seen before in pass 1 · claim D1'));
+    const traced = [...container.querySelectorAll('g')].filter((g) => g.className.baseVal.includes('traced'));
+    expect(traced.map((g) => g.querySelector('title')!.textContent!.split(' ·')[0])).toEqual(['pass 1', 'pass 2', 'pass 3']);
+    expect(screen.getByRole('img').getAttribute('class')).toContain('tracing');
+    fireEvent.pointerLeave(tileOf('pass 3 · D1, seen before in pass 1 · claim D1'));
+    expect(screen.getByRole('img').getAttribute('class')).not.toContain('tracing');
   });
 
   it('marks a pass that found nothing with a patch on the ground', () => {
