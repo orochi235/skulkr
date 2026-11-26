@@ -11,6 +11,9 @@ export type SaturationState =
 /** How often the ledgers are asked for again, so a saturation running meanwhile shows its occasions. */
 export const SATURATION_POLL_MS = 30_000;
 
+/** How often while a scour process holds a ledger, so its jobs' lines keep up. */
+export const SATURATION_LIVE_POLL_MS = 5_000;
+
 /** Every saturation ledger of a tenant, read from `url` (null for none) and asked for again every `everyMs`. */
 export function useSaturation(url: string | null, everyMs: number = SATURATION_POLL_MS): SaturationState {
   const [state, setState] = useState<{ url: string | null; value: SaturationState }>({ url, value: { status: 'loading' } });

@@ -551,6 +551,12 @@ After each occasion skulkr prints a line, rewrites the report, and checks the st
 It stops once the combined estimate puts fewer than one defect unseen, the chance that the next occasion's finding
 is new falls under `saturate.stopNextNew` (15%), or `--max` occasions (`saturate.max`, 40) are in the ledger.
 
+Every line a delve, fold or ingest prints also goes to the ledger's `scour.log`, each led by its time, started over by
+the next process to take the ledger. `ls --json` gives each ledger a live process holds `running`: its pid, when it
+took the ledger, what it does, the delve's `--max`, each job it has out (the occasion, the step, the newest log line and
+onto's progress counter), and the end of `scour.log`; null otherwise. The dashboard's Scour page shows these above the
+ledgers (2026-11-25).
+
 **Which commit.** A new ledger freezes at `--at <sha>`, else at `main`'s tip. Give `--at` when reports already made
 elsewhere were made at a fixed commit: every occasion must review the same code for the cross-source estimates to
 mean anything. Run it again to go on from where it stopped: it resumes the ledger at its own commit, however far

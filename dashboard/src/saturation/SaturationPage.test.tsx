@@ -10,7 +10,7 @@ import fixture from '@dash/audits/fixture.map.json';
 const ledger = (id: string, unseen: number, defects: SaturationLedger['defects']): SaturationLedger => ({
   id, area: id, commit: '9c4522d63555ec5f264441bcef4cd6a1917eac02', files: 26, occasions: 24, sources: { codex: 1, claude: 23 },
   costUsd: 23.28, distinct: defects.length, total: defects.length + unseen, unseen, nextNew: 0.147,
-  stopped: "the next occasion's chance of a new finding is under 15% (14.7%)", updated: '2026-11-25T07:50:00Z', defects,
+  stopped: "the next occasion's chance of a new finding is under 15% (14.7%)", updated: '2026-11-25T07:50:00Z', defects, running: null,
 });
 
 const LEDGERS = [
@@ -21,12 +21,12 @@ const LEDGERS = [
   ledger('geom.booleans', 1.2, []),
 ];
 
-function serve() {
+function serve(ledgers: readonly SaturationLedger[] = LEDGERS) {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => (String(url).endsWith('api/tenants')
     ? new Response('[{"name":"weasel"}]', { status: 200 })
     : String(url).endsWith('/map')
       ? new Response(JSON.stringify(fixture), { status: 200 })
-      : new Response(JSON.stringify(LEDGERS), { status: 200 }))));
+      : new Response(JSON.stringify(ledgers), { status: 200 }))));
 }
 
 afterEach(() => {
@@ -37,6 +37,22 @@ afterEach(() => {
 });
 
 describe('SaturationPage', () => {
+  it('shows what each live scour process is doing, and picks its area when its name is clicked', async () => {
+    serve([{ ...LEDGERS[0]!, running: {
+      pid: 2804, since: new Date(Date.now() - 47 * 60_000).toISOString(), does: 'delve', max: 40,
+      jobs: [{ key: '25-claude', step: 'review', at: null, line: 'skulkr: finding {"claim":"x"}', progress: { done: 5, of: 14 } }],
+      log: ['2026-11-25T23:00:00Z 24/40 claude: 3 findings, 0 new'],
+    } }, LEDGERS[1]!]);
+    window.location.hash = '#weasel/scour';
+    renderWithIcons(<WeaselProvider><SaturationPage base="/test/" /></WeaselProvider>);
+    const now = await screen.findByRole('region', { name: 'Scouring now' });
+    expect(within(now).getByText(/delve · pid 2804 · 47:00 · 24\/40 occasions/)).toBeInTheDocument();
+    expect(within(now).getByText('5/14')).toBeInTheDocument();
+    expect(within(now).getByText('24/40 claude: 3 findings, 0 new')).toBeInTheDocument();
+    fireEvent.click(within(now).getByText('core.animation'));
+    expect(window.location.hash).toBe('#weasel/scour/core.animation');
+  });
+
   it('lists every area on the map and every ledger as a tree, and shows the picked one’s defects with the area in the hash', async () => {
     serve();
     window.location.hash = '#weasel/saturation';

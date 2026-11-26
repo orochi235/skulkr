@@ -63,11 +63,11 @@ export const removeLedger = (cfg, area) => {
 /**
  * Runs `work(ledger)` with `area`'s ledger (undefined when it has none) held by this process alone, letting it go
  * however `work` ends. With `fresh`, an existing ledger is first moved aside to `<area>.<its commit>`, so `work` starts
- * a new one.
+ * a new one. `about` is recorded on the lease, for whoever asks what the holder is doing.
  */
-export const withLedgerHeld = async (cfg, area, { fresh = false } = {}, work) => {
+export const withLedgerHeld = async (cfg, area, { fresh = false, about = {} } = {}, work) => {
   const lock = () => {
-    const unlock = takeLease(join(ledgerDirOf(cfg, area), 'lock'), { saturate: area });
+    const unlock = takeLease(join(ledgerDirOf(cfg, area), 'lock'), { saturate: area, ...about });
     if (!unlock) throw new Error(`another skulkr scour is working on ${area}`);
     return unlock;
   };

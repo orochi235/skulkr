@@ -4,6 +4,7 @@
  */
 import { existsSync, readdirSync } from 'node:fs';
 import { gitIn } from './batch.mjs';
+import { liveScourOf } from './delveLive.mjs';
 import { ledgerOf } from './ledger.mjs';
 import { queryIndex } from './recordIndex.mjs';
 import { chao2, sourcesOf, stopReason, stopRuleOf } from './saturation.mjs';
@@ -59,14 +60,17 @@ const registeredIn = (cfg, root) => {
   return (key) => byLedger.get(key) ?? new Map();
 };
 
-/** Every ledger in `cfg`'s state directory, summed up, by id; each landed one's defects with their registry lines from `root`'s record. */
+/**
+ * Every ledger in `cfg`'s state directory, summed up, by id; each landed one's defects with their registry lines from
+ * `root`'s record, and `running`, what a live scour process holding it is doing (`liveScourOf`), else null.
+ */
 export const ledgerListOf = (cfg, root) => {
   const dir = scourStateDirOf(cfg);
   if (!existsSync(dir)) return [];
   const registered = root ? registeredIn(cfg, root) : undefined;
   return readdirSync(dir).sort().flatMap((id) => {
     const ledger = ledgerOf(cfg, id);
-    return ledger ? [ledgerSummaryOf(cfg, id, ledger, registered)] : [];
+    return ledger ? [{ ...ledgerSummaryOf(cfg, id, ledger, registered), running: liveScourOf(cfg, id) }] : [];
   });
 };
 

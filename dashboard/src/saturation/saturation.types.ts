@@ -38,4 +38,28 @@ export interface SaturationLedger {
   /** When its last occasion was recorded. */
   readonly updated: string | null;
   readonly defects: readonly SaturationDefect[];
+  /** What a live scour process holding the ledger is doing, null while none does. */
+  readonly running: ScourLive | null;
+}
+
+/** One job a scour process has out: its occasion's key, its newest log's step, and that log's last line. */
+export interface ScourJob {
+  readonly key: string;
+  readonly step: string | null;
+  readonly at: string | null;
+  readonly line: string | null;
+  readonly progress: { readonly done: number; readonly of: number } | null;
+}
+
+/** A live scour process on a ledger, as `skulkr scour ls --json` reads it from the ledger's directory. */
+export interface ScourLive {
+  readonly pid: number;
+  readonly since: string;
+  /** `delve`, `fold` or `ingest`; null for a process that did not say. */
+  readonly does: string | null;
+  /** The occasion cap a delve runs to. */
+  readonly max: number | null;
+  readonly jobs: readonly ScourJob[];
+  /** The last lines of its `scour.log`, each led by its ISO time. */
+  readonly log: readonly string[];
 }

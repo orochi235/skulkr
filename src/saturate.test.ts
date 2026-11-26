@@ -82,6 +82,7 @@ describe('skulkr saturate', () => {
     expect(runner.tasks[0]).toBe('proj-saturate-src-01-claude-claude');
     expect(lines).toContain('5/5 claude: 5 findings, 2 new; distinct 13; unseen ≈ 12.8; next-new 32%; $0.60; $0.22/defect');
     expect(lines.some((l) => /stopped, reached the limit of 5/.test(l))).toBe(true);
+    expect(readFileSync(join(cfg.state, 'scour', 'src', 'scour.log'), 'utf8').trim().split('\n').map((l) => l.replace(/^\S+ /, ''))).toEqual(lines);
     expect(readdirSync(join(cfg.state, 'scour/src/reviews'))).toEqual(['01-claude.md', '02-claude.md', '03-claude.md', '04-claude.md', '05-claude.md']);
     expect(existsSync(join(cfg.state, 'scour/src/jobs/05-claude'))).toBe(false);
     const report = readFileSync(join(cfg.state, 'scour/src/report.md'), 'utf8');

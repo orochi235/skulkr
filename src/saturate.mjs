@@ -18,6 +18,7 @@ import {
   allNew, emptyLedger, freezeCommitOf, keepReview, ledgerDirOf, ledgerOf, removeLedger, requireAreaFilesAt, requireSameCommit, withLedgerHeld,
   withOccasion, writeLedger,
 } from './ledger.mjs';
+import { loggingSay } from './delveLive.mjs';
 import { takeLease } from './lease.mjs';
 import { importLedger } from './saturateImport.mjs';
 import { landableIdsOf, landLedgers } from './saturateLand.mjs';
@@ -51,9 +52,11 @@ const pad = (n) => String(n).padStart(2, '0');
  * The area's ledger and a frozen worktree of its commit, held by this process alone, then `work` run with them; the
  * worktree and the hold are let go however it ends. An existing ledger resumes at its own commit, wherever `main` has
  * gone since, unless `at` names another commit, which is refused; with `fresh`, it is moved aside to `<area>.<commit>`.
- * A new ledger freezes at `at`, else `main`'s tip.
+ * A new ledger freezes at `at`, else `main`'s tip. `about` goes on the hold's lease, and `work`'s `say` also writes the
+ * ledger's `scour.log`.
  */
-const withFrozen = async (cfg, root, id, { fresh, at }, work) => withLedgerHeld(cfg, id, { fresh }, async (held) => {
+const withFrozen = async (cfg, root, id, { fresh, at, about, say }, work) => withLedgerHeld(cfg, id, { fresh, about }, async (held) => {
+  const logged = loggingSay(cfg, id, say);
   const git = gitIn(root);
   const wanted = at === undefined ? undefined : freezeCommitOf(cfg, root, at);
   requireSameCommit(held, at, wanted);
@@ -69,7 +72,7 @@ const withFrozen = async (cfg, root, id, { fresh, at }, work) => withLedgerHeld(
     try {
       base = git('merge-base', commit, `${cfg.git.remote}/${cfg.git.main}`);
     } catch { /* no remote: the commit is its own base */ }
-    return await work({ ledger, frozen, base, commit });
+    return await work({ ledger, frozen, base, commit, say: logged });
   } finally {
     removeWorktree(root, frozen);
   }
@@ -141,10 +144,10 @@ const foldPending = async (ctx, ledger, rule) => {
 };
 
 /** Reviews `id` until the stop rule holds, one review per source an iteration. Answers the ledger. */
-export const saturateArea = async (cfg, runner, root, id, args, say) => {
+export const saturateArea = async (cfg, runner, root, id, args, tell) => {
   requireSources(cfg, args.sources);
   const rule = stopRuleOf(cfg, args.max);
-  return withFrozen(cfg, root, id, args, async ({ ledger: start, frozen, base, commit }) => {
+  return withFrozen(cfg, root, id, { ...args, about: { does: 'delve', max: rule.max }, say: tell }, async ({ ledger: start, frozen, base, commit, say }) => {
     let ledger = start;
     writeLedger(cfg, ledger);
     say(`saturate ${id} at ${commit.slice(0, 10)}: ${ledger.files.length} files, ${ledger.occasions.length} occasions so far, sources ${args.sources.join(', ')}`);
@@ -181,12 +184,12 @@ export const saturateArea = async (cfg, runner, root, id, args, say) => {
 };
 
 /** Folds an externally written report into `id`'s ledger as one occasion. Answers the ledger. */
-export const ingestReport = async (cfg, runner, root, id, path, source, args, say) => {
+export const ingestReport = async (cfg, runner, root, id, path, source, args, tell) => {
   if (!source) throw new Error('ingest wants --source <name>: who wrote the report');
   if (!existsSync(path)) throw new Error(`no report at ${path}`);
   const text = readFileSync(path, 'utf8');
   const rule = stopRuleOf(cfg, args.max);
-  return withFrozen(cfg, root, id, { fresh: false, at: args.at }, async ({ ledger, frozen, base, commit }) => {
+  return withFrozen(cfg, root, id, { fresh: false, at: args.at, about: { does: 'ingest' }, say: tell }, async ({ ledger, frozen, base, commit, say }) => {
     const ctx = createSaturateContext({ cfg, runner, frozen, base, commit, area: id, say });
     const key = `${pad(ledger.occasions.length + (ledger.unfolded?.length ?? 0) + 1)}-${source}`;
     const next = await foldPending(ctx, stageReport(cfg, ledger, { key, source, kind: 'ingest', text, findings: [], costUsd: 0, minutes: 0 }), rule);
@@ -196,10 +199,10 @@ export const ingestReport = async (cfg, runner, root, id, path, source, args, sa
 };
 
 /** Folds `id`'s unfolded reports into its ledger, as after a matcher failure. Answers the ledger. */
-export const foldReports = async (cfg, runner, root, id, args, say) => {
+export const foldReports = async (cfg, runner, root, id, args, tell) => {
   if (!ledgerOf(cfg, id)) throw new Error(`${id} has no scour ledger`);
   const rule = stopRuleOf(cfg, args.max);
-  return withFrozen(cfg, root, id, { fresh: false }, async ({ ledger, frozen, base, commit }) => {
+  return withFrozen(cfg, root, id, { fresh: false, about: { does: 'fold' }, say: tell }, async ({ ledger, frozen, base, commit, say }) => {
     if (!ledger.unfolded?.length) {
       say(`fold ${id}: nothing to fold`);
       return ledger;

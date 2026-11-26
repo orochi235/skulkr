@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ResizeHandle } from '@weasel-js/ui/components/ResizeHandle';
 import { Shell } from '@dash/Shell';
 import { AppTitle } from '@dash/AppTitle';
@@ -13,7 +13,8 @@ import { usd } from './format';
 import { LedgerDetail } from './LedgerDetail';
 import { LedgerList } from './LedgerList';
 import { SaturationMap } from './SaturationMap';
-import { useSaturation } from './useSaturation';
+import { ScourNow } from './ScourNow';
+import { SATURATION_LIVE_POLL_MS, SATURATION_POLL_MS, useSaturation } from './useSaturation';
 import { useSaturationArea } from './useSaturationArea';
 import s from './SaturationPage.module.css';
 
@@ -25,7 +26,10 @@ export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: 
   const tenants = useTenants({ url: tenantsUrl(base), dev });
   const names = tenants.status === 'ready' ? tenants.names : [];
   const [tenant, choose] = useTenantChoice(names);
-  const state = useSaturation(tenant === null ? null : saturationUrl(base, tenant));
+  const [everyMs, setEveryMs] = useState(SATURATION_POLL_MS);
+  const state = useSaturation(tenant === null ? null : saturationUrl(base, tenant), everyMs);
+  const anyRunning = state.status === 'ready' && state.ledgers.some((l) => l.running);
+  useEffect(() => setEveryMs(anyRunning ? SATURATION_LIVE_POLL_MS : SATURATION_POLL_MS), [anyRunning]);
   const [picked, pick] = useSaturationArea(tenant);
   const map = useSkulkrMap({ url: tenant === null ? null : mapUrl(base, tenant), dev });
   const [listWidth, setListWidth, keepListWidth] = useViewerPref('saturation.list', LIST.initial, readSize);
@@ -59,6 +63,7 @@ export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: 
         {state.status === 'ready' && !ledgers.length && (
           <p className={s.note}>No saturation ledger yet. <code>skulkr saturate &lt;area&gt;</code> starts one.</p>
         )}
+        {state.status === 'ready' && <ScourNow ledgers={ledgers} onPick={pick} />}
         {state.status === 'ready' && ledgers.length > 0 && (
           <div className={s.main}>
             <LedgerList ledgers={ledgers} areas={areaIds} picked={picked} onPick={(id) => pick(id === picked ? null : id)} />
