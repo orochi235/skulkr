@@ -37,7 +37,7 @@ export function ScourNow({ ledgers, onPick, now = Date.now() }: { ledgers: reado
             </header>
             <div className={s.chart}><DelveChart ledger={l} max={r.max} live /><DelveKey /></div>
             {r.jobs.length > 0 && <ul className={s.jobs}>{r.jobs.map((j) => <JobLine key={j.key} job={j} />)}</ul>}
-            {r.log.length > 0 && <pre className={s.log}>{r.log.slice(-3).map(untimed).join('\n')}</pre>}
+            {r.log.length > 0 && <pre className={s.log}>{r.log.slice(-3).reverse().map(untimed).join('\n')}</pre>}
           </article>
         );
       })}
