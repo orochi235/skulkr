@@ -31,7 +31,8 @@ export const project = (areas: string[] = ['src']) => {
   git('add', '.');
   git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'init');
   const partition = areas.length > 1 ? { partition: { roots: areas, minFiles: 1 } } : {};
-  const cfg = resolveConfig({ name: 'proj', state: scratch(), root, ...partition }, { root });
+  // Each area is one line, so the fix trigger (known defects per thousand lines) would stop every ledger at its fifth pass.
+  const cfg = resolveConfig({ name: 'proj', state: scratch(), root, ...partition, saturate: { fixAtKnownPerKloc: null } }, { root });
   return { root, cfg, git };
 };
 

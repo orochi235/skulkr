@@ -142,9 +142,10 @@ export const DEFAULTS = {
 
   /**
    * `skulkr scour` (README "Scour"): `max` occasions at most, one review per source in `sources` (agent names)
-   * each iteration, stopping once the chance of a new finding falls under `stopNextNew`.
+   * each iteration, stopping once the chance of a new finding falls under `stopNextNew`, or as ready to fix once it
+   * holds `fixAtKnownPerKloc` known defects per thousand lines after `minPasses` (null: never).
    */
-  saturate: { max: 40, minPasses: 5, sources: ['claude'], stopNextNew: 0.15, stopUnseenPerKloc: 1, stopUsdPerDefect: { times: 3 }, openingUsdPerDefect: 0.4 },
+  saturate: { max: 40, minPasses: 5, fixAtKnownPerKloc: 5, sources: ['claude'], stopNextNew: 0.15, stopUnseenPerKloc: 1, stopUsdPerDefect: { times: 3 }, openingUsdPerDefect: 0.4 },
 
   /**
    * How a batch is tested. `{ref}` in the command is the batch branch; `cwd` is `root` or `batch` (its worktree).

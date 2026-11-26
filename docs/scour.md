@@ -1,7 +1,8 @@
 # Scour, in stages
 
 **Status: designed 2026-11-25, part built.** Built: the `scour/` paths, `delve` and `fold` as separate commands, the
-triage fields, and the Scour page's tree. Unbuilt: landing as a shared library, then triage, fix, ask and close, then
+triage fields, the Scour page's tree, and the trigger that stops a delve as `ready to fix` (README "Ready to fix",
+2026-11-26). Unbuilt: landing as a shared library, then triage, fix, ask and close, then
 the page's fix queue and "needs you" list; "Building the fix stage" below is the design for them. What runs today is the README's "Saturation" section: one
 `skulkr scour` command that delves and folds in a loop, plus `ingest`, `import`, `land` and `ls`. This document is
 the plan for splitting it into stages that run on their own. The table under "Stages" says which parts exist.

@@ -592,6 +592,13 @@ is new falls under `saturate.stopNextNew` (15%), the next defect would cost over
 (`saturate.stopUsdPerDefect`, 3× the going rate, below), another pass would take what this command has spent past `--usd`, or `--max`
 occasions (`saturate.max`, 40) are in the ledger. None of the estimates stops a ledger before `saturate.minPasses` (5) occasions: at two, forge.vite.part1 read as saturated with its next-new chance at 100% (2026-11-26).
 
+**Ready to fix.** Before any of those, once an area holds `saturate.fixAtKnownPerKloc` (5) known defects per thousand
+lines or more after `minPasses`, the delve stops with `ready to fix: …`. Past that point each review spends more on
+defects already known, and the cheaper course is to fix them and delve a fresh ledger on the fixed commit, which finds
+what this one missed and tests its estimate (2026-11-26). Of the ledgers then, `core.canvas.nodeShapes`, `cursor`,
+`forge.vite.part2` and `diagram-formats` crossed 5 by their fifth pass, and areas holding 2–4 per thousand lines never
+did. Nothing fixes them yet: the stop marks the area for the fix stage (`docs/scour.md`). `null` turns the trigger off.
+
 **Per thousand lines.** Areas differ in size by five times and more, so the unseen estimate is held to a density,
 and `ls`, the report, the Scour page's ledger panel and Passes table, and its map lenses also give found, unseen and
 spend per thousand lines. An area's lines are counted at the ledger's commit, every line of its files (blank and

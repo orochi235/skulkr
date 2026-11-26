@@ -103,6 +103,15 @@ describe('stopReason', () => {
     expect(stopReason({ m: 1, f0: undefined, nextNew: undefined }, rule)).toBeNull();
   });
 
+  it('hands an area to fixing once it holds enough known defects per thousand lines, from minPasses on', () => {
+    const fixing = { ...rule, minPasses: 5, fixAtKnownPerKloc: 5, stopUsdPerDefect: 1.5 };
+    // diagram-formats at its fifth pass (2026-11-26): 20 defects in 3,583 lines.
+    expect(stopReason({ m: 5, S: 20, f0: 30, nextNew: 0.6 }, fixing, { lines: 3583, price: { usd: 0.5 } })).toBe('ready to fix: 5.6 known defects per thousand lines, at least 5');
+    expect(stopReason({ m: 4, S: 20, f0: 30, nextNew: 0.6 }, fixing, { lines: 3583, price: { usd: 0.5 } })).toBeNull();
+    expect(stopReason({ m: 5, S: 10, f0: 30, nextNew: 0.6 }, fixing, { lines: 3583, price: { usd: 0.5 } })).toBeNull();
+    expect(stopReason({ m: 5, S: 20, f0: 30, nextNew: 0.6 }, { ...fixing, fixAtKnownPerKloc: null }, { lines: 3583, price: { usd: 0.5 } })).toBeNull();
+  });
+
   it('lets no estimate stop a ledger before minPasses, though the limit of occasions and the spend cap still do', () => {
     const held = { ...rule, minPasses: 5, stopUnseenPerKloc: 1, stopUsdPerDefect: 1.5, usd: 1 };
     // forge.vite.part1's second pass (2026-11-26): 3.0 unseen over 3,200 lines read as saturated with next-new at 100%.

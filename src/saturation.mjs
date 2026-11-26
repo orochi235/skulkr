@@ -80,6 +80,7 @@ export const yieldRows = (ledger) => {
 export const stopRuleOf = (cfg, max, { perDefect, usd, factor = 1 } = {}) => ({
   max,
   minPasses: cfg.saturate.minPasses,
+  fixAtKnownPerKloc: cfg.saturate.fixAtKnownPerKloc,
   stopNextNew: cfg.saturate.stopNextNew,
   stopUnseenPerKloc: cfg.saturate.stopUnseenPerKloc,
   stopUsdPerDefect: perDefect ?? cfg.saturate.stopUsdPerDefect,
@@ -97,9 +98,25 @@ export const limitText = ({ stopUsdPerDefect, limit }) => (limit?.times === unde
   ? `$${stopUsdPerDefect.toFixed(2)}`
   : `$${limit.usd.toFixed(2)} (${limit.times}× the $${limit.goingUsd.toFixed(2)} going rate)`);
 
+/** The prefix of a stop reason that hands the area to fixing (`fixReasonOf`), for whoever reads a ledger's stop. */
+export const READY_TO_FIX = 'ready to fix';
+
+/**
+ * Why an area should go to fixing rather than be reviewed again, or null: it holds `fixAtKnownPerKloc` known defects per
+ * thousand lines or more, after `minPasses`. Past that, reviews spend more and more on what is already known, and a
+ * fresh ledger on the fixed commit finds the rest cheaper and tests this one's estimate (2026-11-26).
+ */
+export const fixReasonOf = (stats, { minPasses = 0, fixAtKnownPerKloc }, lines) => {
+  if (fixAtKnownPerKloc == null || !lines || stats.m < minPasses) return null;
+  const known = (stats.S * 1000) / lines;
+  return known >= fixAtKnownPerKloc ? `${READY_TO_FIX}: ${known.toFixed(1)} known defects per thousand lines, at least ${fixAtKnownPerKloc}` : null;
+};
+
 export const stopReason = (stats, rule, { price, spentUsd, lines } = {}) => {
   const { max, minPasses = 0, stopNextNew, stopUnseenPerKloc, stopUsdPerDefect, usd } = rule;
   if (stats.m >= max) return `reached the limit of ${max} occasions`;
+  const fix = fixReasonOf(stats, rule, lines);
+  if (fix) return fix;
   if (stats.m >= minPasses) {
     if (stats.f0 !== undefined && lines && stopUnseenPerKloc !== undefined) {
       const density = (stats.f0 * 1000) / lines;
