@@ -527,8 +527,9 @@ question harder for one area: blind reviews of it, again and again, at one froze
 until capture–recapture says further reviews would find little new. Nothing it records feeds a round: not history,
 calibration, the queue, or the map.
 
-    skulkr scour [delve] <area> [--sources claude,codex] [--max 40] [--per-defect 4x|<$>] [--usd <n>] [--at <sha>] [--fresh]
-    skulkr scour run [areas…] [--by finish|cheapest|spread] [--usd <n>] [--passes 10] [--per-defect 4x|<$>]
+    skulkr scour next <area> [--agent <id>] [--max 40] [--per-defect 4x|<$>] [--at <sha>]
+    skulkr scour [delve] <area> --fleet [--sources claude,codex] [--max 40] [--per-defect 4x|<$>] [--usd <n>] [--at <sha>] [--fresh]
+    skulkr scour run [areas…] --fleet [--by finish|cheapest|spread] [--usd <n>] [--passes 10] [--per-defect 4x|<$>]
     skulkr scour fold <area>
     skulkr scour ingest <area> <report.md> --source <name> [--at <sha>]
     skulkr scour import <area> <dir> --at <sha> [--fresh]
@@ -537,11 +538,35 @@ calibration, the queue, or the map.
     skulkr scour report <area>
     skulkr scour rm <area>
 
-Each **occasion** is one report. `skulkr scour delve <area>` (or `skulkr scour <area>`) freezes a detached worktree of the ledger's commit
+Each **occasion** is one report. Claude's occasions come one of two ways:
+
+| | Session mode (the default) | Fleet mode (`--fleet`) |
+|---|---|---|
+| Who reviews | Subagents of the Claude Code session running the scour | `claude -p` jobs, as a round's reviewers |
+| Driven by | The `skulkr-scour` skill, calling `skulkr scour next` | `skulkr scour delve` or `scour run` |
+| Runs on | This machine, billed to the session's account | The configured runner, billed to each node's signed-in account |
+| Cost of a pass | Priced from the subagent's transcript at `claude.prices` | The job's own `total_cost_usd` |
+
+Without `--fleet`, `delve` and `run` refuse a Claude source and point at session mode; a Codex-only delve still runs
+its jobs on this machine (2026-11-26).
+
+**Session mode.** `skulkr scour next <area>` keeps the books between subagents. It freezes the area's worktree and
+holds its ledger for the session (its lease names the session's Claude Code process, `$CLAUDE_PID`, so it lasts
+until the area stops or the session dies), then prints the next task: a review, or a ledger match, with the model to
+run it on and a prompt file. The prompt is the round reviewer's brief (or the ledger matcher's) under
+`briefs/scourSubagent.md`, which points the subagent at the frozen tree and the file to write. Files are not
+preloaded: the subagent opens them itself. Once that subagent is done, `skulkr scour next <area> --agent <id>` reads
+its file, prices it from its transcript (`<config dir>/projects/<project>/<session>/subagents/agent-<id>.jsonl`, each
+message's usage at `claude.prices`), folds what it can, and prints the next task, or `stop <area>: <reason>` once the
+stop rule holds, when it removes the worktree and lets the ledger go. `next` without `--agent` while a task is out
+prints that task again, which is how a restarted session picks up. A match whose reply does not check out is handed
+out once more, then left unfolded for `scour fold`. The per-job dollar ceilings in `budget` do not apply to subagents.
+
+**Fleet mode.** `skulkr scour delve <area> --fleet` (or `skulkr scour <area> --fleet`) freezes a detached worktree of the ledger's commit
 (`.worktrees/audit-saturate-<area>`, removed when it ends) and runs one review per source in `--sources` at once,
 each exactly the job a round's reviewer runs on that agent (`claude` or `codex`, see "Agents"): the same brief, its
-files preloaded where `review.preload` and the agent allow. Its jobs always run on this machine under the local runner,
-so they spend the account that started them; scour never runs on the fleet (2026-11-26). Each finished report is kept beside the ledger
+files preloaded where `review.preload` and the agent allow. Its jobs go through the configured runner, so each
+spends the account signed in on the node that takes it. Each finished report is kept beside the ledger
 as `reviews/unfolded-<NN>-<source>.md` and listed in the ledger's `unfolded`; **fold** then takes them in the order
 they finished, each through the **ledger matcher**, which says which of its findings are defects the ledger already holds and which are new.
 After each occasion skulkr prints a line, rewrites the report, and checks the stop rule:
@@ -580,7 +605,7 @@ So while fresh areas remain the limit sits at four times the opening price ($1.4
 itself once every area has been delved and the cheap defects are gone. It is priced again before each pass, and the
 progress line, `ls --json`'s `limit`, the stop reason and the Scour page say what it is and how it was set.
 
-**Choosing the next pass.** `skulkr scour run` delves several areas within one budget, `--usd`, sending each pass
+**Choosing the next pass.** `skulkr scour run --fleet` delves several areas within one budget, `--usd`, sending each pass
 where `--by` says. The candidates are the areas named, else every area of the partition, which needs `--usd`. Each
 area still stops by its own rule.
 

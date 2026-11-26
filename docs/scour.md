@@ -18,7 +18,7 @@ checks them against the current code, and nothing fixes them.
 
 Separate stages let each step run where and when it is cheapest:
 
-- delves run overnight in the session that started them, never on the fleet (2026-11-26);
+- delves run overnight as subagents of the session that started them, or on the fleet with `--fleet` (2026-11-26);
 - folding can be retried on its own after the matcher fails;
 - fixing can work through the fix plan in batches of its own size.
 
@@ -40,7 +40,7 @@ project's `.skulkr/`, never from one machine's state directory.
 | Stage | Takes | Writes | Core action | UI expression(s) | User sees? | Exists today |
 |---|---|---|---|---|---|---|
 | **pick** | the partition, the registry, a budget | the areas to saturate, the frozen commit, the sources | The user (or a script) specifies a job | Whatever interface we use to pick an area from the map | Explicit | `scour run` picks areas by strategy within a budget (README "Choosing the next pass", 2026-11-25); `--at` and `--sources` on one area |
-| **delve** | a picked area | one raw report per occasion, unmatched, under the ledger's `reviews/` | We run the job | Updates: progress bar and frequent log events/status updates | Explicit | `scour delve <area>`; the Codex skill and `ingest` bring outside reports |
+| **delve** | a picked area | one raw report per occasion, unmatched, under the ledger's `reviews/` | We run the job | Updates: progress bar and frequent log events/status updates | Explicit | `scour next <area>` from a session (the `skulkr-scour` skill), or `scour delve <area> --fleet`; the Codex skill and `ingest` bring outside reports |
 | **fold** | reports not yet in the ledger | the ledger's distinct defects and sightings (the ledger matcher) | Job results binned in the ledger | Items in various results lists | Implicit? | `scour fold <area>`, run by every delve and ingest |
 | **judge** | the ledger | whether to scan again: the stop rule, and which source to add next from the per-source estimates | Flow control over scanning process | Prefs that govern batch flow control | Configured | inside the loop |
 | **land** | a stopped ledger | `.skulkr/scour/<area>/<commit>/` and the registry lines it adds, committed to `main` | Saves results from recent scans to the database | | Automatic | `scour land`, run by hand |

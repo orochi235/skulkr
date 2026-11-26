@@ -173,8 +173,11 @@ const main = async () => {
     case 'saturate':
     case 'sat':
       tolerateClosedOutput();
-      // Scour never runs on the fleet: its model jobs bill the account that started them (2026-11-26).
-      await saturateCommand(cfg, createLocalRunner(cfg), root(), rest);
+      {
+        // Fleet mode bills each node's signed-in account; otherwise Claude's passes are the running session's subagents.
+        const fleet = rest.includes('--fleet');
+        await saturateCommand(cfg, fleet ? await loadRunner(cfg) : createLocalRunner(cfg), root(), rest.filter((a) => a !== '--fleet'), undefined, { fleet });
+      }
       return 0;
     case 'trial':
       trialCommand(cfg);

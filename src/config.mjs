@@ -138,7 +138,7 @@ export const DEFAULTS = {
    */
   review: { preload: true },
   /** Brief templates, paths relative to the config file; unset uses the shipped default. */
-  briefs: { reviewer: undefined, matcher: undefined, fixer: undefined, repair: undefined, conflict: undefined, ledgerMatch: undefined, scourTriage: undefined },
+  briefs: { reviewer: undefined, matcher: undefined, fixer: undefined, repair: undefined, conflict: undefined, ledgerMatch: undefined, scourTriage: undefined, scourSubagent: undefined },
 
   /**
    * `skulkr scour` (README "Scour"): `max` occasions at most, one review per source in `sources` (agent names)
@@ -244,6 +244,17 @@ export const DEFAULTS = {
       `Write(./${JOB_OUT}/**)`, `Edit(./${JOB_OUT}/**)`,
     ],
     reviewDenied: ['Task', 'Agent'],
+    /**
+     * List-price dollars per million tokens by model, `{ input, cacheRead, output }`, for a scour subagent's cost, which
+     * its transcript gives only as tokens; a cache write is priced from `input`. Haiku's `cacheRead` is taken as 0.1×
+     * its input, the usual ratio, not a published figure (2026-11-26).
+     */
+    prices: {
+      'claude-fable-5-2': { input: 8, cacheRead: 0.2, output: 40 },
+      'claude-opus-5-5': { input: 4, cacheRead: 0.2, output: 20 },
+      'claude-sonnet-5-5': { input: 2, cacheRead: 0.1, output: 10 },
+      'claude-haiku-5-5': { input: 0.1, cacheRead: 0.01, output: 0.5 },
+    },
   },
 
   codex: {

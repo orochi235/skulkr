@@ -10,10 +10,10 @@ import { ledgerDirOf } from './ledger.mjs';
 /** The scour process's own log in a ledger's directory, started over by each process that holds the ledger. */
 export const scourLogOf = (cfg, area) => join(ledgerDirOf(cfg, area), 'scour.log');
 
-/** `say` that also appends each line to the ledger's `scour.log`, which it first empties. */
-export const loggingSay = (cfg, area, say) => {
+/** `say` that also appends each line to the ledger's `scour.log`, which it first empties unless told to `keep` it. */
+export const loggingSay = (cfg, area, say, { keep = false } = {}) => {
   const path = scourLogOf(cfg, area);
-  writeFileSync(path, '');
+  if (!keep) writeFileSync(path, '');
   return (line) => {
     appendFileSync(path, `${new Date().toISOString()} ${line}\n`);
     say(line);

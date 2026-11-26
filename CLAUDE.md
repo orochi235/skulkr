@@ -11,7 +11,8 @@ weasel cutover.
   `sat`, `service`, `config`, `tenants`).
 - `src/defectGraph.mjs` — which findings are one defect, over rounds and landed saturation ledgers; `registry.mjs`
   writes it as `.skulkr/defects/`, `recordIndex.mjs` builds the SQLite index `skulkr q` reads.
-- `src/saturate.mjs` — `skulkr scour` (README "Scour"): `run` in `scourRun.mjs`, prices in `scourPrice.mjs`, its jobs in `saturateJobs.mjs`, `import` in
+- `src/saturate.mjs` — `skulkr scour` (README "Scour"): session mode's `next` in `scourSession.mjs` (a subagent's cost in
+  `agentCost.mjs`), folding in `scourFold.mjs`, `run` in `scourRun.mjs`, prices in `scourPrice.mjs`, fleet mode's jobs in `saturateJobs.mjs`, `import` in
   `saturateImport.mjs`, `land` in `saturateLand.mjs`, `ls` in `saturationList.mjs`, the ledger in `ledger.mjs`, the statistics in `saturation.mjs`, the report in `saturationReport.mjs`. Nothing in rounds reads them.
 - `src/` — the pipeline, plain Node ESM `.mjs` with no build. `config.mjs` holds every default and derives the
   names and regexes the rest reads; no other file may hold a project-specific value.
@@ -21,8 +22,9 @@ weasel cutover.
 - `src/agent/` — the agent interface (documented in `index.mjs`): what a model job runs, chosen per role by the config's
   `agent`. `claude.mjs`, the default, owns every `claude -p` flag and how its `claude.json` reads; `codex.mjs` runs
   reviewers on the Codex CLI.
-- `skills/` — agent skills that drive skulkr, linked into an agent's skills directory: `skulkr-review-saturation`,
-  Codex's hand-run saturation review, which ingests its report into the area's ledger.
+- `skills/` — agent skills that drive skulkr, linked into an agent's skills directory: `skulkr-scour`, which runs a
+  scour's passes as the Claude Code session's own subagents, and
+  `skulkr-review-saturation`, Codex's hand-run saturation review, which ingests its report into the area's ledger.
 - `briefs/` — the shipped default briefs. `examples/weasel.config.mjs` and `examples/weasel/` are weasel's config,
   briefs, and control-sweep adapter, kept to reproduce weasel's behavior exactly.
 - `dashboard/` — the standalone Vite app, its own package (not a workspace); `dashboard/README.md`.

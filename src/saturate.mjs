@@ -2,8 +2,9 @@
  * `skulkr scour` (alias `sat`): repeated blind reviews of one area at one frozen commit, folded into a ledger of
  * distinct defects until capture–recapture says the area is saturated. README "Scour" is its documentation.
  *
- *   skulkr scour [delve] <area> [--sources claude,codex] [--max N] [--per-defect $] [--usd $] [--at <sha>] [--fresh]
- *   skulkr scour run [areas…] [--by finish|cheapest|spread] [--usd $] [--passes N] [--per-defect $]
+ *   skulkr scour next <area> [--agent <id>] [--max N] [--per-defect $] [--at <sha>]
+ *   skulkr scour [delve] <area> --fleet [--sources claude,codex] [--max N] [--per-defect $] [--usd $] [--at <sha>] [--fresh]
+ *   skulkr scour run [areas…] --fleet [--by finish|cheapest|spread] [--usd $] [--passes N] [--per-defect $]
  *   skulkr scour fold <area>
  *   skulkr scour ingest <area> <report.md> --source <name> [--at <sha>]
  *   skulkr scour import <area> <dir> --at <sha> [--fresh]
@@ -12,12 +13,11 @@
  *   skulkr scour report <area>
  *   skulkr scour rm <area>
  */
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { addWorktree, gitIn, removeWorktree } from './batch.mjs';
 import {
-  allNew, emptyLedger, freezeCommitOf, keepReview, ledgerDirOf, ledgerOf, removeLedger, requireAreaFilesAt, requireSameCommit, withLedgerHeld,
-  withOccasion, writeLedger,
+  emptyLedger, freezeCommitOf, keepReview, ledgerDirOf, ledgerOf, removeLedger, requireAreaFilesAt, requireSameCommit, withLedgerHeld, writeLedger,
 } from './ledger.mjs';
 import { loggingSay } from './delveLive.mjs';
 import { takeLease } from './lease.mjs';
@@ -25,14 +25,16 @@ import { importLedger } from './saturateImport.mjs';
 import { landableIdsOf, landLedgers } from './saturateLand.mjs';
 import { ledgerListLines, ledgerListOf, scouredAreasOf } from './saturationList.mjs';
 import { moveFormerScourState } from './scourPaths.mjs';
-import { chao2, stopReason, yieldRows } from './saturation.mjs';
+import { chao2, stopReason } from './saturation.mjs';
 import { limitSpecOf, nextPriceOf, scourRuleOf } from './scourPrice.mjs';
 import { ledgerLinesOf } from './scourLines.mjs';
 import { scourRun } from './scourRun.mjs';
 import { writeReport } from './saturationReport.mjs';
-import { createSaturateContext, matchReport, occasionJobsOf, requireSources, runReview } from './saturateJobs.mjs';
+import { createSaturateContext, occasionJobsOf, requireSources, runReview } from './saturateJobs.mjs';
+import { foldPending, stageReport } from './scourFold.mjs';
+import { nextLines, scourNext } from './scourSession.mjs';
 
-export const SATURATE_USAGE = 'usage: skulkr scour [delve] <area> [--sources claude,codex] [--max N] [--per-defect $] [--usd $] [--at <sha>] [--fresh] | run [areas…] [--by finish|cheapest|spread] [--usd $] [--passes N] [--per-defect $] | fold <area> | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | land <area>… | land --all | ls [--json] | ls --source <name> --ids | report <area> | rm <area>';
+export const SATURATE_USAGE = 'usage: skulkr scour next <area> [--agent <id>] [--max N] [--per-defect $] [--at <sha>] | [delve] <area> --fleet [--sources claude,codex] [--max N] [--per-defect $] [--usd $] [--at <sha>] [--fresh] | run [areas…] --fleet [--by finish|cheapest|spread] [--usd $] [--passes N] [--per-defect $] | fold <area> | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | land <area>… | land --all | ls [--json] | ls --source <name> --ids | report <area> | rm <area>';
 
 /** `argv`'s positional words and flags. */
 export const saturateArgsOf = (cfg, argv) => {
@@ -56,7 +58,7 @@ export const saturateArgsOf = (cfg, argv) => {
   const passes = flags.passes === undefined ? undefined : Number(flags.passes);
   if (passes !== undefined && (!Number.isInteger(passes) || passes < 1)) throw new Error(`--passes wants a whole number, not ${flags.passes}`);
   return {
-    words, max, sources, fresh: Boolean(flags.fresh), all: Boolean(flags.all), json: Boolean(flags.json), ids: Boolean(flags.ids), source: flags.source, at: flags.at,
+    words, max, sources, fresh: Boolean(flags.fresh), all: Boolean(flags.all), json: Boolean(flags.json), ids: Boolean(flags.ids), source: flags.source, at: flags.at, agent: flags.agent,
     usd: dollars('usd'), perDefect: flags['per-defect'] === undefined ? undefined : (limitSpecOf(flags['per-defect']), flags['per-defect']), passes, by: flags.by,
   };
 };
@@ -93,74 +95,6 @@ const withFrozen = async (cfg, root, id, { fresh, at, about, say }, work) => wit
     removeWorktree(root, frozen);
   }
 });
-
-/** The progress line for occasion `o`, the last folded into `ledger`, under the stop rule `rule` (`scourRuleOf`). */
-export const occasionLine = (ledger, o, { max, factor, stopUsdPerDefect }) => {
-  const r = yieldRows(ledger).find((row) => row.n === o.n);
-  const s = r.stats;
-  const unseen = s.f0 === undefined ? '–' : s.f0.toFixed(1);
-  const next = s.nextNew === undefined ? '–' : `${Math.round(s.nextNew * 100)}%`;
-  const perDefect = r.usdPerDefect === undefined ? '–' : `$${r.usdPerDefect.toFixed(2)}`;
-  const price = nextPriceOf(ledger, factor).usd;
-  const nextUsd = price === undefined ? '–' : Number.isFinite(price) ? `$${price.toFixed(2)}` : 'none expected';
-  return `${o.n}/${max} ${o.source}: ${o.findings} findings, ${r.new} new; distinct ${s.S}; unseen ≈ ${unseen}; next-new ${next}; $${o.costUsd.toFixed(2)}; ${perDefect}/defect, next ≈ ${nextUsd} (limit $${stopUsdPerDefect.toFixed(2)})`;
-};
-
-/** The file a report waits in until it is folded, relative to the ledger's directory. */
-const unfoldedFileOf = (key) => `reviews/unfolded-${key.replace(/[^\w.-]+/g, '-')}.md`;
-
-/**
- * Keeps a finished report beside the ledger and lists it in the ledger's `unfolded`, where it waits for `foldPending`;
- * clears the job outputs it came from. Answers the new ledger.
- */
-const stageReport = (cfg, ledger, { key, source, kind, text, findings, costUsd, minutes }) => {
-  const file = unfoldedFileOf(key);
-  const path = join(ledgerDirOf(cfg, ledger.area), file);
-  mkdirSync(join(path, '..'), { recursive: true });
-  writeFileSync(path, text);
-  const next = { ...ledger, unfolded: [...(ledger.unfolded ?? []), { key, source, kind, file, findings, costUsd, minutes }] };
-  writeLedger(cfg, next);
-  rmSync(occasionJobsOf(cfg, ledger.area, key), { recursive: true, force: true });
-  return next;
-};
-
-/**
- * Folds the ledger's first unfolded report in as its next occasion, matched by the ledger matcher (or taken whole as
- * new when the ledger is empty), and writes the ledger. Answers the new ledger; throws, leaving the report unfolded,
- * when the matcher fails.
- */
-const foldNext = async (ctx, ledger) => {
-  const [entry, ...rest] = ledger.unfolded;
-  const { key, source, kind, file, findings, costUsd, minutes } = entry;
-  const dir = ledgerDirOf(ctx.cfg, ledger.area);
-  const text = readFileSync(join(dir, file), 'utf8');
-  const area = { id: ledger.area, files: ledger.files };
-  const matched = kind === 'review' && (ledger.defects.length === 0 || findings.length === 0)
-    ? { match: allNew(findings), costUsd: 0, minutes: 0 }
-    : await matchReport(ctx, area, key, ledger, kind === 'ingest' ? { raw: text } : { findings });
-  const n = ledger.occasions.length + 1;
-  const kept = keepReview(ctx.cfg, ledger.area, n, source, text);
-  const { unfolded: _, ...folded } = ledger;
-  const next = withOccasion(rest.length ? { ...folded, unfolded: rest } : folded, {
-    n, source, kind, file: kept, costUsd: costUsd + matched.costUsd, minutes: minutes + matched.minutes, at: new Date().toISOString(),
-  }, matched.match);
-  writeLedger(ctx.cfg, next);
-  rmSync(join(dir, file), { force: true });
-  rmSync(occasionJobsOf(ctx.cfg, ledger.area, key), { recursive: true, force: true });
-  return next;
-};
-
-/** Folds every unfolded report into the ledger, in the order they finished, printing a line for each. Answers the ledger. */
-const foldPending = async (ctx, ledger, ruleNow) => {
-  let at = ledger;
-  while (at.unfolded?.length) {
-    at = await foldNext(ctx, at);
-    const rule = ruleNow();
-    ctx.say(occasionLine(at, at.occasions.at(-1), rule));
-    writeReport(ctx.cfg, at.area, at, rule);
-  }
-  return at;
-};
 
 const spentOn = (ledger) => ledger.occasions.reduce((sum, o) => sum + (o.costUsd ?? 0), 0);
 
@@ -239,12 +173,31 @@ export const foldReports = async (cfg, runner, root, id, args, tell) => {
   });
 };
 
-/** `skulkr scour …`; each line it prints goes to `say`. */
-export const saturateCommand = async (cfg, runner, root, argv, say = (line) => console.log(line)) => {
+/**
+ * Throws unless Claude's reviews may run as `claude -p` jobs: only in fleet mode, since session mode gives them to the
+ * running session's subagents (README "Scour", 2026-11-26).
+ */
+const requireFleetFor = (sources, fleet) => {
+  if (!fleet && sources.includes('claude')) {
+    throw new Error('Claude reviews run as the session\'s own subagents (`skulkr scour next`, driven by the skulkr-scour skill); --fleet runs them as claude -p jobs instead');
+  }
+};
+
+/**
+ * `skulkr scour …`; each line it prints goes to `say`. `fleet` is fleet mode, where `delve` and `run` launch Claude's
+ * reviews as jobs through `runner`.
+ */
+export const saturateCommand = async (cfg, runner, root, argv, say = (line) => console.log(line), { fleet = true } = {}) => {
   const args = saturateArgsOf(cfg, argv);
   const [first, ...rest] = args.words;
   if (!first) throw new Error(SATURATE_USAGE);
   moveFormerScourState(cfg);
+  if (first === 'next') {
+    if (!rest[0]) throw new Error(SATURATE_USAGE);
+    const step = await scourNext(cfg, root, rest[0], args, say);
+    for (const line of nextLines(rest[0], step)) say(line);
+    return step;
+  }
   if (first === 'ingest') {
     const [id, path] = rest;
     if (!id || !path) throw new Error(SATURATE_USAGE);
@@ -289,14 +242,15 @@ export const saturateCommand = async (cfg, runner, root, argv, say = (line) => c
     say(`removed ${rest[0]}'s saturation ledger`);
     return undefined;
   }
-  if (first === 'run') return scourRun(cfg, runner, root, { ...args, words: rest }, say);
+  if (first === 'run') {
+    requireFleetFor(args.sources, fleet);
+    return scourRun(cfg, runner, root, { ...args, words: rest }, say);
+  }
   if (first === 'fold') {
     if (!rest[0]) throw new Error(SATURATE_USAGE);
     return foldReports(cfg, runner, root, rest[0], args, say);
   }
-  if (first === 'delve') {
-    if (!rest[0]) throw new Error(SATURATE_USAGE);
-    return saturateArea(cfg, runner, root, rest[0], args, say);
-  }
-  return saturateArea(cfg, runner, root, first, args, say);
+  if (first === 'delve' && !rest[0]) throw new Error(SATURATE_USAGE);
+  requireFleetFor(args.sources, fleet);
+  return saturateArea(cfg, runner, root, first === 'delve' ? rest[0] : first, args, say);
 };
