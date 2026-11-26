@@ -41,7 +41,7 @@ export const scourRun = async (cfg, runner, root, args, say) => {
     spent += spentOn(ledgerOf(cfg, id)) - before;
   };
   const byPrice = () => {
-    const rule = scourRuleOf(cfg, args);
+    const rule = scourRuleOf(cfg, root, args);
     return candidatePricesOf(cfg, root, ids, rule, pricingOf(cfg)).filter((c) => !c.stopped).sort((a, b) => a.usd - b.usd);
   };
   say(`scour run by ${by}: ${ids.length} ${ids.length === 1 ? 'area' : 'areas'}, ${Number.isFinite(budget) ? `$${budget.toFixed(2)} to spend` : 'no budget'}`);

@@ -58,6 +58,8 @@ export interface SaturationLedger {
   readonly nextNew: number | null;
   /** What the next defect should cost (README "The price of the next defect"); null under two occasions or with none expected. */
   readonly nextUsd: number | null;
+  /** The per-defect limit a delve stops at: dollars, and where it is a multiple of the going rate, the multiple and rate. */
+  readonly limit: { readonly usd: number; readonly times: number | null; readonly goingUsd: number | null; readonly text: string };
   /** Defects found, estimated unseen, and dollars spent, each per thousand lines; null without `lines`. */
   readonly defectsPerKloc: number | null;
   readonly unseenPerKloc: number | null;

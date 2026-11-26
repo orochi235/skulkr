@@ -144,7 +144,7 @@ export const DEFAULTS = {
    * `skulkr scour` (README "Scour"): `max` occasions at most, one review per source in `sources` (agent names)
    * each iteration, stopping once the chance of a new finding falls under `stopNextNew`.
    */
-  saturate: { max: 40, sources: ['claude'], stopNextNew: 0.15, stopUnseenPerKloc: 1, stopUsdPerDefect: 1.5, openingUsdPerDefect: 0.4 },
+  saturate: { max: 40, sources: ['claude'], stopNextNew: 0.15, stopUnseenPerKloc: 1, stopUsdPerDefect: { times: 4 }, openingUsdPerDefect: 0.4 },
 
   /**
    * How a batch is tested. `{ref}` in the command is the batch branch; `cwd` is `root` or `batch` (its worktree).

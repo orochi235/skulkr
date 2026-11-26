@@ -22,7 +22,7 @@ describe('a delve\'s cost cutoffs', () => {
     const seen = [['A', 'B', 'C', 'D'], ['D', 'B', 'E', 'F', 'G', 'H', 'I'], ['J', 'A', 'K', 'H'], ['A', 'D']];
     await saturateCommand(cfg, fakeRunner(seen), root, ['src', '--per-defect', '0.3'], (l) => lines.push(l));
     expect(occasionsOf(cfg, 'src')).toBe(3);
-    expect(lines.at(-2)).toMatch(/^saturate src: stopped, the next defect would cost about \$0\.38, over the \$0\.30 limit$/);
+    expect(lines.at(-2)).toMatch(/^saturate src: stopped, the next defect would cost about \$0\.38, over the limit of \$0\.30$/);
   });
 });
 

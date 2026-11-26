@@ -10,7 +10,7 @@ const pass = (n: number, over: Partial<SaturationPass> = {}): SaturationPass => 
 
 const ledger = (passes: SaturationPass[]): SaturationLedger => ({
   id: 'core', area: 'core', commit: 'c0ffee', files: 3, occasions: passes.length, sources: { claude: passes.length }, costUsd: 2,
-  distinct: 2, total: null, unseen: null, nextNew: null, nextUsd: null, lines: 2000, defectsPerKloc: 1, unseenPerKloc: null, usdPerKloc: 1, passes, stopped: null, updated: null, running: null, defects: [],
+  distinct: 2, total: null, unseen: null, nextNew: null, nextUsd: null, lines: 2000, defectsPerKloc: 1, unseenPerKloc: null, limit: { usd: 1.5, times: null, goingUsd: null, text: '$1.50' }, usdPerKloc: 1, passes, stopped: null, updated: null, running: null, defects: [],
 });
 
 describe('PassTableButton', () => {

@@ -34,12 +34,12 @@ export const landableIdsOf = (cfg) => {
 };
 
 /** Writes `ledger`, its report, and the raw reports its occasions name into `to`, replacing an earlier landing. */
-const writeLanded = (cfg, id, ledger, to) => {
+const writeLanded = (cfg, root, id, ledger, to) => {
   rmSync(to, { recursive: true, force: true });
   mkdirSync(join(to, 'reviews'), { recursive: true });
   const { unfolded: _, ...folded } = ledger;
   writeFileSync(join(to, 'ledger.json'), `${JSON.stringify(folded, null, 1)}\n`);
-  writeFileSync(join(to, 'report.md'), reportText(ledger, scourRuleOf(cfg)));
+  writeFileSync(join(to, 'report.md'), reportText(ledger, scourRuleOf(cfg, root)));
   for (const { file } of ledger.occasions) if (file) cpSync(join(ledgerDirOf(cfg, id), file), join(to, file));
 };
 
@@ -72,7 +72,7 @@ export const landLedgers = async (cfg, root, ids, say = () => {}) => {
     try {
       const dirs = ledgers.map((ledger, i) => {
         const dir = landedDirOf(cfg, ledger);
-        writeLanded(cfg, ids[i], ledger, join(tree, dir));
+        writeLanded(cfg, root, ids[i], ledger, join(tree, dir));
         rmSync(join(tree, formerLandedDirOf(cfg, ledger)), { recursive: true, force: true });
         return dir;
       });

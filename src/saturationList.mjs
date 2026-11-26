@@ -7,7 +7,7 @@ import { gitIn } from './batch.mjs';
 import { liveScourOf } from './delveLive.mjs';
 import { ledgerOf } from './ledger.mjs';
 import { queryIndex } from './recordIndex.mjs';
-import { chao2, sourcesOf, stopReason } from './saturation.mjs';
+import { chao2, limitText, sourcesOf, stopReason } from './saturation.mjs';
 import { nextPriceOf, passRowsOf, scourRuleOf } from './scourPrice.mjs';
 import { ledgerLinesOf, perKloc } from './scourLines.mjs';
 import { landedLedgersUnder, scourStateDirOf } from './scourPaths.mjs';
@@ -16,7 +16,7 @@ import { landedLedgersUnder, scourStateDirOf } from './scourPaths.mjs';
  * One ledger's summary and defects; `id` is its directory, an area or a set-aside `<area>.<commit>`. `registered`
  * answers, for a landed ledger's key, each of its defects' registry line by defect id (`{ id, status, sha }`).
  */
-export const ledgerSummaryOf = (cfg, id, ledger, registered = () => new Map(), rule = scourRuleOf(cfg)) => {
+export const ledgerSummaryOf = (cfg, id, ledger, registered = () => new Map(), rule = scourRuleOf(cfg, undefined)) => {
   const inRegistry = registered(`${ledger.area}@${ledger.commit.slice(0, 10)}`);
   const stats = chao2(ledger.occasions, ledger.defects);
   const price = nextPriceOf(ledger, rule.factor);
@@ -35,6 +35,7 @@ export const ledgerSummaryOf = (cfg, id, ledger, registered = () => new Map(), r
     unseen: stats.f0 ?? null,
     nextNew: stats.nextNew ?? null,
     nextUsd: price.usd === undefined || !Number.isFinite(price.usd) ? null : price.usd,
+    limit: { usd: rule.stopUsdPerDefect, times: rule.limit?.times ?? null, goingUsd: rule.limit?.goingUsd ?? null, text: limitText(rule) },
     defectsPerKloc: perKloc(ledger.defects.length, ledger.lines),
     unseenPerKloc: perKloc(stats.f0, ledger.lines),
     usdPerKloc: perKloc(costUsd, ledger.lines),
@@ -82,7 +83,7 @@ export const ledgerListOf = (cfg, root) => {
     const ledger = ledgerOf(cfg, id);
     return ledger ? [[id, ledger.lines === undefined ? { ...ledger, lines: ledgerLinesOf(cfg, root, ledger, id) } : ledger]] : [];
   });
-  const rule = scourRuleOf(cfg, {}, ledgers.map(([, ledger]) => ledger));
+  const rule = scourRuleOf(cfg, root, {}, ledgers.map(([, ledger]) => ledger));
   return ledgers.map(([id, ledger]) => ({ ...ledgerSummaryOf(cfg, id, ledger, registered, rule), running: liveScourOf(cfg, id) }));
 };
 

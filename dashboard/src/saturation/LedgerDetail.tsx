@@ -32,7 +32,7 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
           <code>{ledger.commit.slice(0, 10)}</code> · {ledger.occasions} occasions ({sourcesText(ledger.sources)}) ·{' '}
           <span className={s.num}>{ledger.distinct}</span> found, ≈<span className={s.num}>{estimate(ledger.total)}</span> held,
           next new <span className={s.num}>{percent(ledger.nextNew)}</span> · <span className={s.num}>{usd(ledger.costUsd)}</span>,
-          next defect ≈ <span className={s.num}>{usdOrDash(ledger.nextUsd)}</span>
+          next defect ≈ <span className={s.num}>{usdOrDash(ledger.nextUsd)}</span>, limit <span className={s.num}>{ledger.limit.text}</span>
         </p>
         {ledger.lines !== null && (
           <p className={s.facts}>

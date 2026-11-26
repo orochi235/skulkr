@@ -114,7 +114,7 @@ describe('stopReason', () => {
   it('stops when the next defect costs over the limit, or another pass would spend past the cap', () => {
     const priced = { ...rule, stopUsdPerDefect: 1.5, usd: 10 };
     const stats = { m: 6, f0: 3, nextNew: 0.3 };
-    expect(stopReason(stats, priced, { price: { usd: 2.4, passUsd: 0.8 }, spentUsd: 1 })).toBe('the next defect would cost about $2.40, over the $1.50 limit');
+    expect(stopReason(stats, priced, { price: { usd: 2.4, passUsd: 0.8 }, spentUsd: 1 })).toBe('the next defect would cost about $2.40, over the limit of $1.50');
     expect(stopReason(stats, priced, { price: { usd: 1.2, passUsd: 0.8 }, spentUsd: 9.5 })).toBe('another pass would take spending past the $10.00 limit ($9.50 spent)');
     expect(stopReason(stats, priced, { price: { usd: 1.2, passUsd: 0.8 }, spentUsd: 9 })).toBeNull();
     expect(stopReason(stats, priced, { price: { usd: undefined, passUsd: 0.8 }, spentUsd: 0 })).toBeNull();

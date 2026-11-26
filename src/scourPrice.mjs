@@ -4,6 +4,7 @@
  */
 import { existsSync, readdirSync } from 'node:fs';
 import { ledgerOf } from './ledger.mjs';
+import { partitionAt } from './partition.mjs';
 import { chao2, stopRuleOf, yieldRows } from './saturation.mjs';
 import { perKloc } from './scourLines.mjs';
 import { scourStateDirOf } from './scourPaths.mjs';
@@ -66,9 +67,59 @@ export const pricingOf = (cfg, ledgers = stateLedgersOf(cfg)) => ({
   openingUsd: openingPriceOf(ledgers, cfg.saturate.openingUsdPerDefect),
 });
 
-/** The stop rule for a scour command's flags (`max`, `perDefect`, `usd`), priced by `cfg`'s ledgers. */
-export const scourRuleOf = (cfg, { max = cfg.saturate.max, perDefect, usd } = {}, ledgers = undefined) =>
-  stopRuleOf(cfg, max, { perDefect, usd, factor: pricingOf(cfg, ledgers).factor });
+/**
+ * A per-defect limit as the config or `--per-defect` gives it: dollars (`2.5`, `'$2.5'`) as `{ usd }`, or a multiple
+ * of the going rate (`{ times: 4 }`, `'4x'`) as `{ times }`. Throws on anything else.
+ */
+export const limitSpecOf = (given) => {
+  const times = typeof given === 'object' && given !== null ? given.times : /^\s*(\d+(?:\.\d+)?)\s*[x×]\s*$/i.exec(String(given))?.[1];
+  if (times !== undefined) {
+    if (!(Number(times) > 0)) throw new Error(`a per-defect limit's multiple must be over 0, not ${times}`);
+    return { times: Number(times) };
+  }
+  const usd = Number(String(given).replace(/^\s*\$/, ''));
+  if (!(usd > 0)) throw new Error(`a per-defect limit is dollars (2.5) or a multiple of the going rate (4x), not ${given}`);
+  return { usd };
+};
+
+/**
+ * The going rate: the cheapest next defect in the project, among its areas' own ledgers with two passes or more and,
+ * while any area of the partition under `root` has fewer, the opening price (with no `root`, assumed so).
+ */
+export const goingRateOf = (cfg, root, { factor, openingUsd }) => {
+  const dir = scourStateDirOf(cfg);
+  const deep = (existsSync(dir) ? readdirSync(dir) : []).flatMap((id) => {
+    const ledger = ledgerOf(cfg, id);
+    return ledger && ledger.area === id && ledger.occasions.length >= 2 ? [ledger] : [];
+  });
+  let fresh = true;
+  if (root) {
+    try {
+      const delved = new Set(deep.map((l) => l.area));
+      fresh = partitionAt(cfg, root, cfg.git.main).some((a) => !delved.has(a.id));
+    } catch { /* no partition to read: assumed fresh */ }
+  }
+  const prices = deep.map((l) => nextPriceOf(l, factor).usd).filter((p) => p !== undefined && Number.isFinite(p));
+  return Math.min(...prices, ...(fresh ? [openingUsd] : []), Infinity);
+};
+
+/**
+ * The stop rule for a scour command's flags (`max`, `perDefect`, `usd`), priced by `cfg`'s ledgers; `root` is the
+ * project, whose partition says whether fresh areas remain. Its `limit` says how the per-defect limit was set:
+ * `{ usd }`, or `{ usd, times, goingUsd }` for a multiple of the going rate.
+ * @param {any} cfg @param {string | undefined} root
+ * @param {{ max?: number, perDefect?: string | number | { times: number }, usd?: number }} [flags] @param {any[]} [ledgers]
+ */
+export const scourRuleOf = (cfg, root, { max = cfg.saturate.max, perDefect, usd } = {}, ledgers = undefined) => {
+  const pricing = pricingOf(cfg, ledgers);
+  const spec = limitSpecOf(perDefect ?? cfg.saturate.stopUsdPerDefect);
+  const limit = spec.times === undefined ? spec : (() => {
+    const goingUsd = goingRateOf(cfg, root, pricing);
+    return { usd: spec.times * goingUsd, times: spec.times, goingUsd };
+  })();
+  return { ...stopRuleOf(cfg, max, { perDefect: limit.usd, usd, factor: pricing.factor }), limit };
+};
+
 
 /**
  * The price of `ledger`'s next defect: `usd`, the average cost of its last five passes over the new defects its next

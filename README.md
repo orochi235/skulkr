@@ -527,8 +527,8 @@ question harder for one area: blind reviews of it, again and again, at one froze
 until capture–recapture says further reviews would find little new. Nothing it records feeds a round: not history,
 calibration, the queue, or the map.
 
-    skulkr scour [delve] <area> [--sources claude,codex] [--max 40] [--per-defect 1.5] [--usd <n>] [--at <sha>] [--fresh] [--fleet]
-    skulkr scour run [areas…] [--by finish|cheapest|spread] [--usd <n>] [--passes 10] [--per-defect 1.5]
+    skulkr scour [delve] <area> [--sources claude,codex] [--max 40] [--per-defect 4x|<$>] [--usd <n>] [--at <sha>] [--fresh] [--fleet]
+    skulkr scour run [areas…] [--by finish|cheapest|spread] [--usd <n>] [--passes 10] [--per-defect 4x|<$>]
     skulkr scour fold <area>
     skulkr scour ingest <area> <report.md> --source <name> [--at <sha>]
     skulkr scour import <area> <dir> --at <sha> [--fresh]
@@ -547,13 +547,13 @@ as `reviews/unfolded-<NN>-<source>.md` and listed in the ledger's `unfolded`; **
 they finished, each through the **ledger matcher**, which says which of its findings are defects the ledger already holds and which are new.
 After each occasion skulkr prints a line, rewrites the report, and checks the stop rule:
 
-    7/40 claude: 3 findings, 1 new; distinct 19; unseen ≈ 6.1; next-new 18%; $0.62; $1.84/defect, next ≈ $1.12
+    7/40 claude: 3 findings, 1 new; distinct 19; unseen ≈ 6.1; next-new 18%; $0.62; $1.84/defect, next ≈ $1.12 (limit $1.48)
 
 `$/defect` is everything spent so far over the defects found; `next` is what the next defect should cost (below).
 It stops once the combined estimate puts fewer than `saturate.stopUnseenPerKloc` (1) defects unseen per thousand
 lines (fewer than one, where the lines cannot be counted), the chance that the next occasion's finding
 is new falls under `saturate.stopNextNew` (15%), the next defect would cost over `--per-defect` dollars
-(`saturate.stopUsdPerDefect`, 1.50), another pass would take what this command has spent past `--usd`, or `--max`
+(`saturate.stopUsdPerDefect`, 4× the going rate, below), another pass would take what this command has spent past `--usd`, or `--max`
 occasions (`saturate.max`, 40) are in the ledger.
 
 **Per thousand lines.** Areas differ in size by five times and more, so the unseen estimate is held to a density,
@@ -572,6 +572,14 @@ The price ranks passes correctly where the plain trailing rate (the last five pa
 does not: a trailing price over $3 was followed by passes finding defects at $1.37. It has no value under two passes.
 On weasel, a fresh area's first five passes found defects at about 40¢ each, passes 16–20 at about $2.60
 (2026-11-25), and every ledger that ran to the old stop rule ended with its next defect priced at $1.30–3.60.
+
+**The per-defect limit** is dollars (`saturate.stopUsdPerDefect: 2.5`, `--per-defect 2.5`) or a multiple of the
+going rate (`{ times: 4 }`, `--per-defect 4x`), which is the default: never pay more than four times what a defect
+costs elsewhere in the project (2026-11-26). The **going rate** is the cheapest next defect in the project: each area's
+own ledger with two passes or more at its price, and, while any area of the partition has fewer, the opening price.
+So while fresh areas remain the limit sits at four times the opening price ($1.48 on weasel at 37¢), and it rises by
+itself once every area has been delved and the cheap defects are gone. It is priced again before each pass, and the
+progress line, `ls --json`'s `limit`, the stop reason and the Scour page say what it is and how it was set.
 
 **Choosing the next pass.** `skulkr scour run` delves several areas within one budget, `--usd`, sending each pass
 where `--by` says. The candidates are the areas named, else every area of the partition, which needs `--usd`. Each

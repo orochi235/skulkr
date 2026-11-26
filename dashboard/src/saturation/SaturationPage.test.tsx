@@ -9,7 +9,7 @@ import fixture from '@dash/audits/fixture.map.json';
 
 const ledger = (id: string, unseen: number, defects: SaturationLedger['defects']): SaturationLedger => ({
   id, area: id, commit: '9c4522d63555ec5f264441bcef4cd6a1917eac02', files: 26, occasions: 24, sources: { codex: 1, claude: 23 },
-  costUsd: 23.28, distinct: defects.length, total: defects.length + unseen, unseen, nextNew: 0.147, nextUsd: 1.2, lines: null, defectsPerKloc: null, unseenPerKloc: null, usdPerKloc: null, passes: [],
+  costUsd: 23.28, distinct: defects.length, total: defects.length + unseen, unseen, nextNew: 0.147, nextUsd: 1.2, lines: null, defectsPerKloc: null, unseenPerKloc: null, limit: { usd: 1.5, times: null, goingUsd: null, text: '$1.50' }, usdPerKloc: null, passes: [],
   stopped: "the next occasion's chance of a new finding is under 15% (14.7%)", updated: '2026-11-25T07:50:00Z', defects, running: null,
 });
 

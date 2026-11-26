@@ -77,7 +77,7 @@ export const importLedger = async (cfg, root, id, dir, args, say) => {
     for (const o of ledger.occasions) keepReview(cfg, id, o.n, SOURCE, readFileSync(reviewPath(o.n), 'utf8'));
     writeLedger(cfg, ledger);
     say(`imported ${ledger.occasions.length} occasions and ${ledger.defects.length} defects into ${id}'s ledger at ${commit.slice(0, 10)}`);
-    say(`saturate ${id}: report at ${writeReport(cfg, id, ledger, scourRuleOf(cfg, args))}`);
+    say(`saturate ${id}: report at ${writeReport(cfg, id, ledger, scourRuleOf(cfg, root, args))}`);
     return ledger;
   });
 };

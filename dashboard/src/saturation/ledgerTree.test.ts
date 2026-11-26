@@ -4,7 +4,7 @@ import type { SaturationLedger } from './saturation.types';
 
 const ledger = (id: string, distinct: number, unseen: number | null, area = id): SaturationLedger => ({
   id, area, commit: '9c4522d63555ec5f264441bcef4cd6a1917eac02', files: 1, occasions: 2, sources: { claude: 2 },
-  costUsd: 1, distinct, total: null, unseen, nextNew: null, nextUsd: null, lines: null, defectsPerKloc: null, unseenPerKloc: null, usdPerKloc: null, passes: [], stopped: null, updated: null, defects: [], running: null,
+  costUsd: 1, distinct, total: null, unseen, nextNew: null, nextUsd: null, lines: null, defectsPerKloc: null, unseenPerKloc: null, limit: { usd: 1.5, times: null, goingUsd: null, text: '$1.50' }, usdPerKloc: null, passes: [], stopped: null, updated: null, defects: [], running: null,
 });
 
 const shape = (nodes: readonly LedgerTreeNode[]): unknown => nodes.map((n) => [n.label, n.defects, n.unseen, ...(n.children.length ? [shape(n.children)] : [])]);
