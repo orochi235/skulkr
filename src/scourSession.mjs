@@ -16,6 +16,7 @@ import {
   emptyLedger, freezeCommitOf, keepReview, ledgerDirOf, ledgerMatchPrompt, ledgerOf, matchOf, requireAreaFilesAt, requireSameCommit, writeLedger,
 } from './ledger.mjs';
 import { cacheTierOf, sessionTranscriptAt, transcriptAt, transcriptCostOf } from './agentCost.mjs';
+import { preloadedFiles } from './area.mjs';
 import { recentlyChanged, reviewFileList } from './reviewFiles.mjs';
 import { chao2, stopReason } from './saturation.mjs';
 import { occasionJobsOf, sourceConfigOf } from './saturateJobs.mjs';
@@ -83,17 +84,56 @@ const handOut = (cfg, id, task, prompt, model, say) => {
   return { task: task.kind, key: task.key, model: model ?? null, prompt: task.prompt };
 };
 
+/** What one Read call returns whole: well under its 2,000-line default and its token cap. */
+const PART = { lines: 1800, chars: 50_000 };
+
+/** `text` cut at line ends into parts no longer than `limit` (`{ lines, chars }`); an overlong line stands alone. */
+export const partsOf = (text, limit = PART) => {
+  const parts = [];
+  let part = [];
+  let chars = 0;
+  for (const line of text.split('\n')) {
+    if (part.length && (part.length >= limit.lines || chars + line.length + 1 > limit.chars)) {
+      parts.push(part.join('\n'));
+      part = [];
+      chars = 0;
+    }
+    part.push(line);
+    chars += line.length + 1;
+  }
+  if (part.length) parts.push(part.join('\n'));
+  return parts;
+};
+
+/**
+ * Writes the area's files, as a round's preloading reviewer gets them, into part files beside the prompt, and answers
+ * the line telling the subagent to read them all in its first turn: each later turn rereads everything before it, so
+ * reading in one turn rather than one file a turn is most of a review's cost (2026-11-26).
+ */
+const preloadLine = (dir, tree, files) => {
+  const paths = partsOf(preloadedFiles(tree, files)).map((text, i) => {
+    const path = join(dir, `files-${i + 1}.md`);
+    writeFileSync(path, text);
+    return path;
+  });
+  return `- **Every listed file's contents are in ${paths.length === 1 ? 'this file' : `these ${paths.length} files`}; in your first turn, read ${paths.length === 1 ? 'it' : 'them all, in parallel,'} whole: ${paths.map((p) => `\`${p}\``).join(', ')}.** Don't open a listed file again; open others only to follow a call or a type.`;
+};
+
 const reviewTask = (cfg, root, ledger, say) => {
   const id = ledger.area;
   const key = `${pad(ledger.occasions.length + 1)}-${SOURCE}`;
   const dir = occasionJobsOf(cfg, id, key);
+  mkdirSync(dir, { recursive: true });
   const tree = treeOf(cfg, root, id);
   const vars = {
     ...projectVars(cfg, 'reviewer'), round: 'saturation', area: id, commit: ledger.commit, out: 'your final reply',
     files: reviewFileList(tree, ledger.files, recentlyChanged(tree, ledger.files)),
   };
   const body = `${fill(brief(sourceConfigOf(cfg, SOURCE), 'reviewer'), vars)}\n\n${readIf(cfg.briefPath('scourTriage'))}`;
-  const instructions = `- **The brief says the tree's \`CLAUDE.md\` is already in your context; it is not.** Read \`${tree}/CLAUDE.md\` once, first.`;
+  const instructions = [
+    `- **The brief says the tree's \`CLAUDE.md\` is already in your context; it is not.** Read \`${tree}/CLAUDE.md\` in your first turn too.`,
+    preloadLine(dir, tree, ledger.files),
+  ].join('\n');
   const prompt = subagentPrompt(cfg, tree, 'the whole findings document, ending with its `<!-- done: … -->` line', instructions, body);
   return handOut(cfg, id, { kind: 'review', step: 'review', key, prompt: join(dir, 'prompt.md') }, prompt, cfg.claude.models.review, say);
 };

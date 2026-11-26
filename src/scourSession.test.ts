@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { transcriptCostOf, usageCostOf } from './agentCost.mjs';
 import { ledgerOf } from './ledger.mjs';
 import { saturateArgsOf, saturateCommand } from './saturate.mjs';
-import { scourNext } from './scourSession.mjs';
+import { partsOf, scourNext } from './scourSession.mjs';
 import { project, scratch } from './scourTestKit.ts';
 
 const OPUS = { input: 4, cacheRead: 0.2, output: 20 };
@@ -50,6 +50,13 @@ describe('agent cost', () => {
   });
 });
 
+describe('preload parts', () => {
+  it('cuts at line ends under both limits, an overlong line alone', () => {
+    expect(partsOf('a\nb\nc\nd\ne', { lines: 2, chars: 100 })).toEqual(['a\nb', 'c\nd', 'e']);
+    expect(partsOf('aaaa\nbb\ncccccccccc\nd', { lines: 10, chars: 8 })).toEqual(['aaaa\nbb', 'cccccccccc', 'd']);
+  });
+});
+
 describe('skulkr scour next', () => {
   it('hands out reviews and matches, folds their answers at what the subagents cost, and stops at --max', async () => {
     const { root, cfg } = project();
@@ -62,6 +69,8 @@ describe('skulkr scour next', () => {
     expect(prompt).toContain(`The frozen tree is \`${join(root, '.worktrees/audit-saturate-src')}\``);
     expect(prompt).toContain("Write no files");
     expect(prompt).toContain('src/x.ts');
+    expect(prompt).toContain('files-1.md');
+    expect(readFileSync(join(cfg.state, 'scour/src/jobs/01-claude/files-1.md'), 'utf8')).toContain('export const x = 1;');
     expect(existsSync(join(root, '.worktrees/audit-saturate-src/src/x.ts'))).toBe(true);
     expect(await next()).toMatchObject({ task: 'review', key: '01-claude', again: true });
 
