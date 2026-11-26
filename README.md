@@ -528,8 +528,8 @@ until capture–recapture says further reviews would find little new. Nothing it
 calibration, the queue, or the map.
 
     skulkr scour next <area> [--agent <id>] [--metered] [--max 40] [--per-defect 4x|<$>] [--at <sha>]
-    skulkr scour [delve] <area> --fleet [--sources claude,codex] [--max 40] [--per-defect 4x|<$>] [--usd <n>] [--at <sha>] [--fresh]
-    skulkr scour run [areas…] --fleet [--by finish|cheapest|spread] [--usd <n>] [--passes 10] [--per-defect 4x|<$>]
+    skulkr scour [delve] <area> [--fleet] [--account <config dir>] [--metered] [--sources claude,codex] [--max 40] [--per-defect 4x|<$>] [--usd <n>] [--at <sha>] [--fresh]
+    skulkr scour run [areas…] [--fleet] [--account <config dir>] [--metered] [--by finish|cheapest|spread] [--usd <n>] [--passes 10] [--per-defect 4x|<$>]
     skulkr scour fold <area>
     skulkr scour ingest <area> <report.md> --source <name> [--at <sha>]
     skulkr scour import <area> <dir> --at <sha> [--fresh]
@@ -538,17 +538,22 @@ calibration, the queue, or the map.
     skulkr scour report <area>
     skulkr scour rm <area>
 
-Each **occasion** is one report. Claude's occasions come one of two ways:
+Each **occasion** is one report. Claude's occasions come one of three ways:
 
-| | Session mode (the default) | Fleet mode (`--fleet`) |
-|---|---|---|
-| Who reviews | Subagents of the Claude Code session running the scour | `claude -p` jobs, as a round's reviewers |
-| Driven by | The `skulkr-scour` skill, calling `skulkr scour next` | `skulkr scour delve` or `scour run` |
-| Runs on | This machine, billed to the session's account | The configured runner, billed to each node's signed-in account |
-| Cost of a pass | Priced from the subagent's transcript at `claude.prices` | The job's own `total_cost_usd` |
+| | Local mode (the default) | Session mode | Fleet mode (`--fleet`) |
+|---|---|---|---|
+| Who reviews | `claude -p` jobs, as a round's reviewers | Subagents of a Claude Code session | `claude -p` jobs, as a round's reviewers |
+| Driven by | `skulkr scour delve` or `scour run` | The `skulkr-scour` skill, calling `skulkr scour next` | `skulkr scour delve` or `scour run` |
+| Runs on | This machine, as the account that started the run, or `--account` | This machine, as the session's account | The configured runner, as each node's signed-in account |
+| Measured cost of a review (Opus, 2026-11-26) | $1.21–1.57 | $1.72 with files preloaded, $2.48–4.37 before | as local |
 
-Without `--fleet`, `delve` and `run` refuse a Claude source and point at session mode; a Codex-only delve still runs
-its jobs on this machine (2026-11-26).
+**Local mode.** `delve` and `run` without `--fleet` run every job on this machine, each `claude -p` as `--account <config
+dir>` where given, else as the account that started the run (its `CLAUDE_CONFIG_DIR`, else Claude Code's default),
+never the config's own `claude.configDir`: weasel's names the account its fleet nodes run as, which a local run must not spend
+(2026-11-26). Reviews and matches run on Claude Code's own cache
+lifetime rather than `claude.cacheTtl`'s, an hour on plan usage, so each job's cache writes show which it ran on: a
+job that wrote only the five-minute tier ran in usage overage, which is metered, and the delve stops after that
+iteration, `run` with it, unless `--metered` approves metered usage for the run.
 
 **Session mode.** `skulkr scour next <area>` keeps the books between subagents. It freezes the area's worktree and
 holds its ledger for the session (its lease names the session's Claude Code process, `$CLAUDE_PID`, so it lasts
@@ -612,7 +617,7 @@ So while fresh areas remain the limit sits at four times the opening price ($1.4
 itself once every area has been delved and the cheap defects are gone. It is priced again before each pass, and the
 progress line, `ls --json`'s `limit`, the stop reason and the Scour page say what it is and how it was set.
 
-**Choosing the next pass.** `skulkr scour run --fleet` delves several areas within one budget, `--usd`, sending each pass
+**Choosing the next pass.** `skulkr scour run` delves several areas within one budget, `--usd`, sending each pass
 where `--by` says. The candidates are the areas named, else every area of the partition, which needs `--usd`. Each
 area still stops by its own rule.
 

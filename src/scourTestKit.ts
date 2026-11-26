@@ -36,13 +36,13 @@ export const project = (areas: string[] = ['src']) => {
 };
 
 const reportOf = (claims: string[]) => `${claims.map((c) => `## ${c}\n- where: src/x.ts:1\n`).join('\n')}\n## Files read\n- src/x.ts\n\n<!-- done: ${claims.length} findings -->\n`;
-const envelope = (result: string, cost: number) => JSON.stringify({ type: 'result', is_error: false, result, total_cost_usd: cost });
+const envelope = (result: string, cost: number, usage?: object) => JSON.stringify({ type: 'result', is_error: false, result, total_cost_usd: cost, ...(usage ? { usage, modelUsage: { 'claude-opus-5-5': {} } } : {}) });
 
 /**
  * A runner that answers each review, $0.50 each, with the next occasion's claims from `seen`, and each ledger match,
  * $0.10, by reading its prompt and pairing equal claims, as a model would; `matchReply` overrides the matcher's answer.
  */
-export const fakeRunner = (seen: string[][], { matchReply }: { matchReply?: () => string } = {}) => {
+export const fakeRunner = (seen: string[][], { matchReply, usage }: { matchReply?: () => string; usage?: object } = {}) => {
   let review = 0;
   const tasks: string[] = [];
   const run = async (job: { to: string; task: string; shell: string }, { cwd }: { cwd: string }) => {
@@ -64,7 +64,7 @@ export const fakeRunner = (seen: string[][], { matchReply }: { matchReply?: () =
     } else {
       const text = reportOf(seen[review++] ?? []);
       writeFileSync(join(job.to, 'findings.md'), text);
-      writeFileSync(join(job.to, 'claude.json'), envelope(text, 0.5));
+      writeFileSync(join(job.to, 'claude.json'), envelope(text, 0.5, usage));
     }
     return { status: 0 };
   };

@@ -47,11 +47,14 @@ export const createSaturateContext = ({ cfg, runner, frozen, base, commit, area,
   // A runner that keeps its jobs on this machine leases this machine's slots, whatever nodes the config lists for its own runner.
   const slots = createSlots(cfg, runner.routesLocal ? [LOCAL_NODE] : undefined, { about: { saturate: area }, places: Boolean(runner.places) });
   let unavailable = { at: 0, nodes: new Set() };
-  return {
+  const ctx = {
     cfg, runner, frozen, base, commit, say,
     budget: cfg.budget, earlierNights: [], nightDir: ledgerDirOf(cfg, area),
     stopped: () => false,
-    usage: () => {},
+    metered: false,
+    usage: (record) => {
+      if (cfg.saturate.guardMetered && meteredRecord(record)) ctx.metered = true;
+    },
     refuse: (node) => slots.refuse(node),
     acquire: async (role) => {
       for (;;) {
@@ -62,6 +65,17 @@ export const createSaturateContext = ({ cfg, runner, frozen, base, commit, area,
       }
     },
   };
+  return ctx;
+};
+
+/**
+ * Whether a Claude job's usage record shows it ran metered: it wrote the prompt cache only on the five-minute tier,
+ * as a session in usage overage does, where plan usage writes the hour's (README "Local mode"). Codex jobs and jobs
+ * that wrote no cache show nothing either way.
+ */
+export const meteredRecord = (record) => {
+  const t = record?.tokens;
+  return Boolean(t) && (t.cacheWrite5m ?? 0) > 0 && (t.cacheWrite1h ?? 0) === 0 && (record.models ?? []).some((m) => /claude/.test(m));
 };
 
 /** The directory occasion `key`'s jobs write to. */

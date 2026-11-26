@@ -1,6 +1,6 @@
 ---
 name: skulkr-scour
-description: Scour (delve) one or more skulkr areas from this Claude Code session, doing each review and ledger match as a subagent of the session, until each area's stop rule holds. Use on "scour <area>", "delve <areas>", "run N delves", "line up more delves", or any scour that runs on this machine rather than with --fleet.
+description: Scour (delve) skulkr areas in session mode, doing each review and ledger match as a subagent of this Claude Code session, until each area's stop rule holds. Use only when the user asks for session mode or subagents; a plain "scour" or "delve" runs `skulkr scour run` (local claude -p jobs as the starting account) instead.
 ---
 
 # Scour from this session

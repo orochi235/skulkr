@@ -3,8 +3,8 @@
  * distinct defects until capture–recapture says the area is saturated. README "Scour" is its documentation.
  *
  *   skulkr scour next <area> [--agent <id>] [--metered] [--max N] [--per-defect $] [--at <sha>]
- *   skulkr scour [delve] <area> --fleet [--sources claude,codex] [--max N] [--per-defect $] [--usd $] [--at <sha>] [--fresh]
- *   skulkr scour run [areas…] --fleet [--by finish|cheapest|spread] [--usd $] [--passes N] [--per-defect $]
+ *   skulkr scour [delve] <area> [--fleet] [--account <dir>] [--metered] [--sources claude,codex] [--max N] [--per-defect $] [--usd $] [--at <sha>] [--fresh]
+ *   skulkr scour run [areas…] [--fleet] [--account <dir>] [--metered] [--by finish|cheapest|spread] [--usd $] [--passes N] [--per-defect $]
  *   skulkr scour fold <area>
  *   skulkr scour ingest <area> <report.md> --source <name> [--at <sha>]
  *   skulkr scour import <area> <dir> --at <sha> [--fresh]
@@ -34,7 +34,7 @@ import { createSaturateContext, occasionJobsOf, requireSources, runReview } from
 import { foldPending, stageReport } from './scourFold.mjs';
 import { nextLines, scourNext } from './scourSession.mjs';
 
-export const SATURATE_USAGE = 'usage: skulkr scour next <area> [--agent <id>] [--metered] [--max N] [--per-defect $] [--at <sha>] | [delve] <area> --fleet [--sources claude,codex] [--max N] [--per-defect $] [--usd $] [--at <sha>] [--fresh] | run [areas…] --fleet [--by finish|cheapest|spread] [--usd $] [--passes N] [--per-defect $] | fold <area> | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | land <area>… | land --all | ls [--json] | ls --source <name> --ids | report <area> | rm <area>';
+export const SATURATE_USAGE = 'usage: skulkr scour next <area> [--agent <id>] [--metered] [--max N] [--per-defect $] [--at <sha>] | [delve] <area> [--fleet] [--account <config dir>] [--metered] [--sources claude,codex] [--max N] [--per-defect $] [--usd $] [--at <sha>] [--fresh] | run [areas…] [--fleet] [--account <config dir>] [--metered] [--by finish|cheapest|spread] [--usd $] [--passes N] [--per-defect $] | fold <area> | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | land <area>… | land --all | ls [--json] | ls --source <name> --ids | report <area> | rm <area>';
 
 /** `argv`'s positional words and flags. */
 export const saturateArgsOf = (cfg, argv) => {
@@ -58,7 +58,7 @@ export const saturateArgsOf = (cfg, argv) => {
   const passes = flags.passes === undefined ? undefined : Number(flags.passes);
   if (passes !== undefined && (!Number.isInteger(passes) || passes < 1)) throw new Error(`--passes wants a whole number, not ${flags.passes}`);
   return {
-    words, max, sources, fresh: Boolean(flags.fresh), all: Boolean(flags.all), json: Boolean(flags.json), ids: Boolean(flags.ids), source: flags.source, at: flags.at, agent: flags.agent, metered: Boolean(flags.metered),
+    words, max, sources, fresh: Boolean(flags.fresh), all: Boolean(flags.all), json: Boolean(flags.json), ids: Boolean(flags.ids), source: flags.source, at: flags.at, agent: flags.agent, metered: Boolean(flags.metered), account: flags.account,
     usd: dollars('usd'), perDefect: flags['per-defect'] === undefined ? undefined : (limitSpecOf(flags['per-defect']), flags['per-defect']), passes, by: flags.by,
   };
 };
@@ -139,6 +139,9 @@ export const saturateArea = async (cfg, runner, root, id, args, tell) => {
         finished += 1;
       }
       ledger = await foldPending(ctx, ledger, ruleNow);
+      if (ctx.metered) {
+        throw new Error(`saturate ${id}: a job wrote only five-minute cache, the sign of usage overage, which is metered; stopping (--metered runs anyway)`);
+      }
       if (finished === 0) throw new Error(`saturate ${id}: no review of this iteration finished; stopping`);
     }
     say(`saturate ${id}: report at ${writeReport(cfg, id, ledger, ruleNow())}`);
@@ -177,18 +180,26 @@ export const foldReports = async (cfg, runner, root, id, args, tell) => {
  * Throws unless Claude's reviews may run as `claude -p` jobs: only in fleet mode, since session mode gives them to the
  * running session's subagents (README "Scour", 2026-11-26).
  */
-const requireFleetFor = (sources, fleet) => {
-  if (!fleet && sources.includes('claude')) {
-    throw new Error('Claude reviews run as the session\'s own subagents (`skulkr scour next`, driven by the skulkr-scour skill); --fleet runs them as claude -p jobs instead');
-  }
-};
+/**
+ * `cfg` as scour runs its jobs on this machine: each `claude -p` as `account`, else as whichever account started the
+ * run (its `CLAUDE_CONFIG_DIR`, else Claude Code's default), never the config's own `claude.configDir`; on Claude Code's
+ * own cache lifetime, so a job's cache writes show whether it ran on plan usage; and watched for metered usage
+ * unless `metered` allows it (README "Local mode", 2026-11-26).
+ * @param {any} cfg @param {{ account?: string, metered?: boolean }} [opts] @param {Record<string, string | undefined>} [env]
+ */
+export const localScourConfigOf = (cfg, { account, metered = false } = {}, env = process.env) => ({
+  ...cfg,
+  claude: { ...cfg.claude, configDir: account ?? env.CLAUDE_CONFIG_DIR, cacheTtl: { ...cfg.claude.cacheTtl, review: undefined, match: undefined } },
+  saturate: { ...cfg.saturate, guardMetered: !metered },
+});
 
 /**
- * `skulkr scour …`; each line it prints goes to `say`. `fleet` is fleet mode, where `delve` and `run` launch Claude's
- * reviews as jobs through `runner`.
+ * `skulkr scour …`; each line it prints goes to `say`. With `fleet`, its jobs go through `runner` as the config
+ * says; without, they run on this machine as `localScourConfigOf` says.
  */
-export const saturateCommand = async (cfg, runner, root, argv, say = (line) => console.log(line), { fleet = true } = {}) => {
-  const args = saturateArgsOf(cfg, argv);
+export const saturateCommand = async (cfg0, runner, root, argv, say = (line) => console.log(line), { fleet = true, env = process.env } = {}) => {
+  const args = saturateArgsOf(cfg0, argv);
+  const cfg = fleet ? cfg0 : localScourConfigOf(cfg0, args, env);
   const [first, ...rest] = args.words;
   if (!first) throw new Error(SATURATE_USAGE);
   moveFormerScourState(cfg);
@@ -242,15 +253,11 @@ export const saturateCommand = async (cfg, runner, root, argv, say = (line) => c
     say(`removed ${rest[0]}'s saturation ledger`);
     return undefined;
   }
-  if (first === 'run') {
-    requireFleetFor(args.sources, fleet);
-    return scourRun(cfg, runner, root, { ...args, words: rest }, say);
-  }
+  if (first === 'run') return scourRun(cfg, runner, root, { ...args, words: rest }, say);
   if (first === 'fold') {
     if (!rest[0]) throw new Error(SATURATE_USAGE);
     return foldReports(cfg, runner, root, rest[0], args, say);
   }
   if (first === 'delve' && !rest[0]) throw new Error(SATURATE_USAGE);
-  requireFleetFor(args.sources, fleet);
   return saturateArea(cfg, runner, root, first === 'delve' ? rest[0] : first, args, say);
 };

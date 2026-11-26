@@ -2,11 +2,11 @@
 
 Open work on skulkr. Each entry says when it closes.
 
-- [ ] (P2) A killed fleet-mode delve leaves its frozen worktree (`.worktrees/audit-saturate-<area>`) in the project and
+- [ ] (P2) A killed `delve` (local or fleet mode) leaves its frozen worktree (`.worktrees/audit-saturate-<area>`) in the project and
   its `jobs/<NN>-<source>/` beside the ledger; only a normal stop removes them (`withFrozen`'s `finally`), and SIGTERM
   skips it. On 2026-11-26 the user stopped two `scour run` lanes at 15:21Z, and two more were stopped at 16:30Z,
   because their `claude -p` jobs ran as the account weasel's config names (`claude.configDir`), not the one that started them; each
-  time the worktrees were removed by hand. Session mode (`scour next`) reuses its worktree, so this is fleet mode's
+  time the worktrees were removed by hand. Session mode (`scour next`) reuses its worktree, so this is `delve`'s
   alone. Closes when a delve removes them on SIGTERM/SIGINT and the next delve of the area clears any a SIGKILL left.
 
 - [ ] (P1) Build saturation as stages, `docs/scour.md` (designed 2026-11-25, mostly unbuilt). Closes when its

@@ -3,9 +3,9 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { transcriptCostOf, usageCostOf } from './agentCost.mjs';
 import { ledgerOf } from './ledger.mjs';
-import { saturateArgsOf, saturateCommand } from './saturate.mjs';
+import { localScourConfigOf, saturateArgsOf, saturateCommand } from './saturate.mjs';
 import { partsOf, scourNext } from './scourSession.mjs';
-import { project, scratch } from './scourTestKit.ts';
+import { fakeRunner, project, scratch } from './scourTestKit.ts';
 
 const OPUS = { input: 4, cacheRead: 0.2, output: 20 };
 const reportOf = (claims: string[]) => `${claims.map((c) => `## ${c}\n- where: src/x.ts:1\n- severity: low\n`).join('\n')}\n## Files read\nsrc/x.ts\n\n<!-- done: ${claims.length} findings, files read: 1 -->\n`;
@@ -123,9 +123,28 @@ describe('skulkr scour next', () => {
     expect(await scourNext(cfg, root, 'src', saturateArgsOf(cfg, []), () => {}, unknown)).toEqual({ pause: expect.stringMatching(/can't be found/) });
   });
 
-  it("keeps Claude's claude -p reviews to fleet mode", async () => {
+});
+
+describe('local mode', () => {
+  it("runs jobs as the starting account or --account, never the config's, on Claude Code's own cache lifetime", () => {
+    const { cfg } = project();
+    const own = { ...cfg, claude: { ...cfg.claude, configDir: '~/.claude-other', cacheTtl: { review: '5m', match: '5m', fix: '5m' } } };
+    expect(localScourConfigOf(own, {}, { CLAUDE_CONFIG_DIR: '/a' }).claude).toMatchObject({ configDir: '/a', cacheTtl: { review: undefined, match: undefined, fix: '5m' } });
+    expect(localScourConfigOf(own, {}, {}).claude.configDir).toBeUndefined();
+    expect(localScourConfigOf(own, { account: '/b' }, { CLAUDE_CONFIG_DIR: '/a' }).claude.configDir).toBe('/b');
+  });
+
+  it('stops a delve once a job wrote only five-minute cache, unless --metered', async () => {
     const { root, cfg } = project();
-    await expect(saturateCommand(cfg, {}, root, ['src'], () => {}, { fleet: false })).rejects.toThrow(/--fleet/);
-    await expect(saturateCommand(cfg, {}, root, ['run', 'src'], () => {}, { fleet: false })).rejects.toThrow(/--fleet/);
+    const metered = { cache_creation_input_tokens: 900, cache_creation: { ephemeral_5m_input_tokens: 900, ephemeral_1h_input_tokens: 0 } };
+    await expect(saturateCommand(cfg, fakeRunner([['A'], ['B']], { usage: metered }), root, ['src', '--max', '2'], () => {}, { fleet: false, env: {} }))
+      .rejects.toThrow(/five-minute cache/);
+    expect(ledgerOf(cfg, 'src').occasions).toHaveLength(1);
+    await saturateCommand(cfg, fakeRunner([['B']], { usage: metered }), root, ['src', '--max', '2', '--metered'], () => {}, { fleet: false, env: {} });
+    expect(ledgerOf(cfg, 'src').occasions).toHaveLength(2);
+    const plan = { cache_creation_input_tokens: 900, cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 900 } };
+    const { root: root2, cfg: cfg2 } = project();
+    await saturateCommand(cfg2, fakeRunner([['A'], ['B']], { usage: plan }), root2, ['src', '--max', '2'], () => {}, { fleet: false, env: {} });
+    expect(ledgerOf(cfg2, 'src').occasions).toHaveLength(2);
   });
 });

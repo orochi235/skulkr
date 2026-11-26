@@ -18,7 +18,7 @@ checks them against the current code, and nothing fixes them.
 
 Separate stages let each step run where and when it is cheapest:
 
-- delves run overnight as subagents of the session that started them, or on the fleet with `--fleet` (2026-11-26);
+- delves run overnight on this machine as the account that started them, as a session's subagents, or on the fleet with `--fleet` (2026-11-26);
 - folding can be retried on its own after the matcher fails;
 - fixing can work through the fix plan in batches of its own size.
 

@@ -68,7 +68,8 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
   // How many half-rounds of the queue's head to number on the map, each in its area's corner.
   const [halves, setHalves] = useDashPref('map.upcoming');
   const [gray] = useDashPref('map.gray');
-  const places = halves * (areasPerRound / 2);
+  // The queue it numbers is the rounds'; a bare map (the Scour page's) numbers none.
+  const places = bare ? 0 : halves * (areasPerRound / 2);
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<SceneCanvasApi>(null);
   const hud = useHud();
@@ -247,7 +248,7 @@ function NowLegend({ halves, places, onInput, onChange, none, bare }: {
         </span>
       )}
       <span><i className={`${s.key} ${s.uncharted}`} />{none}</span>
-      <span className={s.upcoming}>
+      {!bare && <span className={s.upcoming}>
         numbered upcoming:
         <Slider
           className={s.upcomingSlider} aria-label="Upcoming areas to number on the map, in half rounds"
@@ -258,7 +259,7 @@ function NowLegend({ halves, places, onInput, onChange, none, bare }: {
           readoutPlacement="none"
         />
         <span className={s.upcomingCount}>{places}</span>
-      </span>
+      </span>}
     </>
   );
 }
