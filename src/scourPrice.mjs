@@ -83,14 +83,16 @@ export const limitSpecOf = (given) => {
 };
 
 /**
- * The going rate: the cheapest next defect in the project, among its areas' own ledgers with two passes or more and,
- * while any area of the partition under `root` has fewer, the opening price (with no `root`, assumed so).
+ * The going rate: the cheapest next defect in the project, among its areas' own ledgers with `saturate.minPasses`
+ * passes or more (a price from fewer is noise: ui.components.Timeline stopped rich on 2026-11-26 under a rate set by
+ * another delve's second pass) and, while any area of the partition under `root` has fewer, the opening price (with
+ * no `root`, assumed so).
  */
 export const goingRateOf = (cfg, root, { factor, openingUsd }) => {
   const dir = scourStateDirOf(cfg);
   const deep = (existsSync(dir) ? readdirSync(dir) : []).flatMap((id) => {
     const ledger = ledgerOf(cfg, id);
-    return ledger && ledger.area === id && ledger.occasions.length >= 2 ? [ledger] : [];
+    return ledger && ledger.area === id && ledger.occasions.length >= Math.max(2, cfg.saturate.minPasses ?? 0) ? [ledger] : [];
   });
   let fresh = true;
   if (root) {

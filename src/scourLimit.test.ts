@@ -33,8 +33,12 @@ describe('goingRateOf', () => {
     const pricing = { factor: 1, openingUsd: 0.25 };
     writeLedger(cfg, ledgerOf('src', SEEN));
     expect(goingRateOf(cfg, root, pricing)).toBe(0.25);
+    // Three passes are too few for a price: lib still counts as fresh.
     writeLedger(cfg, ledgerOf('lib', SEEN.slice(0, 3)));
-    const cheapest = Math.min(nextPriceOf(ledgerOf('src', SEEN)).usd!, nextPriceOf(ledgerOf('lib', SEEN.slice(0, 3))).usd!);
+    expect(goingRateOf(cfg, root, pricing)).toBe(0.25);
+    const four = [...SEEN.slice(0, 4), ['A', 'N', 'O']];
+    writeLedger(cfg, ledgerOf('lib', four));
+    const cheapest = Math.min(nextPriceOf(ledgerOf('src', SEEN)).usd!, nextPriceOf(ledgerOf('lib', four)).usd!);
     expect(goingRateOf(cfg, root, pricing)).toBeCloseTo(cheapest, 10);
   });
 });
