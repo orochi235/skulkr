@@ -762,7 +762,7 @@ when started by hand. A tenant added `--read-only` is shown and its live rounds 
 the service never starts or stops one: its rounds run under another service.
 
 On the machine this was extracted on, weasel is registered from `examples/weasel.config.mjs` (root `~/src/weasel`,
-state `~/.local/state/weasel-skulkr`), not read-only: the `skulkr` service there runs weasel's rounds, and weasel's
+state `~/.local/state/weasel-skulkr`), read-only since 2026-11-25 so its scheduled rounds stop (it was the `skulkr` service there that ran weasel's rounds), and weasel's
 own `skulk` service is down (2026-11-21). What is left of the cutover is in "Moving weasel over".
 
 ## The dashboard
