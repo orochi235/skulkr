@@ -14,6 +14,7 @@ const ledger = (id: string, unseen: number, defects: SaturationLedger['defects']
 });
 
 const NO_KLOC = { unseenPerKloc: null, defectsPerKloc: null, usdPerKloc: null };
+const PRICE = { goingUsd: null, limitUsd: 1.5, nextUsd: 1.2, stopped: "the next occasion's chance of a new finding is under 15% (14.7%)" };
 
 const LEDGERS = [
   ledger('core.animation', 9.6, [
@@ -50,7 +51,7 @@ describe('SaturationPage', () => {
     const now = await screen.findByRole('region', { name: 'Scouring now' });
     expect(within(now).getByText(/delve · pid 2804 · 47:0\d · 24\/40 occasions/)).toBeInTheDocument();
     expect(within(now).getByText('5/14')).toBeInTheDocument();
-    expect(within(now).getByText('24/40 claude: 3 findings, 0 new')).toBeInTheDocument();
+    expect(within(now).getByText(/ 24\/40 claude: 3 findings, 0 new$/)).toBeInTheDocument();
     fireEvent.click(within(now).getByText('core.animation'));
     expect(window.location.hash).toBe('#weasel/scour/core.animation');
   });
@@ -78,8 +79,8 @@ describe('SaturationPage', () => {
 
   it('shades the map by each own ledger’s unresolved defects, by the registry where it has landed', () => {
     expect([...saturationByArea([...LEDGERS, { ...LEDGERS[1]!, id: 'geom.booleans.9c4522d635' }])]).toEqual([
-      ['core.animation', { open: 1, unseen: 9.6, distinct: 2, occasions: 24, nextNew: 0.147, total: 11.6, costUsd: 23.28, ...NO_KLOC }],
-      ['geom.booleans', { open: 0, unseen: 1.2, distinct: 0, occasions: 24, nextNew: 0.147, total: 1.2, costUsd: 23.28, ...NO_KLOC }],
+      ['core.animation', { open: 1, unseen: 9.6, distinct: 2, occasions: 24, nextNew: 0.147, total: 11.6, costUsd: 23.28, ...NO_KLOC, ...PRICE }],
+      ['geom.booleans', { open: 0, unseen: 1.2, distinct: 0, occasions: 24, nextNew: 0.147, total: 1.2, costUsd: 23.28, ...NO_KLOC, ...PRICE }],
     ]);
   });
 
@@ -88,9 +89,9 @@ describe('SaturationPage', () => {
     window.location.hash = '#weasel/saturation';
     renderWithIcons(<WeaselProvider><SaturationPage base="/test/" /></WeaselProvider>);
     expect(await screen.findByRole('img', { name: /Treemap of every audit area/ })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Color the map by' })).toHaveValue('saturationOpen');
+    expect(screen.getByRole('combobox', { name: 'Color the map by' })).toHaveValue('saturation');
     expect(within(screen.getByRole('combobox', { name: 'Color the map by' })).getAllByRole('option').map((o) => o.textContent)).toEqual([
-      'chance next review finds a new defect', 'defects not found yet (est.)', 'defects not found yet per 1,000 lines (est.)', 'defects open', 'defects found',
+      'saturation', 'chance next review finds a new defect', 'defects not found yet (est.)', 'defects not found yet per 1,000 lines (est.)', 'defects open', 'defects found',
       'defects found per 1,000 lines', 'defects it holds (est.)', 'reviews', 'spend', 'spend per 1,000 lines',
     ]);
   });
