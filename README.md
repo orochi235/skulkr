@@ -554,9 +554,9 @@ its jobs on this machine (2026-11-26).
 holds its ledger for the session (its lease names the session's Claude Code process, `$CLAUDE_PID`, so it lasts
 until the area stops or the session dies), then prints the next task: a review, or a ledger match, with the model to
 run it on and a prompt file. The prompt is the round reviewer's brief (or the ledger matcher's) under
-`briefs/scourSubagent.md`, which points the subagent at the frozen tree and the file to write. Files are not
-preloaded: the subagent opens them itself. Once that subagent is done, `skulkr scour next <area> --agent <id>` reads
-its file, prices it from its transcript (`<config dir>/projects/<project>/<session>/subagents/agent-<id>.jsonl`, each
+`briefs/scourSubagent.md`, which points the subagent at the frozen tree and has it answer in its final reply: Claude
+Code refuses a subagent's write of a report file (2026-11-26). Files are not preloaded: the subagent opens them
+itself. Once that subagent is done, `skulkr scour next <area> --agent <id>` reads that reply and prices it from its transcript (`<config dir>/projects/<project>/<session>/subagents/agent-<id>.jsonl`, each
 message's usage at `claude.prices`), folds what it can, and prints the next task, or `stop <area>: <reason>` once the
 stop rule holds, when it removes the worktree and lets the ledger go. `next` without `--agent` while a task is out
 prints that task again, which is how a restarted session picks up. A match whose reply does not check out is handed

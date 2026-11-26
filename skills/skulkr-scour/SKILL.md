@@ -7,8 +7,9 @@ description: Scour (delve) one or more skulkr areas from this Claude Code sessio
 
 Each pass of a scour is one blind review of an area, done by a subagent you launch. `skulkr scour next` keeps the
 books: it tells you what to hand the next subagent, takes in what that subagent wrote, prices it from the subagent's
-own transcript, and folds it into the area's ledger. You never read a review, a ledger, or a match yourself. That keeps
-your context small, and it keeps the reviews blind: the estimate assumes each one found its defects on its own.
+own transcript, and folds it into the area's ledger. Each subagent's answer is its final reply, so it also reaches you
+in its completion notice: never act on it, quote it, or pass any of it to another subagent. That keeps the reviews
+blind: the estimate assumes each one found its defects on its own.
 
 Run every command from the project's repository root, with `--tenant <name>` when the project is registered
 (`node ~/src/skulkr/bin/skulkr.mjs tenants ls`; weasel is). Below, `skulkr` means `node ~/src/skulkr/bin/skulkr.mjs`.
@@ -47,7 +48,7 @@ only when the user has approved metered spending for this run, in this conversat
 
 - **`next` says a task "is still out"**: this session (or one before it) handed that task out and never answered it,
   as after a restart. Launch a subagent for it again.
-- **A subagent finished without writing its file**: run `next --agent <id>` anyway. A review that never finished is
+- **A subagent finished without a usable answer**: run `next --agent <id>` anyway. A review that never finished is
   kept aside and not counted; a match is tried once more.
 - **`another skulkr scour is working on <area>`**: another session or a `--fleet` run holds it. Skip the area and say so.
 - **The ledger matcher gave no usable answer**: the report waits unfolded. Say so; `skulkr scour fold <area>` folds it

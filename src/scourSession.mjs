@@ -44,8 +44,8 @@ const withSessionHold = async (cfg, id, pid, about, work) => {
   return work(true, () => rmSync(path, { force: true }));
 };
 
-/** What subagent `agent` cost, from its transcript. */
-const agentCostOf = (cfg, agent, env) => {
+/** What subagent `agent` cost and its final reply, from its transcript. */
+const agentAnswerOf = (cfg, agent, env) => {
   const path = transcriptAt(agent, { session: env.CLAUDE_CODE_SESSION_ID, env });
   if (!path) throw new Error(`no transcript for subagent ${agent}; --agent wants the id the Agent tool gave back`);
   return transcriptCostOf(path, cfg.claude.prices);
@@ -65,9 +65,12 @@ const meteredWhy = (env) => {
     : 'this session has made no cache write yet, so plan usage cannot be told from metered; --metered starts passes anyway';
 };
 
-/** The prompt a subagent is handed: session mode's preface over `body`. */
-const subagentPrompt = (cfg, tree, out, reply, instructions, body) =>
-  `${fill(readIf(cfg.briefPath('scourSubagent')), { tree, out, reply, instructions })}${body}`;
+/**
+ * The prompt a subagent is handed: session mode's preface over `body`. Claude Code refuses a subagent's write of a
+ * report file, so its answer is its final reply, read back from its transcript.
+ */
+const subagentPrompt = (cfg, tree, reply, instructions, body) =>
+  `${fill(readIf(cfg.briefPath('scourSubagent')), { tree, reply, instructions })}${body}`;
 
 /** Writes task `task`'s prompt and a log line for the live view, records the task, and tells the session what to run. */
 const handOut = (cfg, id, task, prompt, model, say) => {
@@ -77,7 +80,7 @@ const handOut = (cfg, id, task, prompt, model, say) => {
   writeFileSync(join(dir, `${task.step}.log`), `${new Date().toISOString()} subagent ${task.step} handed out\n`);
   writeJson(taskPathOf(cfg, id), { ...task, model: model ?? null }, 1);
   say(`next ${id}: ${task.kind} ${task.key}${task.attempt ? ` (attempt ${task.attempt})` : ''}`);
-  return { task: task.kind, key: task.key, model: model ?? null, prompt: task.prompt, out: task.out };
+  return { task: task.kind, key: task.key, model: model ?? null, prompt: task.prompt };
 };
 
 const reviewTask = (cfg, root, ledger, say) => {
@@ -85,45 +88,39 @@ const reviewTask = (cfg, root, ledger, say) => {
   const key = `${pad(ledger.occasions.length + 1)}-${SOURCE}`;
   const dir = occasionJobsOf(cfg, id, key);
   const tree = treeOf(cfg, root, id);
-  const out = join(dir, 'findings.md');
   const vars = {
-    ...projectVars(cfg, 'reviewer'), round: 'saturation', area: id, commit: ledger.commit, out,
+    ...projectVars(cfg, 'reviewer'), round: 'saturation', area: id, commit: ledger.commit, out: 'your final reply',
     files: reviewFileList(tree, ledger.files, recentlyChanged(tree, ledger.files)),
   };
   const body = `${fill(brief(sourceConfigOf(cfg, SOURCE), 'reviewer'), vars)}\n\n${readIf(cfg.briefPath('scourTriage'))}`;
   const instructions = `- **The brief says the tree's \`CLAUDE.md\` is already in your context; it is not.** Read \`${tree}/CLAUDE.md\` once, first.`;
-  const prompt = subagentPrompt(cfg, tree, out, "the brief's final `<!-- done: … -->` line", instructions, body);
-  return handOut(cfg, id, { kind: 'review', step: 'review', key, prompt: join(dir, 'prompt.md'), out }, prompt, cfg.claude.models.review, say);
+  const prompt = subagentPrompt(cfg, tree, 'the whole findings document, ending with its `<!-- done: … -->` line', instructions, body);
+  return handOut(cfg, id, { kind: 'review', step: 'review', key, prompt: join(dir, 'prompt.md') }, prompt, cfg.claude.models.review, say);
 };
 
 const matchTask = (cfg, root, ledger, attempt, spent, say) => {
   const id = ledger.area;
   const entry = ledger.unfolded[0];
   const dir = occasionJobsOf(cfg, id, entry.key);
-  const out = join(dir, `match${attempt}.json`);
   const report = entry.kind === 'ingest' ? { raw: unfoldedTextOf(cfg, ledger) } : { findings: entry.findings };
   const body = ledgerMatchPrompt(fill(readIf(cfg.briefPath('ledgerMatch')), projectVars(cfg, 'matcher')), ledger, report);
-  const instructions = '- **Read no files.** The file holds the JSON the brief asks for and nothing else.';
-  const prompt = subagentPrompt(cfg, treeOf(cfg, root, id), out, '`done`', instructions, body);
-  const task = { kind: 'match', step: `match${attempt}`, key: entry.key, attempt, spent, prompt: join(dir, `match${attempt}.md`), out };
+  const instructions = '- **Read no files.**';
+  const prompt = subagentPrompt(cfg, treeOf(cfg, root, id), 'the JSON the brief asks for', instructions, body);
+  const task = { kind: 'match', step: `match${attempt}`, key: entry.key, attempt, spent, prompt: join(dir, `match${attempt}.md`) };
   return handOut(cfg, id, task, prompt, cfg.claude.models.ledgerMatch, say);
 };
 
 /** Tells the session the task it was handed and has not answered, again. */
 const again = (task, say) => {
   say(`next: ${task.kind} ${task.key} is still out; run it again`);
-  return { task: task.kind, key: task.key, model: task.model, prompt: task.prompt, out: task.out, again: true };
+  return { task: task.kind, key: task.key, model: task.model, prompt: task.prompt, again: true };
 };
 
-/** Takes in the session's answer to `task`. Answers the ledger, or a task to hand out again. */
+/** Takes in subagent `args.agent`'s answer to `task`. Answers the ledger, or a task to hand out again. */
 const takeAnswer = (cfg, root, ledger, task, args, env, rule, say) => {
-  const out = existsSync(task.out) ? readIf(task.out) : '';
+  if (!args.agent) return { handOut: again(task, say) };
+  const { costUsd, minutes, reply: out } = agentAnswerOf(cfg, args.agent, env);
   const answered = task.kind === 'review' ? isFinished(out) : out.trim().length > 0;
-  if (!args.agent) {
-    if (!answered) return { handOut: again(task, say) };
-    throw new Error(`say which subagent did ${task.step} of ${task.key}: --agent <the id the Agent tool gave back>`);
-  }
-  const { costUsd, minutes } = agentCostOf(cfg, args.agent, env);
   rmSync(taskPathOf(cfg, ledger.area), { force: true });
   if (task.kind === 'review') {
     if (!answered) {

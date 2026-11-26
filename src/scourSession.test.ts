@@ -17,15 +17,20 @@ const session = (tier: '1h' | '5m' = '1h') => {
   mkdirSync(join(config, 'projects', '-proj'), { recursive: true });
   const write = { ephemeral_1h_input_tokens: tier === '1h' ? 900 : 0, ephemeral_5m_input_tokens: tier === '5m' ? 900 : 0 };
   writeFileSync(join(config, 'projects', '-proj', 'sess.jsonl'), `${JSON.stringify({ type: 'assistant', message: { id: 's1', model: 'claude-opus-5-5', usage: { cache_creation: write } } })}\n`);
-  /** Leaves subagent `id`'s transcript: one Opus message of `output` tokens over `minutes`. */
-  const transcript = (id: string, output: number, minutes = 2) => {
+  /**
+   * Leaves subagent `id`'s transcript: one Opus message of `output` tokens over `minutes`, a tool call then `reply`,
+   * as Claude Code records a message, one record per content block.
+   */
+  const transcript = (id: string, output: number, reply: string, minutes = 2) => {
     const dir = join(config, 'projects', '-proj', 'sess', 'subagents');
     mkdirSync(dir, { recursive: true });
-    const message = (at: number) => JSON.stringify({
+    const record = (at: number, content: object[]) => JSON.stringify({
       type: 'assistant', timestamp: new Date(Date.UTC(2026, 10, 26, 0, at)).toISOString(),
-      message: { id: `m-${id}`, model: 'claude-opus-5-5', usage: { input_tokens: 0, cache_read_input_tokens: 0, output_tokens: output } },
+      message: { id: `m-${id}`, model: 'claude-opus-5-5', content, usage: { input_tokens: 0, cache_read_input_tokens: 0, output_tokens: output } },
     });
-    writeFileSync(join(dir, `agent-${id}.jsonl`), `${message(0)}\n${message(minutes)}\n`);
+    writeFileSync(join(dir, `agent-${id}.jsonl`), `${record(0, [{ type: 'text', text: 'Reading the files.' }])}\n${record(0, [{ type: 'tool_use' }])}\n`
+      + `${JSON.stringify({ type: 'assistant', timestamp: '2026-11-26T00:01:00Z', message: { id: `r-${id}`, model: 'claude-opus-5-5', content: [{ type: 'text', text: reply }], usage: { output_tokens: 0 } } })}\n`
+      + `${record(minutes, [])}\n`);
   };
   return { env, transcript };
 };
@@ -55,32 +60,28 @@ describe('skulkr scour next', () => {
     expect(first).toMatchObject({ task: 'review', key: '01-claude' });
     const prompt = readFileSync(first.prompt, 'utf8');
     expect(prompt).toContain(`The frozen tree is \`${join(root, '.worktrees/audit-saturate-src')}\``);
-    expect(prompt).toContain(`Write your answer to \`${first.out}\``);
+    expect(prompt).toContain("Write no files");
     expect(prompt).toContain('src/x.ts');
     expect(existsSync(join(root, '.worktrees/audit-saturate-src/src/x.ts'))).toBe(true);
     expect(await next()).toMatchObject({ task: 'review', key: '01-claude', again: true });
 
-    writeFileSync(first.out, reportOf(['A', 'B']));
-    transcript('r1', 50_000);
+    transcript('r1', 50_000, reportOf(['A', 'B']));
     const match = await next('--agent', 'r1');
     expect(match).toMatchObject({ task: 'review', key: '02-claude' });
     expect(ledgerOf(cfg, 'src').occasions[0]).toMatchObject({ n: 1, source: 'claude', costUsd: 1, minutes: 2 });
 
-    writeFileSync(match.out, reportOf(['B', 'C']));
-    transcript('r2', 25_000);
+    transcript('r2', 25_000, reportOf(['B', 'C']));
     const matching = await next('--agent', 'r2');
     expect(matching).toMatchObject({ task: 'match', key: '02-claude', model: 'opus' });
     expect(readFileSync(matching.prompt, 'utf8')).toContain('Read no files');
 
-    writeFileSync(matching.out, 'not json');
-    transcript('m1', 5_000);
+    transcript('m1', 5_000, 'not json');
     const retry = await next('--agent', 'm1');
     expect(retry).toMatchObject({ task: 'match', key: '02-claude' });
-    expect(retry.out).toMatch(/match2\.json$/);
+    expect(retry.prompt).toMatch(/match2\.md$/);
 
     const ledger = ledgerOf(cfg, 'src');
-    writeFileSync(retry.out, JSON.stringify({ sightings: [{ finding: 0, defect: ledger.defects.find((d: { claim: string }) => d.claim === 'B').id }], new: [{ finding: 1, claim: 'C', where: 'src/x.ts:1', severity: 'low' }], same: [] }));
-    transcript('m2', 5_000);
+    transcript('m2', 5_000, JSON.stringify({ sightings: [{ finding: 0, defect: ledger.defects.find((d: { claim: string }) => d.claim === 'B').id }], new: [{ finding: 1, claim: 'C', where: 'src/x.ts:1', severity: 'low' }], same: [] }));
     expect(await next('--agent', 'm2')).toEqual({ stop: 'reached the limit of 2 occasions' });
     const done = ledgerOf(cfg, 'src');
     expect(done.defects.map((d: { claim: string }) => d.claim)).toEqual(['A', 'B', 'C']);
@@ -90,13 +91,14 @@ describe('skulkr scour next', () => {
     expect(existsSync(join(cfg.state, 'scour/src/task.json'))).toBe(false);
   });
 
-  it('refuses an answer it cannot price, and refuses to run outside a Claude Code session', async () => {
+  it('counts a review with no done line as unfinished, refuses a subagent it cannot find, and runs only in a session', async () => {
     const { root, cfg } = project();
-    const { env } = session();
+    const { env, transcript } = session();
     const next = (...argv: string[]) => scourNext(cfg, root, 'src', saturateArgsOf(cfg, argv), () => {}, env);
-    const first = await next();
-    writeFileSync(first.out, reportOf(['A']));
-    await expect(next()).rejects.toThrow(/--agent/);
+    await next();
+    transcript('cut', 10_000, '## A\n- where: src/x.ts:1\n');
+    expect(await next('--agent', 'cut')).toMatchObject({ task: 'review', key: '01-claude' });
+    expect(ledgerOf(cfg, 'src').occasions).toHaveLength(0);
     await expect(next('--agent', 'nobody')).rejects.toThrow(/no transcript for subagent nobody/);
     await expect(scourNext(cfg, root, 'src', saturateArgsOf(cfg, []), () => {}, {})).rejects.toThrow(/Claude Code session/);
   });

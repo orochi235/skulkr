@@ -77,11 +77,13 @@ export const usageCostOf = (usage, price) => {
 };
 
 /**
- * The transcript at `path` summed: `{ costUsd, minutes, models }`, each message counted once under its last record,
- * priced from `prices` by model. Throws for a model `prices` does not hold.
+ * The transcript at `path` summed: `{ costUsd, minutes, models, reply }`, each message counted once under its last
+ * record, priced from `prices` by model; `reply` is the text of its last message that has any. Throws for a model
+ * `prices` does not hold.
  */
 export const transcriptCostOf = (path, prices) => {
   const messages = new Map();
+  const texts = new Map();
   const times = [];
   for (const line of readFileSync(path, 'utf8').split('\n')) {
     if (!line.trim()) continue;
@@ -92,7 +94,11 @@ export const transcriptCostOf = (path, prices) => {
       continue;
     }
     if (record.timestamp) times.push(Date.parse(record.timestamp));
-    if (record.type === 'assistant' && record.message?.usage) messages.set(record.message.id ?? record.uuid, record.message);
+    if (record.type !== 'assistant' || !record.message) continue;
+    const id = record.message.id ?? record.uuid;
+    if (record.message.usage) messages.set(id, record.message);
+    const text = (record.message.content ?? []).filter((c) => c.type === 'text').map((c) => c.text).join('');
+    if (text) texts.set(id, `${texts.get(id) ?? ''}${text}`);
   }
   let costUsd = 0;
   const models = new Set();
@@ -104,5 +110,5 @@ export const transcriptCostOf = (path, prices) => {
     costUsd += usageCostOf(m.usage, price);
   }
   const minutes = times.length ? (Math.max(...times) - Math.min(...times)) / 60_000 : 0;
-  return { costUsd, minutes, models: [...models] };
+  return { costUsd, minutes, models: [...models], reply: [...texts.values()].at(-1) ?? '' };
 };

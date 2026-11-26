@@ -6,10 +6,9 @@ lines as overriding it wherever the two disagree:
 - **The frozen tree is `{{tree}}`.** Wherever the brief says your working directory is the tree's root, read it as
   that directory: open files by their full path under it, and cite paths relative to it. Run git only as
   `git -C {{tree}} log|show|diff|blame …`. Never edit anything under it.
-- **Write your answer to `{{out}}`**, a full path, with the Write tool (and Edit, to add to it). It is the only file
-  you may write.
+- **Write no files.** Where the brief says to write a file, your final reply is that file instead: {{reply}}, with
+  nothing before or after it.
 {{instructions}}
-- **Your reply is one line**: {{reply}}. Everything else goes in the file.
 
 ---
 
