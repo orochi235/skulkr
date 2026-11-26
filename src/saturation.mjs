@@ -79,6 +79,7 @@ export const yieldRows = (ledger) => {
  */
 export const stopRuleOf = (cfg, max, { perDefect, usd, factor = 1 } = {}) => ({
   max,
+  minPasses: cfg.saturate.minPasses,
   stopNextNew: cfg.saturate.stopNextNew,
   stopUnseenPerKloc: cfg.saturate.stopUnseenPerKloc,
   stopUsdPerDefect: perDefect ?? cfg.saturate.stopUsdPerDefect,
@@ -97,15 +98,17 @@ export const limitText = ({ stopUsdPerDefect, limit }) => (limit?.times === unde
   : `$${limit.usd.toFixed(2)} (${limit.times}× the $${limit.goingUsd.toFixed(2)} going rate)`);
 
 export const stopReason = (stats, rule, { price, spentUsd, lines } = {}) => {
-  const { max, stopNextNew, stopUnseenPerKloc, stopUsdPerDefect, usd } = rule;
+  const { max, minPasses = 0, stopNextNew, stopUnseenPerKloc, stopUsdPerDefect, usd } = rule;
   if (stats.m >= max) return `reached the limit of ${max} occasions`;
-  if (stats.f0 !== undefined && lines && stopUnseenPerKloc !== undefined) {
-    const density = (stats.f0 * 1000) / lines;
-    if (density < stopUnseenPerKloc) return `fewer than ${stopUnseenPerKloc} ${stopUnseenPerKloc === 1 ? 'defect' : 'defects'} per thousand lines estimated unseen (${density.toFixed(2)})`;
-  } else if (stats.f0 !== undefined && stats.f0 < 1) return `fewer than one defect estimated unseen (${stats.f0.toFixed(2)})`;
-  if (stats.nextNew !== undefined && stats.nextNew < stopNextNew) return `the next occasion's chance of a new finding is under ${Math.round(stopNextNew * 100)}% (${(stats.nextNew * 100).toFixed(1)}%)`;
-  if (stopUsdPerDefect !== undefined && price?.usd !== undefined && price.usd > stopUsdPerDefect) {
-    return `the next defect would cost about $${price.usd.toFixed(2)}, over the limit of ${limitText(rule)}`;
+  if (stats.m >= minPasses) {
+    if (stats.f0 !== undefined && lines && stopUnseenPerKloc !== undefined) {
+      const density = (stats.f0 * 1000) / lines;
+      if (density < stopUnseenPerKloc) return `fewer than ${stopUnseenPerKloc} ${stopUnseenPerKloc === 1 ? 'defect' : 'defects'} per thousand lines estimated unseen (${density.toFixed(2)})`;
+    } else if (stats.f0 !== undefined && stats.f0 < 1) return `fewer than one defect estimated unseen (${stats.f0.toFixed(2)})`;
+    if (stats.nextNew !== undefined && stats.nextNew < stopNextNew) return `the next occasion's chance of a new finding is under ${Math.round(stopNextNew * 100)}% (${(stats.nextNew * 100).toFixed(1)}%)`;
+    if (stopUsdPerDefect !== undefined && price?.usd !== undefined && price.usd > stopUsdPerDefect) {
+      return `the next defect would cost about $${price.usd.toFixed(2)}, over the limit of ${limitText(rule)}`;
+    }
   }
   if (usd !== undefined && spentUsd !== undefined && spentUsd + (price?.passUsd ?? 0) > usd) {
     return `another pass would take spending past the $${usd.toFixed(2)} limit ($${spentUsd.toFixed(2)} spent)`;

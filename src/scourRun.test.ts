@@ -5,6 +5,8 @@ import { fakeRunner, project } from './scourTestKit.ts';
 
 const reviews = (tasks: string[]) => tasks.filter((t) => t.endsWith('-claude-claude')).map((t) => t.replace(/^proj-saturate-|-claude-claude$/g, ''));
 const occasionsOf = (cfg: unknown, id: string) => ledgerOf(cfg, id)?.occasions.length ?? 0;
+/** `cfg` with estimates allowed to stop a delve from its first pass, as the worked examples need. */
+const early = (cfg: any) => ({ ...cfg, saturate: { ...cfg.saturate, minPasses: 0 } });
 
 describe('a delve\'s cost cutoffs', () => {
   it('stops before a pass would spend past --usd', async () => {
@@ -20,7 +22,7 @@ describe('a delve\'s cost cutoffs', () => {
     const { root, cfg } = project();
     const lines: string[] = [];
     const seen = [['A', 'B', 'C', 'D'], ['D', 'B', 'E', 'F', 'G', 'H', 'I'], ['J', 'A', 'K', 'H'], ['A', 'D']];
-    await saturateCommand(cfg, fakeRunner(seen), root, ['src', '--per-defect', '0.3'], (l) => lines.push(l));
+    await saturateCommand(early(cfg), fakeRunner(seen), root, ['src', '--per-defect', '0.3'], (l) => lines.push(l));
     expect(occasionsOf(cfg, 'src')).toBe(3);
     expect(lines.at(-2)).toMatch(/^saturate src: stopped, the next defect would cost about \$0\.38, over the limit of \$0\.30$/);
   });
@@ -39,7 +41,7 @@ describe('skulkr scour run', () => {
     // lib's second pass repeats its first, so nothing is unseen there and its stop rule holds; src goes next.
     const runner = fakeRunner([['A', 'B'], ['A', 'B'], ['C', 'D'], ['E']]);
     const lines: string[] = [];
-    await saturateCommand(cfg, runner, root, ['run', 'lib', 'src', '--by', 'cheapest', '--usd', '2'], (l) => lines.push(l));
+    await saturateCommand(early(cfg), runner, root, ['run', 'lib', 'src', '--by', 'cheapest', '--usd', '2'], (l) => lines.push(l));
     expect(reviews(runner.tasks)).toEqual(['lib-01', 'lib-02', 'src-01']);
     expect(lines.at(-1)).toBe('scour run: spent $1.60 of $2.00');
   });

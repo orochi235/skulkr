@@ -554,7 +554,7 @@ It stops once the combined estimate puts fewer than `saturate.stopUnseenPerKloc`
 lines (fewer than one, where the lines cannot be counted), the chance that the next occasion's finding
 is new falls under `saturate.stopNextNew` (15%), the next defect would cost over `--per-defect` dollars
 (`saturate.stopUsdPerDefect`, 4× the going rate, below), another pass would take what this command has spent past `--usd`, or `--max`
-occasions (`saturate.max`, 40) are in the ledger.
+occasions (`saturate.max`, 40) are in the ledger. None of the estimates stops a ledger before `saturate.minPasses` (5) occasions: at two, forge.vite.part1 read as saturated with its next-new chance at 100% (2026-11-26).
 
 **Per thousand lines.** Areas differ in size by five times and more, so the unseen estimate is held to a density,
 and `ls`, the report, the Scour page's ledger panel and Passes table, and its map lenses also give found, unseen and

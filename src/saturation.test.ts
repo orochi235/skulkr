@@ -103,6 +103,15 @@ describe('stopReason', () => {
     expect(stopReason({ m: 1, f0: undefined, nextNew: undefined }, rule)).toBeNull();
   });
 
+  it('lets no estimate stop a ledger before minPasses, though the limit of occasions and the spend cap still do', () => {
+    const held = { ...rule, minPasses: 5, stopUnseenPerKloc: 1, stopUsdPerDefect: 1.5, usd: 1 };
+    // forge.vite.part1's second pass (2026-11-26): 3.0 unseen over 3,200 lines read as saturated with next-new at 100%.
+    expect(stopReason({ m: 2, f0: 3, nextNew: 1 }, held, { lines: 3200, price: { usd: 9, passUsd: 0.5 }, spentUsd: 0 })).toBeNull();
+    expect(stopReason({ m: 5, f0: 3, nextNew: 1 }, held, { lines: 3200 })).toMatch(/per thousand lines/);
+    expect(stopReason({ m: 2, f0: 3, nextNew: 1 }, held, { lines: 3200, price: { usd: 0.5, passUsd: 0.5 }, spentUsd: 0.8 })).toMatch(/past the \$1\.00 limit/);
+    expect(stopReason({ m: 2, f0: 3, nextNew: 1 }, { ...held, max: 2 })).toMatch(/limit of 2/);
+  });
+
   it('holds unseen defects to a density per thousand lines where the lines are known', () => {
     const dense = { ...rule, stopUnseenPerKloc: 1 };
     expect(stopReason({ m: 6, f0: 2, nextNew: 0.5 }, dense, { lines: 4000 })).toBe('fewer than 1 defect per thousand lines estimated unseen (0.50)');
