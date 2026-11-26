@@ -30,8 +30,8 @@ export const scourPhasesOf = (ledgers: readonly SaturationLedger[]): ReadonlyMap
 );
 
 /** The audit map's treemap, shaded by what each area's saturation ledger says; picking an area picks its ledger. */
-export function SaturationMap({ areas, ledgers, picked, onPick }: {
-  areas: readonly AuditArea[]; ledgers: readonly SaturationLedger[]; picked: string | null; onPick: (id: string | null) => void;
+export function SaturationMap({ areas, icons, ledgers, picked, onPick }: {
+  areas: readonly AuditArea[]; icons?: Readonly<Record<string, string>>; ledgers: readonly SaturationLedger[]; picked: string | null; onPick: (id: string | null) => void;
 }) {
   const [scene] = useState(createAuditScene);
   const selection = useSelection({ scene, mode: 'single' });
@@ -66,7 +66,7 @@ export function SaturationMap({ areas, ledgers, picked, onPick }: {
       {probes}
       <Treemap
         scene={scene} selection={selection} areas={shaded} palette={colors} phases={phases} onHover={() => {}}
-        colorByPref="saturation.colorBy" metrics={SATURATION_METRICS}
+        colorByPref="saturation.colorBy" metrics={SATURATION_METRICS} bare {...(icons ? { glyphs: icons } : {})}
       />
     </div>
   );

@@ -2,6 +2,7 @@
 import { resolvePaintPattern, textCommandFromRuns, type DrawCommand, type NodeShapeEntry, type PosedPaint, type RectPose } from '@weasel-js/core';
 import { circlePath, pathFromD, type Path } from '@weasel-js/geom';
 import { glyphCommands, type GlyphPath } from './glyph';
+import { mixOf } from './heat';
 import { framePadOf, iconBoxIn } from './mapLayout';
 import { LOCK_WIDTH, PIN_WIDTH, padlockShapeAt, pinShapeAt } from './markShapes';
 
@@ -150,7 +151,11 @@ function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
     { kind: 'path', path: rect(p), stroke: { paint: { color: d.edge }, width: 0.5 } },
   ];
   const iconBox = d.icon ? iconBoxIn(p) : null;
-  if (d.icon && iconBox) out.push(glyphCommands(d.icon, { x: iconBox.x, y: iconBox.y, size: iconBox.width }, d.ink, ICON_INK));
+  if (d.icon && iconBox) {
+    // Solid ink mixed into the fill, as a stencil: faded ink would darken wherever the glyph's own shapes overlap.
+    const solid = 'color' in d.fill && typeof d.fill.color === 'string' ? mixOf(d.fill.color, d.ink, ICON_INK) : null;
+    out.push(glyphCommands(d.icon, { x: iconBox.x, y: iconBox.y, size: iconBox.width }, solid ?? d.ink, solid ? 1 : ICON_INK));
+  }
   // One size for every cell, shrunk only where a cell is too small to hold it.
   const cut = d.worn ? Math.min(Math.min(p.width, p.height) * 0.45, CUT_PX) : 0;
   if (d.worn) {

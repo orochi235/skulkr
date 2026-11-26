@@ -27,11 +27,16 @@ export function rampAt(stops: readonly string[], f: number): string {
   const lo = Math.floor(at);
   const hi = Math.min(lo + 1, stops.length - 1);
   const t = at - lo;
-  const a = oklchOf(stops[lo]!);
-  const b = oklchOf(stops[hi]!);
-  if (!a || !b) return stops[t < 0.5 ? lo : hi]!;
-  const mix = (x: number, y: number) => lerp(x, y, t);
-  return `oklch(${mix(a[0], b[0]).toFixed(4)} ${mix(a[1], b[1]).toFixed(4)} ${hueBetween(a[2], b[2], t).toFixed(2)})`;
+  return mixOf(stops[lo]!, stops[hi]!, t) ?? stops[t < 0.5 ? lo : hi]!;
+}
+
+/** `a` and `b` mixed in oklch, `t` (0 to 1) of the way to `b`; null when either is not in oklch. */
+export function mixOf(a: string, b: string, t: number): string | null {
+  const x = oklchOf(a);
+  const y = oklchOf(b);
+  if (!x || !y) return null;
+  const mix = (p: number, q: number) => lerp(p, q, t);
+  return `oklch(${mix(x[0], y[0]).toFixed(4)} ${mix(x[1], y[1]).toFixed(4)} ${hueBetween(x[2], y[2], t).toFixed(2)})`;
 }
 
 /** `color` with `amount` (0 to 1) of its chroma taken out, for an area the map sets aside; a color not in oklch stays

@@ -69,7 +69,7 @@ export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: 
             <LedgerList ledgers={ledgers} areas={areaIds} picked={picked} onPick={(id) => pick(id === picked ? null : id)} />
             <ResizeHandle value={listWidth} min={LIST.min} max={LIST.max} onInput={setListWidth} onChange={keepListWidth} aria-label="Resize the ledger list" />
             <div className={s.right}>
-              {map.status === 'ready' && <SaturationMap areas={map.map.areas} ledgers={ledgers} picked={picked} onPick={pick} />}
+              {map.status === 'ready' && <SaturationMap areas={map.map.areas} icons={map.map.icons} ledgers={ledgers} picked={picked} onPick={pick} />}
               {map.status === 'ready' && (
                 <ResizeHandle
                   orientation="horizontal" value={mapHeight} min={MAP.min} max={MAP.max}

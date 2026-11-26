@@ -26,9 +26,10 @@ The title's menu switches tenants; the URL hash names the one shown. The switch 
 defects, the area in the hash after it (`#weasel/scour/core.animation`). Above them, each ledger a live scour process holds shows what it does, for how long,
 its occasions against its `--max`, each job it has out with its newest log line, and the end of its `scour.log`, and the
 map outlines its area, pulsing, in the review or match color as the audit map does a live round's; the
-page asks every 5 seconds while one runs, else every 30. Its map shades areas by their saturation
-defects not yet resolved, or by unseen ones, or by any metric the audit map has, kept apart from the audit map's
-choice; picking an area on the map or in the list picks it in both. A slider above the treemap shows it as it stood
+page asks every 5 seconds while one runs, else every 30. Its map shades areas by what their scour ledgers say (the
+chance the next review finds a new defect, defects not found yet, open, found, the estimated total, reviews, spend),
+kept apart from the audit map's choice, and draws only the queue numbers, pins, area icons and live outlines over
+them, none of the audit history's marks; picking an area on the map or in the list picks it in both. A slider above the treemap shows it as it stood
 after an earlier round, shaded only by what was left then (settling, changes and live runs are known only of now);
 the hash carries the round after an `@` (`#weasel@41`), so the view survives a reload and can be shared. Maps without
 `lastByRound`, the demo's among them, show no slider. Reaching a round whose record recut the partition (the map's
