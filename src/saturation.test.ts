@@ -94,13 +94,21 @@ describe('yieldRows', () => {
 });
 
 describe('stopReason', () => {
-  const rule = { max: 40, stopNextNew: 0.1, stopUsdPerDefect: undefined, usd: undefined };
+  const rule = { max: 40, stopNextNew: 0.1, stopUnseenPerKloc: undefined, stopUsdPerDefect: undefined, usd: undefined };
   it('stops at the limit, under one unseen, or under the next-new floor, and not before', () => {
     expect(stopReason({ m: 40, f0: 9, nextNew: 0.5 }, rule)).toMatch(/limit of 40/);
     expect(stopReason({ m: 6, f0: 0.4, nextNew: 0.2 }, rule)).toMatch(/fewer than one/);
     expect(stopReason({ m: 6, f0: 3, nextNew: 0.08 }, rule)).toMatch(/under 10%/);
     expect(stopReason({ m: 6, f0: 3, nextNew: 0.12 }, rule)).toBeNull();
     expect(stopReason({ m: 1, f0: undefined, nextNew: undefined }, rule)).toBeNull();
+  });
+
+  it('holds unseen defects to a density per thousand lines where the lines are known', () => {
+    const dense = { ...rule, stopUnseenPerKloc: 1 };
+    expect(stopReason({ m: 6, f0: 2, nextNew: 0.5 }, dense, { lines: 4000 })).toBe('fewer than 1 defect per thousand lines estimated unseen (0.50)');
+    expect(stopReason({ m: 6, f0: 2, nextNew: 0.5 }, dense, { lines: 1000 })).toBeNull();
+    expect(stopReason({ m: 6, f0: 0.4, nextNew: 0.5 }, dense, { lines: 200 })).toBeNull();
+    expect(stopReason({ m: 6, f0: 0.4, nextNew: 0.5 }, dense)).toMatch(/fewer than one defect/);
   });
 
   it('stops when the next defect costs over the limit, or another pass would spend past the cap', () => {

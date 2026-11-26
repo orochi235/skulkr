@@ -29,7 +29,7 @@ describe('skulkr saturate ls', () => {
       { id: 'D1', claim: 'A', where: 'src/x.ts:1', severity: '', sightings: 2, seenAt: [1, 2], firstOccasion: 1, sources: ['claude', 'codex'], onlyBy: null, registry: null },
       { id: 'D2', claim: 'B', where: 'src/y.ts:2', severity: 'low', sightings: 0, seenAt: [], firstOccasion: null, sources: [], onlyBy: 'codex', registry: null },
     ]);
-    expect(ledgerListLines([only])[1]).toMatch(/^src\s+2\s+2\s+/);
+    expect(ledgerListLines([only])[1]).toMatch(/^src\s+–\s+2\s+2\s+/);
     expect(only.running).toBeNull();
   });
 

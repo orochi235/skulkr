@@ -5,6 +5,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { ledgerOf } from './ledger.mjs';
 import { chao2, stopRuleOf, yieldRows } from './saturation.mjs';
+import { perKloc } from './scourLines.mjs';
 import { scourStateDirOf } from './scourPaths.mjs';
 
 /** Passes the pass cost averages over, and the passes a ledger's opening price is taken from. */
@@ -87,8 +88,8 @@ export const nextPriceOf = (ledger, factor = 1) => {
 const orNull = (n) => (n === undefined || !Number.isFinite(n) ? null : n);
 
 /**
- * The ledger's yield by pass, for the dashboard: each pass's findings, new defects and cost, and the estimates, spend
- * and next defect's price as they stood after it; null where a figure has no value yet.
+ * The ledger's yield by pass, for the dashboard: each pass's findings, new defects and cost, and the estimates, spend,
+ * next defect's price and per-kloc figures (from `ledger.lines`) as they stood after it; null where one has no value.
  */
 export const passRowsOf = (ledger, factor = 1) => yieldRows(ledger).map((r) => ({
   n: r.n,
@@ -102,5 +103,8 @@ export const passRowsOf = (ledger, factor = 1) => yieldRows(ledger).map((r) => (
   spentUsd: r.spentUsd,
   usdPerDefect: orNull(r.usdPerDefect),
   nextUsd: orNull(nextPriceOf({ ...ledger, occasions: ledger.occasions.filter((o) => o.n <= r.n) }, factor).usd),
+  defectsPerKloc: perKloc(r.stats.S, ledger.lines),
+  unseenPerKloc: perKloc(r.stats.f0, ledger.lines),
+  costPerKloc: perKloc(r.costUsd ?? 0, ledger.lines),
   at: r.at ?? null,
 }));

@@ -21,6 +21,9 @@ export const saturationByArea = (ledgers: readonly SaturationLedger[]) => new Ma
   nextNew: l.nextNew,
   total: l.total,
   costUsd: l.costUsd,
+  unseenPerKloc: l.unseenPerKloc,
+  defectsPerKloc: l.defectsPerKloc,
+  usdPerKloc: l.usdPerKloc,
 }]));
 
 /** Each area a live scour process holds, in the phase its jobs are in: `match` while a ledger matcher runs, else

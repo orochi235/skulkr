@@ -80,6 +80,7 @@ export const yieldRows = (ledger) => {
 export const stopRuleOf = (cfg, max, { perDefect, usd, factor = 1 } = {}) => ({
   max,
   stopNextNew: cfg.saturate.stopNextNew,
+  stopUnseenPerKloc: cfg.saturate.stopUnseenPerKloc,
   stopUsdPerDefect: perDefect ?? cfg.saturate.stopUsdPerDefect,
   usd,
   factor,
@@ -87,11 +88,15 @@ export const stopRuleOf = (cfg, max, { perDefect, usd, factor = 1 } = {}) => ({
 
 /**
  * Why saturation should stop, given the combined estimate `stats`, the rule (`stopRuleOf`), the next defect's `price`
- * (`nextPriceOf`), and `spentUsd`, what this command has spent; null to go on.
+ * (`nextPriceOf`), `spentUsd`, what this command has spent, and `lines`, the area's lines; null to go on. Unseen
+ * defects are held to `stopUnseenPerKloc` per thousand lines, or under one where the lines are not known.
  */
-export const stopReason = (stats, { max, stopNextNew, stopUsdPerDefect, usd }, { price, spentUsd } = {}) => {
+export const stopReason = (stats, { max, stopNextNew, stopUnseenPerKloc, stopUsdPerDefect, usd }, { price, spentUsd, lines } = {}) => {
   if (stats.m >= max) return `reached the limit of ${max} occasions`;
-  if (stats.f0 !== undefined && stats.f0 < 1) return `fewer than one defect estimated unseen (${stats.f0.toFixed(2)})`;
+  if (stats.f0 !== undefined && lines && stopUnseenPerKloc !== undefined) {
+    const density = (stats.f0 * 1000) / lines;
+    if (density < stopUnseenPerKloc) return `fewer than ${stopUnseenPerKloc} ${stopUnseenPerKloc === 1 ? 'defect' : 'defects'} per thousand lines estimated unseen (${density.toFixed(2)})`;
+  } else if (stats.f0 !== undefined && stats.f0 < 1) return `fewer than one defect estimated unseen (${stats.f0.toFixed(2)})`;
   if (stats.nextNew !== undefined && stats.nextNew < stopNextNew) return `the next occasion's chance of a new finding is under ${Math.round(stopNextNew * 100)}% (${(stats.nextNew * 100).toFixed(1)}%)`;
   if (stopUsdPerDefect !== undefined && price?.usd !== undefined && price.usd > stopUsdPerDefect) {
     return `the next defect would cost about $${price.usd.toFixed(2)}, over the $${stopUsdPerDefect.toFixed(2)} limit`;

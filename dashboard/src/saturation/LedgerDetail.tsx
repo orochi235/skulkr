@@ -28,11 +28,18 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
       <header className={s.head}>
         <h2 className={s.title}>{ledger.id}</h2>
         <p className={s.facts}>
-          {ledger.files} files at <code>{ledger.commit.slice(0, 10)}</code> · {ledger.occasions} occasions ({sourcesText(ledger.sources)}) ·{' '}
+          {ledger.files} files{ledger.lines !== null && <>, <span className={s.num}>{ledger.lines.toLocaleString('en-US')}</span> lines</>} at{' '}
+          <code>{ledger.commit.slice(0, 10)}</code> · {ledger.occasions} occasions ({sourcesText(ledger.sources)}) ·{' '}
           <span className={s.num}>{ledger.distinct}</span> found, ≈<span className={s.num}>{estimate(ledger.total)}</span> held,
           next new <span className={s.num}>{percent(ledger.nextNew)}</span> · <span className={s.num}>{usd(ledger.costUsd)}</span>,
           next defect ≈ <span className={s.num}>{usdOrDash(ledger.nextUsd)}</span>
         </p>
+        {ledger.lines !== null && (
+          <p className={s.facts}>
+            Per thousand lines: <span className={s.num}>{estimate(ledger.defectsPerKloc)}</span> found,{' '}
+            <span className={s.num}>{estimate(ledger.unseenPerKloc)}</span> estimated unseen, <span className={s.num}>{usdOrDash(ledger.usdPerKloc)}</span> spent
+          </p>
+        )}
         <p className={s.facts}>{ledger.stopped ? `Stopped: ${ledger.stopped}.` : 'Not saturated yet: the stop rule does not hold.'}</p>
         <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} /><div className={s.chartFoot}><DelveKey /><PassTableButton ledger={ledger} /></div></div>
       </header>

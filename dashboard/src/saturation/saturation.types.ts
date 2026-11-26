@@ -31,6 +31,9 @@ export interface SaturationPass {
   readonly spentUsd: number;
   readonly usdPerDefect: number | null;
   readonly nextUsd: number | null;
+  readonly defectsPerKloc: number | null;
+  readonly unseenPerKloc: number | null;
+  readonly costPerKloc: number | null;
   readonly at: string | null;
 }
 
@@ -41,6 +44,8 @@ export interface SaturationLedger {
   readonly area: string;
   readonly commit: string;
   readonly files: number;
+  /** Its lines at the frozen commit; null where they could not be counted. */
+  readonly lines: number | null;
   readonly occasions: number;
   /** Occasions by source. */
   readonly sources: Readonly<Record<string, number>>;
@@ -53,6 +58,10 @@ export interface SaturationLedger {
   readonly nextNew: number | null;
   /** What the next defect should cost (README "The price of the next defect"); null under two occasions or with none expected. */
   readonly nextUsd: number | null;
+  /** Defects found, estimated unseen, and dollars spent, each per thousand lines; null without `lines`. */
+  readonly defectsPerKloc: number | null;
+  readonly unseenPerKloc: number | null;
+  readonly usdPerKloc: number | null;
   /** Its passes in order. */
   readonly passes: readonly SaturationPass[];
   /** Why the stop rule holds, null while it does not. */

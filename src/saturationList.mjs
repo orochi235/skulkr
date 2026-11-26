@@ -9,6 +9,7 @@ import { ledgerOf } from './ledger.mjs';
 import { queryIndex } from './recordIndex.mjs';
 import { chao2, sourcesOf, stopReason } from './saturation.mjs';
 import { nextPriceOf, passRowsOf, scourRuleOf } from './scourPrice.mjs';
+import { ledgerLinesOf, perKloc } from './scourLines.mjs';
 import { landedLedgersUnder, scourStateDirOf } from './scourPaths.mjs';
 
 /**
@@ -25,6 +26,7 @@ export const ledgerSummaryOf = (cfg, id, ledger, registered = () => new Map(), r
     area: ledger.area,
     commit: ledger.commit,
     files: ledger.files.length,
+    lines: ledger.lines ?? null,
     occasions: ledger.occasions.length,
     sources: Object.fromEntries(sourcesOf(ledger).map((s) => [s, ledger.occasions.filter((o) => o.source === s).length])),
     costUsd,
@@ -33,8 +35,11 @@ export const ledgerSummaryOf = (cfg, id, ledger, registered = () => new Map(), r
     unseen: stats.f0 ?? null,
     nextNew: stats.nextNew ?? null,
     nextUsd: price.usd === undefined || !Number.isFinite(price.usd) ? null : price.usd,
+    defectsPerKloc: perKloc(ledger.defects.length, ledger.lines),
+    unseenPerKloc: perKloc(stats.f0, ledger.lines),
+    usdPerKloc: perKloc(costUsd, ledger.lines),
     passes: passRowsOf(ledger, rule.factor),
-    stopped: ledger.occasions.length ? stopReason(stats, rule, { price }) : null,
+    stopped: ledger.occasions.length ? stopReason(stats, rule, { price, lines: ledger.lines }) : null,
     updated: ledger.occasions.at(-1)?.at ?? null,
     defects: ledger.defects.map((d) => ({
       id: d.id,
@@ -75,7 +80,7 @@ export const ledgerListOf = (cfg, root) => {
   const registered = root ? registeredIn(cfg, root) : undefined;
   const ledgers = readdirSync(dir).sort().flatMap((id) => {
     const ledger = ledgerOf(cfg, id);
-    return ledger ? [[id, ledger]] : [];
+    return ledger ? [[id, ledger.lines === undefined ? { ...ledger, lines: ledgerLinesOf(cfg, root, ledger, id) } : ledger]] : [];
   });
   const rule = scourRuleOf(cfg, {}, ledgers.map(([, ledger]) => ledger));
   return ledgers.map(([id, ledger]) => ({ ...ledgerSummaryOf(cfg, id, ledger, registered, rule), running: liveScourOf(cfg, id) }));
@@ -86,9 +91,23 @@ const fixed = (n, digits) => (n === null ? '–' : n.toFixed(digits));
 /** The list as terminal lines, one per ledger, the numbers right-aligned. */
 export const ledgerListLines = (list) => {
   const width = Math.max(4, ...list.map((l) => l.id.length));
+  const usd = (n) => (n === null ? '–' : `$${n.toFixed(2)}`);
+  const cells = (l) => [
+    l.id.padEnd(width),
+    String(l.lines ?? '–').padStart(6),
+    String(l.occasions).padStart(3),
+    String(l.distinct).padStart(8),
+    fixed(l.defectsPerKloc, 1).padStart(6),
+    fixed(l.unseen, 1).padStart(6),
+    fixed(l.unseenPerKloc, 1).padStart(6),
+    (l.nextNew === null ? '–' : `${(l.nextNew * 100).toFixed(1)}%`).padStart(8),
+    usd(l.nextUsd).padStart(6),
+    usd(l.costUsd).padStart(7),
+    usd(l.usdPerKloc).padStart(7),
+  ].join('  ');
   return [
-    `${'area'.padEnd(width)}  occ  distinct  unseen  next-new  next $     cost`,
-    ...list.map((l) => `${l.id.padEnd(width)}  ${String(l.occasions).padStart(3)}  ${String(l.distinct).padStart(8)}  ${fixed(l.unseen, 1).padStart(6)}  ${(l.nextNew === null ? '–' : `${(l.nextNew * 100).toFixed(1)}%`).padStart(8)}  ${(l.nextUsd === null ? '–' : `$${l.nextUsd.toFixed(2)}`).padStart(6)}  ${`$${l.costUsd.toFixed(2)}`.padStart(7)}`),
+    `${'area'.padEnd(width)}   lines  occ  distinct  /kloc  unseen  /kloc  next-new  next $     cost    /kloc`,
+    ...list.map(cells),
   ];
 };
 

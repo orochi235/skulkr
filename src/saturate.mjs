@@ -27,6 +27,7 @@ import { ledgerListLines, ledgerListOf, scouredAreasOf } from './saturationList.
 import { moveFormerScourState } from './scourPaths.mjs';
 import { chao2, stopReason, yieldRows } from './saturation.mjs';
 import { nextPriceOf, scourRuleOf } from './scourPrice.mjs';
+import { ledgerLinesOf } from './scourLines.mjs';
 import { scourRun } from './scourRun.mjs';
 import { writeReport } from './saturationReport.mjs';
 import { createSaturateContext, matchReport, occasionJobsOf, requireSources, runReview } from './saturateJobs.mjs';
@@ -79,6 +80,7 @@ const withFrozen = async (cfg, root, id, { fresh, at, about, say }, work) => wit
     const commit = wanted ?? freezeCommitOf(cfg, root);
     ledger = emptyLedger(id, commit, requireAreaFilesAt(cfg, root, id, commit));
   }
+  if (ledger.lines === undefined) ledger = { ...ledger, lines: ledgerLinesOf(cfg, root, ledger, id) };
   const { commit } = ledger;
   const frozen = addWorktree(root, `${cfg.naming.prefix}-saturate-${id}`, commit);
   try {
@@ -178,7 +180,7 @@ export const saturateArea = async (cfg, runner, root, id, args, tell) => {
     const startUsd = spentOn(ledger);
     for (let pass = 0; ; pass++) {
       const price = nextPriceOf(ledger, rule.factor);
-      const stop = stopReason(chao2(ledger.occasions, ledger.defects), rule, { price, spentUsd: spentOn(ledger) - startUsd });
+      const stop = stopReason(chao2(ledger.occasions, ledger.defects), rule, { price, spentUsd: spentOn(ledger) - startUsd, lines: ledger.lines });
       if (stop) {
         say(`saturate ${id}: stopped, ${stop}`);
         break;

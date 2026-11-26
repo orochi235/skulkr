@@ -5,7 +5,7 @@ import type { AuditArea } from './skulkrMap.types';
 
 export const HEAT_METRICS = ['left', 'density', 'fixed', 'found', 'queue', 'open', 'stale', 'age', 'rounds', 'files'] as const;
 /** What the saturation page's map can shade by besides: its areas' saturation ledgers, which the audit map lacks. */
-export const SATURATION_METRICS = ['saturationNextNew', 'saturationUnseen', 'saturationOpen', 'saturationDefects', 'saturationTotal', 'saturationReviews', 'saturationSpend'] as const;
+export const SATURATION_METRICS = ['saturationNextNew', 'saturationUnseen', 'saturationUnseenPerKloc', 'saturationOpen', 'saturationDefects', 'saturationDefectsPerKloc', 'saturationTotal', 'saturationReviews', 'saturationSpend', 'saturationSpendPerKloc'] as const;
 export type HeatMetric = (typeof HEAT_METRICS)[number] | (typeof SATURATION_METRICS)[number];
 /** Every metric, each with a ramp the viewer may choose. */
 export const ALL_METRICS: readonly HeatMetric[] = [...SATURATION_METRICS, ...HEAT_METRICS];
@@ -71,6 +71,18 @@ export const HEAT_METRIC_SPECS: Readonly<Record<HeatMetric, HeatMetricSpec>> = {
   saturationUnseen: {
     name: 'defects not found yet (est.)', legend: 'defects the scour estimates no review has found yet', none: 'no estimate yet', scheme: 'magma', floor: 5,
     valuesIn: (areas) => each(areas, (a) => a.saturation?.unseen ?? null),
+  },
+  saturationUnseenPerKloc: {
+    name: 'defects not found yet per 1,000 lines (est.)', legend: 'defects the scour estimates no review has found yet, per thousand lines', none: 'no estimate yet', scheme: 'magma', floor: 5,
+    valuesIn: (areas) => each(areas, (a) => a.saturation?.unseenPerKloc ?? null),
+  },
+  saturationDefectsPerKloc: {
+    name: 'defects found per 1,000 lines', legend: 'distinct defects its scour reviews found, per thousand lines', none: 'no scour ledger', scheme: 'ember', floor: 10,
+    valuesIn: (areas) => each(areas, (a) => a.saturation?.defectsPerKloc ?? null),
+  },
+  saturationSpendPerKloc: {
+    name: 'spend per 1,000 lines', legend: 'dollars its scour cost, per thousand lines', none: 'no scour ledger', scheme: 'viridis', floor: 5,
+    valuesIn: (areas) => each(areas, (a) => a.saturation?.usdPerKloc ?? null),
   },
   saturationDefects: {
     name: 'defects found', legend: 'distinct defects its scour reviews found', none: 'no scour ledger', scheme: 'ember', floor: 8,

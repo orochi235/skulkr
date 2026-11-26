@@ -550,10 +550,18 @@ After each occasion skulkr prints a line, rewrites the report, and checks the st
     7/40 claude: 3 findings, 1 new; distinct 19; unseen ≈ 6.1; next-new 18%; $0.62; $1.84/defect, next ≈ $1.12
 
 `$/defect` is everything spent so far over the defects found; `next` is what the next defect should cost (below).
-It stops once the combined estimate puts fewer than one defect unseen, the chance that the next occasion's finding
+It stops once the combined estimate puts fewer than `saturate.stopUnseenPerKloc` (1) defects unseen per thousand
+lines (fewer than one, where the lines cannot be counted), the chance that the next occasion's finding
 is new falls under `saturate.stopNextNew` (15%), the next defect would cost over `--per-defect` dollars
 (`saturate.stopUsdPerDefect`, 1.50), another pass would take what this command has spent past `--usd`, or `--max`
 occasions (`saturate.max`, 40) are in the ledger.
+
+**Per thousand lines.** Areas differ in size by five times and more, so the unseen estimate is held to a density,
+and `ls`, the report, the Scour page's ledger panel and Passes table, and its map lenses also give found, unseen and
+spend per thousand lines. An area's lines are counted at the ledger's commit, every line of its files (blank and
+comment lines included), once: a delve stores them as the ledger's `lines`, and a ledger without them keeps its
+count in `lines.json` beside it. A pass costs much the same whatever an area's size: on weasel (2026-11-25), areas of
+1,200 and 5,600 lines cost $0.66 and $1.18 a pass, while their reviews found 21 and 8 defects per thousand lines.
 
 **The price of the next defect** is the average cost of the ledger's last five passes over the new defects its next
 pass should find. That count is Chao2's (the chance a finding is new, times the sightings a pass makes) times a

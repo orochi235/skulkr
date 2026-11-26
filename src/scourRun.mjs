@@ -6,6 +6,7 @@ import { ledgerOf } from './ledger.mjs';
 import { partitionAt } from './partition.mjs';
 import { saturateArea } from './saturate.mjs';
 import { chao2, stopReason } from './saturation.mjs';
+import { ledgerLinesOf } from './scourLines.mjs';
 import { nextPriceOf, pricingOf, scourRuleOf } from './scourPrice.mjs';
 
 export const STRATEGIES = ['finish', 'cheapest', 'spread'];
@@ -17,11 +18,12 @@ const spentOn = (ledger) => (ledger?.occasions ?? []).reduce((sum, o) => sum + (
  * Each candidate's next defect: its ledger's price from two passes on, the pooled opening price before; `stopped`
  * where its own stop rule already holds.
  */
-export const candidatePricesOf = (cfg, ids, rule, pricing) => ids.map((id) => {
+export const candidatePricesOf = (cfg, root, ids, rule, pricing) => ids.map((id) => {
   const ledger = ledgerOf(cfg, id);
   if (!ledger || ledger.occasions.length < 2) return { id, usd: pricing.openingUsd, stopped: null };
   const price = nextPriceOf(ledger, pricing.factor);
-  return { id, usd: price.usd, stopped: stopReason(chao2(ledger.occasions, ledger.defects), rule, { price }) };
+  const lines = ledgerLinesOf(cfg, root, ledger, id);
+  return { id, usd: price.usd, stopped: stopReason(chao2(ledger.occasions, ledger.defects), rule, { price, lines }) };
 });
 
 /** `skulkr scour run [areas…] --by finish|cheapest|spread [--usd N] [--passes N]`, each line to `say`. */
@@ -40,7 +42,7 @@ export const scourRun = async (cfg, runner, root, args, say) => {
   };
   const byPrice = () => {
     const rule = scourRuleOf(cfg, args);
-    return candidatePricesOf(cfg, ids, rule, pricingOf(cfg)).filter((c) => !c.stopped).sort((a, b) => a.usd - b.usd);
+    return candidatePricesOf(cfg, root, ids, rule, pricingOf(cfg)).filter((c) => !c.stopped).sort((a, b) => a.usd - b.usd);
   };
   say(`scour run by ${by}: ${ids.length} ${ids.length === 1 ? 'area' : 'areas'}, ${Number.isFinite(budget) ? `$${budget.toFixed(2)} to spend` : 'no budget'}`);
   if (by === 'cheapest') {
