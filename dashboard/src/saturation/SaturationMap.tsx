@@ -47,6 +47,19 @@ export const mapAreasFor = (areas: readonly AuditArea[], ledgers: readonly Satur
   });
 };
 
+/** The most pixels a cell stands off the map, and the most per open defect: the area with the most open stands
+ *  `MAX_RISE` high, unless every area has so few that each takes `PER_DEFECT`. */
+const MAX_RISE = 28;
+const PER_DEFECT = 3;
+
+/** How high each area stands: its own ledger's open defects, scaled so the most stands `MAX_RISE` at most. */
+export const risesFor = (areas: readonly AuditArea[]): ReadonlyMap<string, number> => {
+  const open = areas.map((a) => [a.id, a.saturation?.open ?? 0] as const);
+  const most = Math.max(1, ...open.map(([, n]) => n));
+  const per = Math.min(PER_DEFECT, MAX_RISE / most);
+  return new Map(open.filter(([, n]) => n > 0).map(([id, n]) => [id, n * per]));
+};
+
 /** The audit map's treemap, shaded by what each area's saturation ledger says and numbered by `queue`, the order
  *  `scour run` would delve them in (not the rounds' queue); picking an area picks its ledger. */
 export function SaturationMap({ areas, icons, ledgers, queue, picked, onPick }: {
@@ -59,6 +72,7 @@ export function SaturationMap({ areas, icons, ledgers, queue, picked, onPick }: 
   const phases = useMemo(() => scourPhasesOf(ledgers), [ledgers]);
   // The treemap outlines the areas a live run holds; here a live scour holds them.
   const shaded = useMemo(() => mapAreasFor(areas, ledgers, queue, phases), [areas, ledgers, queue, phases]);
+  const rises = useMemo(() => risesFor(shaded), [shaded]);
   const selected = selection.current[0] ?? null;
   // The page's pick and the map's selection follow each other. A change the map's own clicks make picks (or unpicks);
   // one this component makes to follow the pick is noted first, so it never picks back.
@@ -80,7 +94,7 @@ export function SaturationMap({ areas, icons, ledgers, queue, picked, onPick }: 
       {probes}
       <Treemap
         scene={scene} selection={selection} areas={shaded} palette={colors} phases={phases} onHover={() => {}}
-        colorByPref="saturation.colorBy" metrics={SATURATION_METRICS} bare numbered {...(icons ? { glyphs: icons } : {})}
+        colorByPref="saturation.colorBy" metrics={SATURATION_METRICS} bare numbered rises={rises} {...(icons ? { glyphs: icons } : {})}
       />
     </div>
   );

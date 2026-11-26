@@ -176,6 +176,9 @@ export function auditNodeSpecs(
   values: ReadonlyMap<string, number | null> | null = null,
   /** Draw only the shading, labels, queue numbers, pins and live outlines: none of the audit history's marks. */
   bare = false,
+  /** How high each area stands, in pixels; given, every cell sits at the top level, drawn back to front (`backToFront`),
+   *  so a tall one's lid covers the cells behind it whatever frame they are in. */
+  rises: ReadonlyMap<string, number> | null = null,
 ): AuditNodeSpec[] {
   const byId = new Map(areas.map((a) => [a.id, a]));
   const frameBox = new Map(layout.frames.map((f) => [f.name, f]));
@@ -190,19 +193,25 @@ export function auditNodeSpecs(
     };
     out.push({ id: frameIdOf(f.name), parent: f.parent === null ? null : frameIdOf(f.parent), pickable: false, pose: poseIn(f, parent), data });
   }
-  for (const c of layout.cells) {
+  for (const c of rises ? backToFront(layout.cells) : layout.cells) {
     const area = byId.get(c.id);
     if (!area) continue;
-    const parent = c.parent === null ? undefined : frameBox.get(c.parent);
+    const parent = rises || c.parent === null ? undefined : frameBox.get(c.parent);
+    const data = cellData(area, c, palette, heat, phases.get(area.id), area.id === lit, upcoming, estimates.get(area.id),
+      area.icon !== undefined && Object.hasOwn(glyphs, area.icon) ? glyphs[area.icon] : undefined, inColor !== null && !inColor.has(area.id) ? grayAmount : 0,
+      values ? values.get(area.id) ?? null : undefined, bare);
+    const rise = rises?.get(area.id) ?? 0;
     out.push({
-      id: asNodeId(c.id), parent: c.parent === null ? null : frameIdOf(c.parent), pickable: true,
-      pose: poseIn(c, parent), data: cellData(area, c, palette, heat, phases.get(area.id), area.id === lit, upcoming, estimates.get(area.id),
-        area.icon !== undefined && Object.hasOwn(glyphs, area.icon) ? glyphs[area.icon] : undefined, inColor !== null && !inColor.has(area.id) ? grayAmount : 0,
-        values ? values.get(area.id) ?? null : undefined, bare),
+      id: asNodeId(c.id), parent: rises || c.parent === null ? null : frameIdOf(c.parent), pickable: true,
+      pose: poseIn(c, parent), data: rise > 0 ? { ...data, rise } : data,
     });
   }
   return out;
 }
+
+/** Cells in the order a raised map draws them: those further up and to the right first, as a lid rises that way. */
+export const backToFront = <T extends Box>(cells: readonly T[]): T[] =>
+  [...cells].sort((a, b) => (a.y + a.height / 2 - a.x - a.width / 2) - (b.y + b.height / 2 - b.x - b.width / 2));
 
 const samePose = (a: RectPose, b: RectPose) => a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 
@@ -227,6 +236,14 @@ export function syncAuditScene(scene: AuditScene, specs: readonly AuditNodeSpec[
     // Every node still wanted has moved out from under those going, so removing them takes nothing kept.
     const gone = [...scene.nodes.values()].filter((n) => !wanted.has(n.id)).map((n) => n.id);
     if (gone.length > 0) scene.removeMany(gone);
+    // Siblings paint in the specs' order, which a raised map's back-to-front drawing depends on.
+    const byParent = new Map<NodeId | null, NodeId[]>();
+    for (const spec of specs) byParent.set(spec.parent, [...(byParent.get(spec.parent) ?? []), spec.id]);
+    for (const [parent, ids] of byParent) {
+      const now = parent === null ? scene.roots : scene.childrenOf(parent);
+      if (now.length === ids.length && now.every((id, i) => id === ids[i])) continue;
+      ids.forEach((id, i) => scene.reorder(id, i));
+    }
   });
 }
 

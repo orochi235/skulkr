@@ -57,6 +57,8 @@ export interface TreemapProps {
   readonly bare?: boolean;
   /** Number the head of whatever queue `areas` carry (by default all but a bare map), with the legend's slider. */
   readonly numbered?: boolean;
+  /** How high each area stands off the map, in pixels; null draws it flat. */
+  readonly rises?: ReadonlyMap<string, number> | null;
 }
 
 /** Every audit area as a cell of a treemap drawn on the scene graph: hover and click pick through the canvas's
@@ -66,7 +68,7 @@ const NO_GLYPHS: Readonly<Record<string, string>> = {};
 const RECUT_FADE_MS = 1800;
 const HALF_STOPS = Array.from({ length: MAX_HALVES + 1 }, (_, i) => i);
 
-export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, inColor = null, heat: heatGiven, recut = null, header, thermal, colorByPref = 'map.colorBy', metrics = HEAT_METRICS, bare = false, numbered = !bare }: TreemapProps) {
+export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, inColor = null, heat: heatGiven, recut = null, header, thermal, colorByPref = 'map.colorBy', metrics = HEAT_METRICS, bare = false, numbered = !bare, rises = null }: TreemapProps) {
   // How many half-rounds of the queue's head to number on the map, each in its area's corner.
   const [halves, setHalves] = useDashPref('map.upcoming');
   const [gray] = useDashPref('map.gray');
@@ -126,8 +128,8 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
   const metric = HEAT_METRIC_SPECS[colorBy];
   const layout = useMemo(() => layoutMap(areas, size.width, size.height), [areas, size]);
   useLayoutEffect(() => {
-    syncAuditScene(scene, auditNodeSpecs(areas, layout, shades, phases, lit, places, estimates, glyphs, inColor, gray / 100, heat, values, bare));
-  }, [scene, areas, layout, shades, phases, lit, places, estimates, glyphs, inColor, gray, heat, values, bare]);
+    syncAuditScene(scene, auditNodeSpecs(areas, layout, shades, phases, lit, places, estimates, glyphs, inColor, gray / 100, heat, values, bare, rises));
+  }, [scene, areas, layout, shades, phases, lit, places, estimates, glyphs, inColor, gray, heat, values, bare, rises]);
 
   // The map's text is set in the theme's faces, which the canvas draws from the document's fonts once each loads.
   useEffect(() => {

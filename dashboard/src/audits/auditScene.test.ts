@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { asNodeId } from '@weasel-js/core';
-import { auditNodeSpecs, createAuditScene, frameIdOf, syncAuditScene, type AuditPalette } from './auditScene';
+import { auditNodeSpecs, backToFront, createAuditScene, frameIdOf, syncAuditScene, type AuditPalette } from './auditScene';
 import { AUDIT_PAINTER, outline, pipCountOf, pipsPerRowIn, type AuditCellData } from './auditPainter';
 import { ICON, layoutMap } from './mapLayout';
 import { phasesOf } from './phases';
@@ -194,5 +194,28 @@ describe('outline', () => {
 
   it('keeps square corners where the outline sits inside the cut', () => {
     expect(outline(p, 30, 12).kind).toBe('rect');
+  });
+});
+
+describe('a raised map', () => {
+  it('stands each area its rise high at the top level, drawing those up and to the right first', () => {
+    const scene = createAuditScene();
+    const layout = layoutMap(map.areas, 900, 400);
+    syncAuditScene(scene, auditNodeSpecs(map.areas, layout, PALETTE, new Map(), null, Infinity, new Map(), {}, null, 1, undefined, null, false,
+      new Map([['core.ops', 12]])));
+    expect(cellOf(scene, 'core.ops').rise).toBe(12);
+    expect(cellOf(scene, 'core.debug').rise).toBeUndefined();
+    const cells = scene.roots.filter((id) => map.areas.some((a) => a.id === id));
+    expect(cells).toHaveLength(map.areas.length);
+    const boxes = new Map(layout.cells.map((c) => [c.id, c]));
+    expect(cells).toEqual(backToFront(cells.map((id) => boxes.get(id)!)).map((c) => c.id));
+  });
+
+  it("draws a raised cell's walls and its lid above its footprint, and picks by the whole block", () => {
+    const cell = { kind: 'audit-cell', fill: { color: 'oklch(0.8 0.1 80)' }, edge: '#fff', ink: '#000', dots: 0, pulse: 1, font: 'a', numericFont: 'a', rise: 8 } as AuditCellData;
+    const pose = { x: 0, y: 20, width: 30, height: 10 };
+    const commands = AUDIT_PAINTER.paint({ data: cell } as never, pose);
+    expect(Array.from((commands.at(-1) as { transform: Float32Array }).transform)).toEqual([1, 0, 0, 0, 1, 0, 4, -6, 1]);
+    expect(AUDIT_PAINTER.bounds!({ data: cell } as never, pose)).toEqual({ x: -2, y: 12, width: 38, height: 20 });
   });
 });

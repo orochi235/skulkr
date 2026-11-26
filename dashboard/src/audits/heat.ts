@@ -30,6 +30,14 @@ export function rampAt(stops: readonly string[], f: number): string {
   return mixOf(stops[lo]!, stops[hi]!, t) ?? stops[t < 0.5 ? lo : hi]!;
 }
 
+/** `color` moved `t` (0 to 1) of the way to black, or to white when it is dark, so a shade of it shows against it;
+ *  null when it is not in oklch. */
+export function shadeOf(color: string, t: number): string | null {
+  const c = oklchOf(color);
+  if (!c) return null;
+  return mixOf(color, c[0] < 0.45 ? 'oklch(1 0 0)' : 'oklch(0 0 0)', t);
+}
+
 /** `a` and `b` mixed in oklch, `t` (0 to 1) of the way to `b`; null when either is not in oklch. */
 export function mixOf(a: string, b: string, t: number): string | null {
   const x = oklchOf(a);

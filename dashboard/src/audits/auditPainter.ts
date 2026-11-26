@@ -2,7 +2,7 @@
 import { resolvePaintPattern, textCommandFromRuns, type DrawCommand, type NodeShapeEntry, type PosedPaint, type RectPose } from '@weasel-js/core';
 import { circlePath, pathFromD, type Path } from '@weasel-js/geom';
 import { glyphCommands, type GlyphPath } from './glyph';
-import { mixOf } from './heat';
+import { mixOf, shadeOf } from './heat';
 import { framePadOf, iconBoxIn } from './mapLayout';
 import { LOCK_WIDTH, PIN_WIDTH, padlockShapeAt, pinShapeAt } from './markShapes';
 
@@ -58,6 +58,9 @@ export interface AuditCellData {
   readonly recut?: { readonly color: string; readonly opacity: number };
   /** The live outline's opacity, which the page breathes. */
   readonly pulse: number;
+  /** How high the cell stands off the map, in pixels: its lid drawn up and to the right of its footprint (`riseOffsetOf`),
+   *  joined to it by its left and bottom walls. */
+  readonly rise?: number;
   /** The faces its words and its numbers are set in. */
   readonly font: string;
   readonly numericFont: string;
@@ -144,7 +147,39 @@ function filled(path: Path, paint: PosedPaint): DrawCommand[] {
 
 const GLOW = [[1.5, 1], [4.5, 0.5], [7.5, 0.22]] as const;
 
+/** Where a cell `rise` pixels high draws its lid, from its footprint: up and to the right, steeper than 45° so height
+ *  reads as height. */
+export const riseOffsetOf = (rise: number): { readonly dx: number; readonly dy: number } => ({ dx: rise * 0.5, dy: -rise * 0.75 });
+
+/** The outline of a cell standing `rise` high: its footprint, walls and lid as one hexagon. */
+const prismOf = (p: RectPose, rise: number): Path => {
+  const { dx, dy } = riseOffsetOf(rise);
+  const x1 = p.x + p.width, y1 = p.y + p.height;
+  return pathFromD(`M ${p.x} ${y1} L ${x1} ${y1} L ${x1 + dx} ${y1 + dy} L ${x1 + dx} ${p.y + dy} L ${p.x + dx} ${p.y + dy} L ${p.x} ${p.y} Z`);
+};
+
+/** A raised cell: its footprint in the edge color, its left and bottom walls shaded from its fill, then the flat
+ *  cell's own drawing moved up onto its lid. */
+function paintRaised(d: AuditCellData, p: RectPose, rise: number): DrawCommand[] {
+  const { dx, dy } = riseOffsetOf(rise);
+  const x1 = p.x + p.width, y1 = p.y + p.height;
+  const base = 'color' in d.fill && typeof d.fill.color === 'string' ? d.fill.color : d.edge;
+  // A fill not in oklch (a fallback hex) keeps its walls in the edge color.
+  const wall = (shade: number) => ({ color: shadeOf(base, shade) ?? d.edge });
+  return [
+    ...filled(rect(p), { color: d.edge }),
+    ...filled(pathFromD(`M ${p.x} ${p.y} L ${p.x + dx} ${p.y + dy} L ${p.x + dx} ${y1 + dy} L ${p.x} ${y1} Z`), wall(0.45)),
+    ...filled(pathFromD(`M ${p.x} ${y1} L ${p.x + dx} ${y1 + dy} L ${x1 + dx} ${y1 + dy} L ${x1} ${y1} Z`), wall(0.25)),
+    { kind: 'path', path: prismOf(p, rise), stroke: { paint: { color: d.edge }, width: 0.5 } },
+    { kind: 'group', transform: new Float32Array([1, 0, 0, 0, 1, 0, dx, dy, 1]), children: paintFlat(d, p) },
+  ];
+}
+
 function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {
+  return d.rise ? paintRaised(d, p, d.rise) : paintFlat(d, p);
+}
+
+function paintFlat(d: AuditCellData, p: RectPose): DrawCommand[] {
   const out: DrawCommand[] = [
     ...filled(rect(p), d.fill),
     ...(d.over ? filled(rect(p), d.over) : []),
@@ -234,6 +269,9 @@ export const AUDIT_PAINTER: NodeShapeEntry<AuditNodeData, RectPose> = {
   matches: (node) => isAudit(node.data),
   paint: (node, pose) => (node.data.kind === 'audit-cell' ? paintCell(node.data, pose) : paintFrame(node.data, pose)),
   drawsLabel: true,
-  silhouette: (_node, p) => rect(p),
-  bounds: (_node, p) => ({ x: p.x - 2, y: p.y - 2, width: p.width + 4, height: p.height + 4 }),
+  silhouette: (node, p) => (node.data.kind === 'audit-cell' && node.data.rise ? prismOf(p, node.data.rise) : rect(p)),
+  bounds: (node, p) => {
+    const { dx, dy } = riseOffsetOf(node.data.kind === 'audit-cell' ? node.data.rise ?? 0 : 0);
+    return { x: p.x - 2, y: p.y + dy - 2, width: p.width + dx + 4, height: p.height - dy + 4 };
+  },
 };
