@@ -2,6 +2,12 @@
 
 Open work on skulkr. Each entry says when it closes.
 
+- [ ] (P2) `skills/skulkr-review-saturation` reviews `main`'s tip even for an area whose ledger is frozen at an older
+  commit, so `scour ingest` refuses its report. On 2026-11-26 this happened to five of Codex's reports
+  (routing.interactions, routing.interactions.actions, routing.interactions.dispatcher, routing.tools, text-dom); each
+  was reviewed again by hand in a worktree at its ledger's commit. Closes when the skill learns an existing ledger's
+  commit and file list without reading the ledger (say, `scour ls --ids --at`), and reviews a worktree at that commit.
+
 - [ ] (P2) A killed `delve` (local or fleet mode) leaves its frozen worktree (`.worktrees/audit-saturate-<area>`) in the project and
   its `jobs/<NN>-<source>/` beside the ledger; only a normal stop removes them (`withFrozen`'s `finally`), and SIGTERM
   skips it. On 2026-11-26 the user stopped two `scour run` lanes at 15:21Z, and two more were stopped at 16:30Z,
