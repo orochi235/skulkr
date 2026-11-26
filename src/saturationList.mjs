@@ -38,6 +38,7 @@ export const ledgerSummaryOf = (cfg, id, ledger, registered = () => new Map()) =
       where: d.where,
       severity: d.severity ?? '',
       sightings: d.sightings.length,
+      seenAt: [...d.sightings],
       firstOccasion: d.firstOccasion ?? null,
       sources: Object.keys(d.sources ?? {}).filter((s) => d.sources[s].length),
       onlyBy: d.sightings.length ? null : d.source ?? null,

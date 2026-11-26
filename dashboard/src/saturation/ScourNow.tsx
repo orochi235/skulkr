@@ -1,4 +1,5 @@
 import { minutesSince } from '@dash/audits/runData';
+import { DelveChart, DelveKey } from './DelveChart';
 import type { ScourJob, SaturationLedger } from './saturation.types';
 import s from './ScourNow.module.css';
 
@@ -32,6 +33,7 @@ export function ScourNow({ ledgers, onPick, now = Date.now() }: { ledgers: reado
                 {r.does ?? 'held'} · pid {r.pid} · {minutesSince(r.since, now)} · {r.max ? `${l.occasions}/${r.max}` : l.occasions} occasions
               </span>
             </header>
+            <div className={s.chart}><DelveChart ledger={l} max={r.max} live /><DelveKey /></div>
             {r.jobs.length > 0 && <ul className={s.jobs}>{r.jobs.map((j) => <JobLine key={j.key} job={j} />)}</ul>}
             {r.log.length > 0 && <pre className={s.log}>{r.log.slice(-3).map(untimed).join('\n')}</pre>}
           </article>

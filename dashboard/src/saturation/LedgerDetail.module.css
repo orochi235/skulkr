@@ -44,3 +44,10 @@
 }
 
 .unlanded { color: var(--wzl-fg-muted); }
+
+.chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wzl-space-1);
+  margin-block: var(--wzl-space-2);
+}

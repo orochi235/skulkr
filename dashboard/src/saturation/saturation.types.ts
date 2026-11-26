@@ -6,6 +6,8 @@ export interface SaturationDefect {
   readonly severity: string;
   /** How many occasions reported it. */
   readonly sightings: number;
+  /** The occasions that reported it, by number. */
+  readonly seenAt: readonly number[];
   readonly firstOccasion: number | null;
   /** The sources whose occasions reported it. */
   readonly sources: readonly string[];

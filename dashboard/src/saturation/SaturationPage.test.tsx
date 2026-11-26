@@ -15,8 +15,8 @@ const ledger = (id: string, unseen: number, defects: SaturationLedger['defects']
 
 const LEDGERS = [
   ledger('core.animation', 9.6, [
-    { id: 'D1', claim: 'A rejected tween still records its pose', where: 'poseHelpers.ts:110', severity: 'medium', sightings: 7, firstOccasion: 1, sources: ['codex', 'claude'], onlyBy: null, registry: { id: 'd-0123456789', status: 'fixed', sha: '96c86df9c8aa' } },
-    { id: 'D2', claim: 'A pose read during teardown throws', where: 'animator.ts:40', severity: 'low', sightings: 0, firstOccasion: null, sources: [], onlyBy: 'codex', registry: null },
+    { id: 'D1', claim: 'A rejected tween still records its pose', where: 'poseHelpers.ts:110', severity: 'medium', sightings: 7, seenAt: [1, 3, 5, 8, 12, 20, 24], firstOccasion: 1, sources: ['codex', 'claude'], onlyBy: null, registry: { id: 'd-0123456789', status: 'fixed', sha: '96c86df9c8aa' } },
+    { id: 'D2', claim: 'A pose read during teardown throws', where: 'animator.ts:40', severity: 'low', sightings: 0, seenAt: [], firstOccasion: null, sources: [], onlyBy: 'codex', registry: null },
   ]),
   ledger('geom.booleans', 1.2, []),
 ];

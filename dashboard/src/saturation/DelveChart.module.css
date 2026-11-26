@@ -1,0 +1,50 @@
+.chart {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.base { stroke: var(--wzl-border); stroke-width: 1; }
+
+.tick {
+  composes: numeric from '@weasel-js/theme/numeric.module.css';
+  font-size: 10px;
+  fill: var(--wzl-fg-muted);
+  text-anchor: middle;
+}
+
+/* A tile's faces share its color; the top is lit and the side shaded over it. */
+.again { --tile: var(--wzl-fg-muted); }
+
+.new { --tile: var(--wzl-accent); }
+
+.lone { --tile: var(--wzl-warning); }
+
+.front,
+.top,
+.side { fill: var(--tile); stroke: var(--wzl-surface); stroke-width: 0.4; }
+
+.top { filter: brightness(1.35); }
+
+.side { filter: brightness(0.7); }
+
+.ghostLabel {
+  font-size: 11px;
+  fill: var(--wzl-fg-muted);
+}
+
+.key {
+  display: inline-flex;
+  gap: var(--wzl-space-3);
+  font-size: var(--wzl-font-size-xs);
+  color: var(--wzl-fg-muted);
+}
+
+.swatch {
+  display: inline-block;
+  inline-size: 9px;
+  block-size: 6px;
+  margin-inline-end: 4px;
+  background: var(--tile);
+}
