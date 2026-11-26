@@ -12,6 +12,8 @@ export const SWEEP = ['review', 'reviewed', 'match', 'fix'] as const satisfies r
 export const PHASE_LABEL: Readonly<Record<AuditPhase, string>> = {
   review: 'review', reviewed: 'one review in', match: 'match', fix: 'fix', patch: 'patch', conflict: 'conflict', done: 'done',
 };
+/** The phases a live scour holds an area in (`scourPhasesOf`): a review out, or a ledger match. */
+export const SCOUR_PHASES = ['review', 'match'] as const satisfies readonly AuditPhase[];
 /** Where an area can end up, off the sweep. */
 export const OFF_PIPELINE = ['conflict', 'done'] as const;
 export const AUDIT_PHASES = [...PIPELINE, ...OFF_PIPELINE] as const;

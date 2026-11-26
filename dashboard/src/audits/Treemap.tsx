@@ -12,7 +12,7 @@ import { HeatLegend } from './HeatLegend';
 import { LockMark } from './Marks';
 import { HEAT_METRICS, HEAT_METRIC_SPECS, metricScaleOf, type HeatMetric } from './heatMetrics';
 import { heatStopsOf, type HeatScheme } from './heatSchemes';
-import { OFF_PIPELINE, PHASE_LABEL, SWEEP, phaseClass, type AuditPhase } from './phases';
+import { OFF_PIPELINE, PHASE_LABEL, SCOUR_PHASES, SWEEP, phaseClass, type AuditPhase } from './phases';
 import { Slider } from '@weasel-js/ui/components/Slider';
 import { MAX_HALVES, useDashPref } from './dashPrefs';
 import type { AuditArea } from './skulkrMap.types';
@@ -230,15 +230,22 @@ function NowLegend({ halves, places, onInput, onChange, none, bare }: {
           </span>
         </>
       )}
-      <span className={s.phases}>
-        in a live run:
-        <span className={s.phaseRamp}>
-          <i className={s.phaseBar} />
-          {/* Every step keeps its place under the ramp; the one between review and match goes uncaptioned. */}
-          <span className={s.phaseNames}>{SWEEP.map((p) => <span key={p}>{p === 'reviewed' ? '' : PHASE_LABEL[p]}</span>)}</span>
+      {bare ? (
+        <span className={s.phases}>
+          in a live scour:
+          {SCOUR_PHASES.map((p) => <span key={p} className={phaseClass(p)}><i className={`${s.key} ${s.live}`} />{PHASE_LABEL[p]}</span>)}
         </span>
-        {!bare && OFF_PIPELINE.map((p) => <span key={p} className={phaseClass(p)}><i className={`${s.key} ${s.live}`} />{PHASE_LABEL[p]}</span>)}
-      </span>
+      ) : (
+        <span className={s.phases}>
+          in a live run:
+          <span className={s.phaseRamp}>
+            <i className={s.phaseBar} />
+            {/* Every step keeps its place under the ramp; the one between review and match goes uncaptioned. */}
+            <span className={s.phaseNames}>{SWEEP.map((p) => <span key={p}>{p === 'reviewed' ? '' : PHASE_LABEL[p]}</span>)}</span>
+          </span>
+          {OFF_PIPELINE.map((p) => <span key={p} className={phaseClass(p)}><i className={`${s.key} ${s.live}`} />{PHASE_LABEL[p]}</span>)}
+        </span>
+      )}
       <span><i className={`${s.key} ${s.uncharted}`} />{none}</span>
       <span className={s.upcoming}>
         numbered upcoming:
