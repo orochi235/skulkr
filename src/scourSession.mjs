@@ -80,7 +80,6 @@ const handOut = (cfg, id, task, prompt, model, say) => {
   writeFileSync(task.prompt, prompt);
   writeFileSync(join(dir, `${task.step}.log`), `${new Date().toISOString()} subagent ${task.step} handed out\n`);
   writeJson(taskPathOf(cfg, id), { ...task, model: model ?? null }, 1);
-  say(`next ${id}: ${task.kind} ${task.key}${task.attempt ? ` (attempt ${task.attempt})` : ''}`);
   return { task: task.kind, key: task.key, model: model ?? null, prompt: task.prompt };
 };
 
@@ -152,7 +151,6 @@ const matchTask = (cfg, root, ledger, attempt, spent, say) => {
 
 /** Tells the session the task it was handed and has not answered, again. */
 const again = (task, say) => {
-  say(`next: ${task.kind} ${task.key} is still out; run it again`);
   return { task: task.kind, key: task.key, model: task.model, prompt: task.prompt, again: true };
 };
 
@@ -166,7 +164,7 @@ const takeAnswer = (cfg, root, ledger, task, args, env, rule, say) => {
     if (!answered) {
       keepReview(cfg, ledger.area, `unfinished-${task.key}-${Date.now()}`, SOURCE, out);
       rmSync(occasionJobsOf(cfg, ledger.area, task.key), { recursive: true, force: true });
-      say(`next ${ledger.area}: the review ${task.key} never finished ($${costUsd.toFixed(2)}); not counted`);
+      say(`saturate ${ledger.area}: the review ${task.key} never finished ($${costUsd.toFixed(2)}); not counted`);
       return { ledger };
     }
     return { ledger: stageReport(cfg, ledger, { key: task.key, source: SOURCE, kind: 'review', text: out, findings: parseFindings(out), costUsd, minutes }) };
@@ -215,7 +213,7 @@ export const scourNext = async (cfg, root, id, args, tell, env = process.env) =>
     // A task handed out while paused stays recorded, so the next call after the pause hands it out again.
     const give = (step) => {
       if (!paused) return step;
-      say(`next ${id}: paused, ${paused}`);
+      say(`saturate ${id}: paused, ${paused}`);
       return { pause: paused };
     };
     const task = readJson(taskPathOf(cfg, id));
