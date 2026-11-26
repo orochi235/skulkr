@@ -24,7 +24,8 @@ branches, open findings; tabs) sit side by side, their seams dragged to resize t
 The title's menu switches tenants; the URL hash names the one shown. The switch beside it moves to the Scour page
 (`#weasel/scour`): every saturation ledger, sortable, beside the audit map and the picked one's distinct
 defects, the area in the hash after it (`#weasel/scour/core.animation`). Above them, each ledger a live scour process holds shows what it does, for how long,
-its occasions against its `--max`, each job it has out with its newest log line, and the end of its `scour.log`; the
+its occasions against its `--max`, each job it has out with its newest log line, and the end of its `scour.log`, and the
+map outlines its area, pulsing, in the review or match color as the audit map does a live round's; the
 page asks every 5 seconds while one runs, else every 30. Its map shades areas by their saturation
 defects not yet resolved, or by unseen ones, or by any metric the audit map has, kept apart from the audit map's
 choice; picking an area on the map or in the list picks it in both. A slider above the treemap shows it as it stood

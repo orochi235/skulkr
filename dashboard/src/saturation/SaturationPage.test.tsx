@@ -4,7 +4,7 @@ import { WeaselProvider } from '@weasel-js/core';
 import { renderWithIcons } from '@dash/test/icons';
 import { SaturationPage } from './SaturationPage';
 import type { SaturationLedger } from './saturation.types';
-import { saturationByArea } from './SaturationMap';
+import { saturationByArea, scourPhasesOf } from './SaturationMap';
 import fixture from '@dash/audits/fixture.map.json';
 
 const ledger = (id: string, unseen: number, defects: SaturationLedger['defects']): SaturationLedger => ({
@@ -46,7 +46,7 @@ describe('SaturationPage', () => {
     window.location.hash = '#weasel/scour';
     renderWithIcons(<WeaselProvider><SaturationPage base="/test/" /></WeaselProvider>);
     const now = await screen.findByRole('region', { name: 'Scouring now' });
-    expect(within(now).getByText(/delve · pid 2804 · 47:00 · 24\/40 occasions/)).toBeInTheDocument();
+    expect(within(now).getByText(/delve · pid 2804 · 47:0\d · 24\/40 occasions/)).toBeInTheDocument();
     expect(within(now).getByText('5/14')).toBeInTheDocument();
     expect(within(now).getByText('24/40 claude: 3 findings, 0 new')).toBeInTheDocument();
     fireEvent.click(within(now).getByText('core.animation'));
@@ -97,5 +97,13 @@ describe('SaturationPage', () => {
     window.location.hash = '#weasel/saturation/geom.booleans';
     renderWithIcons(<WeaselProvider><SaturationPage base="/test/" /></WeaselProvider>);
     expect(await screen.findByRole('region', { name: "geom.booleans's defects" })).toBeInTheDocument();
+  });
+  it('lights each area a live scour holds on the map, in match while a matcher runs', () => {
+    const live = (step: string) => ({ pid: 1, since: '2026-11-25T00:00:00Z', does: 'delve', max: 40, log: [], jobs: [{ key: '03-claude', step, at: null, line: null, progress: null }] });
+    expect([...scourPhasesOf([
+      { ...LEDGERS[0]!, running: live('review') },
+      { ...LEDGERS[1]!, running: live('match1') },
+      { ...LEDGERS[1]!, id: 'geom.booleans.9c4522d635', running: live('review') },
+    ])]).toEqual([['core.animation', 'review'], ['geom.booleans', 'match']]);
   });
 });

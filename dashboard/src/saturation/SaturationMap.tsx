@@ -11,8 +11,6 @@ import palette from '@dash/audits/palette.module.css';
 import type { SaturationLedger } from './saturation.types';
 import s from './SaturationMap.module.css';
 
-const NO_PHASES: ReadonlyMap<string, AuditPhase> = new Map();
-
 /** Each area's saturation figures from its own ledger (not one set aside): its defects not yet resolved, by the
  *  registry where its ledger has landed, and its unseen estimate. */
 export const saturationByArea = (ledgers: readonly SaturationLedger[]) => new Map(ledgers.filter((l) => l.id === l.area).map((l) => [l.area, {
@@ -23,6 +21,12 @@ export const saturationByArea = (ledgers: readonly SaturationLedger[]) => new Ma
   nextNew: l.nextNew,
 }]));
 
+/** Each area a live scour process holds, in the phase its jobs are in: `match` while a ledger matcher runs, else
+ *  `review`. */
+export const scourPhasesOf = (ledgers: readonly SaturationLedger[]): ReadonlyMap<string, AuditPhase> => new Map(
+  ledgers.filter((l) => l.id === l.area && l.running).map((l) => [l.area, l.running!.jobs.some((j) => j.step?.startsWith('match')) ? 'match' : 'review']),
+);
+
 /** The audit map's treemap, shaded by what each area's saturation ledger says; picking an area picks its ledger. */
 export function SaturationMap({ areas, ledgers, picked, onPick }: {
   areas: readonly AuditArea[]; ledgers: readonly SaturationLedger[]; picked: string | null; onPick: (id: string | null) => void;
@@ -30,10 +34,15 @@ export function SaturationMap({ areas, ledgers, picked, onPick }: {
   const [scene] = useState(createAuditScene);
   const selection = useSelection({ scene, mode: 'single' });
   const { probes, palette: colors } = useAuditPalette();
+  const phases = useMemo(() => scourPhasesOf(ledgers), [ledgers]);
+  // The treemap outlines the areas a live run holds; here a live scour holds them.
   const shaded = useMemo(() => {
     const by = saturationByArea(ledgers);
-    return areas.map((a) => (by.has(a.id) ? { ...a, saturation: by.get(a.id)! } : a));
-  }, [areas, ledgers]);
+    return areas.map((a) => {
+      const shown = by.has(a.id) ? { ...a, saturation: by.get(a.id)! } : a;
+      return phases.has(a.id) ? { ...shown, status: 'tonight' as const } : shown;
+    });
+  }, [areas, ledgers, phases]);
   const selected = selection.current[0] ?? null;
   // The page's pick and the map's selection follow each other. A change the map's own clicks make picks (or unpicks);
   // one this component makes to follow the pick is noted first, so it never picks back.
@@ -54,7 +63,7 @@ export function SaturationMap({ areas, ledgers, picked, onPick }: {
     <div className={`${palette.palette} ${s.map}`}>
       {probes}
       <Treemap
-        scene={scene} selection={selection} areas={shaded} palette={colors} phases={NO_PHASES} onHover={() => {}}
+        scene={scene} selection={selection} areas={shaded} palette={colors} phases={phases} onHover={() => {}}
         colorByPref="saturation.colorBy" metrics={SATURATION_METRICS}
       />
     </div>
