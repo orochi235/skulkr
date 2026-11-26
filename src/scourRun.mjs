@@ -37,7 +37,13 @@ export const scourRun = async (cfg, runner, root, args, say) => {
   const left = () => budget - spent;
   const delve = async (id, passes) => {
     const before = spentOn(ledgerOf(cfg, id));
-    await saturateArea(cfg, runner, root, id, { ...args, passes, usd: Number.isFinite(left()) ? left() : undefined }, say);
+    try {
+      await saturateArea(cfg, runner, root, id, { ...args, passes, usd: Number.isFinite(left()) ? left() : undefined }, say);
+    } catch (error) {
+      // Another run (a second lane, a session) holding an area is no reason to drop the rest of this run's areas.
+      if (!/another skulkr scour is working on/.test(error.message)) throw error;
+      say(`scour run: ${id} skipped, ${error.message}`);
+    }
     spent += spentOn(ledgerOf(cfg, id)) - before;
   };
   const byPrice = () => {

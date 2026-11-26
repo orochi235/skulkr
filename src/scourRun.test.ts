@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ledgerOf } from './ledger.mjs';
 import { saturateCommand } from './saturate.mjs';
@@ -34,6 +36,17 @@ describe('skulkr scour run', () => {
     const runner = fakeRunner([['A'], ['B'], ['C'], ['D']]);
     await saturateCommand(cfg, runner, root, ['run', 'lib', 'src', '--max', '2'], () => {});
     expect(reviews(runner.tasks)).toEqual(['lib-01', 'lib-02', 'src-01', 'src-02']);
+  });
+
+  it('skips an area another live process holds, and goes on to the next', async () => {
+    const { root, cfg } = project(['lib', 'src']);
+    mkdirSync(join(cfg.state, 'scour', 'lib'), { recursive: true });
+    writeFileSync(join(cfg.state, 'scour', 'lib', 'lock'), JSON.stringify({ pid: process.ppid, at: new Date().toISOString() }));
+    const runner = fakeRunner([['A'], ['B']]);
+    const lines: string[] = [];
+    await saturateCommand(cfg, runner, root, ['run', 'lib', 'src', '--max', '2'], (l) => lines.push(l));
+    expect(reviews(runner.tasks)).toEqual(['src-01', 'src-02']);
+    expect(lines.some((l) => /lib skipped, another skulkr scour is working on lib/.test(l))).toBe(true);
   });
 
   it('sends each pass to the cheapest next defect, skipping stopped areas, within --usd', async () => {
