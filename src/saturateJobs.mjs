@@ -120,12 +120,12 @@ const runLedgerMatch = async (ctx, area, key, attempt, prompt) => {
     task: taskOf(cfg, area.id, key, `match${attempt}`), logPath: join(to, '..', `match${attempt}.log`),
     about: `Matches saturation occasion ${key} of area ${area.id} against its ledger of defects.`,
   });
-  return { reply: run.reply ?? '', costUsd: run.usage?.costUsd ?? 0, minutes: run.minutes ?? 0 };
+  return { reply: run.reply ?? '', costUsd: run.usage?.costUsd ?? 0, minutes: run.minutes ?? 0, models: run.usage?.models ?? [] };
 };
 
 /**
  * The ledger matcher's checked answer for a report (`{ findings }` parsed, or `{ raw }` to enumerate), tried once
- * more on a reply that does not check out. Answers `{ match, costUsd, minutes }`; throws after the second bad reply.
+ * more on a reply that does not check out. Answers `{ match, costUsd, minutes, matcher }`, `matcher` the models the reply came from; throws after the second bad reply.
  */
 export const matchReport = async (ctx, area, key, ledger, report) => {
   const prompt = ledgerMatchPrompt(fill(readFileSync(ctx.cfg.briefPath('ledgerMatch'), 'utf8'), projectVars(ctx.cfg, 'matcher')), ledger, report);
@@ -137,7 +137,7 @@ export const matchReport = async (ctx, area, key, ledger, report) => {
     costUsd += run.costUsd;
     minutes += run.minutes;
     try {
-      return { match: matchOf(run.reply, ledger, report.findings), costUsd, minutes };
+      return { match: matchOf(run.reply, ledger, report.findings), costUsd, minutes, ...(run.models.length ? { matcher: run.models.join(',') } : {}) };
     } catch (error) {
       errors.push(error.message);
       ctx.say(`ledger match ${key}: attempt ${attempt} unusable (${error.message})`);

@@ -154,6 +154,7 @@ describe('local mode', () => {
     expect(ledgerOf(cfg, 'src').occasions).toHaveLength(1);
     await saturateCommand(cfg, fakeRunner([['B']], { usage: metered }), root, ['src', '--max', '2', '--metered'], () => {}, { fleet: false, env: {} });
     expect(ledgerOf(cfg, 'src').occasions).toHaveLength(2);
+    expect(ledgerOf(cfg, 'src').occasions[1].matcher).toBe('claude-opus-5-5');
     const plan = { cache_creation_input_tokens: 900, cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 900 } };
     const { root: root2, cfg: cfg2 } = project();
     await saturateCommand(cfg2, fakeRunner([['A'], ['B']], { usage: plan }), root2, ['src', '--max', '2'], () => {}, { fleet: false, env: {} });

@@ -60,7 +60,7 @@ export const fakeRunner = (seen: string[][], { matchReply, usage }: { matchReply
         sightings: claims.flatMap((c, i) => (ledger.has(c) ? [{ finding: i, defect: ledger.get(c) }] : [])),
         new: claims.flatMap((c, i) => (ledger.has(c) ? [] : [{ finding: i, claim: c, where: 'src/x.ts:1', severity: 'low' }])),
       };
-      writeFileSync(join(job.to, 'claude.json'), envelope(matchReply?.() ?? JSON.stringify(reply), 0.1));
+      writeFileSync(join(job.to, 'claude.json'), JSON.stringify({ type: 'result', is_error: false, result: matchReply?.() ?? JSON.stringify(reply), total_cost_usd: 0.1, modelUsage: { 'claude-opus-5-5': {} } }));
     } else {
       const text = reportOf(seen[review++] ?? []);
       writeFileSync(join(job.to, 'findings.md'), text);
