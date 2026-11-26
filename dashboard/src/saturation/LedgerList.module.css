@@ -32,8 +32,9 @@
 .figures {
   display: inline-flex;
   gap: var(--wzl-space-3);
-  font-variant-numeric: tabular-nums;
 }
+
+.values { composes: numeric from '@weasel-js/theme/numeric.module.css'; }
 
 .within,
 .defects,
