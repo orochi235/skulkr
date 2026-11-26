@@ -173,8 +173,8 @@ const main = async () => {
     case 'saturate':
     case 'sat':
       tolerateClosedOutput();
-      // Saturation is model jobs only, billed to whichever account runs them: this machine's unless --fleet says otherwise.
-      await saturateCommand(cfg, rest.includes('--fleet') ? await loadRunner(cfg) : createLocalRunner(cfg), root(), rest.filter((a) => a !== '--fleet'));
+      // Scour never runs on the fleet: its model jobs bill the account that started them (2026-11-26).
+      await saturateCommand(cfg, createLocalRunner(cfg), root(), rest);
       return 0;
     case 'trial':
       trialCommand(cfg);

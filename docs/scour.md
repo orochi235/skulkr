@@ -18,7 +18,7 @@ checks them against the current code, and nothing fixes them.
 
 Separate stages let each step run where and when it is cheapest:
 
-- delves can run overnight on the fleet;
+- delves run overnight in the session that started them, never on the fleet (2026-11-26);
 - folding can be retried on its own after the matcher fails;
 - fixing can work through the fix plan in batches of its own size.
 
