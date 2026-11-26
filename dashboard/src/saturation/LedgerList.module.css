@@ -1,5 +1,5 @@
 .list {
-  --ledger-size: var(--wzl-font-size-lg);
+  --ledger-size: calc(var(--wzl-font-size-md) + 1px);
   display: flex;
   flex-direction: column;
   gap: var(--wzl-space-2);
