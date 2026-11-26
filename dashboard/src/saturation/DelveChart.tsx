@@ -61,6 +61,12 @@ export function DelveChart({ ledger, max = null, live = false }: { ledger: Satur
       aria-label={`${done} passes, ${ledger.distinct} defects found, about ${ghosts} not found yet`}>
       <line className={s.base} x1={0} x2={span * PITCH} y1={base} y2={base} />
       {ticks.map((t) => <text key={t} className={s.tick} x={colX(t) + TILE_W / 2} y={height - 1}>{t}</text>)}
+      {stacks.map((stack, i) => (stack.length ? null : (
+        <polygon key={`empty-${i}`} className={s.empty}
+          points={`${colX(i + 1)},${base} ${colX(i + 1) + DEPTH},${base - DEPTH} ${colX(i + 1) + TILE_W + DEPTH},${base - DEPTH} ${colX(i + 1) + TILE_W},${base}`}>
+          <title>{`pass ${i + 1} · no findings`}</title>
+        </polygon>
+      )))}
       {stacks.map((stack, i) => stack.map(({ defect, novelty }, k) => (
         <Tile key={`${i}-${defect.id}`} x={colX(i + 1)} y={base - (k + 1) * TILE_H} className={s[novelty]!}
           title={`pass ${i + 1} · ${defect.id}, ${LABEL[novelty]} · ${defect.claim}`} />

@@ -28,6 +28,9 @@
 
 .top { filter: brightness(1.35); }
 
+/* A pass that found nothing: a patch on the ground where its stack would stand. */
+.empty { fill: color-mix(in srgb, var(--wzl-fg) 25%, var(--wzl-surface)); }
+
 .side { filter: brightness(0.7); }
 
 .ghostLabel {

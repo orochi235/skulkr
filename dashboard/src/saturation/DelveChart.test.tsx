@@ -27,6 +27,11 @@ describe('DelveChart', () => {
     expect(screen.getByText('≈ 2 not found yet')).toBeInTheDocument();
   });
 
+  it('marks a pass that found nothing with a patch on the ground', () => {
+    const { container } = render(<DelveChart ledger={{ ...ledger, occasions: 4 }} />);
+    expect([...container.querySelectorAll('title')].map((t) => t.textContent)).toContain('pass 4 · no findings');
+  });
+
   it('spans a finished ledger by its passes, and a live one with room to grow up to its cap', () => {
     expect(spanOf(25, 40, false)).toBe(25);
     expect(spanOf(6, 40, true)).toBe(10);
