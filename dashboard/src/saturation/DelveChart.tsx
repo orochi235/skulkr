@@ -1,11 +1,11 @@
 import type { SaturationDefect, SaturationLedger } from './saturation.types';
 import s from './DelveChart.module.css';
 
-const PITCH = 20;
-const TILE_W = 14;
+const PITCH = 38;
+const TILE_W = 28;
 const TILE_H = 7;
 /** How far a tile's top and side faces recede, up and to the right. */
-const DEPTH = 4;
+const DEPTH = 8;
 const AXIS = 13;
 
 /** What a pass's finding was: the first sighting of a defect a later pass saw again, the first of one no other pass
