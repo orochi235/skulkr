@@ -527,9 +527,9 @@ question harder for one area: blind reviews of it, again and again, at one froze
 until capture–recapture says further reviews would find little new. Nothing it records feeds a round: not history,
 calibration, the queue, or the map.
 
-    skulkr scour next <area> [--agent <id>] [--metered] [--release] [--max 40] [--per-defect 4x|<$>] [--at <sha>]
-    skulkr scour [delve] <area> [--fleet] [--account <config dir>] [--metered] [--sources claude,codex] [--max 40] [--per-defect 4x|<$>] [--usd <n>] [--at <sha>] [--fresh]
-    skulkr scour run [areas…] [--fleet] [--account <config dir>] [--metered] [--by finish|cheapest|spread] [--usd <n>] [--passes 10] [--per-defect 4x|<$>]
+    skulkr scour next <area> [--agent <id>] [--metered] [--release] [--max 40] [--per-defect 3x|<$>] [--at <sha>]
+    skulkr scour [delve] <area> [--fleet] [--account <config dir>] [--metered] [--sources claude,codex] [--max 40] [--per-defect 3x|<$>] [--usd <n>] [--at <sha>] [--fresh]
+    skulkr scour run [areas…] [--fleet] [--account <config dir>] [--metered] [--by finish|cheapest|spread] [--usd <n>] [--passes 10] [--per-defect 3x|<$>]
     skulkr scour fold <area>
     skulkr scour ingest <area> <report.md> --source <name> [--at <sha>]
     skulkr scour import <area> <dir> --at <sha> [--fresh]
@@ -589,7 +589,7 @@ After each occasion skulkr prints a line, rewrites the report, and checks the st
 It stops once the combined estimate puts fewer than `saturate.stopUnseenPerKloc` (1) defects unseen per thousand
 lines (fewer than one, where the lines cannot be counted), the chance that the next occasion's finding
 is new falls under `saturate.stopNextNew` (15%), the next defect would cost over `--per-defect` dollars
-(`saturate.stopUsdPerDefect`, 4× the going rate, below), another pass would take what this command has spent past `--usd`, or `--max`
+(`saturate.stopUsdPerDefect`, 3× the going rate, below), another pass would take what this command has spent past `--usd`, or `--max`
 occasions (`saturate.max`, 40) are in the ledger. None of the estimates stops a ledger before `saturate.minPasses` (5) occasions: at two, forge.vite.part1 read as saturated with its next-new chance at 100% (2026-11-26).
 
 **Per thousand lines.** Areas differ in size by five times and more, so the unseen estimate is held to a density,
@@ -610,10 +610,10 @@ On weasel, a fresh area's first five passes found defects at about 40¢ each, pa
 (2026-11-25), and every ledger that ran to the old stop rule ended with its next defect priced at $1.30–3.60.
 
 **The per-defect limit** is dollars (`saturate.stopUsdPerDefect: 2.5`, `--per-defect 2.5`) or a multiple of the
-going rate (`{ times: 4 }`, `--per-defect 4x`), which is the default: never pay more than four times what a defect
-costs elsewhere in the project (2026-11-26). The **going rate** is the cheapest next defect in the project: each area's
+going rate (`{ times: 3 }`, `--per-defect 3x`), which is the default: never pay more than three times what a defect
+costs elsewhere in the project (2026-11-26; 4× until then). The **going rate** is the cheapest next defect in the project: each area's
 own ledger with two passes or more at its price, and, while any area of the partition has fewer, the opening price.
-So while fresh areas remain the limit sits at four times the opening price ($1.48 on weasel at 37¢), and it rises by
+So while fresh areas remain the limit sits at three times the opening price ($1.11 on weasel at 37¢), and it rises by
 itself once every area has been delved and the cheap defects are gone. It is priced again before each pass, and the
 progress line, `ls --json`'s `limit`, the stop reason and the Scour page say what it is and how it was set.
 
