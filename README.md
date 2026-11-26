@@ -653,7 +653,8 @@ A review that never finishes is kept beside the ledger as `unfinished-…` and n
 `skills/skulkr-review-saturation`, linked into `~/.codex/skills/`, ends each area this way): the matcher reads it whole and
 lists its findings itself. A multi-pass audit whose passes shared context counts as one occasion, not one per pass,
 since its passes were not independent. `ls` lists every ledger with its estimates, cost and defects (`--json` for the
-dashboard's saturation page); `ls --ids` prints only the names of areas with a ledger, in the state directory or landed,
+dashboard's saturation page, as `{ ledgers, queue }`, `queue` being every area `scour run` would delve in its order, numbered
+on the Scour page's map); `ls --ids` prints only the names of areas with a ledger, in the state directory or landed,
 holding an occasion from `--source` (any, without it), so a reviewer that must stay blind to the ledgers can skip areas already done; `report` rewrites the report file from the ledger; `rm` deletes the ledger.
 
 `import` builds a new ledger, at `--at`, from a saturation experiment run by hand, every occasion a Claude review.

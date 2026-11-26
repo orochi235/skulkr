@@ -22,6 +22,8 @@ const LIST = { min: 280, max: 900, initial: 460 } as const;
 const MAP = { min: 160, max: 1200, initial: 360 } as const;
 
 /** Each saturation ledger of a tenant beside the picked one's distinct defects. */
+const NO_QUEUE: readonly string[] = [];
+
 export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: { base?: string; dev?: boolean } = {}) {
   const tenants = useTenants({ url: tenantsUrl(base), dev });
   const names = tenants.status === 'ready' ? tenants.names : [];
@@ -41,6 +43,7 @@ export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: 
   }, [listWidth, mapHeight]);
 
   const ledgers = state.status === 'ready' ? state.ledgers : [];
+  const queue = state.status === 'ready' ? state.queue : NO_QUEUE;
   const ledger = ledgers.find((l) => l.id === picked) ?? null;
   const areaIds = useMemo(() => (map.status === 'ready' ? map.map.areas.map((a) => a.id) : []), [map]);
   const totals = useMemo(() => ({
@@ -69,7 +72,7 @@ export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: 
             <LedgerList ledgers={ledgers} areas={areaIds} picked={picked} onPick={(id) => pick(id === picked ? null : id)} />
             <ResizeHandle value={listWidth} min={LIST.min} max={LIST.max} onInput={setListWidth} onChange={keepListWidth} aria-label="Resize the ledger list" />
             <div className={s.right}>
-              {map.status === 'ready' && <SaturationMap areas={map.map.areas} icons={map.map.icons} ledgers={ledgers} picked={picked} onPick={pick} />}
+              {map.status === 'ready' && <SaturationMap areas={map.map.areas} icons={map.map.icons} ledgers={ledgers} queue={queue} picked={picked} onPick={pick} />}
               {map.status === 'ready' && (
                 <ResizeHandle
                   orientation="horizontal" value={mapHeight} min={MAP.min} max={MAP.max}

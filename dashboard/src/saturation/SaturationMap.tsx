@@ -36,22 +36,29 @@ export const scourPhasesOf = (ledgers: readonly SaturationLedger[]): ReadonlyMap
   ledgers.filter((l) => l.id === l.area && l.running).map((l) => [l.area, l.running!.jobs.some((j) => j.step?.startsWith('match')) ? 'match' : 'review']),
 );
 
-/** The audit map's treemap, shaded by what each area's saturation ledger says; picking an area picks its ledger. */
-export function SaturationMap({ areas, icons, ledgers, picked, onPick }: {
-  areas: readonly AuditArea[]; icons?: Readonly<Record<string, string>>; ledgers: readonly SaturationLedger[]; picked: string | null; onPick: (id: string | null) => void;
+/** The map's areas as the Scour page shows them: each with its own ledger's figures, its place in `queue` (the rounds'
+ *  place dropped), and outlined as live (`tonight`) where a live scour holds it. */
+export const mapAreasFor = (areas: readonly AuditArea[], ledgers: readonly SaturationLedger[], queue: readonly string[], phases: ReadonlyMap<string, AuditPhase>): AuditArea[] => {
+  const by = saturationByArea(ledgers);
+  const place = new Map(queue.map((id, i) => [id, i + 1]));
+  return areas.map((a) => {
+    const shown = { ...a, queue: place.get(a.id) ?? null, ...(by.has(a.id) ? { saturation: by.get(a.id)! } : {}) };
+    return phases.has(a.id) ? { ...shown, status: 'tonight' as const } : shown;
+  });
+};
+
+/** The audit map's treemap, shaded by what each area's saturation ledger says and numbered by `queue`, the order
+ *  `scour run` would delve them in (not the rounds' queue); picking an area picks its ledger. */
+export function SaturationMap({ areas, icons, ledgers, queue, picked, onPick }: {
+  areas: readonly AuditArea[]; icons?: Readonly<Record<string, string>>; ledgers: readonly SaturationLedger[]; queue: readonly string[];
+  picked: string | null; onPick: (id: string | null) => void;
 }) {
   const [scene] = useState(createAuditScene);
   const selection = useSelection({ scene, mode: 'single' });
   const { probes, palette: colors } = useAuditPalette();
   const phases = useMemo(() => scourPhasesOf(ledgers), [ledgers]);
   // The treemap outlines the areas a live run holds; here a live scour holds them.
-  const shaded = useMemo(() => {
-    const by = saturationByArea(ledgers);
-    return areas.map((a) => {
-      const shown = by.has(a.id) ? { ...a, saturation: by.get(a.id)! } : a;
-      return phases.has(a.id) ? { ...shown, status: 'tonight' as const } : shown;
-    });
-  }, [areas, ledgers, phases]);
+  const shaded = useMemo(() => mapAreasFor(areas, ledgers, queue, phases), [areas, ledgers, queue, phases]);
   const selected = selection.current[0] ?? null;
   // The page's pick and the map's selection follow each other. A change the map's own clicks make picks (or unpicks);
   // one this component makes to follow the pick is noted first, so it never picks back.
@@ -73,7 +80,7 @@ export function SaturationMap({ areas, icons, ledgers, picked, onPick }: {
       {probes}
       <Treemap
         scene={scene} selection={selection} areas={shaded} palette={colors} phases={phases} onHover={() => {}}
-        colorByPref="saturation.colorBy" metrics={SATURATION_METRICS} bare {...(icons ? { glyphs: icons } : {})}
+        colorByPref="saturation.colorBy" metrics={SATURATION_METRICS} bare numbered {...(icons ? { glyphs: icons } : {})}
       />
     </div>
   );

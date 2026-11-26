@@ -55,6 +55,8 @@ export interface TreemapProps {
   /** Leave out the audit history's marks (pass pips, changes since a pass, settling, unmerged locks) and their keys,
    *  and the conflict and done keys. */
   readonly bare?: boolean;
+  /** Number the head of whatever queue `areas` carry (by default all but a bare map), with the legend's slider. */
+  readonly numbered?: boolean;
 }
 
 /** Every audit area as a cell of a treemap drawn on the scene graph: hover and click pick through the canvas's
@@ -64,12 +66,11 @@ const NO_GLYPHS: Readonly<Record<string, string>> = {};
 const RECUT_FADE_MS = 1800;
 const HALF_STOPS = Array.from({ length: MAX_HALVES + 1 }, (_, i) => i);
 
-export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, inColor = null, heat: heatGiven, recut = null, header, thermal, colorByPref = 'map.colorBy', metrics = HEAT_METRICS, bare = false }: TreemapProps) {
+export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, inColor = null, heat: heatGiven, recut = null, header, thermal, colorByPref = 'map.colorBy', metrics = HEAT_METRICS, bare = false, numbered = !bare }: TreemapProps) {
   // How many half-rounds of the queue's head to number on the map, each in its area's corner.
   const [halves, setHalves] = useDashPref('map.upcoming');
   const [gray] = useDashPref('map.gray');
-  // The queue it numbers is the rounds'; a bare map (the Scour page's) numbers none.
-  const places = bare ? 0 : halves * (areasPerRound / 2);
+  const places = numbered ? halves * (areasPerRound / 2) : 0;
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<SceneCanvasApi>(null);
   const hud = useHud();
@@ -194,7 +195,7 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
         {!bare && <span>· passes: ● five, ○ one</span>}
         {/* Kept in place, faded and out of reach, for a past round, so the legend and the map above it never move. */}
         <span className={asOf === null ? s.nowKeys : `${s.nowKeys} ${s.nowOff}`} inert={asOf !== null} aria-hidden={asOf !== null || undefined}>
-          <NowLegend halves={halves} places={places} onInput={setHalves} onChange={setHalves} none={metric.none} bare={bare} />
+          <NowLegend halves={halves} places={places} onInput={setHalves} onChange={setHalves} none={metric.none} bare={bare} numbered={numbered} />
         </span>
       </div>
     </div>
@@ -214,8 +215,8 @@ function MapLoupe({ canvasRef, hud, visible, onClose }: {
 }
 
 /** The legend's keys for what is known only of now: changes since a pass, settling, live runs, the queue numbers. */
-function NowLegend({ halves, places, onInput, onChange, none, bare }: {
-  halves: number; places: number; onInput: (halves: number) => void; onChange: (halves: number) => void; bare: boolean;
+function NowLegend({ halves, places, onInput, onChange, none, bare, numbered }: {
+  halves: number; places: number; onInput: (halves: number) => void; onChange: (halves: number) => void; bare: boolean; numbered: boolean;
   /** What a hatched cell means under the metric the map is shaded by: never audited, or no value of it. */
   none: string;
 }) {
@@ -248,13 +249,13 @@ function NowLegend({ halves, places, onInput, onChange, none, bare }: {
         </span>
       )}
       <span><i className={`${s.key} ${s.uncharted}`} />{none}</span>
-      {!bare && <span className={s.upcoming}>
+      {numbered && <span className={s.upcoming}>
         numbered upcoming:
         <Slider
-          className={s.upcomingSlider} aria-label="Upcoming areas to number on the map, in half rounds"
+          className={s.upcomingSlider} aria-label={bare ? 'Upcoming areas to number on the map' : 'Upcoming areas to number on the map, in half rounds'}
           min={0} max={MAX_HALVES} step={1} stops={HALF_STOPS} showStops snap="strict" thumbShape="dot"
           trackHeight="var(--wzl-slider-track-h)" thumbSize="var(--wzl-slider-thumb-size)"
-          thumbs={[{ value: halves, valueText: `${places} areas, ${halves / 2} rounds` }]}
+          thumbs={[{ value: halves, valueText: bare ? `${places} areas` : `${places} areas, ${halves / 2} rounds` }]}
           onInput={([t]) => onInput(t!.value)} onChange={([t]) => onChange(t!.value)}
           readoutPlacement="none"
         />

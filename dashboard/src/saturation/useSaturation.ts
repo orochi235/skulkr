@@ -4,8 +4,9 @@ import type { SaturationLedger } from './saturation.types';
 
 export type SaturationState =
   | { readonly status: 'loading' }
-  /** `error`: why the last ask failed, the list the one before it read still shown. */
-  | { readonly status: 'ready'; readonly ledgers: readonly SaturationLedger[]; readonly error?: string }
+  /** `queue`: the areas `scour run` would delve, in its order. `error`: why the last ask failed, the list the one before
+   *  it read still shown. */
+  | { readonly status: 'ready'; readonly ledgers: readonly SaturationLedger[]; readonly queue: readonly string[]; readonly error?: string }
   | { readonly status: 'failed'; readonly error: string };
 
 /** How often the ledgers are asked for again, so a saturation running meanwhile shows its occasions. */
@@ -25,9 +26,9 @@ export function useSaturation(url: string | null, everyMs: number = SATURATION_P
       try {
         const res = await fetch(url, { cache: 'no-store' });
         if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
-        const ledgers: unknown = await res.json();
-        if (!Array.isArray(ledgers)) throw new Error('the server answered something other than a list of ledgers');
-        if (live) setState({ url, value: { status: 'ready', ledgers: ledgers as SaturationLedger[] } });
+        const body = await res.json() as { ledgers?: unknown; queue?: unknown } | null;
+        if (!Array.isArray(body?.ledgers) || !Array.isArray(body.queue)) throw new Error('the server answered something other than ledgers and a queue');
+        if (live) setState({ url, value: { status: 'ready', ledgers: body.ledgers as SaturationLedger[], queue: body.queue as string[] } });
       } catch (e) {
         const error = (e as Error).message;
         if (live) setState((was) => ({ url, value: was.url === url && was.value.status === 'ready' ? { ...was.value, error } : { status: 'failed', error } }));

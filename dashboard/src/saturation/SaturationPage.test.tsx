@@ -4,7 +4,8 @@ import { WeaselProvider } from '@weasel-js/core';
 import { renderWithIcons } from '@dash/test/icons';
 import { SaturationPage } from './SaturationPage';
 import type { SaturationLedger } from './saturation.types';
-import { saturationByArea, scourPhasesOf } from './SaturationMap';
+import { mapAreasFor, saturationByArea, scourPhasesOf } from './SaturationMap';
+import type { AuditArea } from '@dash/audits/skulkrMap.types';
 import fixture from '@dash/audits/fixture.map.json';
 
 const ledger = (id: string, unseen: number, defects: SaturationLedger['defects']): SaturationLedger => ({
@@ -24,12 +25,12 @@ const LEDGERS = [
   ledger('geom.booleans', 1.2, []),
 ];
 
-function serve(ledgers: readonly SaturationLedger[] = LEDGERS) {
+function serve(ledgers: readonly SaturationLedger[] = LEDGERS, queue: readonly string[] = []) {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => (String(url).endsWith('api/tenants')
     ? new Response('[{"name":"weasel"}]', { status: 200 })
     : String(url).endsWith('/map')
       ? new Response(JSON.stringify(fixture), { status: 200 })
-      : new Response(JSON.stringify(ledgers), { status: 200 }))));
+      : new Response(JSON.stringify({ ledgers, queue }), { status: 200 }))));
 }
 
 afterEach(() => {
@@ -109,5 +110,11 @@ describe('SaturationPage', () => {
       { ...LEDGERS[1]!, running: live('match1') },
       { ...LEDGERS[1]!, id: 'geom.booleans.9c4522d635', running: live('review') },
     ])]).toEqual([['core.animation', 'review'], ['geom.booleans', 'match']]);
+  });
+
+  it("numbers the map's areas by scour's queue, not the rounds'", () => {
+    const areas = (fixture as unknown as { areas: AuditArea[] }).areas;
+    const shown = mapAreasFor(areas, [], ['core.debug', 'core.ops'], new Map());
+    expect(shown.filter((a) => a.queue !== null).map((a) => [a.id, a.queue])).toEqual([['core.ops', 2], ['core.debug', 1]]);
   });
 });

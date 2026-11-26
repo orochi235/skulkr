@@ -23,7 +23,7 @@ import { loggingSay } from './delveLive.mjs';
 import { takeLease } from './lease.mjs';
 import { importLedger } from './saturateImport.mjs';
 import { landableIdsOf, landLedgers } from './saturateLand.mjs';
-import { ledgerListLines, ledgerListOf, scouredAreasOf } from './saturationList.mjs';
+import { ledgerListLines, ledgerListOf, scourQueueIn, scouredAreasOf } from './saturationList.mjs';
 import { moveFormerScourState } from './scourPaths.mjs';
 import { chao2, stopReason } from './saturation.mjs';
 import { limitSpecOf, nextPriceOf, scourRuleOf } from './scourPrice.mjs';
@@ -232,7 +232,7 @@ export const saturateCommand = async (cfg0, runner, root, argv, say = (line) => 
   }
   if (first === 'ls') {
     const list = ledgerListOf(cfg, root);
-    if (args.json) say(JSON.stringify(list));
+    if (args.json) say(JSON.stringify({ ledgers: list, queue: scourQueueIn(cfg, root, list) }));
     else for (const line of ledgerListLines(list)) say(line);
     return list;
   }

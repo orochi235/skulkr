@@ -8,7 +8,9 @@ import { liveScourOf } from './delveLive.mjs';
 import { ledgerOf } from './ledger.mjs';
 import { queryIndex } from './recordIndex.mjs';
 import { chao2, limitText, sourcesOf, stopReason } from './saturation.mjs';
-import { nextPriceOf, passRowsOf, scourRuleOf } from './scourPrice.mjs';
+import { partitionAt } from './partition.mjs';
+import { nextPriceOf, passRowsOf, pricingOf, scourRuleOf } from './scourPrice.mjs';
+import { candidatePricesOf, scourQueueOf } from './scourQueue.mjs';
 import { ledgerLinesOf, perKloc } from './scourLines.mjs';
 import { landedLedgersUnder, scourStateDirOf } from './scourPaths.mjs';
 
@@ -85,6 +87,16 @@ export const ledgerListOf = (cfg, root) => {
   });
   const rule = scourRuleOf(cfg, root, {}, ledgers.map(([, ledger]) => ledger));
   return ledgers.map(([id, ledger]) => ({ ...ledgerSummaryOf(cfg, id, ledger, registered, rule), running: liveScourOf(cfg, id) }));
+};
+
+/**
+ * Every area of the partition at `main`'s tip that `scour run` would delve, in the order it would take them; `list` is
+ * `ledgerListOf`'s, whose `running` ledgers are left out.
+ */
+export const scourQueueIn = (cfg, root, list) => {
+  const held = new Set(list.filter((l) => l.running).map((l) => l.area));
+  const ids = partitionAt(cfg, root, cfg.git.main).map((a) => a.id);
+  return scourQueueOf(candidatePricesOf(cfg, root, ids, scourRuleOf(cfg, root), pricingOf(cfg)), (id) => held.has(id)).map((c) => c.id);
 };
 
 const fixed = (n, digits) => (n === null ? '–' : n.toFixed(digits));
