@@ -36,6 +36,13 @@ One task per area is out at a time: never run `next` for an area while its subag
 Keep up to three areas going at once (more if asked), each on its own loop above, and start the next area in the
 list when one stops. Launch the subagents in the background and wait for their notifications; don't poll.
 
+## Never metered without approval
+
+`next` prints `pause <area>: <why>` instead of a task when it cannot show the session is on its plan's usage (it
+looks metered, or its transcript can't be read). Then launch nothing more for any area: let the subagents already out
+finish, run `next --agent <id>` for each so their passes are kept, and tell the user why it paused. Pass `--metered`
+only when the user has approved metered spending for this run, in this conversation.
+
 ## When something goes wrong
 
 - **`next` says a task "is still out"**: this session (or one before it) handed that task out and never answered it,

@@ -15,7 +15,7 @@ import { heldAlive, leaseAt, takeLease } from './lease.mjs';
 import {
   emptyLedger, freezeCommitOf, keepReview, ledgerDirOf, ledgerMatchPrompt, ledgerOf, matchOf, requireAreaFilesAt, requireSameCommit, writeLedger,
 } from './ledger.mjs';
-import { transcriptAt, transcriptCostOf } from './agentCost.mjs';
+import { cacheTierOf, sessionTranscriptAt, transcriptAt, transcriptCostOf } from './agentCost.mjs';
 import { recentlyChanged, reviewFileList } from './reviewFiles.mjs';
 import { chao2, stopReason } from './saturation.mjs';
 import { occasionJobsOf, sourceConfigOf } from './saturateJobs.mjs';
@@ -49,6 +49,20 @@ const agentCostOf = (cfg, agent, env) => {
   const path = transcriptAt(agent, { session: env.CLAUDE_CODE_SESSION_ID, env });
   if (!path) throw new Error(`no transcript for subagent ${agent}; --agent wants the id the Agent tool gave back`);
   return transcriptCostOf(path, cfg.claude.prices);
+};
+
+/**
+ * Why no subagent may be started now, or null: only a session whose newest cache write is on the hour's tier is on its
+ * plan's usage (`cacheTierOf`), and anything that cannot be shown to be is taken as metered (README "Session mode").
+ */
+const meteredWhy = (env) => {
+  const path = env.CLAUDE_CODE_SESSION_ID && sessionTranscriptAt(env.CLAUDE_CODE_SESSION_ID, env);
+  if (!path) return "this session's transcript can't be found, so plan usage can't be told from metered; --metered starts passes anyway";
+  const tier = cacheTierOf(path);
+  if (tier === '1h') return null;
+  return tier === '5m'
+    ? "this session's cache writes dropped to five minutes, the sign of usage overage, which is metered; --metered starts passes anyway"
+    : 'this session has made no cache write yet, so plan usage cannot be told from metered; --metered starts passes anyway';
 };
 
 /** The prompt a subagent is handed: session mode's preface over `body`. */
@@ -160,22 +174,29 @@ export const scourNext = async (cfg, root, id, args, tell, env = process.env) =>
     if (first) say(`saturate ${id} at ${ledger.commit.slice(0, 10)}: ${ledger.files.length} files, ${ledger.occasions.length} occasions so far, by this session's subagents`);
     if (!existsSync(treeOf(cfg, root, id))) addWorktree(root, `${cfg.naming.prefix}-saturate-${id}`, ledger.commit);
     const ruleNow = () => scourRuleOf(cfg, root, args);
+    const paused = args.metered ? null : meteredWhy(env);
+    // A task handed out while paused stays recorded, so the next call after the pause hands it out again.
+    const give = (step) => {
+      if (!paused) return step;
+      say(`next ${id}: paused, ${paused}`);
+      return { pause: paused };
+    };
     const task = readJson(taskPathOf(cfg, id));
     if (task) {
       const taken = takeAnswer(cfg, root, ledger, task, args, env, ruleNow(), say);
-      if (taken.handOut) return taken.handOut;
+      if (taken.handOut) return give(taken.handOut);
       ledger = taken.ledger;
     }
     for (;;) {
       if (ledger.unfolded?.length) {
-        if (!foldsUnmatched(ledger)) return matchTask(cfg, root, ledger, 1, { costUsd: 0, minutes: 0 }, say);
+        if (!foldsUnmatched(ledger)) return give(matchTask(cfg, root, ledger, 1, { costUsd: 0, minutes: 0 }, say));
         ledger = foldWith(cfg, ledger, unmatched(ledger));
         tellOccasion(cfg, say, ledger, ruleNow());
         continue;
       }
       const rule = ruleNow();
       const stop = stopReason(chao2(ledger.occasions, ledger.defects), rule, { price: nextPriceOf(ledger, rule.factor), lines: ledger.lines });
-      if (!stop) return reviewTask(cfg, root, ledger, say);
+      if (!stop) return give(reviewTask(cfg, root, ledger, say));
       say(`saturate ${id}: stopped, ${stop}`);
       say(`saturate ${id}: report at ${writeReport(cfg, id, ledger, rule)}`);
       removeWorktree(root, treeOf(cfg, root, id));
@@ -185,7 +206,9 @@ export const scourNext = async (cfg, root, id, args, tell, env = process.env) =>
   });
 };
 
-/** The lines `scour next` prints for the session: what to hand which subagent, or that the area stopped. */
-export const nextLines = (id, step) => (step.stop
-  ? [`stop ${id}: ${step.stop}`]
-  : [`task: ${step.task} ${step.key}`, `model: ${step.model ?? 'the session default'}`, `prompt: ${step.prompt}`]);
+/** The lines `scour next` prints for the session: what to hand which subagent, or that the area stopped or paused. */
+export const nextLines = (id, step) => {
+  if (step.stop) return [`stop ${id}: ${step.stop}`];
+  if (step.pause) return [`pause ${id}: ${step.pause}`];
+  return [`task: ${step.task} ${step.key}`, `model: ${step.model ?? 'the session default'}`, `prompt: ${step.prompt}`];
+};

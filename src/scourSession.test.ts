@@ -11,9 +11,12 @@ const OPUS = { input: 4, cacheRead: 0.2, output: 20 };
 const reportOf = (claims: string[]) => `${claims.map((c) => `## ${c}\n- where: src/x.ts:1\n- severity: low\n`).join('\n')}\n## Files read\nsrc/x.ts\n\n<!-- done: ${claims.length} findings, files read: 1 -->\n`;
 
 /** A session's environment, with a config directory holding the transcripts its subagents leave. */
-const session = () => {
+const session = (tier: '1h' | '5m' = '1h') => {
   const config = scratch();
   const env = { CLAUDE_PID: String(process.pid), CLAUDE_CODE_SESSION_ID: 'sess', CLAUDE_CONFIG_DIR: config };
+  mkdirSync(join(config, 'projects', '-proj'), { recursive: true });
+  const write = { ephemeral_1h_input_tokens: tier === '1h' ? 900 : 0, ephemeral_5m_input_tokens: tier === '5m' ? 900 : 0 };
+  writeFileSync(join(config, 'projects', '-proj', 'sess.jsonl'), `${JSON.stringify({ type: 'assistant', message: { id: 's1', model: 'claude-opus-5-5', usage: { cache_creation: write } } })}\n`);
   /** Leaves subagent `id`'s transcript: one Opus message of `output` tokens over `minutes`. */
   const transcript = (id: string, output: number, minutes = 2) => {
     const dir = join(config, 'projects', '-proj', 'sess', 'subagents');
@@ -96,6 +99,16 @@ describe('skulkr scour next', () => {
     await expect(next()).rejects.toThrow(/--agent/);
     await expect(next('--agent', 'nobody')).rejects.toThrow(/no transcript for subagent nobody/);
     await expect(scourNext(cfg, root, 'src', saturateArgsOf(cfg, []), () => {}, {})).rejects.toThrow(/Claude Code session/);
+  });
+
+  it('hands out nothing once the session looks metered, unless told --metered', async () => {
+    const { root, cfg } = project();
+    const { env } = session('5m');
+    const next = (...argv: string[]) => scourNext(cfg, root, 'src', saturateArgsOf(cfg, argv), () => {}, env);
+    expect(await next()).toEqual({ pause: expect.stringMatching(/dropped to five minutes/) });
+    expect(await next('--metered')).toMatchObject({ task: 'review', key: '01-claude' });
+    const unknown = { ...env, CLAUDE_CODE_SESSION_ID: 'gone' };
+    expect(await scourNext(cfg, root, 'src', saturateArgsOf(cfg, []), () => {}, unknown)).toEqual({ pause: expect.stringMatching(/can't be found/) });
   });
 
   it("keeps Claude's claude -p reviews to fleet mode", async () => {

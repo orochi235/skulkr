@@ -33,6 +33,39 @@ export const transcriptAt = (id, { session, env = process.env } = {}) => {
   return undefined;
 };
 
+/** Session `session`'s own transcript, `<config dir>/projects/<project>/<session>.jsonl`, or undefined. */
+export const sessionTranscriptAt = (session, env = process.env) => configDirsOf(env).flatMap((dir) => {
+  const projects = join(dir, 'projects');
+  if (!existsSync(projects)) return [];
+  return readdirSync(projects, { withFileTypes: true }).filter((p) => p.isDirectory()).map((p) => join(projects, p.name, `${session}.jsonl`));
+}).find((p) => existsSync(p));
+
+const TAIL_BYTES = 2_000_000;
+
+/**
+ * The cache tier of the newest prompt-cache write in the transcript at `path`: `1h` or `5m`, or undefined before its
+ * first write. A session on a subscription's plan usage writes the hour's tier, and one in usage overage drops to five
+ * minutes (observed 2026-11; Claude Code says nothing more direct), so `5m` means metered.
+ */
+export const cacheTierOf = (path) => {
+  const text = readFileSync(path, 'utf8');
+  const lines = text.slice(-TAIL_BYTES).split('\n').reverse();
+  for (const line of lines) {
+    if (!line.includes('"cache_creation"')) continue;
+    let record;
+    try {
+      record = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const c = record.message?.usage?.cache_creation;
+    if (!c || record.message.model === '<synthetic>') continue;
+    if ((c.ephemeral_1h_input_tokens ?? 0) > 0) return '1h';
+    if ((c.ephemeral_5m_input_tokens ?? 0) > 0) return '5m';
+  }
+  return undefined;
+};
+
 /**
  * What `usage` cost at `price` (`{ input, cacheRead, output }`, dollars per million tokens): a five-minute cache write
  * at 1.25× input, an hour's at 2×.

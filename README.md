@@ -527,7 +527,7 @@ question harder for one area: blind reviews of it, again and again, at one froze
 until capture–recapture says further reviews would find little new. Nothing it records feeds a round: not history,
 calibration, the queue, or the map.
 
-    skulkr scour next <area> [--agent <id>] [--max 40] [--per-defect 4x|<$>] [--at <sha>]
+    skulkr scour next <area> [--agent <id>] [--metered] [--max 40] [--per-defect 4x|<$>] [--at <sha>]
     skulkr scour [delve] <area> --fleet [--sources claude,codex] [--max 40] [--per-defect 4x|<$>] [--usd <n>] [--at <sha>] [--fresh]
     skulkr scour run [areas…] --fleet [--by finish|cheapest|spread] [--usd <n>] [--passes 10] [--per-defect 4x|<$>]
     skulkr scour fold <area>
@@ -561,6 +561,13 @@ message's usage at `claude.prices`), folds what it can, and prints the next task
 stop rule holds, when it removes the worktree and lets the ledger go. `next` without `--agent` while a task is out
 prints that task again, which is how a restarted session picks up. A match whose reply does not check out is handed
 out once more, then left unfolded for `scour fold`. The per-job dollar ceilings in `budget` do not apply to subagents.
+
+**Never metered unasked.** `next` hands out a task only while the session is on its plan's usage, which it reads from the
+session's own transcript: a session on plan usage writes the prompt cache's hour tier, and one in usage overage drops to
+five minutes (an inference from observed sessions, 2026-11-26; Claude Code reports nothing more direct). Any
+other answer, a five-minute write or a transcript it cannot find, prints `pause <area>: <why>` and starts nothing; the
+task waits recorded, and the next call once the session is back on plan usage hands it out. `--metered` starts passes
+regardless, for a run approved to spend metered usage (2026-11-26).
 
 **Fleet mode.** `skulkr scour delve <area> --fleet` (or `skulkr scour <area> --fleet`) freezes a detached worktree of the ledger's commit
 (`.worktrees/audit-saturate-<area>`, removed when it ends) and runs one review per source in `--sources` at once,
