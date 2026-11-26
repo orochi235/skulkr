@@ -187,8 +187,9 @@ const config = {
   claude: {
     configDir: '~/.claude-msb',
     // Jobs start without the account's own settings, so the opus at medium effort those gave is named here (2026-11-20).
-    // The scour's ledger matcher on haiku, to see whether it matches as well for less (2026-11-26).
-    models: { review: 'opus', fix: 'opus', match: 'haiku', ledgerMatch: 'haiku' },
+    // The scour's ledger matcher stays on the default opus: replaying 15 past matches, haiku and sonnet each got one
+    // wrong where opus agreed on all, for a saving of about $0.05 a pass (`scripts/matcherTrial.mjs`, 2026-11-26).
+    models: { review: 'opus', fix: 'opus', match: 'haiku' },
     effort: { review: 'medium', fix: 'medium' },
     timeoutMin: 45,
   },
