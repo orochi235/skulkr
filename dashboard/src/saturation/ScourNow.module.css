@@ -64,6 +64,8 @@
   font-size: var(--wzl-font-size-xs);
   color: var(--wzl-fg-muted);
   white-space: pre-wrap;
+  font-family: var(--wzl-font-mono);
+  font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 

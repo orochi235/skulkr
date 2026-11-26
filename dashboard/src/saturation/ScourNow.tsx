@@ -1,11 +1,23 @@
-import { minutesSince } from '@dash/audits/runData';
+import { minutesSince, minutesText } from '@dash/audits/runData';
 import { DelveChart, DelveKey } from './DelveChart';
 import { usd, usdOrDash } from './format';
 import type { ScourJob, SaturationLedger } from './saturation.types';
 import s from './ScourNow.module.css';
 
-/** A log line without its leading ISO time. */
-const untimed = (line: string) => line.replace(/^\S+ /, '');
+/**
+ * The last `n` of `log`'s lines (each led by its ISO time), newest first, each led by the time since the line before
+ * it (since `since`, when the process took the ledger, for the first), right-aligned: how long that pass took.
+ */
+export const timedLines = (log: readonly string[], since: string, n = 3): string[] => {
+  const at = log.map((line) => Date.parse(line.slice(0, line.indexOf(' '))));
+  const rows = log.map((line, i) => {
+    const before = i ? at[i - 1]! : Date.parse(since);
+    const took = Number.isFinite(at[i]) && Number.isFinite(before) ? minutesText((at[i]! - before) / 60_000) : '';
+    return [took, line.replace(/^\S+ /, '')] as const;
+  }).slice(-n).reverse();
+  const width = Math.max(...rows.map(([took]) => took.length));
+  return rows.map(([took, text]) => `${took.padStart(width)}  ${text}`);
+};
 
 function JobLine({ job }: { job: ScourJob }) {
   return (
@@ -37,7 +49,7 @@ export function ScourNow({ ledgers, onPick, now = Date.now() }: { ledgers: reado
             </header>
             <div className={s.chart}><DelveChart ledger={l} max={r.max} live /><DelveKey /></div>
             {r.jobs.length > 0 && <ul className={s.jobs}>{r.jobs.map((j) => <JobLine key={j.key} job={j} />)}</ul>}
-            {r.log.length > 0 && <pre className={s.log}>{r.log.slice(-3).reverse().map(untimed).join('\n')}</pre>}
+            {r.log.length > 0 && <pre className={s.log}>{timedLines(r.log, r.since).join('\n')}</pre>}
           </article>
         );
       })}
