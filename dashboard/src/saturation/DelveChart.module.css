@@ -15,7 +15,8 @@
 }
 
 /* A tile's faces share its color; the top is lit and the side shaded over it. */
-.again { --tile: var(--wzl-fg-muted); }
+/* Muted text mixed solid: `--wzl-fg-muted` is the text color at 70% alpha, so a stack showed each tile through the one above. */
+.again { --tile: color-mix(in srgb, var(--wzl-fg) 70%, var(--wzl-surface)); }
 
 .new { --tile: var(--wzl-accent); }
 
