@@ -9,7 +9,7 @@ import { addWorktree, fastForwardMain, gitIn, pushMain, removeWorktree } from '.
 import { ledgerDirOf, ledgerOf, withLedgerHeld } from './ledger.mjs';
 import { waitForLease } from './lease.mjs';
 import { mergeLock } from './runs.mjs';
-import { stopRuleOf } from './saturation.mjs';
+import { scourRuleOf } from './scourPrice.mjs';
 import { reportText } from './saturationReport.mjs';
 import { writeRegistry } from './registry.mjs';
 import { formerLandedDirOf, landedDirOf, scourStateDirOf } from './scourPaths.mjs';
@@ -39,7 +39,7 @@ const writeLanded = (cfg, id, ledger, to) => {
   mkdirSync(join(to, 'reviews'), { recursive: true });
   const { unfolded: _, ...folded } = ledger;
   writeFileSync(join(to, 'ledger.json'), `${JSON.stringify(folded, null, 1)}\n`);
-  writeFileSync(join(to, 'report.md'), reportText(ledger, stopRuleOf(cfg, cfg.saturate.max)));
+  writeFileSync(join(to, 'report.md'), reportText(ledger, scourRuleOf(cfg)));
   for (const { file } of ledger.occasions) if (file) cpSync(join(ledgerDirOf(cfg, id), file), join(to, file));
 };
 

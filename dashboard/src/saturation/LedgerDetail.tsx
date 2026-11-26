@@ -1,6 +1,6 @@
 import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
 import { DelveChart, DelveKey } from './DelveChart';
-import { estimate, percent, severityRank, sourcesText, usd } from './format';
+import { estimate, percent, severityRank, sourcesText, usd, usdOrDash } from './format';
 import type { SaturationDefect, SaturationLedger } from './saturation.types';
 import s from './LedgerDetail.module.css';
 
@@ -29,7 +29,8 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
         <p className={s.facts}>
           {ledger.files} files at <code>{ledger.commit.slice(0, 10)}</code> · {ledger.occasions} occasions ({sourcesText(ledger.sources)}) ·{' '}
           <span className={s.num}>{ledger.distinct}</span> found, ≈<span className={s.num}>{estimate(ledger.total)}</span> held,
-          next new <span className={s.num}>{percent(ledger.nextNew)}</span> · <span className={s.num}>{usd(ledger.costUsd)}</span>
+          next new <span className={s.num}>{percent(ledger.nextNew)}</span> · <span className={s.num}>{usd(ledger.costUsd)}</span>,
+          next defect ≈ <span className={s.num}>{usdOrDash(ledger.nextUsd)}</span>
         </p>
         <p className={s.facts}>{ledger.stopped ? `Stopped: ${ledger.stopped}.` : 'Not saturated yet: the stop rule does not hold.'}</p>
         <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} /><DelveKey /></div>

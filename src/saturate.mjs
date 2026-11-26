@@ -2,7 +2,8 @@
  * `skulkr scour` (alias `sat`): repeated blind reviews of one area at one frozen commit, folded into a ledger of
  * distinct defects until capture–recapture says the area is saturated. README "Scour" is its documentation.
  *
- *   skulkr scour [delve] <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh]
+ *   skulkr scour [delve] <area> [--sources claude,codex] [--max N] [--per-defect $] [--usd $] [--at <sha>] [--fresh]
+ *   skulkr scour run [areas…] [--by finish|cheapest|spread] [--usd $] [--passes N] [--per-defect $]
  *   skulkr scour fold <area>
  *   skulkr scour ingest <area> <report.md> --source <name> [--at <sha>]
  *   skulkr scour import <area> <dir> --at <sha> [--fresh]
@@ -24,11 +25,13 @@ import { importLedger } from './saturateImport.mjs';
 import { landableIdsOf, landLedgers } from './saturateLand.mjs';
 import { ledgerListLines, ledgerListOf, scouredAreasOf } from './saturationList.mjs';
 import { moveFormerScourState } from './scourPaths.mjs';
-import { chao2, stopReason, stopRuleOf, yieldRows } from './saturation.mjs';
+import { chao2, stopReason, yieldRows } from './saturation.mjs';
+import { nextPriceOf, scourRuleOf } from './scourPrice.mjs';
+import { scourRun } from './scourRun.mjs';
 import { writeReport } from './saturationReport.mjs';
 import { createSaturateContext, matchReport, occasionJobsOf, requireSources, runReview } from './saturateJobs.mjs';
 
-export const SATURATE_USAGE = 'usage: skulkr scour [delve] <area> [--sources claude,codex] [--max N] [--at <sha>] [--fresh] [--fleet] | fold <area> | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | land <area>… | land --all | ls [--json] | ls --source <name> --ids | report <area> | rm <area>';
+export const SATURATE_USAGE = 'usage: skulkr scour [delve] <area> [--sources claude,codex] [--max N] [--per-defect $] [--usd $] [--at <sha>] [--fresh] [--fleet] | run [areas…] [--by finish|cheapest|spread] [--usd $] [--passes N] [--per-defect $] | fold <area> | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | land <area>… | land --all | ls [--json] | ls --source <name> --ids | report <area> | rm <area>';
 
 /** `argv`'s positional words and flags. */
 export const saturateArgsOf = (cfg, argv) => {
@@ -43,7 +46,18 @@ export const saturateArgsOf = (cfg, argv) => {
   const max = flags.max === undefined ? cfg.saturate.max : Number(flags.max);
   if (!Number.isInteger(max) || max < 1) throw new Error(`--max wants a whole number of occasions, not ${flags.max}`);
   const sources = flags.sources ? flags.sources.split(',').map((s) => s.trim()).filter(Boolean) : cfg.saturate.sources;
-  return { words, max, sources, fresh: Boolean(flags.fresh), all: Boolean(flags.all), json: Boolean(flags.json), ids: Boolean(flags.ids), source: flags.source, at: flags.at };
+  const dollars = (name) => {
+    if (flags[name] === undefined) return undefined;
+    const n = Number(flags[name].replace(/^\$/, ''));
+    if (!(n > 0)) throw new Error(`--${name} wants an amount in dollars, not ${flags[name]}`);
+    return n;
+  };
+  const passes = flags.passes === undefined ? undefined : Number(flags.passes);
+  if (passes !== undefined && (!Number.isInteger(passes) || passes < 1)) throw new Error(`--passes wants a whole number, not ${flags.passes}`);
+  return {
+    words, max, sources, fresh: Boolean(flags.fresh), all: Boolean(flags.all), json: Boolean(flags.json), ids: Boolean(flags.ids), source: flags.source, at: flags.at,
+    usd: dollars('usd'), perDefect: dollars('per-defect'), passes, by: flags.by,
+  };
 };
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -78,14 +92,16 @@ const withFrozen = async (cfg, root, id, { fresh, at, about, say }, work) => wit
   }
 });
 
-/** The progress line for occasion `o` just folded into `ledger`. */
-export const occasionLine = (ledger, o, max) => {
+/** The progress line for occasion `o`, the last folded into `ledger`, priced with the calibration `factor`. */
+export const occasionLine = (ledger, o, max, factor = 1) => {
   const r = yieldRows(ledger).find((row) => row.n === o.n);
   const s = r.stats;
   const unseen = s.f0 === undefined ? '–' : s.f0.toFixed(1);
   const next = s.nextNew === undefined ? '–' : `${Math.round(s.nextNew * 100)}%`;
   const perDefect = r.usdPerDefect === undefined ? '–' : `$${r.usdPerDefect.toFixed(2)}`;
-  return `${o.n}/${max} ${o.source}: ${o.findings} findings, ${r.new} new; distinct ${s.S}; unseen ≈ ${unseen}; next-new ${next}; $${o.costUsd.toFixed(2)}; ${perDefect}/defect`;
+  const price = nextPriceOf(ledger, factor).usd;
+  const nextUsd = price === undefined ? '–' : Number.isFinite(price) ? `$${price.toFixed(2)}` : 'none expected';
+  return `${o.n}/${max} ${o.source}: ${o.findings} findings, ${r.new} new; distinct ${s.S}; unseen ≈ ${unseen}; next-new ${next}; $${o.costUsd.toFixed(2)}; ${perDefect}/defect, next ≈ ${nextUsd}`;
 };
 
 /** The file a report waits in until it is folded, relative to the ledger's directory. */
@@ -137,16 +153,21 @@ const foldPending = async (ctx, ledger, rule) => {
   let at = ledger;
   while (at.unfolded?.length) {
     at = await foldNext(ctx, at);
-    ctx.say(occasionLine(at, at.occasions.at(-1), rule.max));
+    ctx.say(occasionLine(at, at.occasions.at(-1), rule.max, rule.factor));
     writeReport(ctx.cfg, at.area, at, rule);
   }
   return at;
 };
 
-/** Reviews `id` until the stop rule holds, one review per source an iteration. Answers the ledger. */
+const spentOn = (ledger) => ledger.occasions.reduce((sum, o) => sum + (o.costUsd ?? 0), 0);
+
+/**
+ * Reviews `id` until the stop rule holds, one review per source an iteration, or for `args.passes` iterations at most.
+ * `args.usd` caps what this call spends. Answers the ledger.
+ */
 export const saturateArea = async (cfg, runner, root, id, args, tell) => {
   requireSources(cfg, args.sources);
-  const rule = stopRuleOf(cfg, args.max);
+  const rule = scourRuleOf(cfg, args);
   return withFrozen(cfg, root, id, { ...args, about: { does: 'delve', max: rule.max }, say: tell }, async ({ ledger: start, frozen, base, commit, say }) => {
     let ledger = start;
     writeLedger(cfg, ledger);
@@ -154,12 +175,15 @@ export const saturateArea = async (cfg, runner, root, id, args, tell) => {
     const ctx = createSaturateContext({ cfg, runner, frozen, base, commit, area: id, say });
     const area = { id, files: ledger.files };
     ledger = await foldPending(ctx, ledger, rule);
-    for (;;) {
-      const stop = stopReason(chao2(ledger.occasions, ledger.defects), rule);
+    const startUsd = spentOn(ledger);
+    for (let pass = 0; ; pass++) {
+      const price = nextPriceOf(ledger, rule.factor);
+      const stop = stopReason(chao2(ledger.occasions, ledger.defects), rule, { price, spentUsd: spentOn(ledger) - startUsd });
       if (stop) {
         say(`saturate ${id}: stopped, ${stop}`);
         break;
       }
+      if (args.passes !== undefined && pass >= args.passes) break;
       const batch = args.sources.slice(0, rule.max - ledger.occasions.length);
       const at = ledger.occasions.length;
       const keys = batch.map((source, i) => `${pad(at + 1 + i)}-${source}`);
@@ -188,7 +212,7 @@ export const ingestReport = async (cfg, runner, root, id, path, source, args, te
   if (!source) throw new Error('ingest wants --source <name>: who wrote the report');
   if (!existsSync(path)) throw new Error(`no report at ${path}`);
   const text = readFileSync(path, 'utf8');
-  const rule = stopRuleOf(cfg, args.max);
+  const rule = scourRuleOf(cfg, args);
   return withFrozen(cfg, root, id, { fresh: false, at: args.at, about: { does: 'ingest' }, say: tell }, async ({ ledger, frozen, base, commit, say }) => {
     const ctx = createSaturateContext({ cfg, runner, frozen, base, commit, area: id, say });
     const key = `${pad(ledger.occasions.length + (ledger.unfolded?.length ?? 0) + 1)}-${source}`;
@@ -201,7 +225,7 @@ export const ingestReport = async (cfg, runner, root, id, path, source, args, te
 /** Folds `id`'s unfolded reports into its ledger, as after a matcher failure. Answers the ledger. */
 export const foldReports = async (cfg, runner, root, id, args, tell) => {
   if (!ledgerOf(cfg, id)) throw new Error(`${id} has no scour ledger`);
-  const rule = stopRuleOf(cfg, args.max);
+  const rule = scourRuleOf(cfg, args);
   return withFrozen(cfg, root, id, { fresh: false, about: { does: 'fold' }, say: tell }, async ({ ledger, frozen, base, commit, say }) => {
     if (!ledger.unfolded?.length) {
       say(`fold ${id}: nothing to fold`);
@@ -248,7 +272,7 @@ export const saturateCommand = async (cfg, runner, root, argv, say = (line) => c
   if (first === 'report') {
     const ledger = rest[0] && ledgerOf(cfg, rest[0]);
     if (!ledger) throw new Error(rest[0] ? `${rest[0]} has no saturation ledger` : SATURATE_USAGE);
-    say(`wrote ${writeReport(cfg, rest[0], ledger, stopRuleOf(cfg, args.max))}`);
+    say(`wrote ${writeReport(cfg, rest[0], ledger, scourRuleOf(cfg, args))}`);
     return ledger;
   }
   if (first === 'rm') {
@@ -262,6 +286,7 @@ export const saturateCommand = async (cfg, runner, root, argv, say = (line) => c
     say(`removed ${rest[0]}'s saturation ledger`);
     return undefined;
   }
+  if (first === 'run') return scourRun(cfg, runner, root, { ...args, words: rest }, say);
   if (first === 'fold') {
     if (!rest[0]) throw new Error(SATURATE_USAGE);
     return foldReports(cfg, runner, root, rest[0], args, say);

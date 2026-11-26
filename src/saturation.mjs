@@ -72,16 +72,32 @@ export const yieldRows = (ledger) => {
   });
 };
 
-/** The stop rule `stopReason` takes: `max` occasions, and the config's `saturate.stopNextNew`. */
-export const stopRuleOf = (cfg, max) => ({ max, stopNextNew: cfg.saturate.stopNextNew });
+/**
+ * The stop rule `stopReason` takes: `max` occasions, the config's `saturate.stopNextNew`, the most the next defect may
+ * cost (`perDefect`, else `saturate.stopUsdPerDefect`), `usd`, the most one command may spend, if any, and `factor`,
+ * the pricing calibration (`scourPrice.mjs`).
+ */
+export const stopRuleOf = (cfg, max, { perDefect, usd, factor = 1 } = {}) => ({
+  max,
+  stopNextNew: cfg.saturate.stopNextNew,
+  stopUsdPerDefect: perDefect ?? cfg.saturate.stopUsdPerDefect,
+  usd,
+  factor,
+});
 
 /**
- * Why saturation should stop, given the combined estimate `stats`, the occasion limit `max`, and `stopNextNew`, the
- * chance of a new finding below which the next occasion is not worth running; null to go on.
+ * Why saturation should stop, given the combined estimate `stats`, the rule (`stopRuleOf`), the next defect's `price`
+ * (`nextPriceOf`), and `spentUsd`, what this command has spent; null to go on.
  */
-export const stopReason = (stats, { max, stopNextNew }) => {
+export const stopReason = (stats, { max, stopNextNew, stopUsdPerDefect, usd }, { price, spentUsd } = {}) => {
   if (stats.m >= max) return `reached the limit of ${max} occasions`;
   if (stats.f0 !== undefined && stats.f0 < 1) return `fewer than one defect estimated unseen (${stats.f0.toFixed(2)})`;
   if (stats.nextNew !== undefined && stats.nextNew < stopNextNew) return `the next occasion's chance of a new finding is under ${Math.round(stopNextNew * 100)}% (${(stats.nextNew * 100).toFixed(1)}%)`;
+  if (stopUsdPerDefect !== undefined && price?.usd !== undefined && price.usd > stopUsdPerDefect) {
+    return `the next defect would cost about $${price.usd.toFixed(2)}, over the $${stopUsdPerDefect.toFixed(2)} limit`;
+  }
+  if (usd !== undefined && spentUsd !== undefined && spentUsd + (price?.passUsd ?? 0) > usd) {
+    return `another pass would take spending past the $${usd.toFixed(2)} limit ($${spentUsd.toFixed(2)} spent)`;
+  }
   return null;
 };

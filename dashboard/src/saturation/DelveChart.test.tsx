@@ -10,7 +10,7 @@ const defect = (id: string, seenAt: number[]) => ({
 const defects = [defect('D2', [3]), defect('D1', [1, 2, 3]), defect('D3', [2])];
 const ledger: SaturationLedger = {
   id: 'core', area: 'core', commit: 'c0ffee', files: 3, occasions: 3, sources: { claude: 3 }, costUsd: 5, distinct: 3,
-  total: 5.4, unseen: 2.4, nextNew: 0.4, stopped: null, updated: null, running: null, defects,
+  total: 5.4, unseen: 2.4, nextNew: 0.4, nextUsd: null, stopped: null, updated: null, running: null, defects,
 };
 
 describe('DelveChart', () => {

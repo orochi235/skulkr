@@ -39,7 +39,7 @@ project's `.skulkr/`, never from one machine's state directory.
 
 | Stage | Takes | Writes | Core action | UI expression(s) | User sees? | Exists today |
 |---|---|---|---|---|---|---|
-| **pick** | the partition, the registry, a budget | the areas to saturate, the frozen commit, the sources | The user (or a script) specifies a job | Whatever interface we use to pick an area from the map | Explicit | only as `--at` and `--sources` on one area |
+| **pick** | the partition, the registry, a budget | the areas to saturate, the frozen commit, the sources | The user (or a script) specifies a job | Whatever interface we use to pick an area from the map | Explicit | `scour run` picks areas by strategy within a budget (README "Choosing the next pass", 2026-11-25); `--at` and `--sources` on one area |
 | **delve** | a picked area | one raw report per occasion, unmatched, under the ledger's `reviews/` | We run the job | Updates: progress bar and frequent log events/status updates | Explicit | `scour delve <area>`; the Codex skill and `ingest` bring outside reports |
 | **fold** | reports not yet in the ledger | the ledger's distinct defects and sightings (the ledger matcher) | Job results binned in the ledger | Items in various results lists | Implicit? | `scour fold <area>`, run by every delve and ingest |
 | **judge** | the ledger | whether to scan again: the stop rule, and which source to add next from the per-source estimates | Flow control over scanning process | Prefs that govern batch flow control | Configured | inside the loop |

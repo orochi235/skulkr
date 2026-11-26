@@ -1,5 +1,6 @@
 import { minutesSince } from '@dash/audits/runData';
 import { DelveChart, DelveKey } from './DelveChart';
+import { usd, usdOrDash } from './format';
 import type { ScourJob, SaturationLedger } from './saturation.types';
 import s from './ScourNow.module.css';
 
@@ -31,6 +32,7 @@ export function ScourNow({ ledgers, onPick, now = Date.now() }: { ledgers: reado
               <span className={s.area} role="button" tabIndex={0} onClick={() => onPick(l.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onPick(l.id)}>{l.id}</span>
               <span className={s.facts}>
                 {r.does ?? 'held'} · pid {r.pid} · {minutesSince(r.since, now)} · {r.max ? `${l.occasions}/${r.max}` : l.occasions} occasions
+                {' '}· {usd(l.costUsd)} · next defect ≈ {usdOrDash(l.nextUsd)}
               </span>
             </header>
             <div className={s.chart}><DelveChart ledger={l} max={r.max} live /><DelveKey /></div>

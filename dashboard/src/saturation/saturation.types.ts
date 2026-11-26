@@ -35,6 +35,8 @@ export interface SaturationLedger {
   readonly unseen: number | null;
   /** The chance the next occasion's finding is new. */
   readonly nextNew: number | null;
+  /** What the next defect should cost (README "The price of the next defect"); null under two occasions or with none expected. */
+  readonly nextUsd: number | null;
   /** Why the stop rule holds, null while it does not. */
   readonly stopped: string | null;
   /** When its last occasion was recorded. */

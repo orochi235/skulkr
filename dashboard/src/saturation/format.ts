@@ -1,6 +1,9 @@
 /** Dollars to the cent. */
 export const usd = (n: number): string => `$${n.toFixed(2)}`;
 
+/** Dollars to the cent, or a dash where there is no figure. */
+export const usdOrDash = (n: number | null): string => (n === null ? '–' : usd(n));
+
 /** An estimate to one decimal, or a dash where there is none yet. */
 export const estimate = (n: number | null): string => (n === null ? '–' : n.toFixed(1));
 

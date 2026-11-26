@@ -527,7 +527,8 @@ question harder for one area: blind reviews of it, again and again, at one froze
 until capture–recapture says further reviews would find little new. Nothing it records feeds a round: not history,
 calibration, the queue, or the map.
 
-    skulkr scour [delve] <area> [--sources claude,codex] [--max 40] [--at <sha>] [--fresh] [--fleet]
+    skulkr scour [delve] <area> [--sources claude,codex] [--max 40] [--per-defect 1.5] [--usd <n>] [--at <sha>] [--fresh] [--fleet]
+    skulkr scour run [areas…] [--by finish|cheapest|spread] [--usd <n>] [--passes 10] [--per-defect 1.5]
     skulkr scour fold <area>
     skulkr scour ingest <area> <report.md> --source <name> [--at <sha>]
     skulkr scour import <area> <dir> --at <sha> [--fresh]
@@ -546,10 +547,35 @@ as `reviews/unfolded-<NN>-<source>.md` and listed in the ledger's `unfolded`; **
 they finished, each through the **ledger matcher**, which says which of its findings are defects the ledger already holds and which are new.
 After each occasion skulkr prints a line, rewrites the report, and checks the stop rule:
 
-    7/40 claude: 3 findings, 1 new; distinct 19; unseen ≈ 6.1; next-new 18%; $0.62; $1.84/defect
+    7/40 claude: 3 findings, 1 new; distinct 19; unseen ≈ 6.1; next-new 18%; $0.62; $1.84/defect, next ≈ $1.12
 
+`$/defect` is everything spent so far over the defects found; `next` is what the next defect should cost (below).
 It stops once the combined estimate puts fewer than one defect unseen, the chance that the next occasion's finding
-is new falls under `saturate.stopNextNew` (15%), or `--max` occasions (`saturate.max`, 40) are in the ledger.
+is new falls under `saturate.stopNextNew` (15%), the next defect would cost over `--per-defect` dollars
+(`saturate.stopUsdPerDefect`, 1.50), another pass would take what this command has spent past `--usd`, or `--max`
+occasions (`saturate.max`, 40) are in the ledger.
+
+**The price of the next defect** is the average cost of the ledger's last five passes over the new defects its next
+pass should find. That count is Chao2's (the chance a finding is new, times the sightings a pass makes) times a
+calibration factor: across every pass from the fourth on of the project's ledgers in the state directory, the new
+defects passes found over those Chao2 expected, 1 until twenty passes measure it. Chao2 alone runs high: on weasel's
+212 such passes (2026-11-25) passes found 0.73 of what it expected, so the uncalibrated price ran 1.3–1.8× low.
+The price ranks passes correctly where the plain trailing rate (the last five passes' cost over their new defects)
+does not: a trailing price over $3 was followed by passes finding defects at $1.37. It has no value under two passes.
+On weasel, a fresh area's first five passes found defects at about 40¢ each, passes 16–20 at about $2.60
+(2026-11-25), and every ledger that ran to the old stop rule ended with its next defect priced at $1.30–3.60.
+
+**Choosing the next pass.** `skulkr scour run` delves several areas within one budget, `--usd`, sending each pass
+where `--by` says. The candidates are the areas named, else every area of the partition, which needs `--usd`. Each
+area still stops by its own rule.
+
+| `--by` | Each pass goes to |
+|---|---|
+| `finish` (default) | The areas in turn, each until its stop rule holds: the named ones in the order given, otherwise cheapest first. |
+| `cheapest` | The area whose next defect costs least. An area with under two passes is priced at the opening price: what new defects cost over the first five passes of the project's ledgers pooled, else `saturate.openingUsdPerDefect` (0.40). So fresh areas get their cheap passes before any area goes deep. |
+| `spread` | Each area until it has `--passes` (10), in the same order as `finish`; about 74% of what weasel's ledgers found came by pass 10. |
+
+A fresh area's first pass has no price of its own, so `--usd` can be overspent by that one pass.
 
 Every line a delve, fold or ingest prints also goes to the ledger's `scour.log`, each led by its time, started over by
 the next process to take the ledger. `ls --json` gives each ledger a live process holds `running`: its pid, when it

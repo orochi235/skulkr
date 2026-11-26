@@ -94,12 +94,21 @@ describe('yieldRows', () => {
 });
 
 describe('stopReason', () => {
-  const rule = { max: 40, stopNextNew: 0.1 };
+  const rule = { max: 40, stopNextNew: 0.1, stopUsdPerDefect: undefined, usd: undefined };
   it('stops at the limit, under one unseen, or under the next-new floor, and not before', () => {
     expect(stopReason({ m: 40, f0: 9, nextNew: 0.5 }, rule)).toMatch(/limit of 40/);
     expect(stopReason({ m: 6, f0: 0.4, nextNew: 0.2 }, rule)).toMatch(/fewer than one/);
     expect(stopReason({ m: 6, f0: 3, nextNew: 0.08 }, rule)).toMatch(/under 10%/);
     expect(stopReason({ m: 6, f0: 3, nextNew: 0.12 }, rule)).toBeNull();
     expect(stopReason({ m: 1, f0: undefined, nextNew: undefined }, rule)).toBeNull();
+  });
+
+  it('stops when the next defect costs over the limit, or another pass would spend past the cap', () => {
+    const priced = { ...rule, stopUsdPerDefect: 1.5, usd: 10 };
+    const stats = { m: 6, f0: 3, nextNew: 0.3 };
+    expect(stopReason(stats, priced, { price: { usd: 2.4, passUsd: 0.8 }, spentUsd: 1 })).toBe('the next defect would cost about $2.40, over the $1.50 limit');
+    expect(stopReason(stats, priced, { price: { usd: 1.2, passUsd: 0.8 }, spentUsd: 9.5 })).toBe('another pass would take spending past the $10.00 limit ($9.50 spent)');
+    expect(stopReason(stats, priced, { price: { usd: 1.2, passUsd: 0.8 }, spentUsd: 9 })).toBeNull();
+    expect(stopReason(stats, priced, { price: { usd: undefined, passUsd: 0.8 }, spentUsd: 0 })).toBeNull();
   });
 });
