@@ -11,7 +11,6 @@ const treeNodeOf = (n: LedgerTreeNode): TreeNode => ({
   label: n.label,
   textValue: n.label,
   muted: !n.ledger,
-  className: s.row,
   tooltip: n.ledgers === 0 ? `${n.id}: no ledger yet${n.within ? `, nor any of the ${n.within} areas within it` : ''}`
     : `${n.ledger ? n.id : `everything under ${n.id}`}: ${n.defects} defects, ${estimate(n.unseen)} unseen, ${usd(n.costUsd)}`,
   trailing: (

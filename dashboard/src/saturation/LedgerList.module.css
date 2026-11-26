@@ -1,4 +1,5 @@
 .list {
+  --ledger-size: var(--wzl-font-size-lg);
   display: flex;
   flex-direction: column;
   gap: var(--wzl-space-2);
@@ -17,9 +18,8 @@
   --wzl-tree-fold-size: 13px;
   --wzl-tree-leaf-indent: calc(var(--wzl-tree-fold-size) + var(--wzl-space-2));
   --wzl-tree-root-leaf-indent: var(--wzl-tree-leaf-indent);
+  --wzl-tree-font-size: var(--ledger-size);
 }
-
-.row { font-family: var(--wzl-font-mono); }
 
 .head {
   display: flex;
@@ -41,9 +41,9 @@
   text-align: end;
 }
 
-/* Sized in em, not ch: the header and the rows are set in different fonts, whose ch differ. */
-.within { inline-size: 3em; }
+/* Sized by the rows' font, so the smaller header's columns line up with theirs. */
+.within { inline-size: calc(3 * var(--ledger-size)); }
 
-.defects { inline-size: 4.2em; }
+.defects { inline-size: calc(4.2 * var(--ledger-size)); }
 
-.unseen { inline-size: 3.6em; }
+.unseen { inline-size: calc(3.6 * var(--ledger-size)); }
