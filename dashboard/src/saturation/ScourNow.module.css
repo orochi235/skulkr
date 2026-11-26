@@ -1,13 +1,16 @@
+/* Two boxes side by side once each can have 44rem, never more than two. */
 .now {
   flex: none;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(44rem, calc(50% - var(--wzl-space-2)))), 1fr));
+  align-content: start;
   gap: var(--wzl-space-2);
   max-height: 40%;
   overflow: auto;
 }
 
 .run {
+  min-width: 0;
   border: 1px solid var(--wzl-border);
   border-radius: var(--wzl-radius-md);
   padding: var(--wzl-space-2) var(--wzl-space-3);
