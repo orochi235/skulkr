@@ -2,6 +2,12 @@
 
 Open work on skulkr. Each entry says when it closes.
 
+- [ ] (P2) A killed delve leaves its frozen worktree (`.worktrees/audit-saturate-<area>`) in the project and its
+  `jobs/<NN>-<source>/` beside the ledger; only a normal stop removes them (`withFrozen`'s `finally`), and SIGTERM
+  skips it. On 2026-11-26 at 15:21Z two `scour run` lanes and their `claude -p` jobs died within 11 seconds of each
+  other, cause unknown, leaving both; removed by hand. Closes when a delve removes them on SIGTERM/SIGINT and the
+  next delve of the area clears any a SIGKILL left.
+
 - [ ] (P1) Build saturation as stages, `docs/scour.md` (designed 2026-11-25, mostly unbuilt). Closes when its
   stages run on their own and the doc is folded into the README and deleted.
 - [ ] (P2) Scour ledgers' defects reach no fixer: landed ledgers under `<record.dir>/scour/` are read by no fixer
