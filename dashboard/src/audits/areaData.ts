@@ -119,13 +119,16 @@ export const heatScaleOverRounds = (areas: readonly AuditArea[]): HeatScale =>
 export interface HeatScaleOptions {
   readonly floor?: number;
   readonly reverse?: boolean;
+  readonly linear?: boolean;
 }
 
 /** The heat scale for `values`, its top their 98th percentile, at least `floor`. */
-export function heatScaleFor(values: readonly number[], { floor = HEAT_FLOOR, reverse = false }: HeatScaleOptions = {}): HeatScale {
+export function heatScaleFor(values: readonly number[], { floor = HEAT_FLOOR, reverse = false, linear = false }: HeatScaleOptions = {}): HeatScale {
   const sorted = values.filter(Number.isFinite).sort((x, y) => x - y);
   const top = Math.max(floor, quantile(sorted, 0.98));
-  const scale = warpScale({ domain: [0, top], range: [0, 1], to: Math.log1p, from: Math.expm1 });
+  const scale = linear
+    ? warpScale({ domain: [0, top], range: [0, 1], to: (v) => v, from: (v) => v })
+    : warpScale({ domain: [0, top], range: [0, 1], to: Math.log1p, from: Math.expm1 });
   const along = (v: number) => Math.min(1, Math.max(0, scale.position(Math.max(0, v))));
   const at = reverse ? (v: number) => 1 - along(v) : along;
   // The top keeps its own tick, so a round one crowding it gives way.

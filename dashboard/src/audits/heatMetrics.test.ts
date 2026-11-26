@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HEAT_METRIC_SPECS, metricScaleOf } from './heatMetrics';
+import { HEAT_METRIC_SPECS, metricScaleOf, saturationOf } from './heatMetrics';
 import type { AuditArea, AuditPass } from './skulkrMap.types';
 
 const pass = (round: number, more: Partial<AuditPass> = {}): AuditPass =>
@@ -31,5 +31,19 @@ describe('heat metrics', () => {
     expect(Object.fromEntries(values)).toEqual({ old: 2, new: 1, done: null });
     const scale = metricScaleOf('queue', values);
     expect(scale.at(1)).toBeGreaterThan(scale.at(2));
+  });
+});
+
+describe('saturation', () => {
+  const s = (more: object) => ({ open: 0, unseen: null, distinct: 0, occasions: 3, nextNew: null, total: null, costUsd: 0, limitUsd: 1.5, goingUsd: 0.5, nextUsd: null, stopped: null, ...more });
+  it("places the next defect's price between the going rate and the limit, a fresh ledger at 0, and a stop at 100", () => {
+    expect(saturationOf(s({ nextUsd: 1 }))).toBeCloseTo(50);
+    expect(saturationOf(s({}))).toBe(0);
+    expect(saturationOf(s({ nextUsd: 0.3 }))).toBe(0);
+    expect(saturationOf(s({ nextUsd: 0.3, stopped: 'ready to fix: 6.0 known defects per thousand lines, at least 5' }))).toBe(100);
+    expect(saturationOf(s({ nextUsd: 3 }))).toBe(100);
+    expect(saturationOf(undefined)).toBeNull();
+    const scale = metricScaleOf('saturation', new Map([['ripe', 0], ['spent', 100]]));
+    expect(scale.at(0)).toBeGreaterThan(scale.at(100));
   });
 });

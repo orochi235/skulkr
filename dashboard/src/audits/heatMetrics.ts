@@ -5,7 +5,7 @@ import type { AuditArea } from './skulkrMap.types';
 
 export const HEAT_METRICS = ['left', 'density', 'fixed', 'found', 'queue', 'open', 'stale', 'age', 'rounds', 'files'] as const;
 /** What the saturation page's map can shade by besides: its areas' saturation ledgers, which the audit map lacks. */
-export const SATURATION_METRICS = ['saturationNextNew', 'saturationUnseen', 'saturationUnseenPerKloc', 'saturationOpen', 'saturationDefects', 'saturationDefectsPerKloc', 'saturationTotal', 'saturationReviews', 'saturationSpend', 'saturationSpendPerKloc'] as const;
+export const SATURATION_METRICS = ['saturation', 'saturationNextNew', 'saturationUnseen', 'saturationUnseenPerKloc', 'saturationOpen', 'saturationDefects', 'saturationDefectsPerKloc', 'saturationTotal', 'saturationReviews', 'saturationSpend', 'saturationSpendPerKloc'] as const;
 export type HeatMetric = (typeof HEAT_METRICS)[number] | (typeof SATURATION_METRICS)[number];
 /** Every metric, each with a ramp the viewer may choose. */
 export const ALL_METRICS: readonly HeatMetric[] = [...SATURATION_METRICS, ...HEAT_METRICS];
@@ -21,10 +21,25 @@ export interface HeatMetricSpec {
   readonly floor: number;
   /** A low value is the hot end: the queue's first place. */
   readonly reverse?: boolean;
+  /** A percentage or any value whose steps all count alike: a straight scale, not the log one counts get. */
+  readonly linear?: boolean;
   readonly valuesIn: (areas: readonly AuditArea[]) => ReadonlyMap<string, number | null>;
 }
 
 const each = (areas: readonly AuditArea[], valueOf: (area: AuditArea) => number | null) => new Map(areas.map((a) => [a.id, valueOf(a)]));
+
+/**
+ * How spent an area's scour is, in percent: where its next defect's price sits between the project's going rate (0, as
+ * ripe as the cheapest areas) and its per-defect limit (100, where the delve stops). A ledger without a price of its own
+ * yet (under two passes) is as ripe as a fresh area, and one that has stopped, for any reason, is 100.
+ */
+export const saturationOf = (s: AuditArea['saturation']): number | null => {
+  if (!s || !s.limitUsd) return null;
+  if (s.stopped) return 100;
+  const going = s.goingUsd ?? 0;
+  if (s.nextUsd == null || s.limitUsd <= going) return 0;
+  return Math.min(100, Math.max(0, (100 * (s.nextUsd - going)) / (s.limitUsd - going)));
+};
 
 /** What an area's estimate says is left, 0 once it has settled; null with no pass. */
 const leftOf = (area: AuditArea): number | null => (area.status === 'settled' ? 0 : lastPassOf(area)?.left ?? null);
@@ -92,6 +107,10 @@ export const HEAT_METRIC_SPECS: Readonly<Record<HeatMetric, HeatMetricSpec>> = {
     name: 'reviews', legend: 'scour reviews of it, every source', none: 'no scour ledger', scheme: 'viridis', floor: 5,
     valuesIn: (areas) => each(areas, (a) => a.saturation?.occasions ?? null),
   },
+  saturation: {
+    name: 'saturation', legend: "next defect's price, from the going rate (0%) to the limit where a delve stops (100%)", none: 'no scour ledger', scheme: 'magma', floor: 100, linear: true, reverse: true,
+    valuesIn: (areas) => each(areas, (a) => saturationOf(a.saturation)),
+  },
   saturationNextNew: {
     name: 'chance next review finds a new defect', legend: "percent chance the next review's finding is new", none: 'no estimate yet', scheme: 'inferno', floor: 50,
     valuesIn: (areas) => each(areas, (a) => (a.saturation?.nextNew == null ? null : a.saturation.nextNew * 100)),
@@ -109,5 +128,5 @@ export const HEAT_METRIC_SPECS: Readonly<Record<HeatMetric, HeatMetricSpec>> = {
 /** The scale metric `metric` shades `values` on. */
 export const metricScaleOf = (metric: HeatMetric, values: ReadonlyMap<string, number | null>): HeatScale => {
   const spec = HEAT_METRIC_SPECS[metric];
-  return heatScaleFor([...values.values()].filter((v): v is number => v !== null), { floor: spec.floor, reverse: spec.reverse ?? false });
+  return heatScaleFor([...values.values()].filter((v): v is number => v !== null), { floor: spec.floor, reverse: spec.reverse ?? false, linear: spec.linear ?? false });
 };

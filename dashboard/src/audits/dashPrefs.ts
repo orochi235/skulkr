@@ -44,7 +44,7 @@ export const DASH_PREFS = pref.group('Dashboard', {
     }),
   }),
   saturation: pref.group('Scour', {
-    colorBy: pref.enum<HeatMetric>('Color by', 'saturationOpen', SATURATION_METRICS, {
+    colorBy: pref.enum<HeatMetric>('Color by', 'saturation', SATURATION_METRICS, {
       description: "What the Scour page's map shades its areas by; the legend under the map switches it too.",
     }),
   }),
