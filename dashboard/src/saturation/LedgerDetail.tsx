@@ -1,5 +1,6 @@
 import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
 import { DelveChart, DelveKey } from './DelveChart';
+import { PassTableButton } from './PassTable';
 import { estimate, percent, severityRank, sourcesText, usd, usdOrDash } from './format';
 import type { SaturationDefect, SaturationLedger } from './saturation.types';
 import s from './LedgerDetail.module.css';
@@ -33,7 +34,7 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
           next defect ≈ <span className={s.num}>{usdOrDash(ledger.nextUsd)}</span>
         </p>
         <p className={s.facts}>{ledger.stopped ? `Stopped: ${ledger.stopped}.` : 'Not saturated yet: the stop rule does not hold.'}</p>
-        <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} /><DelveKey /></div>
+        <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} /><div className={s.chartFoot}><DelveKey /><PassTableButton ledger={ledger} /></div></div>
       </header>
       <div className={s.scroll}>
         <DataGrid rows={ledger.defects} columns={COLUMNS} defaultSort={{ columnId: 'sightings', direction: 'desc' }} empty="No defects." />

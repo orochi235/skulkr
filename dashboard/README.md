@@ -28,7 +28,7 @@ its occasions against its `--max`, what it has cost and what the next defect sho
 map outlines its area, pulsing, in the review or match color as the audit map does a live round's. Each such box, and a
 picked ledger's panel, charts its passes: one stack of tiles per pass, a tile per defect that pass reported, colored by
 whether it was new and seen again since, new and seen by no other pass, or seen before, with the count estimated not
-found yet beside the last. The page asks every 5 seconds while one runs, else every 30. Its map shades areas by what their scour ledgers say (the
+found yet beside the last. The picked ledger's Passes button opens a table of its passes: what each found and cost, and the estimates, spend and next defect's price as they stood after it. The page asks every 5 seconds while one runs, else every 30. Its map shades areas by what their scour ledgers say (the
 chance the next review finds a new defect, defects not found yet, open, found, the estimated total, reviews, spend),
 kept apart from the audit map's choice, and draws only the queue numbers, pins, area icons and live outlines over
 them, none of the audit history's marks; picking an area on the map or in the list picks it in both. A slider above the treemap shows it as it stood

@@ -1,0 +1,6 @@
+.dialog {
+  width: min(64rem, calc(100vw - 2 * var(--wzl-space-4)));
+  max-height: calc(100vh - 2 * var(--wzl-space-4));
+}
+
+.grid { font-variant-numeric: tabular-nums; }

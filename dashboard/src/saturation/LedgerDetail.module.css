@@ -51,3 +51,9 @@
   gap: var(--wzl-space-1);
   margin-block: var(--wzl-space-2);
 }
+
+.chartFoot {
+  display: flex;
+  align-items: center;
+  gap: var(--wzl-space-3);
+}

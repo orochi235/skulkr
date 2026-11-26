@@ -18,6 +18,22 @@ export interface SaturationDefect {
   readonly registry: { readonly id: string; readonly status: string; readonly sha: string | null } | null;
 }
 
+/** One pass of a ledger: what it found and cost, and the estimates and spend as they stood after it. */
+export interface SaturationPass {
+  readonly n: number;
+  readonly source: string;
+  readonly findings: number;
+  readonly new: number;
+  readonly distinct: number;
+  readonly unseen: number | null;
+  readonly nextNew: number | null;
+  readonly costUsd: number;
+  readonly spentUsd: number;
+  readonly usdPerDefect: number | null;
+  readonly nextUsd: number | null;
+  readonly at: string | null;
+}
+
 /** One area's saturation ledger, summed up: its repeated blind reviews at one frozen commit and what they found. */
 export interface SaturationLedger {
   /** The ledger's directory: its area, or `<area>.<commit>` for one set aside. */
@@ -37,6 +53,8 @@ export interface SaturationLedger {
   readonly nextNew: number | null;
   /** What the next defect should cost (README "The price of the next defect"); null under two occasions or with none expected. */
   readonly nextUsd: number | null;
+  /** Its passes in order. */
+  readonly passes: readonly SaturationPass[];
   /** Why the stop rule holds, null while it does not. */
   readonly stopped: string | null;
   /** When its last occasion was recorded. */

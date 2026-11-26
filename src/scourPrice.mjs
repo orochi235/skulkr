@@ -4,7 +4,7 @@
  */
 import { existsSync, readdirSync } from 'node:fs';
 import { ledgerOf } from './ledger.mjs';
-import { chao2, stopRuleOf } from './saturation.mjs';
+import { chao2, stopRuleOf, yieldRows } from './saturation.mjs';
 import { scourStateDirOf } from './scourPaths.mjs';
 
 /** Passes the pass cost averages over, and the passes a ledger's opening price is taken from. */
@@ -83,3 +83,24 @@ export const nextPriceOf = (ledger, factor = 1) => {
   const expectedNew = e * factor;
   return { usd: expectedNew > 0 ? passUsd / expectedNew : Infinity, expectedNew, passUsd };
 };
+
+const orNull = (n) => (n === undefined || !Number.isFinite(n) ? null : n);
+
+/**
+ * The ledger's yield by pass, for the dashboard: each pass's findings, new defects and cost, and the estimates, spend
+ * and next defect's price as they stood after it; null where a figure has no value yet.
+ */
+export const passRowsOf = (ledger, factor = 1) => yieldRows(ledger).map((r) => ({
+  n: r.n,
+  source: r.source,
+  findings: r.findings,
+  new: r.new,
+  distinct: r.stats.S,
+  unseen: orNull(r.stats.f0),
+  nextNew: orNull(r.stats.nextNew),
+  costUsd: r.costUsd ?? 0,
+  spentUsd: r.spentUsd,
+  usdPerDefect: orNull(r.usdPerDefect),
+  nextUsd: orNull(nextPriceOf({ ...ledger, occasions: ledger.occasions.filter((o) => o.n <= r.n) }, factor).usd),
+  at: r.at ?? null,
+}));

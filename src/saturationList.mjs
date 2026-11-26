@@ -8,7 +8,7 @@ import { liveScourOf } from './delveLive.mjs';
 import { ledgerOf } from './ledger.mjs';
 import { queryIndex } from './recordIndex.mjs';
 import { chao2, sourcesOf, stopReason } from './saturation.mjs';
-import { nextPriceOf, scourRuleOf } from './scourPrice.mjs';
+import { nextPriceOf, passRowsOf, scourRuleOf } from './scourPrice.mjs';
 import { landedLedgersUnder, scourStateDirOf } from './scourPaths.mjs';
 
 /**
@@ -33,6 +33,7 @@ export const ledgerSummaryOf = (cfg, id, ledger, registered = () => new Map(), r
     unseen: stats.f0 ?? null,
     nextNew: stats.nextNew ?? null,
     nextUsd: price.usd === undefined || !Number.isFinite(price.usd) ? null : price.usd,
+    passes: passRowsOf(ledger, rule.factor),
     stopped: ledger.occasions.length ? stopReason(stats, rule, { price }) : null,
     updated: ledger.occasions.at(-1)?.at ?? null,
     defects: ledger.defects.map((d) => ({

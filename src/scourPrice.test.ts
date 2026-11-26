@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { chao2 } from './saturation.mjs';
-import { calibrationOf, nextPriceOf, openingPriceOf } from './scourPrice.mjs';
+import { calibrationOf, nextPriceOf, openingPriceOf, passRowsOf } from './scourPrice.mjs';
 
 /** A ledger whose occasion i (from 1) cost `costs[i-1]` and saw the defects in `seen[i-1]`. */
 const ledgerOf = (seen: string[][], costs = seen.map(() => 1)) => {
@@ -57,5 +57,16 @@ describe('openingPriceOf', () => {
     // The worked example finds 13 defects in its first five passes; a ledger with four passes is left out.
     expect(openingPriceOf([ledgerOf(SEEN, [2, 2, 2, 2, 5]), ledgerOf(SEEN.slice(0, 4))], 0.4)).toBeCloseTo(13 / 13, 10);
     expect(openingPriceOf([ledgerOf(SEEN.slice(0, 4))], 0.4)).toBe(0.4);
+  });
+});
+
+describe('passRowsOf', () => {
+  it('lists each pass with the estimates and price as they stood after it', () => {
+    const l = ledgerOf(SEEN, [1, 1, 1, 0.5, 0.5]);
+    const rows = passRowsOf(l);
+    expect(rows.map((r) => [r.n, r.new, r.distinct, r.spentUsd])).toEqual([[1, 4, 4, 1], [2, 5, 9, 2], [3, 2, 11, 3], [4, 0, 11, 3.5], [5, 2, 13, 4]]);
+    expect(rows[0]).toMatchObject({ unseen: null, nextNew: null, nextUsd: null });
+    expect(rows[2]!.nextUsd).toBeCloseTo(nextPriceOf(ledgerOf(SEEN.slice(0, 3))).usd!, 10);
+    expect(rows[4]!.nextUsd).toBeCloseTo(nextPriceOf(l).usd!, 10);
   });
 });
