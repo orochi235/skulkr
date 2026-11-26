@@ -5,7 +5,7 @@ import type { AuditArea } from './skulkrMap.types';
 
 export const HEAT_METRICS = ['left', 'density', 'fixed', 'found', 'queue', 'open', 'stale', 'age', 'rounds', 'files'] as const;
 /** What the saturation page's map can shade by besides: its areas' saturation ledgers, which the audit map lacks. */
-export const SATURATION_METRICS = ['saturationOpen', 'saturationUnseen', 'saturationDefects', 'saturationReviews', 'saturationNextNew'] as const;
+export const SATURATION_METRICS = ['saturationNextNew', 'saturationUnseen', 'saturationOpen', 'saturationDefects', 'saturationTotal', 'saturationReviews', 'saturationSpend'] as const;
 export type HeatMetric = (typeof HEAT_METRICS)[number] | (typeof SATURATION_METRICS)[number];
 /** Every metric, each with a ramp the viewer may choose. */
 export const ALL_METRICS: readonly HeatMetric[] = [...SATURATION_METRICS, ...HEAT_METRICS];
@@ -65,24 +65,32 @@ export const HEAT_METRIC_SPECS: Readonly<Record<HeatMetric, HeatMetricSpec>> = {
   rounds: { name: 'rounds read', legend: 'rounds that read it', none: 'never audited', scheme: 'viridis', floor: 5, valuesIn: (areas) => each(areas, (a) => (a.passes.length ? roundCountOf(a) : null)) },
   files: { name: 'files', legend: 'source files', none: 'no files', scheme: 'ice', floor: 20, valuesIn: (areas) => each(areas, (a) => a.files) },
   saturationOpen: {
-    name: 'scour defects open', legend: 'scour defects no fixer has resolved', none: 'no scour ledger', scheme: 'ember', floor: 5,
+    name: 'defects open', legend: 'scour defects no fixer has resolved', none: 'no scour ledger', scheme: 'ember', floor: 5,
     valuesIn: (areas) => each(areas, (a) => a.saturation?.open ?? null),
   },
   saturationUnseen: {
-    name: 'scour unseen', legend: 'defects the scour estimates no review has found yet', none: 'no estimate yet', scheme: 'magma', floor: 5,
+    name: 'defects not found yet (est.)', legend: 'defects the scour estimates no review has found yet', none: 'no estimate yet', scheme: 'magma', floor: 5,
     valuesIn: (areas) => each(areas, (a) => a.saturation?.unseen ?? null),
   },
   saturationDefects: {
-    name: 'scour defects found', legend: 'distinct defects its scour reviews found', none: 'no scour ledger', scheme: 'ember', floor: 8,
+    name: 'defects found', legend: 'distinct defects its scour reviews found', none: 'no scour ledger', scheme: 'ember', floor: 8,
     valuesIn: (areas) => each(areas, (a) => a.saturation?.distinct ?? null),
   },
   saturationReviews: {
-    name: 'scour reviews', legend: 'scour reviews of it, every source', none: 'no scour ledger', scheme: 'viridis', floor: 5,
+    name: 'reviews', legend: 'scour reviews of it, every source', none: 'no scour ledger', scheme: 'viridis', floor: 5,
     valuesIn: (areas) => each(areas, (a) => a.saturation?.occasions ?? null),
   },
   saturationNextNew: {
-    name: 'scour next new', legend: "percent chance the next review's finding is new", none: 'no estimate yet', scheme: 'inferno', floor: 50,
+    name: 'chance next review finds a new defect', legend: "percent chance the next review's finding is new", none: 'no estimate yet', scheme: 'inferno', floor: 50,
     valuesIn: (areas) => each(areas, (a) => (a.saturation?.nextNew == null ? null : a.saturation.nextNew * 100)),
+  },
+  saturationTotal: {
+    name: 'defects it holds (est.)', legend: 'defects the scour estimates the area holds, found or not', none: 'no estimate yet', scheme: 'ember', floor: 10,
+    valuesIn: (areas) => each(areas, (a) => a.saturation?.total ?? null),
+  },
+  saturationSpend: {
+    name: 'spend', legend: 'dollars its scour reviews and matchers cost', none: 'no scour ledger', scheme: 'viridis', floor: 20,
+    valuesIn: (areas) => each(areas, (a) => a.saturation?.costUsd ?? null),
   },
 };
 

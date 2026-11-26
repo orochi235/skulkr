@@ -76,8 +76,8 @@ describe('SaturationPage', () => {
 
   it('shades the map by each own ledger’s unresolved defects, by the registry where it has landed', () => {
     expect([...saturationByArea([...LEDGERS, { ...LEDGERS[1]!, id: 'geom.booleans.9c4522d635' }])]).toEqual([
-      ['core.animation', { open: 1, unseen: 9.6, distinct: 2, occasions: 24, nextNew: 0.147 }],
-      ['geom.booleans', { open: 0, unseen: 1.2, distinct: 0, occasions: 24, nextNew: 0.147 }],
+      ['core.animation', { open: 1, unseen: 9.6, distinct: 2, occasions: 24, nextNew: 0.147, total: 11.6, costUsd: 23.28 }],
+      ['geom.booleans', { open: 0, unseen: 1.2, distinct: 0, occasions: 24, nextNew: 0.147, total: 1.2, costUsd: 23.28 }],
     ]);
   });
 
@@ -88,7 +88,7 @@ describe('SaturationPage', () => {
     expect(await screen.findByRole('img', { name: /Treemap of every audit area/ })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Color the map by' })).toHaveValue('saturationOpen');
     expect(within(screen.getByRole('combobox', { name: 'Color the map by' })).getAllByRole('option').map((o) => o.textContent)).toEqual([
-      'scour defects open', 'scour unseen', 'scour defects found', 'scour reviews', 'scour next new',
+      'chance next review finds a new defect', 'defects not found yet (est.)', 'defects open', 'defects found', 'defects it holds (est.)', 'reviews', 'spend',
     ]);
   });
 
