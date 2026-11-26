@@ -63,6 +63,7 @@ export const foldWith = (cfg, ledger, matched) => {
   const { unfolded: _, ...folded } = ledger;
   const next = withOccasion(rest.length ? { ...folded, unfolded: rest } : folded, {
     n, source, kind, file: kept, costUsd: costUsd + matched.costUsd, minutes: minutes + matched.minutes, at: new Date().toISOString(),
+    ...(matched.matcher ? { matcher: matched.matcher } : {}),
   }, matched.match);
   writeLedger(cfg, next);
   rmSync(join(dir, file), { force: true });

@@ -95,6 +95,7 @@ describe('skulkr scour next', () => {
     const done = ledgerOf(cfg, 'src');
     expect(done.defects.map((d: { claim: string }) => d.claim)).toEqual(['A', 'B', 'C']);
     expect(done.occasions[1].costUsd).toBeCloseTo(0.5 + 0.1 + 0.1);
+    expect(done.occasions[1].matcher).toBe('claude-opus-5-5');
     expect(existsSync(join(root, '.worktrees/audit-saturate-src'))).toBe(false);
     expect(existsSync(join(cfg.state, 'scour/src/lock'))).toBe(false);
     expect(existsSync(join(cfg.state, 'scour/src/task.json'))).toBe(false);

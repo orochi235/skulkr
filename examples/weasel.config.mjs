@@ -187,7 +187,8 @@ const config = {
   claude: {
     configDir: '~/.claude-msb',
     // Jobs start without the account's own settings, so the opus at medium effort those gave is named here (2026-11-20).
-    models: { review: 'opus', fix: 'opus', match: 'haiku' },
+    // The scour's ledger matcher on haiku, to see whether it matches as well for less (2026-11-26).
+    models: { review: 'opus', fix: 'opus', match: 'haiku', ledgerMatch: 'haiku' },
     effort: { review: 'medium', fix: 'medium' },
     timeoutMin: 45,
   },

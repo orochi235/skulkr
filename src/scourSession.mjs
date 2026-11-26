@@ -159,7 +159,7 @@ const again = (task, say) => {
 /** Takes in subagent `args.agent`'s answer to `task`. Answers the ledger, or a task to hand out again. */
 const takeAnswer = (cfg, root, ledger, task, args, env, rule, say) => {
   if (!args.agent) return { handOut: again(task, say) };
-  const { costUsd, minutes, reply: out } = agentAnswerOf(cfg, args.agent, env);
+  const { costUsd, minutes, models, reply: out } = agentAnswerOf(cfg, args.agent, env);
   const answered = task.kind === 'review' ? isFinished(out) : out.trim().length > 0;
   rmSync(taskPathOf(cfg, ledger.area), { force: true });
   if (task.kind === 'review') {
@@ -175,7 +175,7 @@ const takeAnswer = (cfg, root, ledger, task, args, env, rule, say) => {
   try {
     const entry = ledger.unfolded[0];
     const match = matchOf(out, ledger, entry.kind === 'ingest' ? undefined : entry.findings);
-    const next = foldWith(cfg, ledger, { match, ...spent });
+    const next = foldWith(cfg, ledger, { match, ...spent, matcher: models.join(",") });
     tellOccasion(cfg, say, next, rule);
     return { ledger: next };
   } catch (error) {
