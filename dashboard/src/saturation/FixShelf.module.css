@@ -1,0 +1,76 @@
+.shelf {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.board { stroke: var(--wzl-border); stroke-width: 1.5; }
+
+.label {
+  composes: numeric from '@weasel-js/theme/numeric.module.css';
+  font-size: 10px;
+  fill: var(--wzl-fg-muted);
+  text-anchor: middle;
+}
+
+/* A tile's faces share its color, the top lit and the side shaded over it, as a delve tile's. Colors mixed solid
+   with the surface, never alpha, so one tile never shows through its neighbor. */
+.waiting { --tile: color-mix(in srgb, var(--wzl-fg) 30%, var(--wzl-surface)); }
+
+.fixing { --tile: var(--wzl-accent); }
+
+.fixed { --tile: var(--wzl-success); }
+
+.notDefect { --tile: color-mix(in srgb, var(--wzl-fg) 12%, var(--wzl-surface)); }
+
+.question { --tile: var(--wzl-warning); }
+
+.notFixed { --tile: var(--wzl-danger); }
+
+.duplicate { --tile: color-mix(in srgb, var(--wzl-fg) 55%, var(--wzl-surface)); }
+
+.unread { --tile: color-mix(in srgb, var(--wzl-danger) 35%, var(--wzl-surface)); }
+
+.front,
+.top,
+.side { fill: var(--tile); stroke: var(--wzl-surface); stroke-width: 0.5; }
+
+.top { filter: brightness(1.3); }
+
+.side { filter: brightness(0.7); }
+
+/* The dot over a recurrent defect's tile. */
+.dot { fill: var(--wzl-fg-muted); }
+
+/* A batch out now breathes, so the eye finds it: the whole tile at once, by opacity. */
+.fixing { animation: breathe 1.6s ease-in-out infinite; }
+
+@keyframes breathe {
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fixing { animation: none; }
+}
+
+.pickable { cursor: pointer; }
+
+.aboutPara { margin: 0 0 var(--wzl-space-2); }
+
+.key {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--wzl-space-1) var(--wzl-space-3);
+  font-size: var(--wzl-font-size-xs);
+  color: var(--wzl-fg-muted);
+}
+
+.swatch {
+  display: inline-block;
+  inline-size: 6px;
+  block-size: 11px;
+  margin-inline-end: 4px;
+  vertical-align: -1px;
+  background: var(--tile);
+}

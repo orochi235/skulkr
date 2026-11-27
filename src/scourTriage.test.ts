@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fixPlanFor, resolvedFile } from './scourTriage.mjs';
 import { scourVerdictsOf } from './scourFix.mjs';
+import { fixStatusesFor } from './scourFixStatus.mjs';
 import { isRecurrent } from './triageFields.mjs';
 
 const d = (id: string, where: string, extra: Record<string, unknown> = {}, seen = 1) => ({ id, claim: `claim ${id}`, where, sightings: Array.from({ length: seen }, (_, i) => i + 1), ...extra });
@@ -52,5 +53,19 @@ describe('scour fix triage', () => {
       { id: 'D9', verdict: 'question', sha: null, line: expect.stringContaining('[D9]') },
       { id: 'D12', verdict: null, sha: null, line: null },
     ]);
+  });
+});
+
+describe("a fix shelf's statuses", () => {
+  it("takes each defect's latest verdict, and marks a batch out with no record yet as fixing", () => {
+    const runs = [
+      { n: 1, jobs: ['core~b2'], record: { area: 'core', finished: 'x', batches: [{ n: 2, branch: 'scour1-core-b2', verdicts: [{ id: 'D4', verdict: 'fixed' }, { id: 'D5', verdict: null }] }] } },
+      { n: 2, jobs: ['core~b1', 'other~b1'], record: null },
+    ];
+    expect(fixStatusesFor('core', runs)).toEqual({
+      D4: { status: 'fixed', run: 1, branch: 'scour1-core-b2' },
+      D5: { status: 'unread', run: 1, branch: 'scour1-core-b2' },
+      b1: { status: 'fixing', run: 2, branch: null },
+    });
   });
 });

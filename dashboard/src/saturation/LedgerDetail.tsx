@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
 import { DelveAbout, DelveChart } from './DelveChart';
+import { FixShelf, FixShelfAbout } from './FixShelf';
 import { PassTableButton } from './PassTable';
 import { estimate, percent, severityRank, sourcesText, usd, usdOrDash } from './format';
-import type { SaturationDefect, SaturationLedger } from './saturation.types';
+import type { FixShelf as FixShelfData, SaturationDefect, SaturationLedger } from './saturation.types';
 import s from './LedgerDetail.module.css';
 
 const COLUMNS: readonly DataGridColumn<SaturationDefect>[] = [
@@ -15,6 +16,15 @@ const COLUMNS: readonly DataGridColumn<SaturationDefect>[] = [
   { id: 'sources', header: 'By', accessor: (d) => (d.onlyBy ? `${d.onlyBy} only` : d.sources.join(', ')), sortable: false },
   { id: 'status', header: 'Status', accessor: (d) => d.registry?.status ?? 'not landed', render: statusOf },
 ];
+
+/** The shelf's caption: its batches, and how many of its defects a fix run has fixed or has out now. */
+export const fixFactsOf = (shelf: FixShelfData): string => {
+  const total = shelf.batches.reduce((n, b) => n + b.defects.length, 0);
+  const statuses = Object.values(shelf.statuses);
+  const fixed = statuses.filter((v) => v.status === 'fixed').length;
+  const fixing = statuses.filter((v) => v.status === 'fixing').length;
+  return `Fix plan · ${shelf.batches.length} batches · ${fixed} of ${total} fixed${fixing ? `, ${fixing} fixing` : ''}${shelf.ask.length ? ` · ${shelf.ask.length} to ask` : ''}`;
+};
 
 /** A defect's registry status, with the commit that resolved it. */
 function statusOf(d: SaturationDefect) {
@@ -54,6 +64,12 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
         )}
         <p className={s.facts}>{ledger.stopped ? `Stopped: ${ledger.stopped}.` : 'Not saturated yet: the stop rule does not hold.'}</p>
         <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} onPickDefect={pickDefect} /><div className={s.chartFoot}><PassTableButton ledger={ledger} /></div></div>
+        {ledger.fix && ledger.fix.batches.length > 0 && (
+          <div className={s.chart}>
+            <div className={s.titleRow}><span className={s.facts}>{fixFactsOf(ledger.fix)}</span><FixShelfAbout /></div>
+            <FixShelf shelf={ledger.fix} onPickDefect={pickDefect} />
+          </div>
+        )}
       </header>
       <div ref={scroll} className={s.scroll}>
         <DataGrid

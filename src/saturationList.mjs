@@ -14,6 +14,7 @@ import { candidatePricesOf, scourQueueOf } from './scourQueue.mjs';
 import { ledgerLinesOf, perKloc } from './scourLines.mjs';
 import { landedLedgersUnder, scourStateDirOf } from './scourPaths.mjs';
 import { isRecurrent } from './triageFields.mjs';
+import { fixRunsIn, fixShelfOf } from './scourFixStatus.mjs';
 
 /**
  * One ledger's summary and defects; `id` is its directory, an area or a set-aside `<area>.<commit>`. `registered`
@@ -88,7 +89,8 @@ export const ledgerListOf = (cfg, root) => {
     return ledger ? [[id, ledger.lines === undefined ? { ...ledger, lines: ledgerLinesOf(cfg, root, ledger, id) } : ledger]] : [];
   });
   const rule = scourRuleOf(cfg, root, {}, ledgers.map(([, ledger]) => ledger));
-  return ledgers.map(([id, ledger]) => ({ ...ledgerSummaryOf(cfg, id, ledger, registered, rule), running: liveScourOf(cfg, id) }));
+  const runs = fixRunsIn(cfg);
+  return ledgers.map(([id, ledger]) => ({ ...ledgerSummaryOf(cfg, id, ledger, registered, rule), running: liveScourOf(cfg, id), fix: id === ledger.area ? fixShelfOf(cfg, ledger, runs) : null }));
 };
 
 /**

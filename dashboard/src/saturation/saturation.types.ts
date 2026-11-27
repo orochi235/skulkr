@@ -75,6 +75,18 @@ export interface SaturationLedger {
   readonly defects: readonly SaturationDefect[];
   /** What a live scour process holding the ledger is doing, null while none does. */
   readonly running: ScourLive | null;
+  /** Where its defects stand in `skulkr scour fix`: the plan's batches and each defect's status; null without defects. */
+  readonly fix?: FixShelf | null;
+}
+
+/** What a fix run said of a defect, or that its batch is out now. */
+export type FixStatus = 'fixing' | 'fixed' | 'not a defect' | 'question' | 'not fixed' | 'duplicate' | 'unread';
+
+/** A ledger's fix plan, for the shelf: batches of defects in order, what goes to ask, and each touched defect's status. */
+export interface FixShelf {
+  readonly batches: readonly { readonly n: number; readonly defects: readonly { readonly id: string; readonly size: string | null; readonly recurrent: boolean }[] }[];
+  readonly ask: readonly string[];
+  readonly statuses: Readonly<Record<string, { readonly status: FixStatus; readonly run: number; readonly branch: string | null }>>;
 }
 
 /** One job a scour process has out: its occasion's key, its newest log's step, and that log's last line. */

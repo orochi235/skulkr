@@ -1,5 +1,6 @@
 import { minutesSince, minutesText } from '@dash/audits/runData';
 import { DelveAbout, DelveChart } from './DelveChart';
+import { FixShelf } from './FixShelf';
 import { PassPill } from './PassPill';
 import { usd, usdOrDash } from './format';
 import type { ScourJob, SaturationLedger } from './saturation.types';
@@ -50,6 +51,7 @@ export function ScourNow({ ledgers, onPick, now = Date.now() }: { ledgers: reado
               <span className={s.about}><DelveAbout ledger={l} /></span>
             </header>
             <div className={s.chart}><DelveChart ledger={l} max={r.max} live /></div>
+            {r.does === 'fix' && l.fix && <div className={s.chart}><FixShelf shelf={l.fix} /></div>}
             {r.jobs.length > 0 && <ul className={s.jobs}>{r.jobs.map((j) => <JobLine key={j.key} job={j} />)}</ul>}
             {r.log.length > 0 && <pre className={s.log}>{timedLines(r.log, r.since).join('\n')}</pre>}
           </article>
