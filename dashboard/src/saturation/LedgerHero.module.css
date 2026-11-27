@@ -52,8 +52,6 @@
 .light .value,
 .clock .value { font-weight: var(--wzl-font-weight-light, 300); }
 
-.clock .value { min-width: 5ch; text-align: end; }
-
 .label {
   margin-block-start: var(--wzl-space-1);
   font-size: var(--wzl-font-size-sm);

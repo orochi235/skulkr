@@ -52,7 +52,8 @@ describe('SaturationPage', () => {
     const now = await screen.findByRole('region', { name: 'Scouring now' });
     expect(within(now).getByText('delve · pid 2804')).toBeInTheDocument();
     expect(within(now).getByText('24')).toBeInTheDocument();
-    expect(within(now).getByText(/^47:0\d$/)).toBeInTheDocument();
+    // LiveQuantity draws the elapsed time as a `<data>` with a span per field.
+    expect(within(now).getByText((_, el) => el?.tagName === 'DATA' && /^47:0\d$/.test(el.textContent ?? ''))).toBeInTheDocument();
     expect(within(now).getByText('5/14')).toBeInTheDocument();
     expect(within(now).getByText(/ 24\/40 claude: 3 findings, 0 new$/)).toBeInTheDocument();
     fireEvent.click(within(now).getByText('core.animation'));

@@ -121,6 +121,13 @@ Open work on skulkr. Each entry says when it closes.
   usage record is complete while the file beside `.onto-fetch-cache.json` is 0 bytes. Something truncates it later,
   perhaps a second fetch into the same job directory; not yet traced. It costs money: `cameHome` treats an empty
   envelope as not home, so `--resume` pays for those jobs again. Closes when the writer is found and fixed.
+- [ ] (P3) The lanes' running times (`stepText` in `clockLane.ts` and `stepsLane.ts`, drawn on the lane canvas)
+  still move only when a snapshot lands, counted to the map's `generated`. The headline elapsed, a live scour's
+  elapsed and a job tail's age count on between snapshots through weasel's `LiveQuantity` (2026-11-27), which is DOM
+  text; a lane label is drawn, so it needs the strip to redraw once a label's text changes, timed the same way
+  (`nextChangeFor` over a `Reading`). Closes when a running lane's label counts on between snapshots without a
+  per-frame redraw.
+
 - [ ] (P3) A "next round" section in the dashboard's prefs that starts a round with the settings the service's `start`
   request takes (`areas`, `only`, `nodes`, `capUsd`, `budget` `{review, match, fix}`; README "The service"), asked for
   2026-11-22. Model, effort and timeout live only in the config, so they stay out unless `start` learns them. No cap on

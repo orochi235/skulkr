@@ -3,10 +3,12 @@ import { after } from '@weasel-js/registry';
 import { STALE_HEADER } from '@shared/routes';
 import { listenToMap } from './mapEvents';
 import type { SkulkrMap } from './skulkrMap.types';
+import { stampOf, type Stamp } from './liveTime';
 
 export type SkulkrMapState =
   | { readonly status: 'loading' }
-  | { readonly status: 'ready'; readonly map: SkulkrMap; readonly error?: string }
+  /** `stamp`: the map's `generated` and when it reached the page, which the page's running times count from. */
+  | { readonly status: 'ready'; readonly map: SkulkrMap; readonly stamp: Stamp; readonly error?: string }
   | { readonly status: 'failed'; readonly error: string }
   /** No dev server answers the route: a build, or a server without the plugin. */
   | { readonly status: 'no-server' };
@@ -37,7 +39,7 @@ function keepMap(url: string, map: SkulkrMap): void {
 /** Where a tenant's map starts: the copy this viewer kept, or loading. */
 const startOf = (url: string | null): SkulkrMapState => {
   const kept = url ? keptMapOf(url) : null;
-  return kept ? { status: 'ready', map: kept } : { status: 'loading' };
+  return kept ? { status: 'ready', map: kept, stamp: stampOf(kept.generated) } : { status: 'loading' };
 };
 
 export interface UseSkulkrMapOptions {
@@ -84,7 +86,8 @@ export function useSkulkrMap(options: UseSkulkrMapOptions): SkulkrMapState {
         if (!live) return;
         keepMap(url, map);
         const stale = res.headers.get(STALE_HEADER);
-        setState(stale ? { status: 'ready', map, error: decodeURIComponent(stale) } : { status: 'ready', map });
+        const stamp = stampOf(map.generated);
+        setState(stale ? { status: 'ready', map, stamp, error: decodeURIComponent(stale) } : { status: 'ready', map, stamp });
       } catch (e) {
         if (!live) return;
         const error = (e as Error).message;
@@ -97,7 +100,7 @@ export function useSkulkrMap(options: UseSkulkrMapOptions): SkulkrMapState {
         try {
           const map = JSON.parse(text) as SkulkrMap;
           keepMap(url, map);
-          setState({ status: 'ready', map });
+          setState({ status: 'ready', map, stamp: stampOf(map.generated) });
         } catch {
           // A torn push is followed by the next one.
         }

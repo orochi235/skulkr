@@ -1,4 +1,6 @@
 import { InlineMarkdown } from '@weasel-js/ui/components/InlineMarkdown';
+import { LiveQuantity } from '@weasel-js/ui/components/LiveQuantity';
+import { duration } from '@weasel-js/quantity';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Checkbox } from '@weasel-js/ui/components/Checkbox';
 import { SegmentedBar } from '@weasel-js/ui/components/Segmented';
@@ -13,7 +15,8 @@ import { icon } from '@dash/icons.gen';
 import { STEP_COLUMN_COUNT, laneStepsOf } from './stepsLane';
 import { passPipsOf } from './auditPainter';
 import { gateRunsOf, inSharedSteps, leadsWithNode, sharedSpansOf } from './sharedLane';
-import { FAIL, NODE_SEP, PASS, TRAILING_MINUTES, elapsedText, headlineOf, lastLineOf, spendOf, startedText } from './runData';
+import { FAIL, NODE_SEP, PASS, TRAILING_MINUTES, headlineOf, lastLineOf, spendOf, startedText } from './runData';
+import { elapsedReading, type Stamp } from './liveTime';
 import { useDashPref } from './dashPrefs';
 import { JobTail } from './JobTail';
 import { LockMark, PinMark } from './Marks';
@@ -161,8 +164,8 @@ const SHARED_WINDOW = { from: 0, to: 2 };
 
 /** The run's areas, on the run's clock or as a grid of steps; a finished one stays, filled, until the run ends, unless
  *  the viewer hides those whose pass is done, as the map shows them. */
-function Lanes({ run, now, mode, hideComplete, on, passes, files, pinned, locked, tailUrl }: {
-  run: AuditRun; now: number; mode: LaneMode; hideComplete: boolean; on: AreaHandlers; passes: ReadonlyMap<string, number>; files: ReadonlyMap<string, number>;
+function Lanes({ run, now, stamp, mode, hideComplete, on, passes, files, pinned, locked, tailUrl }: {
+  run: AuditRun; now: number; stamp: Stamp; mode: LaneMode; hideComplete: boolean; on: AreaHandlers; passes: ReadonlyMap<string, number>; files: ReadonlyMap<string, number>;
   pinned: ReadonlySet<string>; locked: ReadonlySet<string>;
   /** Where a lane's job log is read, for the callout hovering it shows; null where none can be. */
   tailUrl: ((id: string) => string) | null;
@@ -215,7 +218,7 @@ function Lanes({ run, now, mode, hideComplete, on, passes, files, pinned, locked
       {mode === 'clock'
         ? <SpanStrips className={s.laneStack} aria-label={`Round ${run.round} lanes`} window={clock} at={now} ruler={clockRuler(clock.from)} rows={rows} />
         : <SpanStrips aria-label={`Round ${run.round} lanes`} window={{ from: 0, to: STEP_COLUMN_COUNT }} rows={rows} />}
-      {callout && tailUrl && <JobTail id={callout.id} url={tailUrl(callout.id)} now={now} at={callout} />}
+      {callout && tailUrl && <JobTail id={callout.id} url={tailUrl(callout.id)} stamp={stamp} at={callout} />}
     </div>
   );
 }
@@ -237,8 +240,17 @@ function StageCounts({ run }: { run: AuditRun }) {
 
 /** One run's strip: what it is doing and what it has spent, its last line, what its batch left out, and a lane per
  *  area in flight. */
-function RunStrip({ run, now, mode, hideComplete, on, passes, files, tailUrl, pinned, locked }: {
-  run: AuditRun; now: number; mode: LaneMode; hideComplete: boolean; on: AreaHandlers; passes: ReadonlyMap<string, number>; files: ReadonlyMap<string, number>;
+/** How long a round has gone, counting on while it runs, and to its end once over. */
+function Elapsed({ run, stamp }: { run: AuditRun; stamp: Stamp }) {
+  const reading = elapsedReading(run.started, run.ended, run.running, stamp);
+  if (!reading) return null;
+  return <> • <span className={s.elapsed}><LiveQuantity reading={reading} display={ELAPSED} /> elapsed</span></>;
+}
+
+const ELAPSED = duration();
+
+function RunStrip({ run, now, stamp, mode, hideComplete, on, passes, files, tailUrl, pinned, locked }: {
+  run: AuditRun; now: number; stamp: Stamp; mode: LaneMode; hideComplete: boolean; on: AreaHandlers; passes: ReadonlyMap<string, number>; files: ReadonlyMap<string, number>;
   tailUrl: ((id: string) => string) | null; pinned: ReadonlySet<string>; locked: ReadonlySet<string>;
 }) {
   return (
@@ -250,7 +262,7 @@ function RunStrip({ run, now, mode, hideComplete, on, passes, files, tailUrl, pi
           {run.started && (
             <span className={s.started}>
               {startedText(run.started, now)}
-              {elapsedText(run, now) && <> • <span className={s.elapsed}>{elapsedText(run, now)}</span></>}
+              <Elapsed run={run} stamp={stamp} />
             </span>
           )}
         </div>
@@ -262,7 +274,7 @@ function RunStrip({ run, now, mode, hideComplete, on, passes, files, tailUrl, pi
       <LeftOut entries={(run.leftOut ?? []).filter((e) => e.round === run.round)} label="left out" name={`Round ${run.round}, left out of the batch`} on={on} />
       {run.lanes.length > 0 && (
         <div className={s.lanes} data-mode={mode}>
-          <Lanes run={run} now={now} mode={mode} hideComplete={hideComplete} on={on} passes={passes} files={files} pinned={pinned} locked={locked} tailUrl={run.running ? tailUrl : null} />
+          <Lanes run={run} now={now} stamp={stamp} mode={mode} hideComplete={hideComplete} on={on} passes={passes} files={files} pinned={pinned} locked={locked} tailUrl={run.running ? tailUrl : null} />
           {(inSharedSteps(run) || run.lanes.every(passDone)) && (
             <SpanStrips
               aria-label={`Round ${run.round}, every area`} window={SHARED_WINDOW}
@@ -297,8 +309,10 @@ const CALLOUT_DELAY_MS = 350;
 /** The room a lane name's pin or padlock takes, with its gap: an 11px icon. */
 const MARK_PX = 15;
 
-export function LiveRuns({ runs, unmerged, now, on, view, focus = null, passes = NO_PASSES, files = NO_PASSES, leftOut = [], tailUrl = null, pinned = NO_MARKS, locked = NO_MARKS }: {
+export function LiveRuns({ runs, unmerged, now, stamp, on, view, focus = null, passes = NO_PASSES, files = NO_PASSES, leftOut = [], tailUrl = null, pinned = NO_MARKS, locked = NO_MARKS }: {
   runs: readonly AuditRun[]; unmerged: ReadonlySet<number>; now: number; on: AreaHandlers;
+  /** The map's stamp, which a running round's elapsed time counts on from. */
+  stamp: Stamp;
   /** The areas pinned into every round, each lane's name marked with a pin. */
   pinned?: ReadonlySet<string>;
   /** The areas an unmerged round's branch holds, each lane's name marked with a padlock. */
@@ -327,7 +341,7 @@ export function LiveRuns({ runs, unmerged, now, on, view, focus = null, passes =
   if (live.length === 0) return <section className={cx(s.run, s.idle)}><div className={s.what}>No round running</div>{earlier}</section>;
   return (
     <div ref={root} className={s.runs} aria-live="polite">
-      {live.map((run) => <RunStrip key={run.round} run={run} now={now} mode={view.mode} hideComplete={view.hideComplete} on={on} passes={passes} files={files} tailUrl={tailUrl} pinned={pinned} locked={locked} />)}
+      {live.map((run) => <RunStrip key={run.round} run={run} now={now} stamp={stamp} mode={view.mode} hideComplete={view.hideComplete} on={on} passes={passes} files={files} tailUrl={tailUrl} pinned={pinned} locked={locked} />)}
       {earlier}
     </div>
   );

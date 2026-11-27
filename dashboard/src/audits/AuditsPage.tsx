@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { Stamp } from './liveTime';
 import { asNodeId } from '@weasel-js/core';
 import { useSelection } from '@weasel-js/editing';
 import { ResizeHandle } from '@weasel-js/ui/components/ResizeHandle';
@@ -92,8 +93,8 @@ export const createPinArea = (urlOf: (id: string, on: boolean) => string, done: 
   done();
 };
 
-function Chart({ map, areaUrl, eventsUrl = null, tailUrl = null, logUrl = null, view, asOf, pinArea }: {
-  map: SkulkrMap; areaUrl: (id: string) => string; eventsUrl?: string | null; tailUrl?: ((id: string) => string) | null; logUrl?: string | null; view: LaneSettings; asOf: AsOf; pinArea?: PinArea | undefined;
+function Chart({ map, stamp, areaUrl, eventsUrl = null, tailUrl = null, logUrl = null, view, asOf, pinArea }: {
+  map: SkulkrMap; stamp: Stamp; areaUrl: (id: string) => string; eventsUrl?: string | null; tailUrl?: ((id: string) => string) | null; logUrl?: string | null; view: LaneSettings; asOf: AsOf; pinArea?: PinArea | undefined;
 }) {
   const [scene] = useState(createAuditScene);
   const selection = useSelection({ scene, mode: 'single' });
@@ -164,7 +165,7 @@ function Chart({ map, areaUrl, eventsUrl = null, tailUrl = null, logUrl = null, 
     <>
       {probes}
       <div className={s.top}>
-        <div className={s.runs}><LiveRuns runs={map.runs} tailUrl={tailUrl} leftOut={map.leftOut} unmerged={unmerged} now={Date.parse(map.generated)} on={on} view={view} focus={picked} passes={passCounts} files={fileCounts} pinned={pinnedIds} locked={lockedIds} /></div>
+        <div className={s.runs}><LiveRuns runs={map.runs} tailUrl={tailUrl} leftOut={map.leftOut} unmerged={unmerged} now={Date.parse(map.generated)} stamp={stamp} on={on} view={view} focus={picked} passes={passCounts} files={fileCounts} pinned={pinnedIds} locked={lockedIds} /></div>
         <ResizeHandle className={s.vseam} value={tabsWidth} min={TABS.min} max={TABS.max} invert onInput={setTabsWidth} onChange={keepTabs} aria-label="Resize the rounds and queue tabs" />
         <TopTabs rounds={map.rounds} calibration={map.calibration} area={pickedArea} areas={areas} heatOf={heatOf} />
       </div>
@@ -290,7 +291,7 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
         {state.status === 'ready' && tenant !== null && (
           <>
             {state.error && <p className={`${s.note} ${s.stale}`}>The last refresh failed ({state.error}); showing the map before it.</p>}
-            <Chart key={tenant} map={state.map} areaUrl={areaUrlFor(base, tenant)} eventsUrl={eventsUrl} tailUrl={tailUrlFor(base, tenant)} logUrl={logUrlFor(base, tenant)} view={view} asOf={{ round: asOfRound, choose: chooseAsOf }} pinArea={pinArea} />
+            <Chart key={tenant} map={state.map} stamp={state.stamp} areaUrl={areaUrlFor(base, tenant)} eventsUrl={eventsUrl} tailUrl={tailUrlFor(base, tenant)} logUrl={logUrlFor(base, tenant)} view={view} asOf={{ round: asOfRound, choose: chooseAsOf }} pinArea={pinArea} />
           </>
         )}
         <p className={s.foot}>

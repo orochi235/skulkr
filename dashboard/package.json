@@ -20,6 +20,7 @@
   "dependencies": {
     "@msb235/blits": "^1.7.0",
     "@weasel-js/animator": "2.0.0",
+    "@weasel-js/clock": "2.0.0",
     "@weasel-js/core": "2.0.0",
     "@weasel-js/editing": "2.0.0",
     "@weasel-js/font": "2.0.0",
@@ -29,6 +30,7 @@
     "@weasel-js/icons": "2.0.0",
     "@weasel-js/loupe": "2.0.0",
     "@weasel-js/prefs": "2.0.0",
+    "@weasel-js/quantity": "2.0.0",
     "@weasel-js/react": "2.0.0",
     "@weasel-js/registry": "2.0.0",
     "@weasel-js/routing": "2.0.0",

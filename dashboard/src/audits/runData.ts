@@ -1,4 +1,5 @@
 /** What the audit page says about runs: each one's headline, its lanes, and the jobs its log reports. */
+import { instant, present, tag } from '@weasel-js/quantity';
 import type { AuditContinuous, AuditLeftOut, AuditRun, LaneStep, LaneStepKey } from './skulkrMap.types';
 
 /** `m` minutes as a lane says them, `m:ss`, or `h:mm:ss` from an hour up. */
@@ -12,9 +13,6 @@ export function minutesText(m: number): string {
 
 /** A label's closing duration, as {@link minutesText} writes it, with the separator before it. */
 export const TRAILING_MINUTES = /(?: · )?(\d+(?::\d\d){1,2})$/;
-
-/** Minutes since `iso`, as {@link minutesText} says them. */
-export const minutesSince = (iso: string, now: number): string => minutesText(Math.max(0, (now - new Date(iso).getTime()) / 60_000));
 
 export const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 
@@ -73,22 +71,12 @@ export function headlineOf(run: AuditRun): string {
 
 /** When a round began: its clock time, and its date too when that was not today. */
 export function startedText(iso: string, now: number): string {
-  const at = new Date(iso);
-  const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  if (at.toDateString() === new Date(now).toDateString()) return time;
-  return `${at.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
+  const at = Date.parse(iso);
+  const today = new Date(at).toDateString() === new Date(now).toDateString();
+  return present(tag(at, instant({ fields: today ? CLOCK_TIME : { month: 'short', day: 'numeric', ...CLOCK_TIME } }), 'ms')).text;
 }
 
-/** How long a run has gone, to now while it runs and to its end once over, as `hh:mm elapsed`; null where its start or
- *  end does not parse. */
-export function elapsedText(run: Pick<AuditRun, 'started' | 'ended' | 'running'>, now: number): string | null {
-  const from = run.started ? Date.parse(run.started) : NaN;
-  const to = run.running ? now : run.ended ? Date.parse(run.ended) : NaN;
-  if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
-  const minutes = Math.max(0, Math.floor((to - from) / 60_000));
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)} elapsed`;
-}
+const CLOCK_TIME = { hour: 'numeric', minute: '2-digit' } as const;
 
 /** The lanes header's word on continuous mode: on, and the night's budget left; null while it is off. */
 export function continuousText(continuous: AuditContinuous | undefined): string | null {

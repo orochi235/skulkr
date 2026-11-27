@@ -272,7 +272,7 @@ export const saturateCommand = async (cfg0, runner, root, argv, say = (line) => 
   if (first === 'ls') {
     const read = ledgerListOf(cfg, root);
     const list = args.json ? withJobProgress(read, read.some((l) => l.running?.jobs.length) ? progressNow(runner) : new Map()) : read;
-    if (args.json) say(JSON.stringify({ ledgers: list, queue: scourQueueIn(cfg, root, list), fixQueue: fixQueueIn(cfg, list) }));
+    if (args.json) say(JSON.stringify({ ledgers: list, queue: scourQueueIn(cfg, root, list), fixQueue: fixQueueIn(cfg, list), asOf: new Date().toISOString() }));
     else for (const line of ledgerListLines(list)) say(line);
     return list;
   }

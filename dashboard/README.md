@@ -51,7 +51,9 @@ its root; with neither, `.skulkr/config.mjs` or `skulkr.config.mjs` in the direc
 The page is built on weasel (`@weasel-js/*`), pinned to 2.0.0 from npm. The map's loupe (F2, or the loupe button in
 the header) is `@weasel-js/hud`'s round lens, over the map's canvas; the round lens is unreleased (weasel 7d11e12034), so
 it needs the alpo link below until a release carries it. So do the hover cards on the Scour page's charts and the
-lanes' job logs, which are weasel `Tooltip`s anchored to the pointer by `anchorRect` (weasel 41906fd420, unreleased).
+lanes' job logs, which are weasel `Tooltip`s anchored to the pointer by `anchorRect` (weasel 41906fd420, unreleased),
+and the running times that count on between snapshots (`@weasel-js/ui`'s `LiveQuantity`, `@weasel-js/quantity`'s
+`instant` and `relative`, `@weasel-js/clock`'s readings; weasel 2e6a59c4be, unreleased).
 
 On a machine with weasel checked out, alpo can serve the checkout over the published packages:
 

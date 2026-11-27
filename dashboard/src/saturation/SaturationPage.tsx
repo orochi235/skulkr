@@ -83,7 +83,7 @@ export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: 
         {state.status === 'ready' && !ledgers.length && (
           <p className={s.note}>No saturation ledger yet. <code>skulkr saturate &lt;area&gt;</code> starts one.</p>
         )}
-        {state.status === 'ready' && <ScourNow ledgers={ledgers} onPick={pick} onPickDefect={pickDefect} />}
+        {state.status === 'ready' && <ScourNow ledgers={ledgers} stamp={state.stamp} onPick={pick} onPickDefect={pickDefect} />}
         {state.status === 'ready' && ledgers.length > 0 && (
           <div className={s.main}>
             <div className={s.left}>
