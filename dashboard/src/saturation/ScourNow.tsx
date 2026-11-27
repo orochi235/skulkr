@@ -31,10 +31,10 @@ export const liveStatsOf = (l: SaturationLedger, now: number): Stat[] => {
   const light = STAT_TONE.light;
   return [
     ['elapsed', minutesSince(r.since, now), STAT_TONE.clock],
-    [fix ? 'batches' : 'passes', r.max ? `${done}/${r.max}` : String(done)],
+    [fix ? 'batches' : 'passes', String(done), undefined, r.max ? `up to ${r.max}` : undefined],
     ['found', String(l.distinct)],
-    ['next new', percent(l.nextNew), STAT_TONE.estimate],
-    ['next defect', usdOrDash(l.nextUsd), `${STAT_TONE.estimate} ${light}`],
+    ['next new', percent(l.nextNew)],
+    ['next defect', usdOrDash(l.nextUsd), light],
     ['limit', usd(l.limit.usd), light],
     ['spent', usd(l.costUsd), light],
   ];

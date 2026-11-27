@@ -1,3 +1,4 @@
+import { Focusable, Tooltip, TooltipTrigger } from '@weasel-js/ui/components/Tooltip';
 import { isDefectClosed, isFixSettled } from './FixShelf';
 import { percent, usd, usdOrDash } from './format';
 import type { SaturationLedger } from './saturation.types';
@@ -17,7 +18,8 @@ export const heroCountsOf = (ledger: SaturationLedger) => {
   return { found: ledger.distinct, fixed, fixing, open: ledger.defects.length - fixed - ignored - fixing, ignored, unseen: ledger.unseen };
 };
 
-export type Stat = readonly [label: string, value: string, tone?: string];
+/** A figure: its word, its value, a tone class, and a note shown in a tooltip over its word. */
+export type Stat = readonly [label: string, value: string, tone?: string, tip?: string];
 
 /** The tones a figure can take beyond plain: an estimate (italic, muted), a light one, or a clock (light, at a fixed
  *  width, so its changing digits never move what follows). */
@@ -28,9 +30,16 @@ export const STAT_TONE = { estimate: s.estimate!, light: s.light!, clock: s.cloc
 export function StatRow({ label, stats }: { label: string; stats: readonly Stat[] }) {
   return (
     <dl className={s.row} aria-label={label}>
-      {stats.map(([word, value, tone]) => (
+      {stats.map(([word, value, tone, tip]) => (
         <div key={word} className={tone ? `${s.stat} ${tone}` : s.stat}>
-          <dt className={s.label}>{word}</dt>
+          <dt className={s.label}>
+            {tip ? (
+              <TooltipTrigger>
+                <Focusable><span className={s.tipped} tabIndex={0}>{word}</span></Focusable>
+                <Tooltip placement="top">{tip}</Tooltip>
+              </TooltipTrigger>
+            ) : word}
+          </dt>
           <dd className={s.value} title={tone === s.estimate ? 'an estimate' : undefined}>{value}</dd>
         </div>
       ))}

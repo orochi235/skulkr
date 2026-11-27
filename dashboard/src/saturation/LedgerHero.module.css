@@ -63,3 +63,10 @@
   font-size: var(--wzl-font-size-sm);
   color: var(--wzl-fg-muted);
 }
+
+/* A word with a note in a tooltip: dotted underline, as a term with a definition. */
+.tipped {
+  text-decoration: underline dotted var(--wzl-fg-muted);
+  text-underline-offset: 3px;
+  cursor: default;
+}
