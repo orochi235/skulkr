@@ -47,6 +47,12 @@
 /* A next defect priced past the limit a delve stops at. */
 .over .value { color: var(--wzl-warning); }
 
+/* The opening price standing in for an area's own, which needs two passes. */
+.opening .value {
+  font-weight: var(--wzl-font-weight-light, 300);
+  color: var(--wzl-fg-muted);
+}
+
 /* A figure set lighter than the counts, such as a clock that keeps changing. */
 .light .value,
 .clock .value { font-weight: var(--wzl-font-weight-light, 300); }

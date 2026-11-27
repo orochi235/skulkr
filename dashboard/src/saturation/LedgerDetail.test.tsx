@@ -47,4 +47,12 @@ describe("the hero's price figures", () => {
     expect(tone).toMatch(/^x \S/);
     expect(limitStatOf(priced('kloc'))[0]).toBe('limit/kloc');
   });
+
+  it('show the opening price, with a note saying so, until the area has two passes', () => {
+    const fresh = (occasions: number) => ({ nextUsd: null, openingUsd: 0.4, occasions, limit: { usd: 0.1 } }) as unknown as SaturationLedger;
+    const [, value, tone, tip] = nextDefectStatOf(fresh(1), 'x');
+    expect([value, tip]).toEqual(['$0.40', expect.stringMatching(/opening price/)]);
+    expect(tone).toMatch(/^x \S/);
+    expect(nextDefectStatOf(fresh(2), 'x').slice(1, 4)).toEqual(['–', 'x', undefined]);
+  });
 });

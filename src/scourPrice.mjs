@@ -138,7 +138,8 @@ export const goingRateOf = (cfg, root, { factor, openingUsd, priceBy = 'defect' 
 /**
  * The stop rule for a scour command's flags (`max`, `perDefect`, `usd`, `priceBy`), priced by `cfg`'s ledgers; `root`
  * is the project, whose partition says whether fresh areas remain. Its `limit` says how the per-defect limit was set:
- * `{ usd }`, or `{ usd, times, goingUsd }` for a multiple of the going rate, each in the unit `priceBy` names.
+ * `{ usd }`, or `{ usd, times, goingUsd }` for a multiple of the going rate, each in the unit `priceBy` names; its
+ * `openingUsd` is `pricingOf`'s, a fresh area's price in that unit.
  * @param {any} cfg @param {string | undefined} root
  * @param {{ max?: number, perDefect?: string | number | { times: number }, usd?: number, priceBy?: string }} [flags] @param {any[]} [ledgers]
  */
@@ -149,7 +150,7 @@ export const scourRuleOf = (cfg, root, { max = cfg.saturate.max, perDefect, usd,
     const goingUsd = goingRateOf(cfg, root, pricing);
     return { usd: spec.times * goingUsd, times: spec.times, goingUsd };
   })();
-  return { ...stopRuleOf(cfg, max, { perDefect: limit.usd, usd, factor: pricing.factor, priceBy: pricing.priceBy }), limit };
+  return { ...stopRuleOf(cfg, max, { perDefect: limit.usd, usd, factor: pricing.factor, priceBy: pricing.priceBy }), limit, openingUsd: pricing.openingUsd };
 };
 
 

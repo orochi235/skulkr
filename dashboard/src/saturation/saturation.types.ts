@@ -60,6 +60,9 @@ export interface SaturationLedger {
   readonly nextNew: number | null;
   /** What the next defect should cost (README "The price of the next defect"); null under two occasions or with none expected. */
   readonly nextUsd: number | null;
+  /** The opening price, what a new defect cost over every delved area's first passes, in `priceBy`'s unit: what the
+   *  queue prices an area at until it has two passes. */
+  readonly openingUsd?: number | null;
   /** The per-defect limit a delve stops at: dollars, and where it is a multiple of the going rate, the multiple and rate. */
   readonly limit: { readonly usd: number; readonly times: number | null; readonly goingUsd: number | null; readonly text: string };
   /** The unit `nextUsd` and `limit` are in: dollars per defect, or per defect per thousand lines (`kloc`). */

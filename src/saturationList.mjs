@@ -39,6 +39,7 @@ export const ledgerSummaryOf = (cfg, id, ledger, registered = () => new Map(), r
     unseen: stats.f0 ?? null,
     nextNew: stats.nextNew ?? null,
     nextUsd: price.usd === undefined || !Number.isFinite(price.usd) ? null : price.usd,
+    openingUsd: rule.openingUsd ?? null,
     limit: { usd: rule.stopUsdPerDefect, times: rule.limit?.times ?? null, goingUsd: rule.limit?.goingUsd ?? null, text: limitText(rule) },
     priceBy: rule.priceBy ?? 'defect',
     defectsPerKloc: perKloc(ledger.defects.length, ledger.lines),

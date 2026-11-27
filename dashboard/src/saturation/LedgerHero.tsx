@@ -31,12 +31,18 @@ export const shelfToneOf = (status: Parameters<typeof tileClassOf>[0]): string =
 
 const PER_KLOC_TIP = 'Dollars per defect per thousand lines: the price of a defect times the area\'s lines over 1,000.';
 
+const OPENING_TIP = 'The opening price: what a new defect cost over the first passes of every delved area. This area\'s own price starts at its second pass.';
+
 /** A ledger's next defect's price in tone `tone`, amber once it passes the limit a delve stops at; both are in the
- *  ledger's `priceBy` unit, named in the word under `kloc`. */
+ *  ledger's `priceBy` unit, named in the word under `kloc`. Under two passes it is the opening price, set lighter. */
 export const nextDefectStatOf = (ledger: SaturationLedger, tone: string): Stat => {
-  const over = ledger.nextUsd !== null && ledger.nextUsd > ledger.limit.usd;
   const kloc = ledger.priceBy === 'kloc';
-  return [kloc ? 'next defect/kloc' : 'next defect', usdOrDash(ledger.nextUsd), over ? `${tone} ${s.over}` : tone, kloc ? PER_KLOC_TIP : undefined];
+  const word = kloc ? 'next defect/kloc' : 'next defect';
+  if (ledger.occasions < 2 && ledger.openingUsd != null) {
+    return [word, usd(ledger.openingUsd), `${tone} ${s.opening}`, kloc ? `${OPENING_TIP} ${PER_KLOC_TIP}` : OPENING_TIP];
+  }
+  const over = ledger.nextUsd !== null && ledger.nextUsd > ledger.limit.usd;
+  return [word, usdOrDash(ledger.nextUsd), over ? `${tone} ${s.over}` : tone, kloc ? PER_KLOC_TIP : undefined];
 };
 
 /** The per-defect limit a ledger's delve stops at, in tone `tone`, its unit named as `nextDefectStatOf` names it. */

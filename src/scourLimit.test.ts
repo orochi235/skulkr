@@ -60,6 +60,7 @@ describe('scourRuleOf', () => {
   it('defaults to three times the going rate', () => {
     const { root, cfg } = project();
     expect(scourRuleOf(cfg, root).limit.times).toBe(3);
+    expect(scourRuleOf(cfg, root).openingUsd).toBe(cfg.saturate.openingUsdPerDefect);
   });
 
   it('prices per defect unless told kloc, by the config or the flag, and names the unit', () => {
