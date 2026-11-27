@@ -64,7 +64,7 @@ describe('skulkr saturate ls', () => {
 });
 
 describe('a live fix run', () => {
-  it("shows its batches' jobs, read from its run directory and keyed by batch", () => {
+  it("shows its batches' jobs, read from its run directory and keyed by batch, leaving out those its record holds", () => {
     const state = mkdtempSync(join(tmpdir(), 'skulkr-fixlive-'));
     dirs.push(state);
     const cfg = resolveConfig({ name: 'proj', state });
@@ -72,10 +72,15 @@ describe('a live fix run', () => {
     const jobs = join(state, 'scour', 'fix-3', 'jobs', 'core~b2');
     mkdirSync(jobs, { recursive: true });
     writeFileSync(join(jobs, 'fix.log'), 'skulkr: says: reading useKeyDrag\n');
+    const finished = join(state, 'scour', 'fix-3', 'jobs', 'core~b1');
+    mkdirSync(finished, { recursive: true });
+    writeFileSync(join(finished, 'fix.log'), 'done\n');
+    writeFileSync(join(state, 'scour', 'fix-3', 'record.json'), JSON.stringify({ batches: [{ n: 1 }] }));
     const release = takeLease(join(ledgerDirOf(cfg, 'core'), 'lock'), { saturate: 'core', does: 'fix', max: 5, jobs: 'fix-3' })!;
     try {
       const [ledger] = ledgerListOf(cfg, undefined);
       expect(ledger!.running).toMatchObject({ does: 'fix', max: 5, jobs: [{ key: 'b2', step: 'fix', line: 'skulkr: says: reading useKeyDrag' }] });
+      expect(ledger!.running!.jobs).toHaveLength(1);
     } finally {
       release();
     }

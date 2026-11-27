@@ -2,7 +2,7 @@
  * What a scour process holding a ledger is doing now, read from that ledger's directory: its lease, the jobs it has
  * out, and the end of its own log. `skulkr scour ls --json` carries it for the dashboard's Scour page.
  */
-import { appendFileSync, closeSync, existsSync, openSync, readSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { heldAlive, leaseAt } from './lease.mjs';
 import { ledgerDirOf } from './ledger.mjs';
@@ -73,6 +73,17 @@ const jobsIn = (dir) => {
   });
 };
 
+/** A fix run's batches still out, keyed `b<k>`: its job directories stay after a batch ends, and its record holds a
+ *  batch once it has. */
+const fixJobsIn = (runDir) => {
+  const path = join(runDir, 'record.json');
+  let done = new Set();
+  try {
+    done = new Set(JSON.parse(readFileSync(path, 'utf8')).batches.map((b) => `b${b.n}`));
+  } catch { /* no record yet */ }
+  return jobsIn(runDir).map((j) => ({ ...j, key: j.key.replace(/^.*~/, '') })).filter((j) => !done.has(j.key));
+};
+
 /**
  * What the live process holding ledger `id` is doing: its `pid`, `since` it took the ledger, what it `does` (`delve`,
  * `fold`, `ingest`, `fix`, or null for a process that did not say), the occasion cap it runs to (a fix run's batches), its jobs out, and the last
@@ -84,7 +95,7 @@ export const liveScourOf = (cfg, id, n = 8) => {
   if (!heldAlive(lease)) return null;
   const log = scourLogOf(cfg, id);
   // A fix run keeps its jobs in its own run directory (`fix-<N>`), one per batch, keyed `b<k>`.
-  const jobs = lease.jobs ? jobsIn(join(scourStateDirOf(cfg), lease.jobs)).map((j) => ({ ...j, key: j.key.replace(/^.*~/, '') })) : jobsIn(dir);
+  const jobs = lease.jobs ? fixJobsIn(join(scourStateDirOf(cfg), lease.jobs)) : jobsIn(dir);
   return {
     pid: lease.pid,
     since: lease.at,
