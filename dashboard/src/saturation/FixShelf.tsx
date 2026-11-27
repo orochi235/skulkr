@@ -86,3 +86,12 @@ export function FixShelfAbout() {
     </AboutButton>
   );
 }
+
+/** A defect's fix status as a swatch in its shelf color and its word, with the branch its fix is on. */
+export function FixStatusChip({ status, branch = null }: { status: ShelfStatus; branch?: string | null }) {
+  return (
+    <span className={s.chip}>
+      <i className={`${s.swatch} ${CLASS[status]}`} />{status}{branch && <code className={s.branch}>{branch}</code>}
+    </span>
+  );
+}

@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
 import { DelveAbout, DelveChart } from './DelveChart';
-import { FixShelf, FixShelfAbout } from './FixShelf';
+import { FixShelf, FixShelfAbout, FixStatusChip } from './FixShelf';
 import { PassTableButton } from './PassTable';
 import { estimate, percent, severityRank, sourcesText, usd, usdOrDash } from './format';
 import type { FixShelf as FixShelfData, SaturationDefect, SaturationLedger } from './saturation.types';
@@ -16,6 +16,20 @@ const COLUMNS: readonly DataGridColumn<SaturationDefect>[] = [
   { id: 'sources', header: 'By', accessor: (d) => (d.onlyBy ? `${d.onlyBy} only` : d.sources.join(', ')), sortable: false },
   { id: 'status', header: 'Status', accessor: (d) => d.registry?.status ?? 'not landed', render: statusOf },
 ];
+
+/** The table's columns, with a Fix column before Status where the ledger has a fix plan: each defect's fix-run status,
+ *  the shelf's, which moves before the registry's does (that waits for a fix to land). */
+export const columnsFor = (shelf: FixShelfData | null | undefined): readonly DataGridColumn<SaturationDefect>[] => {
+  if (!shelf) return COLUMNS;
+  const fix: DataGridColumn<SaturationDefect> = {
+    id: 'fix', header: 'Fix', accessor: (d) => shelf.statuses[d.id]?.status ?? '',
+    render: (d) => {
+      const at = shelf.statuses[d.id];
+      return at ? <FixStatusChip status={at.status} branch={at.status === 'fixed' ? at.branch : null} /> : '–';
+    },
+  };
+  return [...COLUMNS.slice(0, -1), fix, COLUMNS.at(-1)!];
+};
 
 /** The shelf's caption: its batches, and how many of its defects a fix run has fixed or has out now. */
 export const fixFactsOf = (shelf: FixShelfData): string => {
@@ -44,6 +58,7 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
     cell?.closest('tr')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [picked]);
   useEffect(() => setPicked(null), [ledger.id]);
+  const columns = useMemo(() => columnsFor(ledger.fix), [ledger.fix]);
   const pickDefect = useCallback((id: string) => setPicked((was) => ({ id, n: (was?.n ?? 0) + 1 })), []);
   return (
     <section className={s.detail} aria-label={`${ledger.area}'s defects`}>
@@ -73,7 +88,7 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
       </header>
       <div ref={scroll} className={s.scroll}>
         <DataGrid
-          rows={ledger.defects} columns={COLUMNS} defaultSort={{ columnId: 'sightings', direction: 'desc' }} empty="No defects."
+          rows={ledger.defects} columns={columns} defaultSort={{ columnId: 'sightings', direction: 'desc' }} empty="No defects."
           rowClassName={(d) => (d.id === picked?.id ? s.picked : undefined)}
         />
       </div>

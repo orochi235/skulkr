@@ -74,3 +74,11 @@
   vertical-align: -1px;
   background: var(--tile);
 }
+
+.chip { white-space: nowrap; }
+
+.branch {
+  margin-inline-start: var(--wzl-space-1);
+  font-size: var(--wzl-font-size-xs);
+  color: var(--wzl-fg-muted);
+}
