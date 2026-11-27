@@ -6,7 +6,7 @@
  * lands that branch on `main` (`scourLand.mjs`), or with `--ready` leaves it for the repository's own batching.
  * Closing the registry's lines from the fixers' verdicts is not built yet.
  */
-import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fixInto, stageIn } from './area.mjs';
 import { addWorktree, gitIn, removeWorktree } from './batch.mjs';
@@ -20,6 +20,7 @@ import { stackBranchFor } from './scourFixBase.mjs';
 import { createRepairLayer } from './scourFixLay.mjs';
 import { VERDICTS, fixRunsIn, verdictIn } from './scourFixStatus.mjs';
 import { landFixBranch } from './scourLand.mjs';
+import { revertedDefectsOf, withRevertsRead } from './scourReverts.mjs';
 import { fixPlanFor, fixPlanLines, filesOf } from './scourTriage.mjs';
 
 
@@ -172,7 +173,8 @@ const fixBatches = async (cfg, runner, root, id, ledger, batches, n, runDir, arg
       mkdirSync(dir, { recursive: true });
       say(`batch ${b.n}: ${b.defects.length} defects (${b.defects.map((d) => d.id).join(' ')}) over ${b.files.length} files, on ${tipOf(at)}`);
       const fixed = await fixInto(ctx, area, dir, b.defects.length, scourSource(area.id, ctx.commit, tipOf(at), ledger.commit, b.defects.length));
-      const verdicts = scourVerdictsOf(fixed.report, b.defects.map((d) => d.id));
+      const verdicts = withRevertsRead(scourVerdictsOf(fixed.report, b.defects.map((d) => d.id)),
+        fixed.mbox && existsSync(fixed.mbox) ? revertedDefectsOf(readFileSync(fixed.mbox, 'utf8')) : new Set());
       const branch = `scour${n}-${id}-b${b.n}`;
       const applied = fixed.mbox ? branchWith(root, branch, ctx.commit, fixed.mbox) : false;
       // The next batch stacks on this one only if it is sound: a failed verify is kept on its branch for a look, not built on.
