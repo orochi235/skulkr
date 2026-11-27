@@ -141,7 +141,9 @@ const config = {
       command: `${VITEST} related --run --maxWorkers=4 ${['!gate', ...BROWSER_PROJECTS.map((p) => `!${p}`)].map((p) => `--project='${p}'`).join(' ')} {files}; s=$?; if [ -n "$VERIFY_PROVEN" ]; then echo "skulkr: checks:gate passed at this commit in the fixer's own run; not run again"; else ${CHECKS} || s=1; fi; npm run -s check:unnameable -- --build {files} || s=1; exit $s`,
       gui: {
         probe: `npx vitest list --filesOnly ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {related}`,
-        command: `${VITEST} related --run --maxWorkers=2 ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {files}`,
+        // No --maxWorkers: weasel sizes its browser projects to the node, and a cap here overrides that. Capped at 2,
+        // 436 files took 242 s on teitou; uncapped, 122 s at 6 cores and 24 GB (2026-11-27). onto places by both.
+        command: `${VITEST} related --run ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {files}`,
       },
       timeoutMin: 30,
     },
@@ -155,7 +157,7 @@ const config = {
       command: `npx vitest run --maxWorkers=4 --reporter=default --reporter=./scripts/vitest-fleet-fail.mjs ${BROWSER_PROJECTS.map((p) => `--project='!${p}'`).join(' ')} scripts/ci-checks.gate.ts {tests}`,
       // The last red gate's browser tests, at once on a GUI node.
       gui: {
-        command: `npx vitest run --maxWorkers=2 --reporter=default --reporter=./scripts/vitest-fleet-fail.mjs ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {tests}`,
+        command: `npx vitest run --reporter=default --reporter=./scripts/vitest-fleet-fail.mjs ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {tests}`,
         project: '^(browser|forge-stories)',
       },
       gateArgs: ['--no-checks'],

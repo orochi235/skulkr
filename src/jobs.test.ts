@@ -123,7 +123,7 @@ describe('verify and repair job lines', () => {
   it("run the GUI part's own command with no probe in a GUI verify job", () => {
     const shell = verifyShell(cfg, 'core', { gui: true });
     expect(shell).not.toContain('claude -p');
-    expect(shell).toContain("related --run --maxWorkers=2 --project='\\''browser*'\\''");
+    expect(shell).toContain("related --run --project='\\''browser*'\\''");
     expect(shell).not.toContain('vitest list');
   });
 
