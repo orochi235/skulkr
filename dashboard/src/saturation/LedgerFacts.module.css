@@ -1,15 +1,39 @@
 .facts {
+  container-type: inline-size;
   margin-block-start: var(--wzl-space-3);
   font-size: var(--wzl-font-size-sm);
 }
 
+/* Scope and effort down the left, the yield grid over the outlook on the right; one row of three once there is room,
+   one column once there is not room for two. */
 .groups {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--wzl-space-3) var(--wzl-space-7);
+  display: grid;
+  grid-template-columns: minmax(9rem, 13rem) auto;
+  grid-template-areas: 'scope yield' 'scope outlook';
+  align-items: start;
+  justify-content: start;
+  gap: var(--wzl-space-6) var(--wzl-space-8);
 }
 
-.group { flex: 1 1 8.5rem; max-width: 13rem; }
+.scope { grid-area: scope; }
+
+.yield { grid-area: yield; }
+
+.outlook { grid-area: outlook; min-width: 11rem; max-width: 14rem; }
+
+@container (min-width: 44rem) {
+  .groups {
+    grid-template-columns: minmax(9rem, 13rem) auto minmax(11rem, 14rem);
+    grid-template-areas: 'scope yield outlook';
+  }
+}
+
+@container (max-width: 24rem) {
+  .groups {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'scope' 'yield' 'outlook';
+  }
+}
 
 .title {
   margin: 0 0 var(--wzl-space-1);
@@ -37,6 +61,33 @@
   text-align: end;
   font-variant-numeric: tabular-nums;
 }
+
+/* The yield grid: figures right-aligned under their column heads, the row labels muted as the lists' are. */
+.grid {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.grid th,
+.grid td {
+  padding: 0 0 0 var(--wzl-space-7);
+  line-height: 1.45;
+  text-align: end;
+  white-space: nowrap;
+}
+
+.grid th:first-child { padding-inline-start: 0; text-align: start; }
+
+.grid thead th {
+  padding-block-end: var(--wzl-space-1);
+  font-size: var(--wzl-font-size-2xs);
+  font-weight: 600;
+  color: var(--wzl-fg-muted);
+}
+
+.grid tbody th { font-weight: inherit; color: var(--wzl-fg-muted); }
+
+.grid .estimate td { padding-inline-end: 0.15em; font-style: italic; color: var(--wzl-fg-muted); }
 
 /* An estimate, set apart as the hero's are: italic and muted. */
 .estimate { padding-inline-end: 0.15em; font-style: italic; color: var(--wzl-fg-muted); }
