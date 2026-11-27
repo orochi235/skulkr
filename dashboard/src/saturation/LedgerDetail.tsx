@@ -96,20 +96,20 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
         }}
         onPointerLeave={() => setPointer(null)}
       >
+        <div className={`${s.titleRow} ${s.summaryTitle}`}><h2 className={s.title}>{ledger.id}</h2><DelveAbout ledger={ledger} picks /></div>
         <div className={s.summary}>
-          <div className={`${s.titleRow} ${s.summaryTitle}`}><h2 className={s.title}>{ledger.id}</h2><DelveAbout ledger={ledger} picks /></div>
-          <div className={s.heroCell}><LedgerHero ledger={ledger} /></div>
-          <div className={s.blurb}><LedgerFacts ledger={ledger} /></div>
+          <LedgerHero ledger={ledger} />
+          <LedgerFacts ledger={ledger} />
+          {ledger.fix && ledger.fix.batches.length > 0 && (
+            <section className={s.fixBox} aria-label="Fix plan">
+              <div className={s.titleRow}>
+                <span className={s.facts}>{fixFactsOf(ledger.fix)}</span><FixShelfAbout /><ShelfOrderSwitch order={shelfOrder} onChange={setShelfOrder} />
+              </div>
+              <FixShelf shelf={ledger.fix} order={shelfOrder} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} />
+            </section>
+          )}
         </div>
         <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} /><div className={s.chartFoot}><PassTableButton ledger={ledger} /></div></div>
-        {ledger.fix && ledger.fix.batches.length > 0 && (
-          <div className={s.chart}>
-            <div className={s.titleRow}>
-              <span className={s.facts}>{fixFactsOf(ledger.fix)}</span><FixShelfAbout /><ShelfOrderSwitch order={shelfOrder} onChange={setShelfOrder} />
-            </div>
-            <FixShelf shelf={ledger.fix} order={shelfOrder} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} />
-          </div>
-        )}
         <DefectCallout ledger={ledger} id={traced} at={pointer} flipX={(head.current?.clientWidth ?? 0) / 2} />
       </header>
       <div ref={scroll} className={s.scroll}>

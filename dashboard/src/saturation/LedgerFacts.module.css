@@ -1,23 +1,20 @@
 .facts {
-  container-type: inline-size;
+  min-width: 0;
   font-size: var(--wzl-font-size-sm);
 }
 
-/* The yield grid beside scope and effort, scope dropping below once there is no room for both. */
+/* The yield grid beside scope and effort, scope wrapping below once there is no room for both. */
 .groups {
-  display: grid;
-  grid-template-columns: auto minmax(9rem, 13rem);
-  align-items: start;
-  justify-content: start;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: var(--wzl-space-4);
 }
 
 /* The fact boxes, tighter than the hero's. */
 .box { composes: box from './box.module.css'; padding: var(--wzl-space-3) var(--wzl-space-5); }
 
-@container (max-width: 24rem) {
-  .groups { grid-template-columns: minmax(0, 1fr); }
-}
+.groups > .box:last-child { min-width: 11rem; }
 
 .title {
   margin: 0 0 var(--wzl-space-1);

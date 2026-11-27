@@ -23,24 +23,18 @@
 
 .num { font-variant-numeric: tabular-nums; }
 
-/* The title over the hero box, the facts beside the hero; one column once the panel is too narrow for both. */
+/* The hero, the fact boxes and the fix plan in a row under the title, each box wrapping to the next line when the
+   panel is too narrow for it. */
 .summary {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-areas: 'title .' 'hero facts';
-  align-items: start;
-  gap: var(--wzl-space-3) var(--wzl-space-4);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--wzl-space-4);
 }
 
-.summaryTitle { grid-area: title; }
+.summaryTitle { margin-block-end: var(--wzl-space-3); }
 
-.heroCell { grid-area: hero; }
-
-.blurb { grid-area: facts; min-width: 0; }
-
-@container (max-width: 40rem) {
-  .summary { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'title' 'hero' 'facts'; }
-}
+.fixBox { composes: box from './box.module.css'; min-width: 0; padding: var(--wzl-space-3) var(--wzl-space-5); }
 
 .scroll {
   flex: 1 1 0;
