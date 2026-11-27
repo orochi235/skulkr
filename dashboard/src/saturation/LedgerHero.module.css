@@ -12,6 +12,7 @@
 
 /* The figure above its word, though the word comes first in the markup for a screen reader. */
 .stat {
+  position: relative;
   display: flex;
   flex-direction: column-reverse;
   align-items: flex-end;
@@ -33,6 +34,22 @@
   font-weight: var(--wzl-font-weight-bold);
   font-variant-numeric: tabular-nums;
   line-height: 1;
+}
+
+/* An estimated count: italic, lighter, and muted beside the counted ones. */
+.estimate .value {
+  font-style: italic;
+  font-weight: var(--wzl-font-weight-normal, 400);
+  color: var(--wzl-fg-muted);
+}
+
+.hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .label {

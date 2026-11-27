@@ -1,0 +1,48 @@
+/* Placed by custom properties (`--x`, `--y`) the pointer sets: a position that changes on every move has no class. */
+.callout {
+  position: absolute;
+  z-index: 10;
+  inset-inline-start: var(--x);
+  inset-block-start: var(--y);
+  inline-size: max-content;
+  max-inline-size: 26rem;
+  padding: var(--wzl-space-4) var(--wzl-space-6);
+  border: var(--wzl-border-w) solid var(--wzl-border-strong);
+  border-radius: var(--wzl-radius-md);
+  background: var(--wzl-surface);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--wzl-fg) 18%, transparent);
+  font-size: var(--wzl-font-size-sm);
+  pointer-events: none;
+  transform: translateY(-100%);
+}
+
+.flip { transform: translate(-100%, -100%); }
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--wzl-space-4);
+  color: var(--wzl-fg-muted);
+}
+
+.id {
+  font-family: var(--wzl-font-mono);
+  font-weight: var(--wzl-font-weight-bold);
+  color: var(--wzl-fg);
+}
+
+.claim { margin: var(--wzl-space-2) 0 0; }
+
+.where {
+  margin: var(--wzl-space-2) 0 0;
+  font-family: var(--wzl-font-mono);
+  font-size: var(--wzl-font-size-xs);
+  color: var(--wzl-fg-muted);
+  overflow-wrap: anywhere;
+}
+
+.seen {
+  margin: var(--wzl-space-2) 0 0;
+  font-size: var(--wzl-font-size-xs);
+  color: var(--wzl-fg-muted);
+}

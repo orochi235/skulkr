@@ -3,7 +3,7 @@
   flex-direction: column;
   gap: var(--wzl-space-3);
   height: 100%;
-  overflow: hidden;
+  overflow: clip; /* not hidden: a hidden box still scrolls for scrollIntoView, as picking a defect does */
   padding: var(--wzl-space-4);
 }
 

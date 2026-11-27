@@ -1,0 +1,61 @@
+.facts {
+  margin-block-start: var(--wzl-space-3);
+  font-size: var(--wzl-font-size-sm);
+}
+
+.groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--wzl-space-3) var(--wzl-space-7);
+}
+
+.group { flex: 1 1 8.5rem; max-width: 13rem; }
+
+.title {
+  margin: 0 0 var(--wzl-space-1);
+  font-size: var(--wzl-font-size-2xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wzl-fg-muted);
+}
+
+.list { margin: 0; }
+
+/* A label left, its value right-aligned against the column's edge, so figures line up down it. */
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--wzl-space-6);
+  line-height: 1.45;
+}
+
+.row dt { color: var(--wzl-fg-muted); }
+
+.row dd {
+  margin: 0;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+/* An estimate, set apart as the hero's are: italic and muted. */
+.estimate { padding-inline-end: 0.15em; font-style: italic; color: var(--wzl-fg-muted); }
+
+.stop {
+  margin: var(--wzl-space-3) 0 0;
+  color: var(--wzl-fg-muted);
+}
+
+/* A dot before the stop rule's state: green once the ledger has stopped, gray while it runs on. */
+.stop::before {
+  content: '';
+  display: inline-block;
+  inline-size: 7px;
+  block-size: 7px;
+  margin-inline-end: var(--wzl-space-3);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--wzl-fg) 30%, var(--wzl-surface));
+  vertical-align: 1px;
+}
+
+.stopped::before { background: var(--wzl-success); }

@@ -6,7 +6,7 @@
   min-width: 0;
 }
 
-.head { flex: none; }
+.head { position: relative; flex: none; }
 
 .title {
   margin: 0;

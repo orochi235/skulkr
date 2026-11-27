@@ -1,5 +1,4 @@
 import { isDefectClosed, isFixSettled } from './FixShelf';
-import { estimate } from './format';
 import type { SaturationLedger } from './saturation.types';
 import s from './LedgerHero.module.css';
 
@@ -20,20 +19,21 @@ export const heroCountsOf = (ledger: SaturationLedger) => {
 /** The headline counts beside a ledger's facts, each a big figure over its word. */
 export function LedgerHero({ ledger }: { ledger: SaturationLedger }) {
   const c = heroCountsOf(ledger);
-  const stats: [string, string, string?][] = [
+  // An estimate is set apart by its type (`.estimate`), not a sign before it.
+  const stats: [label: string, value: string, tone?: string][] = [
     ['found', String(c.found)],
     ['fixed', String(c.fixed), s.fixed],
     ...(c.fixing ? [['fixing', String(c.fixing), s.fixing] as [string, string, string]] : []),
     ['open', String(c.open), s.open],
     ...(c.dismissed ? [['dismissed', String(c.dismissed)] as [string, string]] : []),
-    ['unseen', c.unseen === null ? '–' : `≈${estimate(c.unseen)}`],
+    ['unseen', c.unseen === null ? '–' : String(Math.round(c.unseen)), s.estimate],
   ];
   return (
     <dl className={s.hero} aria-label="Defects at a glance">
       {stats.map(([label, value, tone]) => (
         <div key={label} className={tone ? `${s.stat} ${tone}` : s.stat}>
-          <dt className={s.label}>{label}</dt>
-          <dd className={s.value}>{value}</dd>
+          <dt className={s.label}>{label}{tone === s.estimate && <span className={s.hidden}> (estimated)</span>}</dt>
+          <dd className={s.value} title={tone === s.estimate ? 'an estimate' : undefined}>{value}</dd>
         </div>
       ))}
     </dl>

@@ -4,7 +4,9 @@ import { DelveAbout, DelveChart } from './DelveChart';
 import { FixShelf, FixShelfAbout, FixStatusChip, FixSwatch, isDefectClosed, ShelfOrderSwitch, shelfStatusOf, type ShelfOrder } from './FixShelf';
 import { LedgerHero } from './LedgerHero';
 import { PassTableButton } from './PassTable';
-import { estimate, linesText, percent, severityRank, sourcesText, usd, usdOrDash } from './format';
+import { severityRank } from './format';
+import { DefectCallout } from './DefectCallout';
+import { LedgerFacts } from './LedgerFacts';
 import type { FixShelf as FixShelfData, SaturationDefect, SaturationLedger } from './saturation.types';
 import s from './LedgerDetail.module.css';
 
@@ -77,31 +79,28 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
   // The defect hovered on either chart, traced on both.
   const [traced, setTraced] = useState<string | null>(null);
   const [shelfOrder, setShelfOrder] = useState<ShelfOrder>('batch');
+  // Where the pointer is over the header, for the traced defect's callout.
+  const head = useRef<HTMLElement>(null);
+  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
   useEffect(() => { setPicked(null); setTraced(null); }, [ledger.id]);
   const columns = useMemo(() => columnsFor(ledger.fix), [ledger.fix]);
   const groups = useMemo(() => defectGroupsOf(ledger), [ledger]);
   const pickDefect = useCallback((id: string) => setPicked((was) => ({ id, n: (was?.n ?? 0) + 1 })), []);
   return (
     <section className={s.detail} aria-label={`${ledger.area}'s defects`}>
-      <header className={s.head}>
+      <header
+        ref={head} className={s.head}
+        onPointerMove={(e) => {
+          const box = e.currentTarget.getBoundingClientRect();
+          setPointer({ x: e.clientX - box.left, y: e.clientY - box.top });
+        }}
+        onPointerLeave={() => setPointer(null)}
+      >
         <div className={s.summary}>
           <LedgerHero ledger={ledger} />
           <div className={s.blurb}>
             <div className={s.titleRow}><h2 className={s.title}>{ledger.id}</h2><DelveAbout ledger={ledger} picks /></div>
-            <p className={s.facts}>
-              {ledger.files} files{ledger.lines !== null && <>, <span className={s.num}>{linesText(ledger.lines)}</span> lines</>} at{' '}
-              <code>{ledger.commit.slice(0, 10)}</code> · {ledger.occasions} occasions ({sourcesText(ledger.sources)}) ·{' '}
-              <span className={s.num}>{ledger.distinct}</span> found, ≈<span className={s.num}>{estimate(ledger.total)}</span> held,
-              next new <span className={s.num}>{percent(ledger.nextNew)}</span> · <span className={s.num}>{usd(ledger.costUsd)}</span>,
-              next defect ≈ <span className={s.num}>{usdOrDash(ledger.nextUsd)}</span>, limit <span className={s.num}>{ledger.limit.text}</span>
-            </p>
-            {ledger.lines !== null && (
-              <p className={s.facts}>
-                Per thousand lines: <span className={s.num}>{estimate(ledger.defectsPerKloc)}</span> found,{' '}
-                <span className={s.num}>{estimate(ledger.unseenPerKloc)}</span> estimated unseen, <span className={s.num}>{usdOrDash(ledger.usdPerKloc)}</span> spent
-              </p>
-            )}
-            <p className={s.facts}>{ledger.stopped ? `Stopped: ${ledger.stopped}.` : 'Not saturated yet: the stop rule does not hold.'}</p>
+            <LedgerFacts ledger={ledger} />
           </div>
         </div>
         <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} /><div className={s.chartFoot}><PassTableButton ledger={ledger} /></div></div>
@@ -113,6 +112,7 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
             <FixShelf shelf={ledger.fix} order={shelfOrder} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} />
           </div>
         )}
+        <DefectCallout ledger={ledger} id={traced} at={pointer} flipX={(head.current?.clientWidth ?? 0) / 2} />
       </header>
       <div ref={scroll} className={s.scroll}>
         {groups.map((g) => (
