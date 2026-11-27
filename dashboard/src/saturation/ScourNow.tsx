@@ -2,8 +2,8 @@ import { minutesSince, minutesText } from '@dash/audits/runData';
 import { DelveAbout, DelveChart } from './DelveChart';
 import { FixShelf } from './FixShelf';
 import { PassPill } from './PassPill';
-import { LedgerHero, StatRow, type Stat } from './LedgerHero';
-import { usd } from './format';
+import { STAT_TONE, StatRow, type Stat } from './LedgerHero';
+import { percent, usd, usdOrDash } from './format';
 import type { ScourJob, SaturationLedger } from './saturation.types';
 import s from './ScourNow.module.css';
 
@@ -22,16 +22,22 @@ export const timedLines = (log: readonly string[], since: string, n = 3): string
   return rows.map(([took, text]) => `${took.padStart(width)}  ${text}`);
 };
 
-/** What a live process has done so far: its passes (or a fix run's batches) against its cap, the ledger's spend, and
- *  how long it has held the ledger, last so its changing width moves nothing. */
-export const runStatsOf = (l: SaturationLedger, now: number): Stat[] => {
+/** A live ledger's figures in one row: found and left, what a next pass looks like, then this run's passes (or a fix
+ *  run's batches) against its cap, the spend, and how long it has held the ledger, last so its changing width moves
+ *  nothing. */
+export const liveStatsOf = (l: SaturationLedger, now: number): Stat[] => {
   const r = l.running!;
   const fix = r.does === 'fix';
   const done = fix ? r.jobs.length : l.occasions;
   return [
+    ['found', String(l.distinct)],
+    ['left (est.)', l.unseen === null ? '–' : String(Math.round(l.unseen)), STAT_TONE.estimate],
+    ['next new', percent(l.nextNew), STAT_TONE.estimate],
+    ['next defect', usdOrDash(l.nextUsd), STAT_TONE.estimate],
+    ['limit', usd(l.limit.usd)],
     [fix ? 'batches' : 'passes', r.max ? `${done}/${r.max}` : String(done)],
     ['spent', usd(l.costUsd)],
-    ['running', minutesSince(r.since, now)],
+    ['running', minutesSince(r.since, now), STAT_TONE.light],
   ];
 };
 
@@ -61,10 +67,7 @@ export function ScourNow({ ledgers, onPick, now = Date.now() }: { ledgers: reado
               <span className={s.facts}>{r.does ?? 'held'} · pid {r.pid}</span>
               <span className={s.about}><DelveAbout ledger={l} /></span>
             </header>
-            <div className={s.boxes}>
-              <LedgerHero ledger={l} />
-              <div className={s.runBox}><StatRow label="This run" stats={runStatsOf(l, now)} /></div>
-            </div>
+            <div className={s.liveBox}><StatRow label="This scour" stats={liveStatsOf(l, now)} /></div>
             <div className={s.chart}><DelveChart ledger={l} max={r.max} live /></div>
             {r.does === 'fix' && l.fix && <div className={s.chart}><FixShelf shelf={l.fix} /></div>}
             {r.jobs.length > 0 && <ul className={s.jobs}>{r.jobs.map((j) => <JobLine key={j.key} job={j} />)}</ul>}

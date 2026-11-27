@@ -52,6 +52,9 @@
   color: var(--wzl-fg-muted);
 }
 
+/* A figure set lighter than the counts, such as a clock that keeps changing. */
+.light .value { font-weight: var(--wzl-font-weight-light, 300); }
+
 .label {
   margin-block-start: var(--wzl-space-1);
   font-size: var(--wzl-font-size-sm);

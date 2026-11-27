@@ -19,6 +19,9 @@ export const heroCountsOf = (ledger: SaturationLedger) => {
 
 export type Stat = readonly [label: string, value: string, tone?: string];
 
+/** The tones a figure can take beyond plain: an estimate (italic, muted), or a light one, such as a clock. */
+export const STAT_TONE = { estimate: s.estimate!, light: s.light! } as const;
+
 /** A row of headline figures, each big over its word. An estimate is set apart by its type (`.estimate`), not a sign
  *  before it. */
 export function StatRow({ label, stats }: { label: string; stats: readonly Stat[] }) {

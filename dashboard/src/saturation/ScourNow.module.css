@@ -88,13 +88,10 @@
 /* At the row's end whatever the facts' length, so the ticking time before it never moves it. */
 .about { margin-inline-start: auto; }
 
-/* The ledger's hero and this run's figures side by side, wrapping when the box is narrow. */
-.boxes {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: stretch;
-  gap: var(--wzl-space-4);
+/* The live ledger's figures, one row in one box, wrapping only when the box is narrow. */
+.liveBox {
+  composes: box from './box.module.css';
+  display: inline-block;
   margin-block: var(--wzl-space-3);
+  padding: var(--wzl-space-3) var(--wzl-space-6);
 }
-
-.runBox { composes: box from './box.module.css'; padding: var(--wzl-space-3) var(--wzl-space-6); }
