@@ -37,6 +37,10 @@ Open work on skulkr. Each entry says when it closes.
   `total_cost_usd` ($0.82) was right (2026-11-26). Costs stay correct; turns, tokens and weighted tokens do not.
   Closes when a fixer's record sums every turn, as a reviewer's does.
 
+- [ ] (P2) A delve reviewer's file counter can sit at `onto: progress 0/31` for a whole pass: `text.layout`'s pass 4
+  (2026-11-27) read 0/31 for its full 14 minutes and wrote nothing to `claude.json` until it ended, then logged 3
+  findings, so a working pass looks hung in its log and on the Scour page. Likely cause (not checked): the files
+  arrive preloaded in the prompt, so `progress.mjs` never sees a Read. Closes when a live reviewer shows it is working.
 - [ ] (P2) A flag a command doesn't know is ignored, not refused: `skulkr night --dyr` runs a real round. Each command
   reads its flags out of `rest` itself (`rest.includes('--dry')`), so nothing knows the full set. Closes when every
   command declares its flags beside its usage in `src/cliHelp.mjs` and an unknown one exits 2 with that usage.
