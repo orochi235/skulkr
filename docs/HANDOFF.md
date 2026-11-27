@@ -1,72 +1,45 @@
 # Handoff
 
-For the next session in skulkr. Written 2026-11-27 ~12:25 local. Check each claim against the tree.
+For the next session in skulkr. Rewritten 2026-11-27 ~18:30 local. Check each claim against the tree.
 
 ## State
 
-On `main`, pushed except as noted under Loose ends. Updated ~15:10 by skulkr-3d: the sections below this one predate
-it, so check run state with `pgrep -f "scour fix"` and `node scripts/fixRunStats.mjs`.
+On `main`, pushed. Live jobs: `pgrep -fl "scour fix|scour delve|fix-lane"`; per-run figures `node scripts/fixRunStats.mjs`.
+Commit each verified change on `main` without asking (Mike, 2026-11-27).
 
-## Next
+## Running now (started 2026-11-27 ~18:13 local, all local mode)
 
-Stacking (`77290ea`) and scour landing (`c3620a7`) are built and on `main`; `docs/scour.md` "Stacking" and
-"Landing". Mike chose landing by default for the live queue (2026-11-27), so the next queued fix run,
-`core.canvas.SceneCanvas.part2`, is the **first real scour landing**: it batches `scour<N>-core.canvas.SceneCanvas.part2-b4`
-as `batch/<date>-scour<N>`, gates it, and fast-forwards and pushes weasel's `main`. Watch its log
-(`~/.local/state/weasel-skulkr/scour/fix-core.canvas.SceneCanvas.part2.log`, lines from `land:`) and check the
-record commit landed `.skulkr/scour/fix-<N>/record.json`. Runs 11 and 12 started on the old code and will not land.
-Then: **close** (fixers' verdicts written to the registry as statuses), unbuilt.
+| What | Started by | Log |
+|---|---|---|
+| Fix run 14 `animator.engine` (3 batches), then `animator` (2 batches) | `.playwright-mcp/fix-lane.sh animator-a …` | `.playwright-mcp/logs/fix-<area>.log`, lane in `fix-animator-a.log` |
+| Fix run 15 `animator.timeline` (2 batches) | `.playwright-mcp/fix-lane.sh animator-b …` | same, `fix-animator-b.log` |
+| Delve `text.layout` (31 files, no `--max`: runs to the stop rule) | `nohup … scour delve text.layout` | `.playwright-mcp/logs/delve-text.layout.log` |
 
-The scour branches made before today's batch (`scour1`–`scour11`) are weasel-7a's `batch/2026-11-27-scour`; they
-were not stacked.
+`animator` and `animator.engine` share `createHostedAnimator.ts`, `engine/animatorApi.ts` and `engine/core.ts`, so
+they run one after the other: each fix run lands on weasel's `main` when its batches end (stacking + landing,
+`docs/scour.md` "Landing"), and the next starts from the landed tip. Report each landing to Mike (did `main`
+fast-forward, did `.skulkr/scour/fix-<N>/` land, were `scour<N>-*` deleted).
 
-## Watching: the first scour landing (kouhai t-635)
+Fix run 13 (`core.canvas.SceneCanvas.part2`) was the first scour landing: `main` fast-forwarded to `471ca1528c` and
+pushed, record committed, branches deleted (kouhai t-635, settled).
 
-Fix run 13 (`core.canvas.SceneCanvas.part2`, 4 batches, started ~15:35) runs the new code: batch 1 fixed 8 of 8 and
-verified ($3.78); batch 2 stacked on batch 1's tip. When its batches end it lands `scour13-…-b<k>` on weasel's `main`
-through `batch/<date>-scour13`, the gate and a push. Watch
-`~/.local/state/weasel-skulkr/scour/fix-core.canvas.SceneCanvas.part2.log` (lines from `land:`, `record:`, `capstone`,
-`gate`) and report the outcome to Mike: did `main` fast-forward, did `.skulkr/scour/fix-13/record.json` land, were the
-area's `scour13-*` branches deleted. A watcher script: `/private/tmp/claude-501/-Users-mike-src-skulkr/fb4d90b7-09dc-4b45-be83-91f21416d9e7/scratchpad/watch-land.sh`
-(run under Monitor; it starts at the log's current end). Settle t-635 with what happened.
+## Waiting on Mike's go: landing fix runs 9, 11, 12
 
-Also on 2026-11-27, after the sections below were written: live-elapsed merged (`4df6fc8`); scour verdicts read after
-their `(scour):` source (`6d349c7`, D9 and D15 of run 12 were misread as duplicates); weasel `main` took
-`anchorRect` (41f4dcb6de) and `~/src/weasel` was rebuilt, so the dashboard's hover cards anchor correctly.
+Runs 1–8 and 10 landed in weasel-7a's hand batch `batch/2026-11-27-scour`. Runs 9 (`forge.vite.part2`, b1–b8),
+11 (`core.canvas.nodeShapes`, b1–b3) and 12 (`core.canvas.part4`, b1–b4) finished before landing existed; their
+`scour<N>-*` branches sit in weasel, each cut from `main` on its own (pre-stacking), so the newest holds only its own
+batch. Nothing lands a finished fix run. Proposed (not built): `skulkr scour fix <area> --land`, which runs no
+batches and lands the area's unlanded verified branches: the newest alone when it holds the rest (`landFixBranch`),
+else all of them as one `batchAndTest` with conflict repair, gate and capstone, one mbox per branch. It pushes weasel's
+`main` per area, so it needs his go to build and to run; conflict repairs are local Claude jobs.
 
-## In flight: the Timeline and registry fix trial
+## Dashboard, this session (`0a2855f`, `71053f7`, `b5e5d82`)
 
-| Run | Batch | Verdicts | Branch (weasel) | Verify |
-|---|---|---|---|---|
-| 1 | b6 | 2 fixed | `scour1-ui.components.Timeline-b6` | passed |
-| 2 | b1–b3 | 17 fixed, 6 not a defect | `scour2-ui.components.Timeline-b1..b3` | passed |
-| 3 | b4 | D13 D12 D30 fixed; D37 D22 D27 D38 not fixed | `scour3-ui.components.Timeline-b4` | passed by hand on the fleet, browser tests not run |
-| 4 | registry b1 | all 7 fixed | `scour4-registry-b1` (9 commits; 2 answer no defect) | passed |
-| 5 | b5 | 7 fixed | `scour5-ui.components.Timeline-b5` (based on main `1f25c27a41`) | passed |
-| 6 | b4 rerun: D37 D22 D27 D38, `--on scour3-…-b4` | 3 fixed, 1 not a defect | `scour6-ui.components.Timeline-b4` | passed |
-
-## In flight: the fix queue, two lanes (unattended)
-
-- **Done:** run 7 `core.core.viewport` (27 fixed, $6.36) and run 8 `routing.interactions` (21 fixed, 9 not a defect,
-  every verify passed, $7.06); branches `scour7-*`, `scour8-*` in weasel.
-- **Running side by side** since 2026-11-27 ~12:09: run 9 `forge.vite.part2` (8 batches, started by
-  `.playwright-mcp/fix-chain2.sh`) and run 10 `routing.tools` (4 batches, started by hand). Logs
-  `.playwright-mcp/logs/fix-<area>.log`.
-- **The fix queue drains the rest:** `skulkr scour fix --queue --lanes 2` (pid in `pgrep -f "fix --queue"`, log
-  `.playwright-mcp/logs/fix-queue.log`) starts the next queued area whenever under two fix runs are live; queued:
-  `core.canvas.nodeShapes`, `core.canvas.part4`, `core.canvas.SceneCanvas.part2`. Their logs:
-  `~/.local/state/weasel-skulkr/scour/fix-<area>.log`. `skulkr scour queue ls|add|drop` (with
-  `--config examples/weasel.config.mjs`, from `~/src/weasel`) reads and edits it. The user asked for "a few more hours so
-  there's always one running" and then to "try two fix rounds in parallel"; add areas when the queue runs low. Areas were
-  my pick: deeply scoured, low next-new. `core.animation` is skipped while weasel-7a's `coast-on-glide` branch overlaps it.
-- **The parallel trial's comparison:** `node scripts/fixRunStats.mjs` (per run: wall, overlap, per-batch, fixer and
-  verify minutes, $/fixed; `--json` per batch). One at a time, runs 7–8 took ~15 min a batch (fixer ~10, verify ~5–6).
-  Machine load each minute in `.playwright-mcp/logs/load.tsv` from `.playwright-mcp/sampleLoad.sh` (stops itself after
-  8 h); load was already ~20 before the second lane started, and no serial-time load was recorded. Report the
-  comparison once runs 9 and 10 end.
-- ⚠️ Batches split past eight defects can share a file and each branches from `main`, so pairs may conflict at landing.
-- **Then:** the user reviews all `scour<N>-*` branches in weasel and the `tile-charts` port
-  (`~/src/weasel/.worktrees/tile-charts`, unpushed); scour landing is built (see "Next") and no longer waits on that review.
+Invert ramp checkbox (`map.invert`), the queue's place column fitted to its digits, batch pills reading `batch 1`, a
+live fix run's zero counts hidden and its counts barred in the fix shelf's colors (`tileClassOf`), a live delve's
+`pass N` with its cap in the tooltip, and next defect amber past the limit (`nextDefectStatOf`). The dashboard's
+`npm run typecheck` on the fleet fails only on unreleased weasel (`LiveQuantity`, `anchorRect`, `relative`,
+`instant`, `Reading`); filter those out when checking.
 
 ## Next to build
 
