@@ -87,6 +87,13 @@ describe('SaturationPage', () => {
     ]);
   });
 
+  it('takes a defect a verified fix run fixed off the map’s open count before it lands', () => {
+    const l = LEDGERS[0]!;
+    const open = l.defects.find((d) => (d.registry?.status ?? 'open') === 'open')!;
+    const fixed = { ...l, fix: { batches: [], ask: [], statuses: { [open.id]: { status: 'fixed' as const, run: 1, branch: 'scour1-b1', verified: true } } } };
+    expect(saturationByArea([fixed]).get(l.area)!.open).toBe(0);
+  });
+
   it('draws the map above the defects', async () => {
     serve();
     window.location.hash = '#weasel/saturation';

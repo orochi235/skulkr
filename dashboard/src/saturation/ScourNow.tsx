@@ -40,7 +40,7 @@ export const liveStatsOf = (l: SaturationLedger, now: number): Stat[] => {
   ];
 };
 
-/** A running fix run's tally from its own verdicts: batches back (of the run's), and its defects by where they stand. */
+/** A running fix run's tally from its own verdicts: batches back of the run's, and its defects by where they stand. */
 export const fixStatsOf = (l: SaturationLedger, max: number | null): Stat[] => {
   const shelf = l.fix;
   const run = shelf?.lastRun?.n;
@@ -49,7 +49,7 @@ export const fixStatsOf = (l: SaturationLedger, max: number | null): Stat[] => {
   const back = touched.filter((b) => b.defects.every((d) => mine(d.id) && mine(d.id)!.status !== 'fixing')).length;
   const count = (...of: string[]) => Object.keys(shelf?.statuses ?? {}).filter((id) => of.includes(mine(id)?.status ?? '')).length;
   return [
-    ['batches', String(back), undefined, max ? `of ${max}` : undefined],
+    ['batches', max ? `${back}/${max}` : String(back)],
     ['fixing', String(count('fixing'))],
     ['fixed', String(count('fixed'))],
     ['not a defect', String(count('not a defect'))],

@@ -9,13 +9,14 @@ import { useAuditPalette } from '@dash/audits/useAuditPalette';
 import type { AuditArea } from '@dash/audits/skulkrMap.types';
 import type { AuditPhase } from '@dash/audits/phases';
 import palette from '@dash/audits/palette.module.css';
+import { heroCountsOf } from './LedgerHero';
 import type { SaturationLedger } from './saturation.types';
 import s from './SaturationMap.module.css';
 
-/** Each area's saturation figures from its own ledger (not one set aside): its defects not yet resolved, by the
- *  registry where its ledger has landed, and its unseen estimate. */
+/** Each area's saturation figures from its own ledger (not one set aside): its defects open as its hero counts them
+ *  (not fixed, fixing or closed by a fix run or the registry), and its unseen estimate. */
 export const saturationByArea = (ledgers: readonly SaturationLedger[]) => new Map(ledgers.filter((l) => l.id === l.area).map((l) => [l.area, {
-  open: l.defects.filter((d) => (d.registry?.status ?? 'open') === 'open').length,
+  open: heroCountsOf(l).open,
   unseen: l.unseen,
   distinct: l.distinct,
   occasions: l.occasions,
