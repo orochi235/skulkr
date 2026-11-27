@@ -9,6 +9,13 @@ Open work on skulkr. Each entry says when it closes.
   and fails. weasel-cd is fixing onto. Closes when onto's client calls git with no probe timeout and reports git's real
   error.
 
+- [ ] (P1) A scour fixer killed at its 45-minute limit (`perl -e 'alarm 2700'`) is recorded as if it finished: an
+  empty `claude.json`, so "no verdicts read" and `$0.00`, with its commits verified and branched as usual (2026-11-27,
+  Timeline batch 4 at 44.9 min and registry batch 1 at 44.9 min, both under a loaded controller). Their verdicts and
+  costs were filled in by hand from the branches' commits and the transcripts. Closes when a fixer that hits the limit
+  is reported as timed out, its cost is read from its transcript, and its verdicts are read from its commits or
+  marked unread with that reason.
+
 - [ ] (P2) The dashboard's Scour page keeps a headless Chromium tab at 150–180% CPU while nobody touches it
   (2026-11-26, measured with `ps` on two headless browsers left open on it). Closes when an idle Scour page costs
   next to nothing.
