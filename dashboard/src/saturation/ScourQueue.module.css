@@ -48,13 +48,19 @@
   list-style: none;
 }
 
+/* The place column fits the list's widest place number: a tabular digit is about 0.52 of the rows' font. */
+.digits1 { --place-w: calc(0.6 * var(--queue-size)); }
+.digits2 { --place-w: calc(1.1 * var(--queue-size)); }
+.digits3 { --place-w: calc(1.6 * var(--queue-size)); }
+.digits4 { --place-w: calc(2.1 * var(--queue-size)); }
+
 /* One grid for the heads and every row; the figure columns' widths in the rows' font, as the tree's are. */
 .cells {
   display: grid;
-  grid-template-columns: calc(2 * var(--queue-size)) minmax(0, 1fr) calc(3.4 * var(--queue-size)) calc(4.2 * var(--queue-size));
+  grid-template-columns: var(--place-w) minmax(0, 1fr) calc(3.4 * var(--queue-size)) calc(4.2 * var(--queue-size));
   gap: var(--wzl-space-2);
   align-items: baseline;
-  padding: 1px var(--wzl-space-2);
+  padding: 1px var(--wzl-space-2) 1px var(--wzl-space-1);
 }
 
 /* The column heads: the tree's head, pinned above the rows as they scroll. */
@@ -100,7 +106,7 @@
 }
 
 /* A live fix run's row: its status at its own width after the area, which gives way first. */
-.live { grid-template-columns: calc(2 * var(--queue-size)) minmax(0, 1fr) auto; }
+.live { grid-template-columns: var(--place-w) minmax(0, 1fr) auto; }
 
 .fixing {
   white-space: nowrap;

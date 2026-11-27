@@ -22,6 +22,11 @@ export const queueTitleOf = (id: string, ledger: SaturationLedger | undefined): 
 export const fixingText = (row: FixQueueRow): string =>
   `${row.phase ?? 'fixing'} ${row.done + 1}/${row.batches ?? '?'}${row.progress ? ` · ${row.progress.done.toLocaleString('en-US')}/${row.progress.of.toLocaleString('en-US')}` : ''}`;
 
+const DIGITS = [s.digits1!, s.digits2!, s.digits3!, s.digits4!];
+
+/** The class sizing a list's place column for its widest place number, `count`. */
+const placeClassFor = (count: number): string => DIGITS[Math.min(String(Math.max(count, 1)).length, DIGITS.length) - 1]!;
+
 /** The areas a mode's queue lists, in its order: for the map's numbers and for picking. */
 export const queueIdsFor = (mode: QueueMode, queue: readonly string[], fixQueue: readonly FixQueueRow[]): readonly string[] =>
   mode === 'fix' ? fixQueue.map((r) => r.area) : queue;
@@ -57,7 +62,7 @@ function DelveList({ queue, ledgers, picked, onPick }: {
   if (queue.length === 0) return <p className={s.empty}>Nothing to delve: every area has stopped or is held.</p>;
   const byArea = new Map(ledgers.filter((l) => l.id === l.area).map((l) => [l.area, l]));
   return (
-    <div className={s.scroll}>
+    <div className={`${s.scroll} ${placeClassFor(queue.length)}`}>
       <div className={`${s.cells} ${s.columns}`} aria-hidden="true">
         <span /><span>Area</span><span className={s.num}>Lines</span><span className={s.num}>Defects</span>
       </div>
@@ -84,7 +89,7 @@ function FixList({ rows, picked, onPick }: { rows: readonly FixQueueRow[]; picke
   if (rows.length === 0) return <p className={s.empty}>Nothing to fix: add areas with <code>skulkr scour queue add</code>.</p>;
   const waiting = rows.filter((r) => !r.running);
   return (
-    <div className={s.scroll}>
+    <div className={`${s.scroll} ${placeClassFor(waiting.length)}`}>
       <div className={`${s.cells} ${s.columns}`} aria-hidden="true">
         <span /><span>Area</span><span className={s.num}>Open</span><span className={s.num}>Batches</span>
       </div>
