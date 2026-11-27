@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
 import { DelveAbout, DelveChart } from './DelveChart';
-import { FixShelf, FixShelfAbout, FixStatusChip } from './FixShelf';
+import { FixShelf, FixShelfAbout, FixStatusChip, FixSwatch, isDefectClosed, shelfStatusOf } from './FixShelf';
 import { PassTableButton } from './PassTable';
 import { estimate, linesText, percent, severityRank, sourcesText, usd, usdOrDash } from './format';
 import type { FixShelf as FixShelfData, SaturationDefect, SaturationLedger } from './saturation.types';
@@ -21,14 +21,19 @@ const COLUMNS: readonly DataGridColumn<SaturationDefect>[] = [
  *  the shelf's, which moves before the registry's does (that waits for a fix to land). */
 export const columnsFor = (shelf: FixShelfData | null | undefined): readonly DataGridColumn<SaturationDefect>[] => {
   if (!shelf) return COLUMNS;
+  // A row leads with its tile's color, so where its fix stands reads at the row's start.
+  const id: DataGridColumn<SaturationDefect> = {
+    ...COLUMNS[0]!,
+    render: (d) => <span data-defect={d.id}><FixSwatch status={shelfStatusOf(shelf.statuses[d.id])} />{d.id}</span>,
+  };
   const fix: DataGridColumn<SaturationDefect> = {
     id: 'fix', header: 'Fix', accessor: (d) => shelf.statuses[d.id]?.status ?? '',
     render: (d) => {
       const at = shelf.statuses[d.id];
-      return at ? <FixStatusChip status={at.status} branch={at.status === 'fixed' ? at.branch : null} /> : '–';
+      return at ? <FixStatusChip status={shelfStatusOf(at)} branch={at.status === 'fixed' ? at.branch : null} /> : '–';
     },
   };
-  return [...COLUMNS.slice(0, -1), fix, COLUMNS.at(-1)!];
+  return [id, ...COLUMNS.slice(1, -1), fix, COLUMNS.at(-1)!];
 };
 
 /** The shelf's caption: its batches, and how many of its defects a fix run has fixed or has out now. */
@@ -91,7 +96,7 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
       <div ref={scroll} className={s.scroll}>
         <DataGrid
           rows={ledger.defects} columns={columns} defaultSort={{ columnId: 'sightings', direction: 'desc' }} empty="No defects."
-          rowClassName={(d) => (d.id === picked?.id ? s.picked : undefined)}
+          rowClassName={(d) => [d.id === picked?.id ? s.picked : '', isDefectClosed(ledger.fix?.statuses[d.id], d.registry) ? s.closed : ''].filter(Boolean).join(' ') || undefined}
         />
       </div>
     </section>

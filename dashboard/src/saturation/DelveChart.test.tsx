@@ -40,6 +40,13 @@ describe('DelveChart', () => {
     expect(screen.getByRole('img').getAttribute('class')).not.toContain('tracing');
   });
 
+  it("fades a defect whose fix is settled, every sighting of it", () => {
+    const fix = { batches: [], ask: [], statuses: { D1: { status: 'fixed' as const, run: 1, branch: 'scour1-core-b1', verified: true } } };
+    const { container } = render(<DelveChart ledger={{ ...ledger, fix }} />);
+    const settled = [...container.querySelectorAll('g')].filter((g) => g.className.baseVal.includes('settled'));
+    expect(settled.map((g) => g.querySelector('title')!.textContent!.split(' · ')[1]!.split(',')[0])).toEqual(['D1', 'D1', 'D1']);
+  });
+
   it('marks a pass that found nothing with a patch on the ground', () => {
     const { container } = render(<DelveChart ledger={{ ...ledger, occasions: 4 }} />);
     expect([...container.querySelectorAll('title')].map((t) => t.textContent)).toContain('pass 4 · no findings');

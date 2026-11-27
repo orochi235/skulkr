@@ -33,6 +33,9 @@
 
 .tracing .traced.again { --tile: var(--wzl-accent); }
 
+/* A defect whose fix is settled (`isFixSettled`) steps back unless it is the one traced. */
+.settled:not(.traced) { opacity: 0.3; }
+
 .front,
 .top,
 .side { fill: var(--tile); stroke: var(--wzl-surface); stroke-width: 0.4; }

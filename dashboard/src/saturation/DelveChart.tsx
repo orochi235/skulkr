@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AboutButton } from '@dash/AboutButton';
+import { isFixSettled } from './FixShelf';
 import type { SaturationDefect, SaturationLedger } from './saturation.types';
 import s from './DelveChart.module.css';
 
@@ -88,7 +89,8 @@ export function DelveChart({ ledger, max = null, live = false, onPickDefect, tra
       )))}
       {stacks.map((stack, i) => stack.map(({ defect, novelty }, k) => (
         <Tile key={`${i}-${defect.id}`} x={colX(i + 1)} y={base - (k + 1) * TILE_H}
-          className={[s[novelty], defect.id === traced ? s.traced : '', ledger.passes[i]?.source === 'codex' ? s.codex : ''].filter(Boolean).join(' ')}
+          className={[s[novelty], defect.id === traced ? s.traced : '', ledger.passes[i]?.source === 'codex' ? s.codex : '',
+            isFixSettled(ledger.fix?.statuses[defect.id], defect.registry) ? s.settled : ''].filter(Boolean).join(' ')}
           title={tileTitleOf(defect, i + 1, novelty)}
           onEnter={() => setTraced(defect.id)} onLeave={() => setTraced(null)}
           onPick={onPickDefect ? () => onPickDefect(defect.id) : undefined} />
@@ -116,7 +118,8 @@ export function DelveAbout({ ledger, picks = false }: { ledger: SaturationLedger
     <AboutButton label="What the delve chart shows">
       <p className={s.aboutPara}>
         Each pass is a stack, one tile per defect it reported: those an earlier pass found at the bottom, then the new ones.
-        Hover a tile to trace its defect across every pass{picks ? '; click it to jump to its row' : ''}.
+        Hover a tile to trace its defect across every pass{picks ? '; click it to jump to its row' : ''}. A defect
+        fixed on a verified branch, or in the registry, shows faint.
       </p>
       <DelveKey codex={hasCodexPass(ledger)} />
     </AboutButton>

@@ -1,6 +1,6 @@
 import { Focusable, Tooltip, TooltipTrigger } from '@weasel-js/ui/components/Tooltip';
 import { AboutButton } from '@dash/AboutButton';
-import type { FixShelf as FixShelfData, FixStatus } from './saturation.types';
+import type { FixShelf as FixShelfData, FixStage, FixStatus, FixStatusEntry } from './saturation.types';
 import s from './FixShelf.module.css';
 
 /** A tile is a delve tile stood on end, the same size for every defect: only its color says anything. */
@@ -14,15 +14,35 @@ const LABEL = 13;
 /** Room above the tiles for a recurrent defect's dot. */
 const DOT = 6;
 
-/** What a defect's tile is colored by: its fix status, `waiting` before any run has touched it. */
-export type ShelfStatus = FixStatus | 'waiting';
+/** What a defect's tile is colored by: its fix status, its stage while its batch is out (`fixing` where none was
+ *  read), `waiting` before any run has touched it. */
+export type ShelfStatus = FixStatus | FixStage | 'waiting';
+
+/** The one answer to what a defect's tile and chip show, from its shelf entry. */
+export const shelfStatusOf = (entry: FixStatusEntry | undefined): ShelfStatus =>
+  !entry ? 'waiting' : entry.status === 'fixing' ? entry.stage ?? 'fixing' : entry.status;
+
+/** Whether a defect's fix is done with: fixed on a branch whose verify passed, or fixed in the registry. */
+export const isFixSettled = (entry: FixStatusEntry | undefined, registry: { readonly status: string } | null = null): boolean =>
+  (entry?.status === 'fixed' && entry.branch !== null && entry.verified === true) || registry?.status === 'fixed';
+
+/** Whether a defect is closed: its fix settled, a verified run calling it no defect or a duplicate, or its registry
+ *  line past `open`. */
+export const isDefectClosed = (entry: FixStatusEntry | undefined, registry: { readonly status: string } | null = null): boolean =>
+  isFixSettled(entry, registry)
+  || (entry?.verified === true && (entry.status === 'not a defect' || entry.status === 'duplicate'))
+  || (registry !== null && registry.status !== 'open');
+
+const STAGE: Readonly<Record<FixStage | 'fixing', string>> = {
+  fixing: s.fixing!, analyzing: s.analyzing!, writing: s.writing!, written: s.written!, checking: s.checking!, repairing: s.repairing!,
+};
 
 const CLASS: Readonly<Record<ShelfStatus, string>> = {
-  waiting: s.waiting!, fixing: s.fixing!, fixed: s.fixed!, 'not a defect': s.notDefect!, question: s.question!,
+  ...STAGE, waiting: s.waiting!, fixed: s.fixed!, 'not a defect': s.notDefect!, question: s.question!,
   'not fixed': s.notFixed!, duplicate: s.duplicate!, unread: s.unread!,
 };
 
-const KEY: readonly ShelfStatus[] = ['waiting', 'fixing', 'fixed', 'not a defect', 'question', 'not fixed', 'duplicate', 'unread'];
+const KEY: readonly ShelfStatus[] = ['waiting', 'analyzing', 'writing', 'written', 'checking', 'repairing', 'fixed', 'not a defect', 'question', 'not fixed', 'duplicate', 'unread'];
 
 /** Each batch's tiles laid along the shelf: their x and status, the batch's label x, and the shelf's width. */
 export const shelfLayoutOf = (shelf: FixShelfData) => {
@@ -30,7 +50,7 @@ export const shelfLayoutOf = (shelf: FixShelfData) => {
   const groups = shelf.batches.map((b) => {
     const start = x;
     const books = b.defects.map((d) => {
-      const book = { ...d, x, h: BOOK_H, status: (shelf.statuses[d.id]?.status ?? 'waiting') as ShelfStatus };
+      const book = { ...d, x, h: BOOK_H, status: shelfStatusOf(shelf.statuses[d.id]) };
       x += BOOK_W + GAP;
       return book;
     });
@@ -56,14 +76,14 @@ export function FixShelf({ shelf, onPickDefect, traced = null, onTrace }: {
       aria-label={`${total} defects in ${groups.length} fix batches`}>
       <line className={s.board} x1={0} x2={width} y1={base} y2={base} />
       {groups.map((g) => (
-        <g key={g.n}>
+        <g key={g.n} className={g.books.some((b) => b.id === traced) ? s.tracedGroup : undefined}>
           {g.books.map((b) => {
             const top = base - b.h;
             const run = shelf.statuses[b.id];
             const title = `${b.id} · batch ${g.n} · ${b.status}${run ? ` (fix run ${run.run}${run.branch ? `, ${run.branch}` : ''})` : ''}${b.recurrent ? ' · recurrent' : ''}`;
             return (
               <g
-                key={b.id} className={[s.tile, CLASS[b.status], b.id === traced ? s.traced : '', onPickDefect ? s.pickable : ''].filter(Boolean).join(' ')}
+                key={b.id} className={[s.tile, CLASS[b.status], b.status in STAGE ? s.out : '', b.id === traced ? s.traced : '', onPickDefect ? s.pickable : ''].filter(Boolean).join(' ')}
                 onClick={onPickDefect ? () => onPickDefect(b.id) : undefined}
                 onPointerEnter={onTrace ? () => onTrace(b.id) : undefined} onPointerLeave={onTrace ? () => onTrace(null) : undefined}
               >
@@ -87,7 +107,9 @@ export function FixShelfAbout() {
   return (
     <AboutButton label="What the fix shelf shows">
       <p className={s.aboutPara}>
-        Each open defect is a tile, grouped by the fix batch triage puts it in, colored by where its fix stands. A dot
+        Each open defect is a tile, grouped by the fix batch triage puts it in, colored by where its fix stands. While
+        its batch is out, a tile shows the step it is on: analyzing until the fixer takes it up, writing until its
+        commit, written after, then checking (the fixer&apos;s checks and verify) and repairing. A dot
         above a tile marks a defect most reviews keep finding. Click a tile to jump to its row.
       </p>
       <span className={s.key}>
@@ -97,10 +119,15 @@ export function FixShelfAbout() {
   );
 }
 
+/** A swatch in a fix status's shelf color, a tile in miniature. */
+export function FixSwatch({ status }: { status: ShelfStatus }) {
+  return <i className={`${s.swatch} ${CLASS[status]}`} aria-hidden="true" />;
+}
+
 /** A defect's fix status as a swatch in its shelf color and its word; where its fix is on a branch, the word names it
  *  in a tooltip. */
 export function FixStatusChip({ status, branch = null }: { status: ShelfStatus; branch?: string | null }) {
-  const chip = <span className={s.chip}><i className={`${s.swatch} ${CLASS[status]}`} />{status}</span>;
+  const chip = <span className={s.chip}><FixSwatch status={status} />{status}</span>;
   if (!branch) return chip;
   return (
     <TooltipTrigger>

@@ -5,10 +5,11 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { scourStateDirOf } from './scourPaths.mjs';
+import { fixStagesIn } from './scourFixStage.mjs';
 import { fixPlanFor } from './scourTriage.mjs';
 
-/** Every fix run in the state directory, oldest first: its number, its record (null before its first batch ends), and
- *  the batches it has jobs out for. */
+/** Every fix run in the state directory, oldest first: its number, its directory, its record (null before its first
+ *  batch ends), and the batches it has jobs out for. */
 export const fixRunsIn = (cfg) => {
   const dir = scourStateDirOf(cfg);
   if (!existsSync(dir)) return [];
@@ -19,13 +20,14 @@ export const fixRunsIn = (cfg) => {
     let record = null;
     try { record = JSON.parse(readFileSync(join(at, 'record.json'), 'utf8')); } catch { /* not written yet */ }
     const jobs = existsSync(join(at, 'jobs')) ? readdirSync(join(at, 'jobs')) : [];
-    return [{ n, record, jobs }];
+    return [{ n, dir: at, record, jobs }];
   }).sort((a, b) => a.n - b.n);
 };
 
 /**
  * Each defect's fix status for ledger `area` from the `runs` (`fixRunsIn`): the latest run's verdict (`fixed`, `not a
- * defect`, `question`, `not fixed`, `duplicate`, or `unread` when its line could not be read), with the run and branch.
+ * defect`, `question`, `not fixed`, `duplicate`, or `unread` when its line could not be read), with the run, branch, and
+ * whether the batch's verify passed.
  * A batch with a job out in an unfinished run that has not recorded it is entered as `b<k>`, `fixing`. A defect no run
  * has touched has no entry.
  */
@@ -36,7 +38,7 @@ export const fixStatusesFor = (area, runs) => {
     if (run.record?.area === area) {
       for (const b of run.record.batches ?? []) {
         done.add(b.n);
-        for (const v of b.verdicts ?? []) out[v.id] = { status: v.verdict ?? 'unread', run: run.n, branch: b.branch ?? null };
+        for (const v of b.verdicts ?? []) out[v.id] = { status: v.verdict ?? 'unread', run: run.n, branch: b.branch ?? null, verified: b.verify?.ok === true };
       }
     }
     if (run.record?.finished) continue;
@@ -51,15 +53,19 @@ export const fixStatusesFor = (area, runs) => {
 };
 
 /** A ledger's shelf: its plan's batches (ids in order, with each one's size and whether it recurs), what goes to ask,
- *  and each defect's fix status. */
+ *  and each defect's fix status, with its `stage` (`fixStagesIn`) while its batch is out. */
 export const fixShelfOf = (cfg, ledger, runs = fixRunsIn(cfg)) => {
   if (ledger.defects.length === 0) return null;
   const plan = fixPlanFor(ledger, { recurrent: cfg.saturate.recurrent });
   const statuses = fixStatusesFor(ledger.area, runs);
-  // A batch out with no record yet names no ids; the plan, computed the same way, says which they are.
+  // A batch out with no record yet names no ids; the plan, computed the same way, says which they are, and its job
+  // directory where each one stands.
   for (const b of plan.batches) {
-    if (statuses[`b${b.n}`]?.status !== 'fixing') continue;
-    for (const d of b.defects) statuses[d.id] ??= statuses[`b${b.n}`];
+    const out = statuses[`b${b.n}`];
+    if (out?.status !== 'fixing') continue;
+    const dir = runs.find((r) => r.n === out.run)?.dir;
+    const stages = fixStagesIn(dir ? join(dir, 'jobs', `${ledger.area}~b${b.n}`) : null, b.defects.map((d) => d.id));
+    for (const d of b.defects) statuses[d.id] ??= { ...out, stage: stages[d.id] };
     delete statuses[`b${b.n}`];
   }
   return {

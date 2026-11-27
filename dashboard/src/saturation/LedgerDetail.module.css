@@ -64,6 +64,11 @@
 /* The defect a chart tile was clicked for. */
 .picked { background: color-mix(in srgb, var(--wzl-accent) 18%, transparent); }
 
+/* A closed defect's row (`isDefectClosed`) steps back. */
+.closed { color: var(--wzl-fg-muted); }
+
+.closed .id { text-decoration: line-through; }
+
 .titleRow {
   display: flex;
   align-items: center;

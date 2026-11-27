@@ -41,6 +41,15 @@ const lastLines = (path, n) => {
 
 const PROGRESS = /^onto: progress (\d+)\/(\d+)/;
 
+/** The log in job directory `dir` written last (`f`, its name, with its `stat`), whose name is the step the job is on;
+ *  null before any. */
+export const newestLogIn = (dir) => {
+  if (!existsSync(dir)) return null;
+  return readdirSync(dir).filter((f) => f.endsWith('.log'))
+    .map((f) => ({ f, ...statSync(join(dir, f)) }))
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)[0] ?? null;
+};
+
 /**
  * Each job a scour process has out, from its occasion directories under `jobs/`: the occasion's key, the step its
  * newest log is for (`review`, `match1`, …), when that log last changed, its last line worth reading, and onto's
@@ -50,11 +59,8 @@ const jobsIn = (dir) => {
   const root = join(dir, 'jobs');
   if (!existsSync(root)) return [];
   return readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name)).flatMap((occasion) => {
-    const logs = readdirSync(join(root, occasion.name)).filter((f) => f.endsWith('.log'))
-      .map((f) => ({ f, ...statSync(join(root, occasion.name, f)) }))
-      .sort((a, b) => b.mtimeMs - a.mtimeMs);
-    if (!logs.length) return [{ key: occasion.name, step: null, at: null, line: null, progress: null }];
-    const newest = logs[0];
+    const newest = newestLogIn(join(root, occasion.name));
+    if (!newest) return [{ key: occasion.name, step: null, at: null, line: null, progress: null }];
     const lines = newest.size ? lastLines(join(root, occasion.name, newest.f), 40) : [];
     const counter = lines.findLast((l) => PROGRESS.test(l))?.match(PROGRESS);
     return [{

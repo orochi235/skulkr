@@ -1,6 +1,6 @@
 import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { FixShelf, shelfLayoutOf } from './FixShelf';
+import { FixShelf, isDefectClosed, isFixSettled, shelfLayoutOf, shelfStatusOf } from './FixShelf';
 import type { FixShelf as FixShelfData } from './saturation.types';
 
 const shelf: FixShelfData = {
@@ -28,5 +28,23 @@ describe('FixShelf', () => {
     ]);
     fireEvent.click(container.querySelectorAll('svg > g > g')[1]!);
     expect(pick).toHaveBeenCalledWith('D2');
+  });
+
+  it("shows a defect out now by its stage, and settles a fix only once it is verified on a branch or fixed in the registry", () => {
+    expect(shelfStatusOf({ status: 'fixing', run: 2, branch: null, stage: 'repairing' })).toBe('repairing');
+    expect(shelfStatusOf({ status: 'fixing', run: 2, branch: null })).toBe('fixing');
+    expect(shelfStatusOf(undefined)).toBe('waiting');
+    expect(isFixSettled({ status: 'fixed', run: 1, branch: 'b', verified: true })).toBe(true);
+    expect(isFixSettled({ status: 'fixed', run: 1, branch: 'b', verified: false })).toBe(false);
+    expect(isFixSettled({ status: 'not a defect', run: 1, branch: 'b', verified: true })).toBe(false);
+    expect(isFixSettled(undefined, { status: 'fixed' })).toBe(true);
+    expect(isDefectClosed({ status: 'not a defect', run: 1, branch: 'b', verified: true })).toBe(true);
+    expect(isDefectClosed({ status: 'question', run: 1, branch: 'b', verified: true }, { status: 'open' })).toBe(false);
+  });
+
+  it("keeps a traced defect's whole batch in color", () => {
+    const { container } = render(<FixShelf shelf={shelf} traced="D2" />);
+    const groups = [...container.querySelectorAll('svg > g')];
+    expect(groups.map((g) => g.getAttribute('class') ?? '')).toEqual([expect.stringContaining('tracedGroup'), '']);
   });
 });

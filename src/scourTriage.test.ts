@@ -59,12 +59,12 @@ describe('scour fix triage', () => {
 describe("a fix shelf's statuses", () => {
   it("takes each defect's latest verdict, and marks a batch out with no record yet as fixing", () => {
     const runs = [
-      { n: 1, jobs: ['core~b2'], record: { area: 'core', finished: 'x', batches: [{ n: 2, branch: 'scour1-core-b2', verdicts: [{ id: 'D4', verdict: 'fixed' }, { id: 'D5', verdict: null }] }] } },
+      { n: 1, jobs: ['core~b2'], record: { area: 'core', finished: 'x', batches: [{ n: 2, branch: 'scour1-core-b2', verify: { ok: true }, verdicts: [{ id: 'D4', verdict: 'fixed' }, { id: 'D5', verdict: null }] }] } },
       { n: 2, jobs: ['core~b1', 'other~b1'], record: null },
     ];
     expect(fixStatusesFor('core', runs)).toEqual({
-      D4: { status: 'fixed', run: 1, branch: 'scour1-core-b2' },
-      D5: { status: 'unread', run: 1, branch: 'scour1-core-b2' },
+      D4: { status: 'fixed', run: 1, branch: 'scour1-core-b2', verified: true },
+      D5: { status: 'unread', run: 1, branch: 'scour1-core-b2', verified: true },
       b1: { status: 'fixing', run: 2, branch: null },
     });
   });

@@ -82,11 +82,25 @@ export interface SaturationLedger {
 /** What a fix run said of a defect, or that its batch is out now. */
 export type FixStatus = 'fixing' | 'fixed' | 'not a defect' | 'question' | 'not fixed' | 'duplicate' | 'unread';
 
+/** Where a defect being fixed stands in its batch's job (`src/scourFixStage.mjs`). */
+export type FixStage = 'analyzing' | 'writing' | 'written' | 'checking' | 'repairing';
+
+/** A defect's entry in a fix shelf: its status, the run that gave it, its branch once on one, and its stage while its
+ *  batch is out. */
+export interface FixStatusEntry {
+  readonly status: FixStatus;
+  readonly run: number;
+  readonly branch: string | null;
+  /** Whether its batch's verify passed; absent while the batch is out. */
+  readonly verified?: boolean;
+  readonly stage?: FixStage;
+}
+
 /** A ledger's fix plan, for the shelf: batches of defects in order, what goes to ask, and each touched defect's status. */
 export interface FixShelf {
   readonly batches: readonly { readonly n: number; readonly defects: readonly { readonly id: string; readonly size: string | null; readonly recurrent: boolean }[] }[];
   readonly ask: readonly string[];
-  readonly statuses: Readonly<Record<string, { readonly status: FixStatus; readonly run: number; readonly branch: string | null }>>;
+  readonly statuses: Readonly<Record<string, FixStatusEntry>>;
 }
 
 /** One job a scour process has out: its occasion's key, its newest log's step, and that log's last line. */

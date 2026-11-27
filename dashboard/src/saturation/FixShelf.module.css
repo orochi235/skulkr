@@ -18,11 +18,22 @@
    with the surface, never alpha, so one tile never shows through its neighbor. */
 .waiting { --tile: color-mix(in srgb, var(--wzl-fg) 30%, var(--wzl-surface)); }
 
-.fixing { --tile: var(--wzl-accent); }
+/* A batch out: each tile by the step its defect is on, from the accent through to the success it heads for. */
+.fixing,
+.writing { --tile: var(--wzl-accent); }
+
+.analyzing { --tile: color-mix(in srgb, var(--wzl-accent) 40%, var(--wzl-surface)); }
+
+.written { --tile: color-mix(in srgb, var(--wzl-accent) 50%, var(--wzl-success)); }
+
+.checking { --tile: color-mix(in srgb, var(--wzl-success) 55%, var(--wzl-surface)); }
+
+.repairing { --tile: color-mix(in srgb, var(--wzl-warning) 60%, var(--wzl-danger)); }
 
 .fixed { --tile: var(--wzl-success); }
 
-.notDefect { --tile: color-mix(in srgb, var(--wzl-fg) 12%, var(--wzl-surface)); }
+/* Translucent white by request, the one status mixed with alpha. */
+.notDefect { --tile: color-mix(in srgb, white 45%, transparent); }
 
 .question { --tile: var(--wzl-warning); }
 
@@ -44,14 +55,14 @@
 .dot { fill: var(--wzl-fg-muted); }
 
 /* A batch out now breathes, so the eye finds it: the whole tile at once, by opacity. */
-.fixing { animation: breathe 1.6s ease-in-out infinite; }
+.out { animation: breathe 1.6s ease-in-out infinite; }
 
 @keyframes breathe {
   50% { opacity: 0.45; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fixing { animation: none; }
+  .out { animation: none; }
 }
 
 .pickable { cursor: pointer; }
@@ -84,8 +95,10 @@
   cursor: default;
 }
 
-/* Tracing a defect from either chart: its tile keeps its color, the rest fade to the shelf's ground, mixed solid as
-   the statuses are. */
-.tracing .tile:not(.traced) { --tile: color-mix(in srgb, var(--wzl-fg) 14%, var(--wzl-surface)); }
+/* Tracing a defect from either chart: its batch keeps its colors, the other batches fade to the shelf's ground, mixed
+   solid as the statuses are. */
+.tracing g:not(.tracedGroup) > .tile { --tile: color-mix(in srgb, var(--wzl-fg) 14%, var(--wzl-surface)); }
 
-.tracing .tile:not(.traced) .dot { fill: color-mix(in srgb, var(--wzl-fg) 25%, var(--wzl-surface)); }
+.traced .front { stroke: var(--wzl-fg); stroke-width: 1; }
+
+.tracing g:not(.tracedGroup) > .tile .dot { fill: color-mix(in srgb, var(--wzl-fg) 25%, var(--wzl-surface)); }
