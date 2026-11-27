@@ -33,7 +33,7 @@
 .fixed { --tile: var(--wzl-success); }
 
 /* Translucent white by request, the one status mixed with alpha. */
-.notDefect { --tile: color-mix(in srgb, white 45%, transparent); }
+.notDefect { --tile: color-mix(in srgb, white 20%, transparent); }
 
 .question { --tile: var(--wzl-warning); }
 

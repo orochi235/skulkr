@@ -64,6 +64,14 @@
 /* The defect a chart tile was clicked for. */
 .picked { background: color-mix(in srgb, var(--wzl-accent) 18%, transparent); }
 
+/* The heading over each group of the defects table. */
+.group {
+  margin: var(--wzl-space-3) 0 var(--wzl-space-1);
+  font-size: var(--wzl-font-size-sm);
+  font-weight: 600;
+  color: var(--wzl-fg-muted);
+}
+
 /* A closed defect's row (`isDefectClosed`) steps back. */
 .closed { color: var(--wzl-fg-muted); }
 

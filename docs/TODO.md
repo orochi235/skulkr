@@ -60,6 +60,10 @@ Open work on skulkr. Each entry says when it closes.
   fix's hand-back sends a GUI verify to the fleet whether or not its changes reach a browser test. Every fixer of
   round 83 did. Closes when the probe lists the browser tests related to the changed files (`vitest related` has no
   list mode; the probe may need `--changed` or a module-graph walk) and a fix touching none runs no GUI verify.
+- [ ] (P3) The Scour page's defects table is two tables, unresolved above resolved (`defectGroupsOf` in
+  `LedgerDetail.tsx`, 2026-11-26), because weasel's DataGrid cannot group rows; each sorts on its own, so a header
+  click in one leaves the other as it was. Closes when DataGrid takes a public row-grouping prop (groups in a fixed
+  order, sorted within, a heading row each), a weasel release carries it, and the page uses one table.
 - [ ] (P2) Fix steps on the dashboard don't show progress reliably, and keep showing an error after it has
   presumably been fixed (reported 2026-11-22, not yet traced): work out where each comes from (the fixer's progress
   counter in `progress.mjs`, the map's run and lane state) and how a fixed error should clear. Closes when a fix

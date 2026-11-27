@@ -36,6 +36,17 @@ export const columnsFor = (shelf: FixShelfData | null | undefined): readonly Dat
   return [id, ...COLUMNS.slice(1, -1), fix, COLUMNS.at(-1)!];
 };
 
+/** A ledger's defects split by whether each is closed (`isDefectClosed`), the unresolved first; the resolved group only
+ *  where it has rows. Each is its own table, sorted on its own: weasel's DataGrid cannot group rows. */
+export const defectGroupsOf = (ledger: SaturationLedger) => {
+  const closed = ledger.defects.filter((d) => isDefectClosed(ledger.fix?.statuses[d.id], d.registry));
+  const open = ledger.defects.filter((d) => !closed.includes(d));
+  return [
+    { label: 'Unresolved', closed: false, rows: open },
+    ...(closed.length ? [{ label: 'Resolved', closed: true, rows: closed }] : []),
+  ];
+};
+
 /** The shelf's caption: its batches, and how many of its defects a fix run has fixed or has out now. */
 export const fixFactsOf = (shelf: FixShelfData): string => {
   const total = shelf.batches.reduce((n, b) => n + b.defects.length, 0);
@@ -66,6 +77,7 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
   const [traced, setTraced] = useState<string | null>(null);
   useEffect(() => { setPicked(null); setTraced(null); }, [ledger.id]);
   const columns = useMemo(() => columnsFor(ledger.fix), [ledger.fix]);
+  const groups = useMemo(() => defectGroupsOf(ledger), [ledger]);
   const pickDefect = useCallback((id: string) => setPicked((was) => ({ id, n: (was?.n ?? 0) + 1 })), []);
   return (
     <section className={s.detail} aria-label={`${ledger.area}'s defects`}>
@@ -94,10 +106,15 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
         )}
       </header>
       <div ref={scroll} className={s.scroll}>
-        <DataGrid
-          rows={ledger.defects} columns={columns} defaultSort={{ columnId: 'sightings', direction: 'desc' }} empty="No defects."
-          rowClassName={(d) => [d.id === picked?.id ? s.picked : '', isDefectClosed(ledger.fix?.statuses[d.id], d.registry) ? s.closed : ''].filter(Boolean).join(' ') || undefined}
-        />
+        {groups.map((g) => (
+          <div key={g.label}>
+            {groups.length > 1 && <h3 className={s.group}>{g.label} · <span className={s.num}>{g.rows.length}</span></h3>}
+            <DataGrid
+              rows={g.rows} columns={columns} defaultSort={{ columnId: 'sightings', direction: 'desc' }} empty="No defects."
+              rowClassName={(d) => [d.id === picked?.id ? s.picked : '', g.closed ? s.closed : ''].filter(Boolean).join(' ') || undefined}
+            />
+          </div>
+        ))}
       </div>
     </section>
   );
