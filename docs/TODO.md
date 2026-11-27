@@ -2,12 +2,12 @@
 
 Open work on skulkr. Each entry says when it closes.
 
-- [ ] (P1) A fleet verify from a local tree was refused by onto with "trees/t1 is not inside a git repository" while
-  t1 is a working `git clone --shared` (2026-11-26, Timeline fix run 3's batch 4, logged in t1's
-  `.skulkr/out/verify.log`). The same `onto do` from t1 ran fine minutes later, so it looks transient. My guess, not
-  proven, is a race with the controller writing t1's `.git` (`fix.mbox` and `fixup.log` were written that minute).
-  Until 92dfdc1 the wrapper then ran the verify on the controller. Now it asks three times and fails. Closes when the
-  cause is found and fixed.
+- [ ] (P1) onto refuses a job when the controller is loaded: the client's `git rev-parse --show-toplevel` runs with a
+  3-second timeout (onto `client.go` `localRepoAt` through `caps.go` `execRun`), and any error comes out as "<dir> is
+  not inside a git repository". On 2026-11-26, at a load average of 400–570, that refused Timeline fix run 3's batch 4
+  verify. Until 92dfdc1 the wrapper then ran the verify on the controller, adding to the load; now it asks three times
+  and fails. weasel-cd is fixing onto. Closes when onto's client calls git with no probe timeout and reports git's real
+  error.
 
 - [ ] (P2) The dashboard's Scour page keeps a headless Chromium tab at 150–180% CPU while nobody touches it
   (2026-11-26, measured with `ps` on two headless browsers left open on it). Closes when an idle Scour page costs
