@@ -42,7 +42,7 @@ describe('FixShelf', () => {
     expect(isDefectClosed({ status: 'question', run: 1, branch: 'b', verified: true }, { status: 'open' })).toBe(false);
   });
 
-  it('gathers done batches into one group at the end, and orders tiles by status on request', () => {
+  it('gathers done batches into one group at the end, and by status dissolves the batches into one run', () => {
     const done: FixShelfData = {
       batches: [
         { n: 1, defects: [{ id: 'D1', size: null, recurrent: false }, { id: 'D2', size: null, recurrent: false }] },
@@ -57,7 +57,7 @@ describe('FixShelf', () => {
     };
     const ids = (order: 'batch' | 'status') => shelfLayoutOf(done, order).groups.map((g) => [g.label, g.books.map((b) => b.id)]);
     expect(ids('batch')).toEqual([['b2', ['D3']], ['done', ['D1', 'D2', 'D4']]]);
-    expect(ids('status')).toEqual([['b2', ['D3']], ['done', ['D2', 'D4', 'D1']]]);
+    expect(ids('status')).toEqual([['', ['D3', 'D2', 'D4', 'D1']]]);
   });
 
   it("keeps a traced defect's whole batch in color", () => {

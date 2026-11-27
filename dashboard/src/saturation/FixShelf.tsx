@@ -40,10 +40,10 @@ const STAGE: Readonly<Record<FixStage | 'fixing', string>> = {
 
 const CLASS: Readonly<Record<ShelfStatus, string>> = {
   ...STAGE, waiting: s.waiting!, fixed: s.fixed!, 'not a defect': s.notDefect!, question: s.question!,
-  'not fixed': s.notFixed!, duplicate: s.duplicate!, unread: s.unread!, 'flagged for repair': s.flagged!,
+  'not fixed': s.notFixed!, duplicate: s.duplicate!, unread: s.unread!, 'flagged': s.flagged!,
 };
 
-const KEY: readonly ShelfStatus[] = ['waiting', 'analyzing', 'writing', 'written', 'checking', 'repairing', 'fixed', 'not a defect', 'flagged for repair', 'question', 'not fixed', 'duplicate', 'unread'];
+const KEY: readonly ShelfStatus[] = ['waiting', 'analyzing', 'writing', 'written', 'checking', 'repairing', 'fixed', 'not a defect', 'flagged', 'question', 'not fixed', 'duplicate', 'unread'];
 
 /** How the shelf orders tiles within a group: as triage batched them, or by status in the key's order. */
 export type ShelfOrder = 'batch' | 'status';
@@ -52,12 +52,14 @@ export type ShelfOrder = 'batch' | 'status';
 const isBatchDone = (shelf: FixShelfData, defects: FixShelfData['batches'][number]['defects']) =>
   defects.every((d) => { const at = shelf.statuses[d.id]; return at !== undefined && at.status !== 'fixing'; });
 
-/** Each group's tiles laid along the shelf, their x and status, the group's label and its x, and the shelf's width: a
- *  group per batch still to finish, then every done batch's defects in one group at the end, each in `order`. */
+/** Each group's tiles laid along the shelf, their x and status, the group's label and its x, and the shelf's width. By
+ *  batch: a group per batch still to finish, then every done batch's defects in one group at the end. By status: one
+ *  unlabeled group of every tile, in the key's order. */
 export const shelfLayoutOf = (shelf: FixShelfData, order: ShelfOrder = 'batch') => {
   const tiles = (b: FixShelfData['batches'][number]) => b.defects.map((d) => ({ ...d, batch: b.n, status: shelfStatusOf(shelf.statuses[d.id]) }));
   const done = shelf.batches.filter((b) => isBatchDone(shelf, b.defects));
-  const sets = [
+  // By status the batches dissolve: one run of every tile, unlabeled.
+  const sets = order === 'status' ? [{ key: 'all', label: '', tiles: shelf.batches.flatMap(tiles) }] : [
     ...shelf.batches.filter((b) => !done.includes(b)).map((b) => ({ key: `b${b.n}`, label: `b${b.n}`, tiles: tiles(b) })),
     ...(done.length ? [{ key: 'done', label: 'done', tiles: done.flatMap(tiles) }] : []),
   ];
@@ -99,7 +101,7 @@ export function FixShelf({ shelf, order = 'batch', onPickDefect, traced = null, 
       aria-label={`${total} defects in ${groups.length} fix groups`}>
       <line className={s.board} x1={0} x2={width} y1={base} y2={base} />
       {groups.map((g) => (
-        <g key={g.key} className={g.books.some((b) => b.id === traced) ? s.tracedGroup : undefined}>
+        <g key={g.key} className={order === 'batch' && g.books.some((b) => b.id === traced) ? s.tracedGroup : undefined}>
           {g.books.map((b) => {
             const top = base - b.h;
             const run = shelf.statuses[b.id];

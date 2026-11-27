@@ -36,7 +36,7 @@
 /* Translucent white by request, the one status mixed with alpha. */
 .notDefect { --tile: color-mix(in srgb, white 20%, transparent); }
 
-/* A verdict a person put in doubt, back for repair: magenta, a hue no other status takes. */
+/* A verdict a person put in doubt: magenta, a hue no other status takes. */
 .flagged { --tile: #d63aaf; }
 
 .question { --tile: var(--wzl-warning); }
@@ -101,7 +101,7 @@
 
 /* Tracing a defect from either chart: its batch keeps its colors, the other batches fade to the shelf's ground, mixed
    solid as the statuses are. */
-.tracing g:not(.tracedGroup) > .tile { --tile: color-mix(in srgb, var(--wzl-fg) 14%, var(--wzl-surface)); }
+.tracing g:not(.tracedGroup) > .tile:not(.traced) { --tile: color-mix(in srgb, var(--wzl-fg) 14%, var(--wzl-surface)); }
 
 .outline {
   fill: none;
@@ -111,4 +111,4 @@
   pointer-events: none;
 }
 
-.tracing g:not(.tracedGroup) > .tile .dot { fill: color-mix(in srgb, var(--wzl-fg) 25%, var(--wzl-surface)); }
+.tracing g:not(.tracedGroup) > .tile:not(.traced) .dot { fill: color-mix(in srgb, var(--wzl-fg) 25%, var(--wzl-surface)); }

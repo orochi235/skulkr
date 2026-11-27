@@ -80,7 +80,7 @@ export interface SaturationLedger {
 }
 
 /** What a fix run said of a defect, or that its batch is out now. */
-export type FixStatus = 'fixing' | 'fixed' | 'not a defect' | 'question' | 'not fixed' | 'duplicate' | 'unread' | 'flagged for repair';
+export type FixStatus = 'fixing' | 'fixed' | 'not a defect' | 'question' | 'not fixed' | 'duplicate' | 'unread' | 'flagged';
 
 /** Where a defect being fixed stands in its batch's job (`src/scourFixStage.mjs`). */
 export type FixStage = 'analyzing' | 'writing' | 'written' | 'checking' | 'repairing';
@@ -91,7 +91,7 @@ export interface FixStatusEntry {
   readonly status: FixStatus;
   /** The fix run that gave it; null for a flag on a defect no run has touched. */
   readonly run: number | null;
-  /** For a defect flagged for repair, the fix run's verdict the flag overrides. */
+  /** For a defect flagged, the fix run's verdict the flag overrides. */
   readonly verdict?: FixStatus | null;
   readonly branch: string | null;
   /** Whether its batch's verify passed; absent while the batch is out. */

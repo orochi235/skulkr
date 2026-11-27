@@ -84,7 +84,7 @@ describe("a ledger's last flush", () => {
   });
 });
 
-describe('flags for repair', () => {
+describe('flags', () => {
   it('adds ids to an area in order, clears them, and drops an area left with none', () => {
     const one = withFlags({}, 'core', ['D10', 'D9']);
     expect(one).toEqual({ core: ['D9', 'D10'] });

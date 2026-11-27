@@ -64,7 +64,7 @@ export const lastFixRunOf = (area, runs) => {
 };
 
 /** A ledger's shelf: its plan's batches (ids in order, with each one's size and whether it recurs), what goes to ask,
- *  and each defect's fix status, with its `stage` (`fixStagesIn`) while its batch is out, and `flagged for repair` (with
+ *  and each defect's fix status, with its `stage` (`fixStagesIn`) while its batch is out, and `flagged` (with
  *  the `verdict` it overrides) where a person flagged it (`scourFlags.mjs`). */
 export const fixShelfOf = (cfg, ledger, runs = fixRunsIn(cfg), flags = scourFlagsOf(cfg)) => {
   if (ledger.defects.length === 0) return null;

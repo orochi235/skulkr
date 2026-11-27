@@ -1,13 +1,13 @@
 /**
- * Defects a person has flagged for repair: a fix run's verdict on them is not to be trusted (a "not a defect" its own
+ * Defects a person has flagged: a fix run's verdict on them is in doubt (a "not a defect" its own
  * evidence contradicts, say), so they go back to a fixer. Kept in `<state>/scour/flags.json` as `{ area: [ids] }`;
- * `skulkr scour flag <area> <ids…> [--clear]` writes it, and the Scour page shows each as `flagged for repair`.
+ * `skulkr scour flag <area> <ids…> [--clear]` writes it, and the Scour page shows each as `flagged`.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { scourStateDirOf } from './scourPaths.mjs';
 
-export const FLAGGED = 'flagged for repair';
+export const FLAGGED = 'flagged';
 
 const flagsPathOf = (cfg) => join(scourStateDirOf(cfg), 'flags.json');
 
