@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { fixStatsOf, stepWordsOf, tallyText, timedLines } from './ScourNow';
-import type { SaturationLedger } from './saturation.types';
+import { fixStatsOf, jobLinesOf, stepWordsOf, tallyText, timedLines } from './ScourNow';
+import type { SaturationLedger, ScourJob } from './saturation.types';
 import { passKeyParts } from './PassPill';
+
+describe('jobLinesOf', () => {
+  it("lists each job's recent lines newest first, led by its key", () => {
+    const job = (key: string, recent?: string[]) => ({ key, step: 'fix', at: null, line: null, progress: null, recent }) as ScourJob;
+    expect(jobLinesOf([job('b1', ['says: one', 'commit 1/8 for D4: two']), job('b2')])).toEqual([
+      'b1        commit 1/8 for D4: two',
+      'b1        says: one',
+    ]);
+  });
+});
 
 describe('timedLines', () => {
   it('leads each of the last lines, newest first, with the time since the line before, right-aligned', () => {

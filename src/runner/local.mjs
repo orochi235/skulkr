@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { JOB_IN } from '../config.mjs';
 import { readJson, writeJson } from '../json.mjs';
 import { amendLease, heldAlive, takeLease } from '../lease.mjs';
+import { lineTextOf } from '../progress.mjs';
 
 /** How long a finished job's record is kept for `jobs()`. */
 const KEEP_JOBS_MS = 7 * 24 * 3_600_000;
@@ -135,16 +136,6 @@ const runShell = (shell, { cwd, env, log, timeoutMs, graceMs = KILL_GRACE_MS, on
  */
 /** @typedef {{ done: number, total: number, failed: number }} JobCounter */
 /** @typedef {{ done?: number, total?: number, checks?: JobCounter, tests?: JobCounter, now?: { text: string, at: string } }} JobProgress */
-/** A `skulkr:` line's text as a job's `now`: a reviewer's finding by its claim, anything else as it is. */
-const nowOf = (text) => {
-  if (!text.startsWith('finding {')) return text;
-  try {
-    return `found: ${JSON.parse(text.slice('finding '.length)).claim}`;
-  } catch {
-    return text;
-  }
-};
-
 export const createProgressReader = () => {
   let partial = '';
   /** @type {JobProgress & Record<string, any>} */
@@ -167,7 +158,7 @@ export const createProgressReader = () => {
         }
         moved = true;
       } else if ((m = /^skulkr: (.+)$/.exec(line))) {
-        p.now = { text: nowOf(m[1]), at: new Date().toISOString() };
+        p.now = { text: lineTextOf(m[1]), at: new Date().toISOString() };
         moved = true;
       }
     }

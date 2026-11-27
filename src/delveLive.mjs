@@ -6,6 +6,7 @@ import { appendFileSync, closeSync, existsSync, openSync, readFileSync, readSync
 import { join } from 'node:path';
 import { heldAlive, leaseAt } from './lease.mjs';
 import { ledgerDirOf } from './ledger.mjs';
+import { lineTextOf } from './progress.mjs';
 import { scourStateDirOf } from './scourPaths.mjs';
 
 /** The scour process's own log in a ledger's directory, started over by each process that holds the ledger. */
@@ -41,6 +42,11 @@ const lastLines = (path, n) => {
 
 const PROGRESS = /^onto: progress (\d+)\/(\d+)/;
 
+/** A job log's `skulkr:` lines worth showing as it works (its commits, notes, findings, tests, hand-offs), the commands
+ *  it runs left out; the newest `n`, without the prefix. */
+const recentOf = (lines, n = 5) => lines.filter((l) => l.startsWith('skulkr: ') && !l.startsWith('skulkr: running:'))
+  .slice(-n).map((l) => lineTextOf(l.slice('skulkr: '.length)));
+
 /** The log in job directory `dir` written last (`f`, its name, with its `stat`), whose name is the step the job is on;
  *  null before any. */
 export const newestLogIn = (dir) => {
@@ -52,7 +58,8 @@ export const newestLogIn = (dir) => {
 
 /**
  * Each job a scour process has out, from its occasion directories under `jobs/`: the occasion's key, the step its
- * newest log is for (`review`, `match1`, …), when that log last changed, its last line worth reading, and onto's
+ * newest log is for (`review`, `match1`, …), when that log last changed, its last line worth reading, its last few
+ * `skulkr:` lines (`recent`), and onto's
  * progress counter where the job prints one.
  */
 const jobsIn = (dir) => {
@@ -60,7 +67,7 @@ const jobsIn = (dir) => {
   if (!existsSync(root)) return [];
   return readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name)).flatMap((occasion) => {
     const newest = newestLogIn(join(root, occasion.name));
-    if (!newest) return [{ key: occasion.name, step: null, at: null, line: null, progress: null }];
+    if (!newest) return [{ key: occasion.name, step: null, at: null, line: null, recent: [], progress: null }];
     const lines = newest.size ? lastLines(join(root, occasion.name, newest.f), 40) : [];
     const counter = lines.findLast((l) => PROGRESS.test(l))?.match(PROGRESS);
     return [{
@@ -68,6 +75,7 @@ const jobsIn = (dir) => {
       step: newest.f.replace(/\.log$/, ''),
       at: new Date(newest.mtimeMs).toISOString(),
       line: lines.findLast((l) => !PROGRESS.test(l)) ?? null,
+      recent: recentOf(lines),
       progress: counter ? { done: Number(counter[1]), of: Number(counter[2]) } : null,
     }];
   });

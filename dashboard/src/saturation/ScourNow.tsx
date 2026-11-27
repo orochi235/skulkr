@@ -11,6 +11,11 @@ import { percent, usd } from './format';
 import type { ScourJob, SaturationLedger, Tally } from './saturation.types';
 import s from './ScourNow.module.css';
 
+/** What each live job's log said last (`recent`), newest first, each led by the job's key: a run's log says nothing
+ *  between batches or passes, so these show it working. Untimed, since a job's log lines carry no time. */
+export const jobLinesOf = (jobs: readonly ScourJob[]): string[] =>
+  jobs.flatMap((j) => [...(j.recent ?? [])].reverse().map((line) => `${j.key.padEnd(9)} ${line}`));
+
 /**
  * The last `n` of `log`'s lines (each led by its ISO time), newest first, each led by the time since the line before
  * it (since `since`, when the process took the ledger, for the first), right-aligned: how long that pass took.
@@ -126,7 +131,7 @@ function LiveRun({ ledger: l, onPick, onPickDefect, stamp }: {
       </div>
       {r.does !== 'fix' && <div className={s.chart}><DelveChart ledger={l} max={r.max} live onPickDefect={pickDefect} traced={traced} onTrace={setTraced} /></div>}
       {r.jobs.length > 0 && <ul className={s.jobs}>{r.jobs.map((j) => <JobLine key={j.key} job={j} />)}</ul>}
-      {r.log.length > 0 && <pre className={s.log}>{timedLines(r.log, r.since).join('\n')}</pre>}
+      {(r.log.length > 0 || r.jobs.some((j) => j.recent?.length)) && <pre className={s.log}>{[...jobLinesOf(r.jobs), ...timedLines(r.log, r.since)].join('\n')}</pre>}
       <DefectCallout ledger={l} id={traced} at={at} />
     </article>
   );

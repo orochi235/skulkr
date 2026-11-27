@@ -33,6 +33,16 @@ const readPaths = (event) => {
 /** The prefix of the line {@link createFindingsEcho} prints for each finding. */
 export const FINDING_LINE = 'skulkr: finding ';
 
+/** A `skulkr:` line's text, prefix gone, as a person reads it: a reviewer's finding by its claim, anything else as it is. */
+export const lineTextOf = (text) => {
+  if (!text.startsWith('finding {')) return text;
+  try {
+    return `found: ${JSON.parse(text.slice('finding '.length)).claim}`;
+  } catch {
+    return text;
+  }
+};
+
 /** A findings file's `##` sections that cite a `where:`, as `findings.mjs`' `parseFindings` reads them. */
 const sectionsOf = (text) => text.split(/^## /m).slice(1).flatMap((section) => {
   const [claim, ...rest] = section.split('\n');
