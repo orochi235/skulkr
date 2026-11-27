@@ -83,6 +83,8 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
   const [shelfOrder, setShelfOrder] = useState<ShelfOrder>('batch');
   const [hideFixed, setHideFixed] = useState(false);
   const hasFixPlan = Boolean(ledger.fix && ledger.fix.batches.length > 0);
+  // Only a delve grows the chart toward its cap; a fix run's max counts batches, not passes.
+  const delving = ledger.running !== null && ledger.running.does !== 'fix';
   // Where the pointer is over the header, for the traced defect's callout.
   const head = useRef<HTMLElement>(null);
   const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
@@ -124,7 +126,7 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
             {ledger.fix && ledger.fix.batches.length > 0 && <div className={s.legendFixes}><h3 className={s.legendTitle}>Fixes</h3><FixShelfKey /></div>}
           </section>
         </div>
-        <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} hideFixed={hideFixed && hasFixPlan} /><div className={s.chartFoot}><PassTableButton ledger={ledger} />{hasFixPlan && <Checkbox isSelected={hideFixed} onChange={setHideFixed}>Collapse fixed passes</Checkbox>}</div></div>
+        <div className={s.chart}><DelveChart ledger={ledger} max={delving ? ledger.running!.max : null} live={delving} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} hideFixed={hideFixed && hasFixPlan} /><div className={s.chartFoot}><PassTableButton ledger={ledger} />{hasFixPlan && <Checkbox isSelected={hideFixed} onChange={setHideFixed}>Collapse fixed passes</Checkbox>}</div></div>
         <DefectCallout ledger={ledger} id={traced} at={pointer} flipX={(head.current?.clientWidth ?? 0) / 2} />
       </header>
       <div ref={scroll} className={s.scroll}>

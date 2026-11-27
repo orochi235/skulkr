@@ -67,7 +67,7 @@ export function ScourNow({ ledgers, onPick, now = Date.now() }: { ledgers: reado
               <span className={s.about}><DelveAbout ledger={l} /></span>
             </header>
             <div className={s.liveBox}><StatRow label="This scour" stats={liveStatsOf(l, now)} /></div>
-            <div className={s.chart}><DelveChart ledger={l} max={r.max} live /></div>
+            {r.does !== 'fix' && <div className={s.chart}><DelveChart ledger={l} max={r.max} live /></div>}
             {r.does === 'fix' && l.fix && <div className={s.chart}><FixShelf shelf={l.fix} /></div>}
             {r.jobs.length > 0 && <ul className={s.jobs}>{r.jobs.map((j) => <JobLine key={j.key} job={j} />)}</ul>}
             {r.log.length > 0 && <pre className={s.log}>{timedLines(r.log, r.since).join('\n')}</pre>}

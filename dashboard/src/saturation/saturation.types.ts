@@ -121,7 +121,7 @@ export interface ScourJob {
 export interface ScourLive {
   readonly pid: number;
   readonly since: string;
-  /** `delve`, `fold` or `ingest`; null for a process that did not say. */
+  /** `delve`, `fix`, `fold` or `ingest`; null for a process that did not say. */
   readonly does: string | null;
   /** The occasion cap a delve runs to. */
   readonly max: number | null;
