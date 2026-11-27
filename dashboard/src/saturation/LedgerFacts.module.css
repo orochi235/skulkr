@@ -4,35 +4,17 @@
   font-size: var(--wzl-font-size-sm);
 }
 
-/* Scope and effort down the left, the yield grid over the outlook on the right; one row of three once there is room,
-   one column once there is not room for two. */
+/* Scope and effort beside the yield grid, the grid dropping below once there is no room for both. */
 .groups {
   display: grid;
   grid-template-columns: minmax(9rem, 13rem) auto;
-  grid-template-areas: 'scope yield' 'scope outlook';
   align-items: start;
   justify-content: start;
   gap: var(--wzl-space-6) var(--wzl-space-8);
 }
 
-.scope { grid-area: scope; }
-
-.yield { grid-area: yield; }
-
-.outlook { grid-area: outlook; min-width: 11rem; max-width: 14rem; }
-
-@container (min-width: 44rem) {
-  .groups {
-    grid-template-columns: minmax(9rem, 13rem) auto minmax(11rem, 14rem);
-    grid-template-areas: 'scope yield outlook';
-  }
-}
-
 @container (max-width: 24rem) {
-  .groups {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: 'scope' 'yield' 'outlook';
-  }
+  .groups { grid-template-columns: minmax(0, 1fr); }
 }
 
 .title {

@@ -1,13 +1,24 @@
 .hero {
-  display: flex;
   flex: none;
-  flex-wrap: wrap;
-  gap: var(--wzl-space-6) var(--wzl-space-8);
-  margin: 0;
   padding: var(--wzl-space-6) var(--wzl-space-8);
   border: var(--wzl-border-w) solid var(--wzl-border-strong);
   border-radius: var(--wzl-radius-md);
   background: var(--wzl-surface);
+}
+
+/* Each row of figures, the outlook under the counts past a rule. */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--wzl-space-6) var(--wzl-space-8);
+  margin: 0;
+}
+
+.row + .row {
+  margin-block-start: var(--wzl-space-6);
+  padding-block-start: var(--wzl-space-6);
+  border-block-start: var(--wzl-border-w) solid var(--wzl-border);
 }
 
 /* The figure above its word, though the word comes first in the markup for a screen reader. */
