@@ -1,5 +1,6 @@
 import { minutesSince, minutesText } from '@dash/audits/runData';
 import { DelveAbout, DelveChart } from './DelveChart';
+import { PassPill } from './PassPill';
 import { usd, usdOrDash } from './format';
 import type { ScourJob, SaturationLedger } from './saturation.types';
 import s from './ScourNow.module.css';
@@ -22,7 +23,7 @@ export const timedLines = (log: readonly string[], since: string, n = 3): string
 function JobLine({ job }: { job: ScourJob }) {
   return (
     <li className={s.job}>
-      <code className={s.key}>{job.key}</code>
+      <span className={s.key}><PassPill jobKey={job.key} /></span>
       <span className={s.step}>{job.step ?? 'starting'}</span>
       <span className={s.progress}>{job.progress ? `${job.progress.done}/${job.progress.of}` : ''}</span>
       <span className={s.line}>{job.line ?? ''}</span>

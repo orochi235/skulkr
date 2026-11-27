@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { timedLines } from './ScourNow';
+import { passKeyParts } from './PassPill';
 
 describe('timedLines', () => {
   it('leads each of the last lines, newest first, with the time since the line before, right-aligned', () => {
@@ -18,5 +19,13 @@ describe('timedLines', () => {
 
   it('times the first line from when the process took the ledger', () => {
     expect(timedLines(['2026-11-26T10:01:00.000Z started'], '2026-11-26T10:00:00.000Z')).toEqual(['1:00  started']);
+  });
+});
+
+describe('passKeyParts', () => {
+  it("splits a delve job's key into its pass number and source, and keeps any other key whole", () => {
+    expect(passKeyParts('07-claude')).toEqual({ index: '07', name: 'claude' });
+    expect(passKeyParts('12-codex')).toEqual({ index: '12', name: 'codex' });
+    expect(passKeyParts('match')).toEqual({ index: null, name: 'match' });
   });
 });

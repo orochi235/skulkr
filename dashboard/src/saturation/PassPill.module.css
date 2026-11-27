@@ -1,0 +1,23 @@
+.pill {
+  /* Mixed solid from fixed colors: `--wzl-fg-muted` follows the text color, which the index inverts. */
+  --pill-edge: color-mix(in srgb, var(--wzl-fg) 62%, var(--wzl-surface));
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--pill-edge);
+  border-radius: 3px;
+  overflow: hidden;
+  font-family: var(--wzl-font-mono);
+  font-size: var(--wzl-font-size-xs);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+/* The pass number, inverted on the border's own color. */
+.index {
+  padding-inline: 4px;
+  background: var(--pill-edge);
+  color: var(--wzl-surface);
+  font-variant-numeric: tabular-nums;
+}
+
+.name { padding-inline: 5px; }

@@ -43,6 +43,7 @@
 .job {
   display: grid;
   grid-template-columns: 12ch 8ch 7ch minmax(0, 1fr);
+  align-items: center;
   gap: var(--wzl-space-2);
   font-size: var(--wzl-font-size-sm);
 }
