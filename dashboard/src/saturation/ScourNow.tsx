@@ -1,5 +1,5 @@
 import { minutesSince, minutesText } from '@dash/audits/runData';
-import { DelveChart, DelveKey, hasCodexPass } from './DelveChart';
+import { DelveAbout, DelveChart } from './DelveChart';
 import { usd, usdOrDash } from './format';
 import type { ScourJob, SaturationLedger } from './saturation.types';
 import s from './ScourNow.module.css';
@@ -46,8 +46,9 @@ export function ScourNow({ ledgers, onPick, now = Date.now() }: { ledgers: reado
                 {r.does ?? 'held'} · pid {r.pid} · {minutesSince(r.since, now)} · {r.max ? `${l.occasions}/${r.max}` : l.occasions} occasions
                 {' '}· {usd(l.costUsd)} · next defect ≈ {usdOrDash(l.nextUsd)}, limit {l.limit.text}
               </span>
+              <span className={s.about}><DelveAbout ledger={l} /></span>
             </header>
-            <div className={s.chart}><DelveChart ledger={l} max={r.max} live /><DelveKey codex={hasCodexPass(l)} /></div>
+            <div className={s.chart}><DelveChart ledger={l} max={r.max} live /></div>
             {r.jobs.length > 0 && <ul className={s.jobs}>{r.jobs.map((j) => <JobLine key={j.key} job={j} />)}</ul>}
             {r.log.length > 0 && <pre className={s.log}>{timedLines(r.log, r.since).join('\n')}</pre>}
           </article>

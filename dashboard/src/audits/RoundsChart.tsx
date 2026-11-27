@@ -2,10 +2,7 @@ import { niceDomain, stepTicks, tickStep } from '@weasel-js/scale';
 import { useId, useRef } from 'react';
 import { useElementSize } from '@weasel-js/routing/react';
 import { ordinal } from './ordinal';
-import { Button, DialogTrigger } from 'react-aria-components';
-import { Icon } from '@weasel-js/ui/components/Icon';
-import { Popover, PopoverDialog } from '@weasel-js/ui/components/Popover';
-import { icon } from '@dash/icons.gen';
+import { AboutButton } from '@dash/AboutButton';
 import type { AuditArea, AuditRound } from './skulkrMap.types';
 import { passRoundsOf } from './areaData';
 import s from './RoundsChart.module.css';
@@ -123,16 +120,11 @@ export function RoundsChart({ rounds: all, area: picked, areas = [], heatOf }: {
           {area ? <><strong>{area.id}</strong>, each round that read it</>
             : picked ? <><strong>{picked.id}</strong> {passesText(pickedPasses.length)}</> : 'per area the round read'}
         </span>
-        <DialogTrigger>
-          <Button className={s.about} aria-label="What the rounds chart shows"><Icon name={icon('ui:info')} size={14} /></Button>
-          <Popover placement="bottom end" offset={6}>
-            <PopoverDialog aria-label="What the rounds chart shows" className={s.aboutText}>
+        <AboutButton label="What the rounds chart shows">
               {area ? <><strong>{area.id}</strong>, each round that read it.</> : 'Per area the round read.'} Solid: distinct defects
               found. Dashed: Chapman&apos;s estimate of what those areas held. Hatched: a round not merged yet, or still running,
               read from its run&apos;s own results.{area && heatOf ? ' Each pass is colored as the map would have drawn the area after it, by the defects it left.' : ''}{area ? ' Gray: what an area\'s pass in the same place (its first, second, …) found on average, across every area.' : ''}
-            </PopoverDialog>
-          </Popover>
-        </DialogTrigger>
+        </AboutButton>
       </div>
     </div>
   );

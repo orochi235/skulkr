@@ -22,6 +22,10 @@ export const candidatePricesOf = (cfg, root, ids, rule, pricing) => ids.map((id)
 /**
  * The order `scour run` takes candidates in: cheapest next defect first, ties in the order given, those whose stop rule
  * holds or that `held` names (a live process has them) left out.
+ * @template {{ id: string, usd: number, stopped: string | null }} C
+ * @param {readonly C[]} candidates
+ * @param {(id: string) => boolean} [held]
+ * @returns {C[]}
  */
 export const scourQueueOf = (candidates, held = () => false) =>
   candidates.filter((c) => !c.stopped && !held(c.id)).sort((a, b) => a.usd - b.usd);

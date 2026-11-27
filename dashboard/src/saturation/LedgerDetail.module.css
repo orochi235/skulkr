@@ -60,3 +60,9 @@
 
 /* The defect a chart tile was clicked for. */
 .picked { background: color-mix(in srgb, var(--wzl-accent) 18%, transparent); }
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--wzl-space-2);
+}

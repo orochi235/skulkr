@@ -7,9 +7,6 @@
 .axis { composes: axis from './RoundsChart.module.css'; }
 .foot { composes: foot from './RoundsChart.module.css'; }
 .scope { composes: scope from './RoundsChart.module.css'; }
-.about { composes: about from './RoundsChart.module.css'; }
-.aboutText { composes: aboutText from './RoundsChart.module.css'; }
-
 .factorAxis {
   composes: axis from './RoundsChart.module.css';
   fill: var(--audit-ink);

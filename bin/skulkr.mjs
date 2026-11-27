@@ -23,6 +23,7 @@
  *   skulkr tenants rm <name>
  */
 import { gitIn, mainCheckout } from '../src/batch.mjs';
+import { USAGE, asksHelp, helpFor } from '../src/cliHelp.mjs';
 import { exitAfterFlush, tolerateClosedOutput } from '../src/exit.mjs';
 import { loadConfig } from '../src/config.mjs';
 import { defectsFor } from '../src/defects.mjs';
@@ -41,7 +42,6 @@ import { serve } from '../src/service.mjs';
 import { trialCommand } from '../src/trial.mjs';
 import { addTenant, readTenants, removeTenant, requireTenant, tenantsPath } from '../src/tenants.mjs';
 
-const USAGE = 'usage: skulkr <init|night|partition|map|fetch|defects|registry|q|pin|unpin|scour|trial|service|config|tenants|menu> [--config <file> | --tenant <name>] [--root <dir>] [--local] …';
 
 /** `argv` less `--config`, `--tenant` and `--root` and their values, and those values. */
 const takeOptions = (argv) => {
@@ -105,11 +105,16 @@ const hostsRegistry = (opts) => opts.config === undefined && opts.root === undef
 
 const main = async () => {
   const [command, ...args] = process.argv.slice(2);
-  const { opts, rest } = takeOptions(args);
-  if (!command || command === '--help' || command === '-h') {
+  if (!command || asksHelp([command])) {
     console.log(USAGE);
     return 0;
   }
+  // Before anything else, so asking a command for help never runs it.
+  if (asksHelp(args)) {
+    console.log(helpFor(command));
+    return 0;
+  }
+  const { opts, rest } = takeOptions(args);
   if (command === 'tenants') return tenantsCommand(rest);
   if (command === 'menu') {
     const { menuCommand } = await import('../src/menu.mjs');

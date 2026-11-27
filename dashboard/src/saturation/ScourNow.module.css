@@ -78,3 +78,6 @@
   gap: var(--wzl-space-1);
   margin-block: var(--wzl-space-2);
 }
+
+/* At the row's end whatever the facts' length, so the ticking time before it never moves it. */
+.about { margin-inline-start: auto; }

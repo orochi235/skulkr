@@ -51,7 +51,8 @@
 
 .key {
   display: inline-flex;
-  gap: var(--wzl-space-3);
+  flex-wrap: wrap;
+  gap: var(--wzl-space-1) var(--wzl-space-3);
   font-size: var(--wzl-font-size-xs);
   color: var(--wzl-fg-muted);
 }
@@ -65,3 +66,5 @@
 }
 
 .pickable { cursor: pointer; }
+
+.aboutPara { margin: 0 0 var(--wzl-space-2); }

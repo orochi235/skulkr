@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AboutButton } from '@dash/AboutButton';
 import type { SaturationDefect, SaturationLedger } from './saturation.types';
 import s from './DelveChart.module.css';
 
@@ -100,6 +101,19 @@ export function DelveKey({ codex = false }: { codex?: boolean }) {
       {NOVELTIES.map((n) => <span key={n}><i className={`${s.swatch} ${s[n]}`} />{LABEL[n]}</span>)}
       {codex && <span>{NOVELTIES.map((n) => <i key={n} className={`${s.swatch} ${s[n]} ${s.codex}`} />)}codex pass</span>}
     </span>
+  );
+}
+
+/** What a delve chart shows, behind an ⓘ in its section's title row: how to read it, and its key. */
+export function DelveAbout({ ledger, picks = false }: { ledger: SaturationLedger; picks?: boolean }) {
+  return (
+    <AboutButton label="What the delve chart shows">
+      <p className={s.aboutPara}>
+        Each pass is a stack, one tile per defect it reported: those an earlier pass found at the bottom, then the new ones.
+        Hover a tile to trace its defect across every pass{picks ? '; click it to jump to its row' : ''}.
+      </p>
+      <DelveKey codex={hasCodexPass(ledger)} />
+    </AboutButton>
   );
 }
 

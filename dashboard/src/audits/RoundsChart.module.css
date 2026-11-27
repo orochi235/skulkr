@@ -80,22 +80,3 @@
   white-space: nowrap;
 }
 
-.about {
-  display: inline-flex;
-  padding: 2px;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: var(--audit-muted);
-  cursor: pointer;
-}
-
-.about[data-hovered],
-.about[data-focus-visible],
-.about[data-pressed] { color: var(--audit-ink); }
-
-.aboutText {
-  max-width: 280px;
-  padding: var(--wzl-space-3);
-  font-size: var(--wzl-font-size-sm);
-}

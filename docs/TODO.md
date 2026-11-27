@@ -2,6 +2,10 @@
 
 Open work on skulkr. Each entry says when it closes.
 
+- [ ] (P2) A flag a command doesn't know is ignored, not refused: `skulkr night --dyr` runs a real round. Each command
+  reads its flags out of `rest` itself (`rest.includes('--dry')`), so nothing knows the full set. Closes when every
+  command declares its flags beside its usage in `src/cliHelp.mjs` and an unknown one exits 2 with that usage.
+
 - [ ] (P2) `skills/skulkr-review-saturation` reviews `main`'s tip even for an area whose ledger is frozen at an older
   commit, so `scour ingest` refuses its report. On 2026-11-26 this happened to five of Codex's reports
   (routing.interactions, routing.interactions.actions, routing.interactions.dispatcher, routing.tools, text-dom); each

@@ -1,9 +1,6 @@
 import { useElementSize } from '@weasel-js/routing/react';
-import { Icon } from '@weasel-js/ui/components/Icon';
-import { Popover, PopoverDialog } from '@weasel-js/ui/components/Popover';
-import { icon } from '@dash/icons.gen';
 import { useRef } from 'react';
-import { Button, DialogTrigger } from 'react-aria-components';
+import { AboutButton } from '@dash/AboutButton';
 import { CHART_ROUNDS, ticksFor } from './RoundsChart';
 import type { AuditCalibration, CalibrationFactor } from './skulkrMap.types';
 import s from './CalibrationChart.module.css';
@@ -92,10 +89,7 @@ export function CalibrationChart({ calibration: cal }: { calibration?: AuditCali
       <div className={s.foot}>
         <span className={s.scope}>{cal ? captionOf(cal) : 'no calibration in this map'}</span>
         {cal && (
-          <DialogTrigger>
-            <Button className={s.about} aria-label="What the calibration chart shows"><Icon name={icon('ui:info')} size={14} /></Button>
-            <Popover placement="bottom end" offset={6}>
-              <PopoverDialog aria-label="What the calibration chart shows" className={s.aboutText}>
+          <AboutButton label="What the calibration chart shows">
                 <p className={s.para}>
                   Dashed: the defects a round&apos;s passes estimated were left, per area. Solid: the distinct defects the
                   next pass of each of those areas found, per area. Line: found over predicted, pooled over that round and every earlier one.
@@ -106,9 +100,7 @@ export function CalibrationChart({ calibration: cal }: { calibration?: AuditCali
                   A pass&apos;s corrected left is its left times its shared bucket&apos;s factor, or the overall one under{' '}
                   {cal.minPairs} pairs, never under 1×.
                 </p>
-              </PopoverDialog>
-            </Popover>
-          </DialogTrigger>
+          </AboutButton>
         )}
       </div>
     </div>
