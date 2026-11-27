@@ -68,6 +68,16 @@ describe('scour fix triage', () => {
       { id: 'D12', verdict: null, sha: null, line: null },
     ]);
   });
+
+  it('reads the verdict after the source, so a claim holding a verdict word is not misread', () => {
+    const report = [
+      '[D9] A marker skipped for a duplicate id never takes over when the holder leaves (scour): fixed 3c67d8e86c',
+      '[D15] The duplicate-marker check reads the id only at registration (scour): not a defect: it rereads on change',
+      '[D4] a duplicate key is not fixed by a reload: fixed 1a2b3c4d',
+    ].join('\n');
+    expect(scourVerdictsOf(report, ['D9', 'D15', 'D4']).map((v: { verdict: string }) => v.verdict)).toEqual(['fixed', 'not a defect', 'fixed']);
+    expect(whyOf({ verdict: 'not a defect', line: report.split('\n')[1] })).toBe('it rereads on change');
+  });
 });
 
 describe("a fix shelf's statuses", () => {

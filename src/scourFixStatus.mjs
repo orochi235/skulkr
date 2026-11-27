@@ -9,6 +9,27 @@ import { FLAGGED, scourFlagsOf } from './scourFlags.mjs';
 import { fixStagesIn } from './scourFixStage.mjs';
 import { fixPlanFor } from './scourTriage.mjs';
 
+export const VERDICTS = ['not a defect', 'not fixed', 'duplicate', 'question', 'fixed'];
+
+/**
+ * A fixer's verdict line's verdict and where in the line it starts (`{ verdict, at }`, null and -1 for none): the first
+ * verdict after the line's source, `(scour):`, since a claim may hold a verdict's word ("a duplicate id"); else a
+ * `fixed <sha>`; else the line's first verdict word.
+ */
+export const verdictIn = (line) => {
+  const lower = String(line ?? '').toLowerCase();
+  const first = (from) => VERDICTS.map((v) => ({ verdict: v, at: lower.indexOf(v, from) })).filter((h) => h.at >= 0).sort((a, b) => a.at - b.at)[0];
+  const source = /\((?:scour|carried|sweep|a\+b|a|b)\b[^)]*\)\s*:?/.exec(lower);
+  const sha = /\bfixed\s+[0-9a-f]{7,40}\b/.exec(lower);
+  return (source && first(source.index + source[0].length)) || (sha && { verdict: 'fixed', at: sha.index }) || first(0) || { verdict: null, at: -1 };
+};
+
+/** `record` with each verdict read again from its line, so a record written by an older reader reads as today's would. */
+export const withVerdictsRead = (record) => (record ? {
+  ...record,
+  batches: (record.batches ?? []).map((b) => ({ ...b, verdicts: (b.verdicts ?? []).map((v) => (v.line ? { ...v, verdict: verdictIn(v.line).verdict } : v)) })),
+} : record);
+
 /** Every fix run in the state directory, oldest first: its number, its directory, its record (null before its first
  *  batch ends), and the batches it has jobs out for. */
 export const fixRunsIn = (cfg) => {
@@ -19,7 +40,7 @@ export const fixRunsIn = (cfg) => {
     if (!n) return [];
     const at = join(dir, name);
     let record = null;
-    try { record = JSON.parse(readFileSync(join(at, 'record.json'), 'utf8')); } catch { /* not written yet */ }
+    try { record = withVerdictsRead(JSON.parse(readFileSync(join(at, 'record.json'), 'utf8'))); } catch { /* not written yet */ }
     const jobs = existsSync(join(at, 'jobs')) ? readdirSync(join(at, 'jobs')) : [];
     return [{ n, dir: at, record, jobs }];
   }).sort((a, b) => a.n - b.n);
@@ -29,7 +50,7 @@ export const fixRunsIn = (cfg) => {
  *  On release, …`; null where it gives none. */
 export const whyOf = ({ verdict, line }) => {
   if (!verdict || verdict === 'fixed' || !line) return null;
-  const at = line.toLowerCase().indexOf(verdict);
+  const { at } = verdictIn(line);
   const rest = at < 0 ? '' : line.slice(at + verdict.length).replace(/^[\s:.,;—–-]+/, '').trim();
   return rest || null;
 };

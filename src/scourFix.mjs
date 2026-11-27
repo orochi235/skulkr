@@ -18,11 +18,10 @@ import { createSaturateContext } from './saturateJobs.mjs';
 import { scourStateDirOf } from './scourPaths.mjs';
 import { stackBranchFor } from './scourFixBase.mjs';
 import { createRepairLayer } from './scourFixLay.mjs';
-import { fixRunsIn } from './scourFixStatus.mjs';
+import { VERDICTS, fixRunsIn, verdictIn } from './scourFixStatus.mjs';
 import { landFixBranch } from './scourLand.mjs';
 import { fixPlanFor, fixPlanLines, filesOf } from './scourTriage.mjs';
 
-const VERDICTS = ['not a defect', 'not fixed', 'duplicate', 'question', 'fixed'];
 
 /** Claims the next fix run: one past the highest `fix-<N>` in the scour state directory, its directory made here.
  *  Answers its number and directory. Two runs started at once each take their own (fix runs may share a queue's lanes). */
@@ -73,8 +72,7 @@ export const scourVerdictsOf = (report, ids) => {
   for (const line of String(report ?? '').split('\n')) {
     const m = /\[(D\d+)\]/.exec(line);
     if (!m || !ids.includes(m[1]) || out.has(m[1])) continue;
-    const lower = line.toLowerCase();
-    const verdict = VERDICTS.map((v) => [v, lower.indexOf(v)]).filter(([, i]) => i >= 0).sort((a, b) => a[1] - b[1])[0]?.[0] ?? null;
+    const { verdict } = verdictIn(line);
     out.set(m[1], { verdict, line: line.trim(), sha: /\bfixed\s+([0-9a-f]{7,40})\b/i.exec(line)?.[1] ?? null });
   }
   return ids.map((id) => ({ id, ...(out.get(id) ?? { verdict: null, line: null, sha: null }) }));

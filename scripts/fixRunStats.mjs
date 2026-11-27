@@ -10,6 +10,7 @@
  * records stay the raw data; this only derives from them. `--json` prints one line per batch instead of the tables.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { withVerdictsRead } from '../src/scourFixStatus.mjs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -39,7 +40,7 @@ const readJson = (path) => { try { return JSON.parse(readFileSync(path, 'utf8'))
 const runs = readdirSync(dir).flatMap((name) => {
   const n = Number(/^fix-(\d+)$/.exec(name)?.[1]);
   if (!n || (opts.runs.length && !opts.runs.includes(n))) return [];
-  const record = readJson(join(dir, name, 'record.json'));
+  const record = withVerdictsRead(readJson(join(dir, name, 'record.json')));
   if (!record) return [];
   const jobs = join(dir, name, 'jobs');
   const batches = record.batches.map((b) => {
