@@ -26,13 +26,13 @@ export function LedgerHero({ ledger }: { ledger: SaturationLedger }) {
     ...(c.fixing ? [['fixing', String(c.fixing), s.fixing] as [string, string, string]] : []),
     ['open', String(c.open), s.open],
     ...(c.dismissed ? [['dismissed', String(c.dismissed)] as [string, string]] : []),
-    ['unseen', c.unseen === null ? '–' : String(Math.round(c.unseen)), s.estimate],
+    ['left (est.)', c.unseen === null ? '–' : String(Math.round(c.unseen)), s.estimate],
   ];
   return (
     <dl className={s.hero} aria-label="Defects at a glance">
       {stats.map(([label, value, tone]) => (
         <div key={label} className={tone ? `${s.stat} ${tone}` : s.stat}>
-          <dt className={s.label}>{label}{tone === s.estimate && <span className={s.hidden}> (estimated)</span>}</dt>
+          <dt className={s.label}>{label}</dt>
           <dd className={s.value} title={tone === s.estimate ? 'an estimate' : undefined}>{value}</dd>
         </div>
       ))}

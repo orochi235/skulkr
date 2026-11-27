@@ -16,7 +16,7 @@ export const factGroupsOf = (ledger: SaturationLedger): readonly { title: string
         ['files', ledger.files],
         ['lines', linesText(ledger.lines)],
         ['commit', <code key="c">{ledger.commit.slice(0, 10)}</code>],
-        ...(kloc ? [['found / kloc', estimate(ledger.defectsPerKloc)] as Fact, ['unseen / kloc', estimate(ledger.unseenPerKloc), true] as Fact] : []),
+        ...(kloc ? [['found / kloc', estimate(ledger.defectsPerKloc)] as Fact, ['left / kloc', estimate(ledger.unseenPerKloc), true] as Fact] : []),
       ],
     },
     {
