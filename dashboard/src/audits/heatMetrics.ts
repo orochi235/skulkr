@@ -5,7 +5,7 @@ import type { AuditArea } from './skulkrMap.types';
 
 export const HEAT_METRICS = ['left', 'density', 'fixed', 'found', 'queue', 'open', 'stale', 'age', 'rounds', 'files'] as const;
 /** What the saturation page's map can shade by besides: its areas' saturation ledgers, which the audit map lacks. */
-export const SATURATION_METRICS = ['saturation', 'saturationNextNew', 'saturationUnseen', 'saturationUnseenPerKloc', 'saturationOpen', 'saturationDefects', 'saturationDefectsPerKloc', 'saturationTotal', 'saturationReviews', 'saturationSpend', 'saturationSpendPerKloc'] as const;
+export const SATURATION_METRICS = ['saturation', 'saturationNextNew', 'saturationUnseen', 'saturationUnseenPerKloc', 'saturationOpen', 'saturationFixed', 'saturationFixedPerKloc', 'saturationFixHours', 'saturationDefects', 'saturationDefectsPerKloc', 'saturationTotal', 'saturationReviews', 'saturationSpend', 'saturationSpendPerKloc'] as const;
 export type HeatMetric = (typeof HEAT_METRICS)[number] | (typeof SATURATION_METRICS)[number];
 /** Every metric, each with a ramp the viewer may choose. */
 export const ALL_METRICS: readonly HeatMetric[] = [...SATURATION_METRICS, ...HEAT_METRICS];
@@ -82,6 +82,18 @@ export const HEAT_METRIC_SPECS: Readonly<Record<HeatMetric, HeatMetricSpec>> = {
   saturationOpen: {
     name: 'defects open', legend: 'scour defects no fixer has resolved', none: 'no scour ledger', scheme: 'ember', floor: 5,
     valuesIn: (areas) => each(areas, (a) => a.saturation?.open ?? null),
+  },
+  saturationFixed: {
+    name: 'defects fixed', legend: 'scour defects a fix run fixed and verified', none: 'no scour ledger', scheme: 'moss', floor: 5,
+    valuesIn: (areas) => each(areas, (a) => a.saturation?.fixed ?? null),
+  },
+  saturationFixedPerKloc: {
+    name: 'defects fixed per 1,000 lines', legend: 'scour defects a fix run fixed and verified, per thousand lines', none: 'no scour ledger', scheme: 'moss', floor: 5,
+    valuesIn: (areas) => each(areas, (a) => a.saturation?.fixedPerKloc ?? null),
+  },
+  saturationFixHours: {
+    name: 'hours since a fix run', legend: 'hours since its last fix run ended, 0 while one runs', none: 'never fixed', scheme: 'whitehot', floor: 24,
+    valuesIn: (areas) => each(areas, (a) => a.saturation?.fixHours ?? null),
   },
   saturationUnseen: {
     name: 'defects not found yet (est.)', legend: 'defects the scour estimates no review has found yet', none: 'no estimate yet', scheme: 'magma', floor: 5,

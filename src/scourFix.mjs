@@ -4,7 +4,7 @@
  * round's is, and its commits land on a branch of their own, `scour<N>-<area>-b<k>`. `main` is never touched: landing
  * and closing the registry's lines are not built yet.
  */
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fixInto, stageIn } from './area.mjs';
 import { addWorktree, gitIn, removeWorktree } from './batch.mjs';

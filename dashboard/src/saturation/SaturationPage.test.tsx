@@ -4,7 +4,7 @@ import { WeaselProvider } from '@weasel-js/core';
 import { renderWithIcons } from '@dash/test/icons';
 import { SaturationPage } from './SaturationPage';
 import type { SaturationLedger } from './saturation.types';
-import { mapAreasFor, saturationByArea, scourPhasesOf } from './SaturationMap';
+import { fixHoursOf, mapAreasFor, saturationByArea, scourPhasesOf } from './SaturationMap';
 import type { AuditArea } from '@dash/audits/skulkrMap.types';
 import fixture from '@dash/audits/fixture.map.json';
 
@@ -82,16 +82,23 @@ describe('SaturationPage', () => {
 
   it('shades the map by each own ledger’s unresolved defects, by the registry where it has landed', () => {
     expect([...saturationByArea([...LEDGERS, { ...LEDGERS[1]!, id: 'geom.booleans.9c4522d635' }])]).toEqual([
-      ['core.animation', { open: 1, unseen: 9.6, distinct: 2, occasions: 24, nextNew: 0.147, total: 11.6, costUsd: 23.28, ...NO_KLOC, ...PRICE }],
-      ['geom.booleans', { open: 0, unseen: 1.2, distinct: 0, occasions: 24, nextNew: 0.147, total: 1.2, costUsd: 23.28, ...NO_KLOC, ...PRICE }],
+      ['core.animation', { open: 1, fixed: 1, fixedPerKloc: null, fixHours: null, unseen: 9.6, distinct: 2, occasions: 24, nextNew: 0.147, total: 11.6, costUsd: 23.28, ...NO_KLOC, ...PRICE }],
+      ['geom.booleans', { open: 0, fixed: 0, fixedPerKloc: null, fixHours: null, unseen: 1.2, distinct: 0, occasions: 24, nextNew: 0.147, total: 1.2, costUsd: 23.28, ...NO_KLOC, ...PRICE }],
     ]);
   });
 
-  it('takes a defect a verified fix run fixed off the map’s open count before it lands', () => {
+  it('counts a defect a verified fix run fixed as fixed on the map, not open, before it lands', () => {
     const l = LEDGERS[0]!;
     const open = l.defects.find((d) => (d.registry?.status ?? 'open') === 'open')!;
     const fixed = { ...l, fix: { batches: [], ask: [], statuses: { [open.id]: { status: 'fixed' as const, run: 1, branch: 'scour1-b1', verified: true } } } };
-    expect(saturationByArea([fixed]).get(l.area)!.open).toBe(0);
+    expect(saturationByArea([fixed]).get(l.area)).toMatchObject({ open: 0, fixed: 2 });
+    expect(saturationByArea([{ ...fixed, lines: 500 }]).get(l.area)!.fixedPerKloc).toBe(4);
+  });
+
+  it('gives an area its hours since a fix run ended, 0 while one runs and null before any', () => {
+    expect(fixHoursOf(null, 0)).toBeNull();
+    expect(fixHoursOf({ finished: null }, 0)).toBe(0);
+    expect(fixHoursOf({ finished: '2026-11-27T10:00:00Z' }, Date.parse('2026-11-27T13:30:00Z'))).toBe(3.5);
   });
 
   it('draws the map above the defects', async () => {
@@ -101,7 +108,8 @@ describe('SaturationPage', () => {
     expect(await screen.findByRole('img', { name: /Treemap of every audit area/ })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Color the map by' })).toHaveValue('saturation');
     expect(within(screen.getByRole('combobox', { name: 'Color the map by' })).getAllByRole('option').map((o) => o.textContent)).toEqual([
-      'saturation', 'chance next review finds a new defect', 'defects not found yet (est.)', 'defects not found yet per 1,000 lines (est.)', 'defects open', 'defects found',
+      'saturation', 'chance next review finds a new defect', 'defects not found yet (est.)', 'defects not found yet per 1,000 lines (est.)', 'defects open', 'defects fixed',
+      'defects fixed per 1,000 lines', 'hours since a fix run', 'defects found',
       'defects found per 1,000 lines', 'defects it holds (est.)', 'reviews', 'spend', 'spend per 1,000 lines',
     ]);
   });

@@ -13,10 +13,20 @@ import { heroCountsOf } from './LedgerHero';
 import type { SaturationLedger } from './saturation.types';
 import s from './SaturationMap.module.css';
 
-/** Each area's saturation figures from its own ledger (not one set aside): its defects open as its hero counts them
- *  (not fixed, fixing or closed by a fix run or the registry), and its unseen estimate. */
-export const saturationByArea = (ledgers: readonly SaturationLedger[]) => new Map(ledgers.filter((l) => l.id === l.area).map((l) => [l.area, {
-  open: heroCountsOf(l).open,
+/** Hours since fix run `run` ended at `now`: 0 while it runs, null with no run. */
+export const fixHoursOf = (run: { readonly finished: string | null } | null | undefined, now: number): number | null => {
+  if (!run) return null;
+  if (!run.finished) return 0;
+  return Math.max(0, (now - Date.parse(run.finished)) / 3_600_000);
+};
+
+/** Each area's saturation figures from its own ledger (not one set aside): its defects open and fixed as its hero counts
+ *  them (open: not fixed, fixing or closed by a fix run or the registry), its hours since a fix run, and its unseen estimate. */
+export const saturationByArea = (ledgers: readonly SaturationLedger[], now: number = Date.now()) => new Map(ledgers.filter((l) => l.id === l.area).map((l) => [l, heroCountsOf(l)] as const).map(([l, counts]) => [l.area, {
+  open: counts.open,
+  fixed: counts.fixed,
+  fixedPerKloc: l.lines ? (1000 * counts.fixed) / l.lines : null,
+  fixHours: fixHoursOf(l.fix?.lastRun, now),
   unseen: l.unseen,
   distinct: l.distinct,
   occasions: l.occasions,
