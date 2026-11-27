@@ -16,12 +16,11 @@ Open work on skulkr. Each entry says when it closes.
   is reported as timed out, its cost is read from its transcript, and its verdicts are read from its commits or
   marked unread with that reason.
 
-- [ ] (P2) Branch `live-elapsed` (worktree `.worktrees/live-elapsed`, 2026-11-27) makes the dashboard's elapsed
-  times and job-tail age count on between snapshots, through weasel's `LiveQuantity`, from each snapshot's own
-  service time (`generated`, and a new `asOf` on `saturate ls --json`). It is built and untested: weasel's
-  `LiveQuantity` is on weasel `main` (2e6a59c4be) and in no release, so its typecheck and tests need the alpo link
-  to a weasel `dist` built from that `main`. Closes when its dashboard typecheck, `liveTime.test.ts` and
-  `auditData.test.ts` pass against that build and it merges.
+- [ ] (P2) The dashboard runs on unreleased weasel (`dashboard/README.md`): `Tooltip`'s `anchorRect` (41906fd420, only on
+  weasel's `batch/2026-11-27-scour`) and `LiveQuantity` (2e6a59c4be, on weasel `main`). Until a weasel release carries
+  both: the hover cards draw at the window's top-left whenever the linked `~/src/weasel` dist lacks 41906fd420; the
+  fleet's dashboard suite fails six files on missing exports; and the dashboard typecheck runs nowhere (the hook
+  refuses it here, and fleet nodes have no alpo). Closes when a weasel release has both and the dashboard pins it.
 
 - [ ] (P2) On the Scour page in a window 900px tall with two live runs, the ledger's defects table gets no height at
   all: the live runs, the map and the ledger's header fill the right column, which does not scroll, so a picked
