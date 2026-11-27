@@ -29,6 +29,11 @@ precision lost far from the origin, prototype-chain lookups on user-keyed tables
 delays bypassing `after`, docs/README examples that do not work against the code. Style nits, naming
 preferences and "could be cleaner" are not defects — leave them out.
 
+Weigh a defect by how likely real use is to reach it. One that ordinary input hits (English and other widely used
+languages, everyday values, common call orders) matters far more than one only exotic input reaches, such as a rare
+or historic script missing from a table, or a Unicode rule no living language exercises. Spend your reading on the
+first kind; report the second only as `low`, or leave it out.
+
 Earlier rounds fixed a lot; look for what is still there, especially in the files the list below marks
 `changed this week` (from `git log` over the last seven days; never run that search yourself).
 

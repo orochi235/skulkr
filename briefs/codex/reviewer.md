@@ -26,6 +26,11 @@ teardown, a decision answered two different ways in two places, an option silent
 docs or README examples that do not work against the code. Style nits, naming preferences and "could be
 cleaner" are not defects — leave them out.
 
+Weigh a defect by how likely real use is to reach it. One that ordinary input hits (English and other widely used
+languages, everyday values, common call orders) matters far more than one only exotic input reaches, such as a rare
+or historic script missing from a table, or a Unicode rule no living language exercises. Spend your reading on the
+first kind; report the second only as `low`, or leave it out.
+
 Look hardest at code changed in the last week: the list below marks those files `changed this week`, from
 `git log` over the last seven days, so never run that search yourself.
 
