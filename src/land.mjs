@@ -103,13 +103,15 @@ const mergeCycles = (a, b) => {
  * leaves its branches for the round's own batch rather than out of it.
  * `resolve(branch, { batch, paths, label })`, where given, is a conflict repair (`conflict.mjs`): a branch that conflicts
  * with the batch is merged with its resolution, which a rebuilt batch reuses while it applies, and is left out only when
- * that fails; an early landing tries none.
+ * that fails; an early landing tries none. A run that is not a round (a scour fix run, docs/scour.md "Landing") passes
+ * `record(tree)`, which commits its own record on the batch and answers `{ tip, path }`, and `leftOut: null`, so it
+ * neither retries rounds' left-out branches nor leaves its own for them.
  */
-export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, resolve = /** @type {any} */ (undefined), mayRepair = /** @type {(started: number) => string} */ (() => ''), baseline, checks = /** @type {any} */ (undefined), early = false, onLanded = /** @type {(landed: { tip: string, areas: string[] }) => void} */ (() => {}) }) => {
+export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightDir, branches, results, sweep, outcomes, merge, say, setStep, repair, resolve = /** @type {any} */ (undefined), mayRepair = /** @type {(started: number) => string} */ (() => ''), baseline, checks = /** @type {any} */ (undefined), early = false, record = /** @type {((tree: string) => { tip: string, path: string }) | undefined} */ (undefined), leftOut = /** @type {string | null} */ (cfg.state), onLanded = /** @type {(landed: { tip: string, areas: string[] }) => void} */ (() => {}) }) => {
   const idOf = cfg.names.idOf;
   const fixCommits = new Map(results.map((a) => [a.id, a.fixCommits]));
   const main = cfg.git.main;
-  const earlier = early ? new Map() : new Map(retryable(git, leftOutIn(cfg.state), main).filter((e) => !branches.includes(e.branch)).map((e) => [e.branch, e]));
+  const earlier = early || !leftOut ? new Map() : new Map(retryable(git, leftOutIn(leftOut), main).filter((e) => !branches.includes(e.branch)).map((e) => [e.branch, e]));
   if (earlier.size) say(`batch: retrying ${earlier.size} branches left out of earlier rounds: ${[...earlier.keys()].join(', ')}`);
   let landing = [...branches, ...earlier.keys()];
   let left = [];
@@ -156,8 +158,9 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
       if (area) area.fixCommits = [];
     }
     if (early) return { batch: made, tip: gitIn(made.tree)('rev-parse', 'HEAD') };
-    const tip = commitRecord(cfg, made.tree, { round, commit, date, nightDir, areas: results, sweep, outcomes });
-    say(`record: ${cfg.record.dir}/round-${round}/ committed on ${made.name} at ${tip.slice(0, 10)}`);
+    const { tip, path } = record?.(made.tree)
+      ?? { tip: commitRecord(cfg, made.tree, { round, commit, date, nightDir, areas: results, sweep, outcomes }), path: `${cfg.record.dir}/round-${round}/` };
+    say(`record: ${path} committed on ${made.name} at ${tip.slice(0, 10)}`);
     return { batch: made, tip };
   };
   let { batch, tip: recorded } = await build();
@@ -257,7 +260,7 @@ export const batchAndTest = async ({ cfg, root, git, round, commit, date, nightD
     }
     return `${result}${tried}`;
   } finally {
-    if (!early) recordLeftOut(cfg.state, git, main, left);
+    if (!early && leftOut) recordLeftOut(leftOut, git, main, left);
     release();
   }
 };

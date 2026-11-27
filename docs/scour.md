@@ -2,9 +2,9 @@
 
 **Status: designed 2026-11-25, part built.** Built: the `scour/` paths, `delve` and `fold` as separate commands, the
 triage fields, the Scour page's tree, and the trigger that stops a delve as `ready to fix` (README "Ready to fix",
-2026-11-26), and triage and fix up to verified branches (`skulkr scour fix`, 2026-11-26). Unbuilt: landing as a
-shared library, then ask and close, then the page's fix queue and "needs you" list; "Building the fix stage" below
-says what is built of it and is the design for the rest. What runs today is the README's "Saturation" section: one
+2026-11-26), triage and fix up to verified branches (`skulkr scour fix`, 2026-11-26), and fix runs landing their
+branches through the rounds' landing (2026-11-27). Unbuilt: ask and close, then the page's "needs you" list;
+"Building the fix stage" below says what is built of it. What runs today is the README's "Saturation" section: one
 `skulkr scour` command that delves and folds in a loop, plus `ingest`, `import`, `land` and `ls`. This document is
 the plan for splitting it into stages that run on their own. The table under "Stages" says which parts exist.
 
@@ -65,11 +65,11 @@ project's `.skulkr/`, never from one machine's state directory.
 
 ## Building the fix stage
 
-**Built (2026-11-26): triage and fix, stopping at verified branches.** `skulkr scour fix <area> [--dry] [--batch k,…] [--defects D1,…] [--on <ref>]`
+**Built (2026-11-26): triage and fix.** `skulkr scour fix <area> [--dry] [--batch k,…] [--defects D1,…] [--on <ref>] [--ready]`
 (`src/scourFix.mjs`) plans the area's batches (`src/scourTriage.mjs`), runs each through a round's fixer job
 (`area.mjs:fixInto`: verify and up to two repairs), and puts its commits on a branch of its own,
 `scour<N>-<area>-b<k>`. Its record, one row per defect with its verdict, and each batch's commits, verify, repairs
-and cost, is `<state>/scour/fix-<N>/record.json`. `main` is never touched. Locally, fixers run on this machine and
+and cost, is `<state>/scour/fix-<N>/record.json`. The run then lands (below). Locally, fixers run on this machine and
 their verify and checks on the fleet (`runner: 'local'`, so `checksOnFleet` holds). A run holds its ledger as a delve
  does (`does: 'fix'`), so the Scour page shows it live, each batch's jobs read from the run's directory.
 
@@ -99,23 +99,23 @@ their verify and checks on the fleet (`runner: 'local'`, so `checksOnFleet` hold
 - **First trial** (ui.components.Timeline, 39 defects in six batches, 2026-11-26): batch 6's two CSS defects, both
   fixed, one only after a repair, since the fixer cannot run browser tests and its fix failed in Chromium; $1.44.
 
-Unbuilt (2026-11-25). Every landing step reads its names from `cfg.names`, which `config.mjs` derives from
-`naming.prefix` (`audit<N>-<area>` branches, `batch/<date>-audit<N>`, `audit<N>-am-<area>` trees, the gate's job
-pattern, `branchOf`, `idOf`). A round number runs through all of them: `applyFix`, `makeBatch`, `gateOnFleet`,
-`repairCapstone`'s test of which branches are this run's, and the map's parsing of the log.
+### Landing
 
-- **Names.** Make the name set a function of its prefix (`namesFor(prefix)`), `cfg.names` being `namesFor(naming.prefix)`
-  as now. A fix run calls the landing code with `{ ...cfg, names: namesFor('scour') }`, numbered by its own counter
-  (`scour<N>-<area>`, `batch/<date>-scour<N>`), so no landing function changes its signature and rounds see no change.
-- **What `batchAndTest` must be told rather than assume.** Its record commit (`commitRecord`, the round's
-  `round-<N>/`) becomes a `record(tree)` it is passed; a fix run commits its own record there and rewrites
-  `.skulkr/defects/`. Its left-out store (`leftOutIn(cfg.state)`, which later rounds retry) becomes one it is passed, so
-  a fix run neither retries round branches nor leaves branches for rounds to retry.
-- **Fix.** Per triage batch, a fixer job like a round's (`fixer.md`), handed registry ids with each defect's claim,
-  where, scenario and triage fields, its verify as a round fixer's; verdicts name registry ids, which `close` writes
-  as statuses.
-- **Where it runs.** `skulkr scour fix [<area>…]`, state under `<state>/scour/fix-<N>/`, the record under
-  `.skulkr/scour/fix-<N>/`.
+Built 2026-11-27 (`src/scourLand.mjs`). Once its batches end, a fix run lands the area's newest fix branch, which
+stacking makes hold every unlanded fix of the area, through the rounds' own `batchAndTest`: batch with conflict
+repair, gate, capstone repair, and the fast-forward and push of `main`. With `--ready` (also on `fix --queue`) it
+lands nothing and records the branch as `ready`, for the repository's own batching.
+
+- **Names.** `config.mjs:namesFor(name, naming)` makes the name set; `cfg.names` is the config's, and a landing uses
+  `scourCfgOf(cfg)`'s, prefix `scour`: the branch `scour<N>-<area>-b<k>`, the batch `batch/<date>-scour<N>`, `N` the
+  branch's own run. Rounds' names are unchanged.
+- **What `batchAndTest` is told.** `record(tree)` commits the record of every fix run whose batches the branch holds
+  under `.skulkr/scour/fix-<N>/record.json`, and rewrites `.skulkr/defects/`; `leftOut: null`, so a landing neither
+  retries rounds' left-out branches nor records its own. A branch that does not land stays the area's newest, and the
+  next fix run stacks on it.
+- **After it lands**, the area's fix branches `main` now holds are deleted, so the next run starts from `main`.
+- **Not built: close.** The fixers' verdicts still live only in the run records; nothing yet writes them to the
+  registry as statuses.
 
 ### Fix queue
 

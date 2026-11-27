@@ -1,42 +1,15 @@
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { writeLedger } from './ledger.mjs';
 import { scourFix } from './scourFix.mjs';
 import { fixBranchesOf, stackBranchFor } from './scourFixBase.mjs';
 import { fixRunsIn } from './scourFixStatus.mjs';
-import { project, scratch } from './scourTestKit.ts';
+import { fixingRunner, project } from './scourTestKit.ts';
 
 const run = (n: number, area: string, batches: { n: number; branch: string | null; ok?: boolean }[]) => ({
   n, dir: '', jobs: [] as string[], record: { area, batches: batches.map((b) => ({ n: b.n, branch: b.branch, verify: b.ok === undefined ? null : { ok: b.ok } })) },
 });
-
-/** A runner whose fixer commits one file per batch on top of the tree it was handed, and notes the commit it saw. */
-const fixingRunner = () => {
-  const seen: string[] = [];
-  const runner = {
-    unavailableNodes: () => new Set(), jobs: () => [],
-    run: async (job: { to: string; task: string }, { cwd }: { cwd: string }) => {
-      mkdirSync(job.to, { recursive: true });
-      writeFileSync(join(job.to, 'exit'), '0');
-      const git = (dir: string, ...a: string[]) => execFileSync('git', a, { cwd: dir, encoding: 'utf8' }).trim();
-      const head = git(cwd, 'rev-parse', 'HEAD');
-      seen.push(head);
-      const k = /~b(\d+)-fix$/.exec(job.task)?.[1] ?? '0';
-      const tree = join(scratch(), 'w');
-      git(cwd, 'worktree', 'add', '-q', '--detach', tree, head);
-      writeFileSync(join(tree, 'src', `b${k}.ts`), `export const b${k} = ${Math.random()};\n`);
-      git(tree, 'add', '.');
-      git(tree, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', `fix b${k}\n\nDefect: D${k}`);
-      writeFileSync(join(job.to, 'fix.mbox'), git(tree, 'format-patch', '-1', '--stdout') + '\n');
-      git(cwd, 'worktree', 'remove', '--force', tree);
-      writeFileSync(join(job.to, 'claude.json'), JSON.stringify({ type: 'result', is_error: false, result: `[D${k}] fixed\ntally: 1 of 1 fixed, 0 extra fixed`, total_cost_usd: 0.1 }));
-      return { status: 0 };
-    },
-  };
-  return { runner, seen };
-};
 
 describe('stacking scour fix batches', () => {
   it('lists an area\'s fix branches newest first, by run and then batch', () => {
@@ -65,7 +38,7 @@ describe('stacking scour fix batches', () => {
     writeLedger(cfg, { area: 'src', commit: main, files: ['src/f.ts'], occasions: Array.from({ length: 10 }, () => ({})), defects: Array.from({ length: 9 }, (_, k) => defect(k + 1)) });
     const said: string[] = [];
     const first = fixingRunner();
-    const record = await scourFix(cfg, first.runner, root, 'src', {}, (l: string) => said.push(l));
+    const record = await scourFix(cfg, first.runner, root, 'src', { ready: true }, (l: string) => said.push(l));
     expect(record.batches.map((b: { branch: string }) => b.branch)).toEqual(['scour1-src-b1', 'scour1-src-b2']);
     expect(first.seen).toEqual([main, git('rev-parse', 'scour1-src-b1')]);
     expect(git('rev-parse', 'scour1-src-b2^')).toBe(git('rev-parse', 'scour1-src-b1'));
@@ -73,7 +46,7 @@ describe('stacking scour fix batches', () => {
 
     const second = fixingRunner();
     said.length = 0;
-    await scourFix(cfg, second.runner, root, 'src', { defects: 'D1' }, (l: string) => said.push(l));
+    await scourFix(cfg, second.runner, root, 'src', { defects: 'D1', ready: true }, (l: string) => said.push(l));
     expect(fixRunsIn(cfg).length).toBe(2);
     expect(second.seen).toEqual([git('rev-parse', 'scour1-src-b2')]);
     expect(said[0]).toContain("the tip of `scour1-src-b2`, the area's newest fix branch");

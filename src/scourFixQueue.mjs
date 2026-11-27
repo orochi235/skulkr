@@ -93,9 +93,9 @@ export const fixQueueLines = (rows) => {
  * `skulkr scour fix --queue`: every 30 seconds, while fewer than `lanes` fix runs are live (as `liveFixes` counts them)
  * and the queue holds an area, takes the first off and starts `skulkr scour fix <area>` as its own process, detached,
  * its output in `<state>/scour/fix-<area>.log`. Ends once the queue is empty and the runs it started have ended.
- * @param {{ lanes?: number, liveFixes?: () => string[], root: string, say: (line: string) => void, pollMs?: number }} opts
+ * @param {{ lanes?: number, ready?: boolean, liveFixes?: () => string[], root: string, say: (line: string) => void, pollMs?: number }} opts
  */
-export const drainFixQueue = async (cfg, { lanes = 1, liveFixes = () => liveFixesIn(cfg), root, say, pollMs = 30_000 }) => {
+export const drainFixQueue = async (cfg, { lanes = 1, ready = false, liveFixes = () => liveFixesIn(cfg), root, say, pollMs = 30_000 }) => {
   if (!cfg.file) throw new Error('the fix queue starts its runs with --config, and this config has no file');
   const mine = new Map();
   for (;;) {
@@ -109,7 +109,7 @@ export const drainFixQueue = async (cfg, { lanes = 1, liveFixes = () => liveFixe
       if (live.includes(area)) { say(`fix queue: ${area} already has a live fix run; dropped`); continue; }
       const log = join(scourStateDirOf(cfg), `fix-${area}.log`);
       const out = openSync(log, 'w');
-      const child = spawn(process.execPath, [BIN, 'scour', 'fix', area, '--config', cfg.file], { cwd: root, detached: true, stdio: ['ignore', out, out] });
+      const child = spawn(process.execPath, [BIN, 'scour', 'fix', area, '--config', cfg.file, ...(ready ? ['--ready'] : [])], { cwd: root, detached: true, stdio: ['ignore', out, out] });
       child.unref();
       mine.set(area, child);
       say(`fix queue: started ${area} (pid ${child.pid}, ${live.length + 1} of ${lanes} lanes); log ${log}`);

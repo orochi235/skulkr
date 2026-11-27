@@ -12,6 +12,9 @@ const FORMER = 'saturation';
 /** The state directory's ledgers. */
 export const scourStateDirOf = (cfg) => join(cfg.state, NAME);
 
+/** Where fix run `n`'s record is committed when the run lands. */
+export const fixRecordDirOf = (cfg, n) => `${cfg.record.dir}/${NAME}/fix-${n}`;
+
 /** Moves the state directory's `saturation/` to `scour/`, once, when only the old one exists. */
 export const moveFormerScourState = (cfg) => {
   const former = join(cfg.state, FORMER);

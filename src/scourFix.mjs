@@ -2,8 +2,9 @@
  * `skulkr scour fix <area>`: a fix run over one ledger's defects (docs/scour.md "Building the fix stage"). Triage
  * batches them (`scourTriage.mjs`); each batch goes to a round's fixer job, verified and repaired as a round's is, and
  * its commits land on a branch of their own, `scour<N>-<area>-b<k>`. Batches stack (`scourFixBase.mjs`): each is fixed
- * on the tip of the last one that applied and verified, so the area's newest branch holds all its fixes. `main` is
- * never touched: landing and closing the registry's lines are not built yet.
+ * on the tip of the last one that applied and verified, so the area's newest branch holds all its fixes. The run then
+ * lands that branch on `main` (`scourLand.mjs`), or with `--ready` leaves it for the repository's own batching.
+ * Closing the registry's lines from the fixers' verdicts is not built yet.
  */
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -17,6 +18,8 @@ import { createSaturateContext } from './saturateJobs.mjs';
 import { scourStateDirOf } from './scourPaths.mjs';
 import { stackBranchFor } from './scourFixBase.mjs';
 import { createRepairLayer } from './scourFixLay.mjs';
+import { fixRunsIn } from './scourFixStatus.mjs';
+import { landFixBranch } from './scourLand.mjs';
 import { fixPlanFor, fixPlanLines, filesOf } from './scourTriage.mjs';
 
 const VERDICTS = ['not a defect', 'not fixed', 'duplicate', 'question', 'fixed'];
@@ -186,6 +189,16 @@ const fixBatches = async (cfg, runner, root, id, ledger, batches, n, runDir, arg
       keep();
       const tally = VERDICTS.map((v) => [v, verdicts.filter((x) => x.verdict === v).length]).filter(([, k]) => k > 0).map(([v, k]) => `${k} ${v}`).join(', ');
       say(`batch ${b.n}: ${tally || 'no verdicts read'}; ${result.commits} commits${applied ? ` on ${branch}` : ''}; verify ${result.verify?.ok === false ? 'failed' : result.verify ? 'passed' : 'not run'}; $${costUsd.toFixed(2)}`);
+    }
+    // The area's newest branch holds every unlanded fix, this run's and any it stacked on.
+    const newest = stackBranchFor(cfg, root, id);
+    if (!newest) say('land: no verified fix branch to land');
+    else if (args.ready) {
+      record.ready = newest;
+      say(`ready: ${newest} holds the area's fixes; --ready, so ${cfg.git.main} is untouched`);
+    } else {
+      keep();
+      record.landing = await landFixBranch({ ctx, cfg, root, area: id, branch: newest, runs: fixRunsIn(cfg), say });
     }
   } finally {
     removeWorktree(root, frozen);

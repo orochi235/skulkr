@@ -8,7 +8,7 @@
  *   skulkr scour fold <area>
  *   skulkr scour ingest <area> <report.md> --source <name> [--at <sha>]
  *   skulkr scour import <area> <dir> --at <sha> [--fresh]
- *   skulkr scour fix <area> [--dry] [--batch k,…] [--defects D1,…] [--on <ref>] | --queue [--lanes N]
+ *   skulkr scour fix <area> [--dry] [--batch k,…] [--defects D1,…] [--on <ref>] [--ready] | --queue [--lanes N] [--ready]
  *   skulkr scour queue add|drop <area>… | ls
  *   skulkr scour land <area>… | --all
  *   skulkr scour ls [--json]
@@ -39,7 +39,7 @@ import { createSaturateContext, occasionJobsOf, requireSources, runReview } from
 import { foldPending, stageReport } from './scourFold.mjs';
 import { nextLines, scourNext } from './scourSession.mjs';
 
-export const SATURATE_USAGE = 'usage: skulkr scour next <area> [--agent <id>] [--metered] [--release] [--max N] [--per-defect $] [--at <sha>] | [delve] <area> [--fleet] [--account <config dir>] [--metered] [--sources claude,codex] [--max N] [--per-defect $] [--usd $] [--at <sha>] [--fresh] | run [areas…] [--fleet] [--account <config dir>] [--metered] [--by finish|cheapest|spread] [--usd $] [--passes N] [--per-defect $] | fold <area> | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | fix <area> [--dry] [--batch k,…] [--defects D1,…] [--on <ref>] | fix --queue [--lanes N] | queue add|drop <area>… | queue ls | flag <area> <ids…> [--clear] | land <area>… | land --all | ls [--json] | ls --source <name> --ids | report <area> | rm <area>';
+export const SATURATE_USAGE = 'usage: skulkr scour next <area> [--agent <id>] [--metered] [--release] [--max N] [--per-defect $] [--at <sha>] | [delve] <area> [--fleet] [--account <config dir>] [--metered] [--sources claude,codex] [--max N] [--per-defect $] [--usd $] [--at <sha>] [--fresh] | run [areas…] [--fleet] [--account <config dir>] [--metered] [--by finish|cheapest|spread] [--usd $] [--passes N] [--per-defect $] | fold <area> | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | fix <area> [--dry] [--batch k,…] [--defects D1,…] [--on <ref>] [--ready] | fix --queue [--lanes N] [--ready] | queue add|drop <area>… | queue ls | flag <area> <ids…> [--clear] | land <area>… | land --all | ls [--json] | ls --source <name> --ids | report <area> | rm <area>';
 
 /** `argv`'s positional words and flags. */
 export const saturateArgsOf = (cfg, argv) => {
@@ -47,7 +47,7 @@ export const saturateArgsOf = (cfg, argv) => {
   const words = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--fresh' || a === '--all' || a === '--json' || a === '--ids' || a === '--metered' || a === '--release' || a === '--dry' || a === '--clear' || a === '--queue') flags[a.slice(2)] = true;
+    if (a === '--fresh' || a === '--all' || a === '--json' || a === '--ids' || a === '--metered' || a === '--release' || a === '--dry' || a === '--clear' || a === '--queue' || a === '--ready') flags[a.slice(2)] = true;
     else if (a.startsWith('--')) flags[a.slice(2)] = argv[++i];
     else words.push(a);
   }
@@ -63,7 +63,7 @@ export const saturateArgsOf = (cfg, argv) => {
   const passes = flags.passes === undefined ? undefined : Number(flags.passes);
   if (passes !== undefined && (!Number.isInteger(passes) || passes < 1)) throw new Error(`--passes wants a whole number, not ${flags.passes}`);
   return {
-    words, max, sources, fresh: Boolean(flags.fresh), all: Boolean(flags.all), json: Boolean(flags.json), ids: Boolean(flags.ids), source: flags.source, at: flags.at, agent: flags.agent, metered: Boolean(flags.metered), release: Boolean(flags.release), account: flags.account, dry: Boolean(flags.dry), clear: Boolean(flags.clear), batch: flags.batch, defects: flags.defects, on: flags.on, queue: Boolean(flags.queue), lanes: flags.lanes,
+    words, max, sources, fresh: Boolean(flags.fresh), all: Boolean(flags.all), json: Boolean(flags.json), ids: Boolean(flags.ids), source: flags.source, at: flags.at, agent: flags.agent, metered: Boolean(flags.metered), release: Boolean(flags.release), account: flags.account, dry: Boolean(flags.dry), clear: Boolean(flags.clear), batch: flags.batch, defects: flags.defects, on: flags.on, queue: Boolean(flags.queue), ready: Boolean(flags.ready), lanes: flags.lanes,
     usd: dollars('usd'), perDefect: flags['per-defect'] === undefined ? undefined : (limitSpecOf(flags['per-defect']), flags['per-defect']), passes, by: flags.by,
   };
 };
@@ -232,7 +232,7 @@ export const saturateCommand = async (cfg0, runner, root, argv, say = (line) => 
   if (first === 'fix' && args.queue) {
     const lanes = args.lanes === undefined ? 1 : Number(args.lanes);
     if (!Number.isInteger(lanes) || lanes < 1) throw new Error(`--lanes wants a whole number of fix runs, not ${args.lanes}`);
-    return drainFixQueue(cfg, { lanes, root, say });
+    return drainFixQueue(cfg, { lanes, ready: args.ready, root, say });
   }
   if (first === 'queue') {
     const [verb, ...ids] = rest;

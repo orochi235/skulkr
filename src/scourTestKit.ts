@@ -71,3 +71,29 @@ export const fakeRunner = (seen: string[][], { matchReply, usage }: { matchReply
   };
   return { run, unavailableNodes: () => new Set(), jobs: () => [], tasks };
 };
+
+/** A runner whose fixer commits one file per batch on top of the tree it was handed, and notes the commit it saw. */
+export const fixingRunner = () => {
+  const seen: string[] = [];
+  const runner = {
+    unavailableNodes: () => new Set(), jobs: () => [],
+    run: async (job: { to: string; task: string }, { cwd }: { cwd: string }) => {
+      mkdirSync(job.to, { recursive: true });
+      writeFileSync(join(job.to, 'exit'), '0');
+      const git = (dir: string, ...a: string[]) => execFileSync('git', a, { cwd: dir, encoding: 'utf8' }).trim();
+      const head = git(cwd, 'rev-parse', 'HEAD');
+      seen.push(head);
+      const k = /~b(\d+)-fix$/.exec(job.task)?.[1] ?? '0';
+      const tree = join(scratch(), 'w');
+      git(cwd, 'worktree', 'add', '-q', '--detach', tree, head);
+      writeFileSync(join(tree, 'src', `b${k}.ts`), `export const b${k} = ${Math.random()};\n`);
+      git(tree, 'add', '.');
+      git(tree, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', `fix b${k}\n\nDefect: D${k}`);
+      writeFileSync(join(job.to, 'fix.mbox'), git(tree, 'format-patch', '-1', '--stdout') + '\n');
+      git(cwd, 'worktree', 'remove', '--force', tree);
+      writeFileSync(join(job.to, 'claude.json'), JSON.stringify({ type: 'result', is_error: false, result: `[D${k}] fixed\ntally: 1 of 1 fixed, 0 extra fixed`, total_cost_usd: 0.1 }));
+      return { status: 0 };
+    },
+  };
+  return { runner, seen };
+};

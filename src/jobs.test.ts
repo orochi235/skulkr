@@ -99,7 +99,7 @@ describe('verify and repair job lines', () => {
   it("run weasel's verify step in the fixer's own job, after the model and its mbox", () => {
     const shell = fixShell(cfg, 'core', 15, 3);
     expect(at(shell, 'claude -p')).toBeLessThan(at(shell, 'git format-patch'));
-    expect(at(shell, 'git format-patch')).toBeLessThan(at(shell, 'vitest related --run --maxWorkers=4'));
+    expect(at(shell, 'git format-patch')).toBeLessThan(at(shell, ' related --run --maxWorkers=4'));
     expect(shell).toContain("--project='\\''!browser*'\\''");
     expect(shell).toContain('vitest list --filesOnly');
     expect(fixShell(resolveConfig({}), 'core', 15, 3)).not.toContain('VERIFY_FILES=$(');
@@ -123,7 +123,7 @@ describe('verify and repair job lines', () => {
   it("run the GUI part's own command with no probe in a GUI verify job", () => {
     const shell = verifyShell(cfg, 'core', { gui: true });
     expect(shell).not.toContain('claude -p');
-    expect(shell).toContain("vitest related --run --maxWorkers=2 --project='\\''browser*'\\''");
+    expect(shell).toContain("related --run --maxWorkers=2 --project='\\''browser*'\\''");
     expect(shell).not.toContain('vitest list');
   });
 
