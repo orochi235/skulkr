@@ -126,7 +126,7 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
             {ledger.fix && ledger.fix.batches.length > 0 && <div className={s.legendFixes}><h3 className={s.legendTitle}>Fixes</h3><FixShelfKey /></div>}
           </section>
         </div>
-        <div className={s.chart}><DelveChart ledger={ledger} max={delving ? ledger.running!.max : null} live={delving} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} hideFixed={hideFixed && hasFixPlan} /><div className={s.chartFoot}><PassTableButton ledger={ledger} />{hasFixPlan && <Checkbox isSelected={hideFixed} onChange={setHideFixed}>Collapse fixed passes</Checkbox>}</div></div>
+        <div className={s.chart}><DelveChart ledger={ledger} max={delving ? ledger.running!.max : null} live={delving} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} hideFixed={hideFixed && hasFixPlan} /><div className={s.chartFoot}><PassTableButton ledger={ledger} />{hasFixPlan && <Checkbox isSelected={hideFixed} onChange={setHideFixed}>Collapse resolved passes</Checkbox>}</div></div>
         <DefectCallout ledger={ledger} id={traced} at={pointer} flipX={(head.current?.clientWidth ?? 0) / 2} />
       </header>
       <div ref={scroll} className={s.scroll}>

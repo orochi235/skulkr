@@ -49,7 +49,7 @@ export const fixStatsOf = (l: SaturationLedger, max: number | null): Stat[] => {
   const back = touched.filter((b) => b.defects.every((d) => mine(d.id) && mine(d.id)!.status !== 'fixing')).length;
   const count = (...of: string[]) => Object.keys(shelf?.statuses ?? {}).filter((id) => of.includes(mine(id)?.status ?? '')).length;
   return [
-    ['batches', max ? `${back}/${max}` : String(back)],
+    ['batch', max ? `${back}/${max}` : String(back), STAT_TONE.light],
     ['fixing', String(count('fixing'))],
     ['fixed', String(count('fixed'))],
     ['not a defect', String(count('not a defect'))],

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AboutButton } from '@dash/AboutButton';
-import { isFixSettled } from './FixShelf';
+import { isDefectClosed } from './FixShelf';
 import type { SaturationDefect, SaturationLedger } from './saturation.types';
 import s from './DelveChart.module.css';
 
@@ -60,7 +60,7 @@ export function DelveChart({ ledger, max = null, live = false, onPickDefect, tra
    *  shelf); without them the chart keeps its own. */
   traced?: string | null;
   onTrace?: (id: string | null) => void;
-  /** Collapse each pass whose defects are all fixed (`isFixSettled`), labeling every pass still shown with its number. */
+  /** Collapse each pass whose defects are all resolved (`isDefectClosed`), labeling every pass still shown with its number. */
   hideFixed?: boolean;
 }) {
   const [own, setOwn] = useState<string | null>(null);
@@ -69,7 +69,7 @@ export function DelveChart({ ledger, max = null, live = false, onPickDefect, tra
   const done = ledger.occasions;
   if (done === 0) return null;
   const stacks = stacksOf(ledger.defects, done);
-  const settled = (d: SaturationDefect) => isFixSettled(ledger.fix?.statuses[d.id], d.registry);
+  const settled = (d: SaturationDefect) => isDefectClosed(ledger.fix?.statuses[d.id], d.registry);
   // The passes drawn, by number: every one, or with `hideFixed` those holding a defect not yet fixed.
   const shown = stacks.map((_, i) => i + 1).filter((pass) => !hideFixed || stacks[pass - 1]!.some(({ defect }) => !settled(defect)));
   const ghosts = Math.max(0, Math.round(ledger.unseen ?? 0));

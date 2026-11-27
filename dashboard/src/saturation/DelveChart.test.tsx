@@ -40,19 +40,20 @@ describe('DelveChart', () => {
     expect(screen.getByRole('img').getAttribute('class')).not.toContain('tracing');
   });
 
-  it("fades a defect whose fix is settled, every sighting of it", () => {
-    const fix = { batches: [], ask: [], statuses: { D1: { status: 'fixed' as const, run: 1, branch: 'scour1-core-b1', verified: true } } };
+  it("fades a resolved defect, fixed or won't fix, every sighting of it", () => {
+    const fix = { batches: [], ask: [], statuses: { D1: { status: 'fixed' as const, run: 1, branch: 'scour1-core-b1', verified: true }, D2: { status: 'not a defect' as const, run: 1, branch: null, verified: true } } };
     const { container } = render(<DelveChart ledger={{ ...ledger, fix }} />);
     const settled = [...container.querySelectorAll('g')].filter((g) => g.className.baseVal.includes('settled'));
-    expect(settled.map((g) => g.querySelector('title')!.textContent!.split(' · ')[1]!.split(',')[0])).toEqual(['D1', 'D1', 'D1']);
+    expect(settled.map((g) => g.querySelector('title')!.textContent!.split(' · ')[1]!.split(',')[0])).toEqual(expect.arrayContaining(['D1', 'D2']));
+    expect(settled.filter((g) => g.querySelector('title')!.textContent!.includes(' · D1')).length).toBe(3);
   });
 
-  it('collapses a pass whose defects are all fixed, labeling each pass left with its own number', () => {
+  it('collapses a pass whose defects are all resolved, labeling each pass left with its own number', () => {
     const fix = { batches: [], ask: [], statuses: { D3: { status: 'fixed' as const, run: 1, branch: 'b', verified: true } } };
     const { container } = render(<DelveChart ledger={{ ...ledger, fix }} hideFixed />);
     const passes = [...new Set([...container.querySelectorAll('title')].map((t) => t.textContent!.split(' ·')[0]))];
     expect(passes).toEqual(['pass 1', 'pass 2', 'pass 3']);
-    const fixAll = { ...fix, statuses: { ...fix.statuses, D1: fix.statuses.D3, D2: fix.statuses.D3 } };
+    const fixAll = { ...fix, statuses: { ...fix.statuses, D1: fix.statuses.D3, D2: { status: 'not a defect' as const, run: 1, branch: null, verified: true } } };
     const collapsed = render(<DelveChart ledger={{ ...ledger, fix: fixAll }} hideFixed />).container;
     expect(collapsed.querySelectorAll('title')).toHaveLength(0);
   });
