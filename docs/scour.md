@@ -65,13 +65,17 @@ project's `.skulkr/`, never from one machine's state directory.
 
 ## Building the fix stage
 
-**Built (2026-11-26): triage and fix, stopping at verified branches.** `skulkr scour fix <area> [--dry] [--batch k,…]`
+**Built (2026-11-26): triage and fix, stopping at verified branches.** `skulkr scour fix <area> [--dry] [--batch k,…] [--defects D1,…] [--on <ref>]`
 (`src/scourFix.mjs`) plans the area's batches (`src/scourTriage.mjs`), runs each through a round's fixer job on
 `main`'s tip (`area.mjs:fixInto`: verify and up to two repairs), and puts its commits on a branch of its own,
 `scour<N>-<area>-b<k>`. Its record, one row per defect with its verdict, and each batch's commits, verify, repairs
 and cost, is `<state>/scour/fix-<N>/record.json`. `main` is never touched. Locally, fixers run on this machine and
 their verify and checks on the fleet (`runner: 'local'`, so `checksOnFleet` holds). A run holds its ledger as a delve
  does (`does: 'fix'`), so the Scour page shows it live, each batch's jobs read from the run's directory.
+
+- **Sending defects again** (2026-11-27): `--defects D37,D22,…` makes one batch of exactly those defects, numbered as
+  the first one's batch, for what a batch left unfixed. `--on <ref>` starts the run from that ref instead of `main`'s tip,
+  so a batch touching an earlier batch's files stacks on its branch and lands after it without conflicts.
 
 - **Batches group for the fixer's sake, never by severity**: every open defect is to be fixed, so defects join one
   batch when they share a file a fix would touch or a stated cause, a group past eight split in file and line order

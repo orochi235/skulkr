@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fixPlanFor, resolvedFile } from './scourTriage.mjs';
-import { scourVerdictsOf } from './scourFix.mjs';
+import { defectsBatchOf, scourVerdictsOf } from './scourFix.mjs';
 import { fixStatusesFor, lastFixRunOf } from './scourFixStatus.mjs';
 import { withFlags } from './scourFlags.mjs';
 import { isRecurrent } from './triageFields.mjs';
@@ -9,6 +9,18 @@ const d = (id: string, where: string, extra: Record<string, unknown> = {}, seen 
 const ledgerOf = (defects: unknown[], files: string[] = [], occasions = 10) => ({ files, defects, occasions: Array.from({ length: occasions }, () => ({})) });
 
 describe('scour fix triage', () => {
+  it('makes one batch of exactly the named defects, numbered as the first one\'s batch, and refuses an id no batch holds', () => {
+    const plan = { batches: [
+      { n: 1, defects: [{ id: 'D1', files: ['a.ts'] }, { id: 'D2', files: ['b.ts'] }], files: ['a.ts', 'b.ts'] },
+      { n: 2, defects: [{ id: 'D3', files: ['c.ts'] }], files: ['c.ts'] },
+    ] };
+    const b = defectsBatchOf(plan, ['D2', 'D3']);
+    expect(b.n).toBe(1);
+    expect(b.defects.map((x: { id: string }) => x.id)).toEqual(['D2', 'D3']);
+    expect(b.files).toEqual(['b.ts', 'c.ts']);
+    expect(() => defectsBatchOf(plan, ['D9'])).toThrow('no batch holds D9');
+  });
+
   it('batches defects that share a file a fix would touch or a cause, and sets design-sized ones aside to ask', () => {
     const plan = fixPlanFor(ledgerOf([
       d('D1', 'src/a.ts:10'), d('D2', 'src/b.ts:5', { fix: ['src/a.ts'] }), d('D3', 'src/c.ts:1', { cause: 'stale capture' }),

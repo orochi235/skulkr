@@ -61,6 +61,16 @@ export const scourVerdictsOf = (report, ids) => {
   return ids.map((id) => ({ id, ...(out.get(id) ?? { verdict: null, line: null, sha: null }) }));
 };
 
+/**
+ * One batch of exactly the defects `ids` names, taken from `plan`'s batches with their files, numbered as the first
+ * one's batch: to send again the defects a batch left unfixed. Throws for an id no batch holds.
+ */
+export const defectsBatchOf = (plan, ids) => {
+  const all = plan.batches.flatMap((b) => b.defects.map((d) => ({ d, n: b.n })));
+  const picked = ids.map((id) => all.find((x) => x.d.id === id) ?? (() => { throw new Error(`no batch holds ${id}`); })());
+  return { n: picked[0].n, defects: picked.map((x) => x.d), files: [...new Set(picked.flatMap((x) => x.d.files ?? []))] };
+};
+
 /** `branch` made at `commit` in `root` with `mbox` applied by `git am`; answers whether it applied. */
 const branchWith = (root, branch, commit, mbox) => {
   const tree = addWorktree(root, `${branch}-am`, commit, branch);
@@ -76,8 +86,9 @@ const branchWith = (root, branch, commit, mbox) => {
 };
 
 /**
- * `skulkr scour fix <area> [--dry] [--batch k,…]`: the plan with `--dry`, else every batch (or those listed) through a
- * fixer, one at a time. Answers the run's record.
+ * `skulkr scour fix <area> [--dry] [--batch k,…] [--defects D1,…] [--on <ref>]`: the plan with `--dry`, else every batch
+ * (those listed, or one of exactly the defects named) through a fixer, one at a time, from `main`'s tip or `--on`'s.
+ * Answers the run's record.
  */
 export const scourFix = async (cfg, runner, root, id, args, say) => {
   const ledger = ledgerOf(cfg, id);
@@ -87,8 +98,10 @@ export const scourFix = async (cfg, runner, root, id, args, say) => {
     for (const line of fixPlanLines(id, plan)) say(line);
     return { plan };
   }
+  if (args.batch !== undefined && args.defects !== undefined) throw new Error('give --batch or --defects, not both');
   const wanted = args.batch === undefined ? null : new Set(String(args.batch).split(',').map(Number));
-  const batches = wanted ? plan.batches.filter((b) => wanted.has(b.n)) : plan.batches;
+  const batches = args.defects !== undefined ? [defectsBatchOf(plan, String(args.defects).split(',').map((x) => x.trim()).filter(Boolean))]
+    : wanted ? plan.batches.filter((b) => wanted.has(b.n)) : plan.batches;
   if (batches.length === 0) throw new Error(`${id} has no batch ${args.batch}`);
   const n = nextRunOf(cfg);
   const runDir = join(scourStateDirOf(cfg), `fix-${n}`);
@@ -99,7 +112,8 @@ export const scourFix = async (cfg, runner, root, id, args, say) => {
 
 /** Fix run `n`'s `batches` of ledger `id`, one at a time, recorded in `runDir`. Answers the run's record. */
 const fixBatches = async (cfg, runner, root, id, ledger, batches, n, runDir, args, say) => {
-  const commit = freezeCommitOf(cfg, root);
+  // `--on <branch>` stacks the run on an earlier batch's branch, so batches touching the same files land in order.
+  const commit = freezeCommitOf(cfg, root, args.on);
   const git = gitIn(root);
   const frozen = addWorktree(root, `${cfg.naming.prefix}-scour-fix${n}`, commit);
   const record = { run: n, area: id, commit, ledgerCommit: ledger.commit, started: new Date().toISOString(), batches: [] };

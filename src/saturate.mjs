@@ -36,7 +36,7 @@ import { createSaturateContext, occasionJobsOf, requireSources, runReview } from
 import { foldPending, stageReport } from './scourFold.mjs';
 import { nextLines, scourNext } from './scourSession.mjs';
 
-export const SATURATE_USAGE = 'usage: skulkr scour next <area> [--agent <id>] [--metered] [--release] [--max N] [--per-defect $] [--at <sha>] | [delve] <area> [--fleet] [--account <config dir>] [--metered] [--sources claude,codex] [--max N] [--per-defect $] [--usd $] [--at <sha>] [--fresh] | run [areas…] [--fleet] [--account <config dir>] [--metered] [--by finish|cheapest|spread] [--usd $] [--passes N] [--per-defect $] | fold <area> | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | fix <area> [--dry] [--batch k,…] | flag <area> <ids…> [--clear] | land <area>… | land --all | ls [--json] | ls --source <name> --ids | report <area> | rm <area>';
+export const SATURATE_USAGE = 'usage: skulkr scour next <area> [--agent <id>] [--metered] [--release] [--max N] [--per-defect $] [--at <sha>] | [delve] <area> [--fleet] [--account <config dir>] [--metered] [--sources claude,codex] [--max N] [--per-defect $] [--usd $] [--at <sha>] [--fresh] | run [areas…] [--fleet] [--account <config dir>] [--metered] [--by finish|cheapest|spread] [--usd $] [--passes N] [--per-defect $] | fold <area> | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | fix <area> [--dry] [--batch k,…] [--defects D1,…] [--on <ref>] | flag <area> <ids…> [--clear] | land <area>… | land --all | ls [--json] | ls --source <name> --ids | report <area> | rm <area>';
 
 /** `argv`'s positional words and flags. */
 export const saturateArgsOf = (cfg, argv) => {
@@ -60,7 +60,7 @@ export const saturateArgsOf = (cfg, argv) => {
   const passes = flags.passes === undefined ? undefined : Number(flags.passes);
   if (passes !== undefined && (!Number.isInteger(passes) || passes < 1)) throw new Error(`--passes wants a whole number, not ${flags.passes}`);
   return {
-    words, max, sources, fresh: Boolean(flags.fresh), all: Boolean(flags.all), json: Boolean(flags.json), ids: Boolean(flags.ids), source: flags.source, at: flags.at, agent: flags.agent, metered: Boolean(flags.metered), release: Boolean(flags.release), account: flags.account, dry: Boolean(flags.dry), clear: Boolean(flags.clear), batch: flags.batch,
+    words, max, sources, fresh: Boolean(flags.fresh), all: Boolean(flags.all), json: Boolean(flags.json), ids: Boolean(flags.ids), source: flags.source, at: flags.at, agent: flags.agent, metered: Boolean(flags.metered), release: Boolean(flags.release), account: flags.account, dry: Boolean(flags.dry), clear: Boolean(flags.clear), batch: flags.batch, defects: flags.defects, on: flags.on,
     usd: dollars('usd'), perDefect: flags['per-defect'] === undefined ? undefined : (limitSpecOf(flags['per-defect']), flags['per-defect']), passes, by: flags.by,
   };
 };
