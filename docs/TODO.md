@@ -16,6 +16,13 @@ Open work on skulkr. Each entry says when it closes.
   is reported as timed out, its cost is read from its transcript, and its verdicts are read from its commits or
   marked unread with that reason.
 
+- [ ] (P2) Branch `live-elapsed` (worktree `.worktrees/live-elapsed`, 2026-11-27) makes the dashboard's elapsed
+  times and job-tail age count on between snapshots, through weasel's `LiveQuantity`, from each snapshot's own
+  service time (`generated`, and a new `asOf` on `saturate ls --json`). It is built and untested: weasel's
+  `LiveQuantity` is on weasel `main` (2e6a59c4be) and in no release, so its typecheck and tests need the alpo link
+  to a weasel `dist` built from that `main`. Closes when its dashboard typecheck, `liveTime.test.ts` and
+  `auditData.test.ts` pass against that build and it merges.
+
 - [ ] (P2) The dashboard's Scour page keeps a headless Chromium tab at 150–180% CPU while nobody touches it
   (2026-11-26, measured with `ps` on two headless browsers left open on it). Closes when an idle Scour page costs
   next to nothing.
