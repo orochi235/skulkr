@@ -1,6 +1,6 @@
 # Handoff
 
-For the next session in skulkr. Written 2026-11-27 ~11:20 local. Check each claim against the tree.
+For the next session in skulkr. Written 2026-11-27 ~12:25 local. Check each claim against the tree.
 
 ## State
 
@@ -17,34 +17,36 @@ On `main`, pushed except as noted under Loose ends.
 | 5 | b5 | 7 fixed | `scour5-ui.components.Timeline-b5` (based on main `1f25c27a41`) | passed |
 | 6 | b4 rerun: D37 D22 D27 D38, `--on scour3-…-b4` | 3 fixed, 1 not a defect | `scour6-ui.components.Timeline-b4` | passed |
 
-## In flight: fix runs 8–9 (unattended)
+## In flight: the fix queue, two lanes (unattended)
 
-- **Run 7, `core.core.viewport`: done.** All 27 fixed, every verify passed, $6.36; `scour7-core.core.viewport-b1..b4`.
-- **Run 8, `routing.interactions`** (5 batches, pid 66169) is running; then **`forge.vite.part2`** (8 batches).
-  `fix-chain.sh`'s shell died mid-run, so `.playwright-mcp/fix-chain2.sh` (`pgrep -f fix-chain2`) waits for pid 66169
-  and starts forge; logs `logs/fix-chain.log`, `logs/fix-<area>.log`. b1: 8 fixed, verify passed, $2.18. b2: 6 fixed,
-  2 not a defect, one repair, verify passed, $2.06. Report each run's outcome to the user when it ends. The areas were my pick after viewport, at the user's "start another, and another".
-- **Then `routing.tools`, `core.canvas.nodeShapes`, `core.canvas.part4`**, queued 2026-11-27 12:10 at the user's "keep
-  the fixes rolling for a few more hours so there's always one running": `.playwright-mcp/fix-chain3.sh`
-  (`pgrep -f fix-chain3`) waits for fix-chain2 and runs them in turn; `touch .playwright-mcp/logs/stop-chain` stops it
-  before the next area starts. `core.animation` was skipped: its coast files overlap weasel-7a's pending
-  `coast-on-glide` branch.
-- ⚠️ Batches split past eight defects can share a file (routing b1/b2 share `elementAt.ts`; forge b2/b3 share
-  `plugin.ts`), and each branches from `main`, so those pairs may conflict at landing.
-- Runs 3 and 4's records were filled in by hand: both fixers were killed at the 45-minute limit (`docs/TODO.md` P1).
+- **Done:** run 7 `core.core.viewport` (27 fixed, $6.36) and run 8 `routing.interactions` (21 fixed, 9 not a defect,
+  every verify passed, $7.06); branches `scour7-*`, `scour8-*` in weasel.
+- **Running side by side** since 2026-11-27 ~12:09: run 9 `forge.vite.part2` (8 batches, started by
+  `.playwright-mcp/fix-chain2.sh`) and run 10 `routing.tools` (4 batches, started by hand). Logs
+  `.playwright-mcp/logs/fix-<area>.log`.
+- **The fix queue drains the rest:** `skulkr scour fix --queue --lanes 2` (pid in `pgrep -f "fix --queue"`, log
+  `.playwright-mcp/logs/fix-queue.log`) starts the next queued area whenever under two fix runs are live; queued:
+  `core.canvas.nodeShapes`, `core.canvas.part4`, `core.canvas.SceneCanvas.part2`. Their logs:
+  `~/.local/state/weasel-skulkr/scour/fix-<area>.log`. `skulkr scour queue ls|add|drop` (with
+  `--config examples/weasel.config.mjs`, from `~/src/weasel`) reads and edits it. The user asked for "a few more hours so
+  there's always one running" and then to "try two fix rounds in parallel"; add areas when the queue runs low. Areas were
+  my pick: deeply scoured, low next-new. `core.animation` is skipped while weasel-7a's `coast-on-glide` branch overlaps it.
+- **The parallel trial's comparison:** `node scripts/fixRunStats.mjs` (per run: wall, overlap, per-batch, fixer and
+  verify minutes, $/fixed; `--json` per batch). One at a time, runs 7–8 took ~15 min a batch (fixer ~10, verify ~5–6).
+  Machine load each minute in `.playwright-mcp/logs/load.tsv` from `.playwright-mcp/sampleLoad.sh` (stops itself after
+  8 h); load was already ~20 before the second lane started, and no serial-time load was recorded. Report the
+  comparison once runs 9 and 10 end.
+- ⚠️ Batches split past eight defects can share a file and each branches from `main`, so pairs may conflict at landing.
 - **Then:** the user reviews all `scour<N>-*` branches in weasel and the `tile-charts` port
   (`~/src/weasel/.worktrees/tile-charts`, unpushed); landing is built only after that review.
 
 ## Next to build
 
-1. **A "defects fixed" map metric** on the Scour page: `saturationFixed` in `dashboard/src/audits/heatMetrics.ts`
-   (`SATURATION_METRICS`), counting defects `isFixSettled` on the ledger's fix shelf, maybe with a per-kloc twin.
-   Proposed, not yet confirmed as wanted.
-
-Built 2026-11-27: per-defect stages (`8ae7440`, docs/scour.md "Each defect's own stage"), the fixer's reason on
-non-fixed verdicts (`75222a7`), weasel's verify through `onto adapt vitest` (`f9b7a6c`). The first run to show
-trailers, reasons asked for, and onto's test-count bar is `forge.vite.part2`, since run 8's process loaded the
-older code; watch its shelf through a repair to confirm the laid defects read right.
+Built 2026-11-27, this session: the fix queue and the Scour queue's Delve | Fix switch (docs/scour.md "Fix queue"),
+atomic fix-run numbers, `scripts/fixRunStats.mjs`, map lenses "defects fixed", "per 1,000 lines" and "hours since a fix
+run", and the topbar's "N defects found · M fixed". Earlier: per-defect stages, the fixer's reason on non-fixed
+verdicts, weasel's verify through `onto adapt vitest`. Run 9 is the first on that code: watch its shelf through a
+repair to confirm laid defects read right.
 
 ## Decisions made in conversation (2026-11-26/27)
 
