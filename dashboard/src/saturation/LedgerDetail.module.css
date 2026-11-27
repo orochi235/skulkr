@@ -36,6 +36,16 @@
 
 .fixBox { composes: box from './box.module.css'; min-width: 0; padding: var(--wzl-space-3) var(--wzl-space-5); }
 
+/* The stop rule's status over the fix plan, both the plan's width: the status wraps rather than widening the column. */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wzl-space-4);
+  min-width: 0;
+}
+
+.stack:has(> .fixBox) > :first-child { inline-size: 0; min-inline-size: 100%; }
+
 .scroll {
   flex: 1 1 0;
   min-height: 0;

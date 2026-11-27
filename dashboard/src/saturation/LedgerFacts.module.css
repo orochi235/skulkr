@@ -76,13 +76,16 @@
 /* An estimate, set apart as the hero's are: italic and muted. */
 .estimate { padding-inline-end: 0.15em; font-style: italic; color: var(--wzl-fg-muted); }
 
-.stop {
-  margin: var(--wzl-space-3) 0 0;
+.status {
+  composes: box from './box.module.css';
+  margin: 0;
+  padding: var(--wzl-space-3) var(--wzl-space-5);
+  font-size: var(--wzl-font-size-sm);
   color: var(--wzl-fg-muted);
 }
 
 /* A dot before the stop rule's state: green once the ledger has stopped, gray while it runs on. */
-.stop::before {
+.status::before {
   content: '';
   display: inline-block;
   inline-size: 7px;

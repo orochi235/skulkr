@@ -6,7 +6,7 @@ import { LedgerHero } from './LedgerHero';
 import { PassTableButton } from './PassTable';
 import { severityRank } from './format';
 import { DefectCallout } from './DefectCallout';
-import { LedgerFacts } from './LedgerFacts';
+import { LedgerFacts, StopStatus } from './LedgerFacts';
 import type { FixShelf as FixShelfData, SaturationDefect, SaturationLedger } from './saturation.types';
 import s from './LedgerDetail.module.css';
 
@@ -100,14 +100,17 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
         <div className={s.summary}>
           <LedgerHero ledger={ledger} />
           <LedgerFacts ledger={ledger} />
-          {ledger.fix && ledger.fix.batches.length > 0 && (
-            <section className={s.fixBox} aria-label="Fix plan">
-              <div className={s.titleRow}>
-                <span className={s.facts}>{fixFactsOf(ledger.fix)}</span><FixShelfAbout /><ShelfOrderSwitch order={shelfOrder} onChange={setShelfOrder} />
-              </div>
-              <FixShelf shelf={ledger.fix} order={shelfOrder} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} />
-            </section>
-          )}
+          <div className={s.stack}>
+            <StopStatus ledger={ledger} />
+            {ledger.fix && ledger.fix.batches.length > 0 && (
+              <section className={s.fixBox} aria-label="Fix plan">
+                <div className={s.titleRow}>
+                  <span className={s.facts}>{fixFactsOf(ledger.fix)}</span><FixShelfAbout /><ShelfOrderSwitch order={shelfOrder} onChange={setShelfOrder} />
+                </div>
+                <FixShelf shelf={ledger.fix} order={shelfOrder} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} />
+              </section>
+            )}
+          </div>
         </div>
         <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} /><div className={s.chartFoot}><PassTableButton ledger={ledger} /></div></div>
         <DefectCallout ledger={ledger} id={traced} at={pointer} flipX={(head.current?.clientWidth ?? 0) / 2} />

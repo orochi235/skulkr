@@ -71,17 +71,21 @@ function YieldGrid({ ledger }: { ledger: SaturationLedger }) {
   );
 }
 
-/** The facts under a ledger's name: the yield grid beside its single-valued facts, and its stop rule's state. */
+/** The facts under a ledger's name: the yield grid beside its single-valued facts. */
 export function LedgerFacts({ ledger }: { ledger: SaturationLedger }) {
   return (
-    <div className={s.facts}>
-      <div className={s.groups}>
-        <YieldGrid ledger={ledger} />
-        <FactList title="Scope & effort" facts={scopeFactsOf(ledger)} />
-      </div>
-      <p className={ledger.stopped ? `${s.stop} ${s.stopped}` : s.stop}>
-        {ledger.stopped ? <>Stopped: {ledger.stopped}.</> : 'Not saturated yet: the stop rule does not hold.'}
-      </p>
+    <div className={`${s.facts} ${s.groups}`}>
+      <YieldGrid ledger={ledger} />
+      <FactList title="Scope & effort" facts={scopeFactsOf(ledger)} />
     </div>
+  );
+}
+
+/** Whether a ledger's stop rule holds, and why, in a box of its own. */
+export function StopStatus({ ledger }: { ledger: SaturationLedger }) {
+  return (
+    <p className={ledger.stopped ? `${s.status} ${s.stopped}` : s.status}>
+      {ledger.stopped ? <>Stopped: {ledger.stopped}.</> : 'Not saturated yet: the stop rule does not hold.'}
+    </p>
   );
 }
