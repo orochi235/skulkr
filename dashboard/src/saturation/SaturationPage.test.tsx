@@ -63,7 +63,7 @@ describe('SaturationPage', () => {
     serve();
     window.location.hash = '#weasel/saturation';
     renderWithIcons(<WeaselProvider><SaturationPage base="/test/" /></WeaselProvider>);
-    expect(await screen.findByText('2 ledgers · 2 defects · $46.56')).toBeInTheDocument();
+    expect(await screen.findByText('2 ledgers · 2 defects found · 1 fixed · $46.56')).toBeInTheDocument();
     const list = screen.getByRole('region', { name: 'Ledgers' });
     await within(list).findByText('ui');
     const top = within(list).getAllByRole('treeitem').filter((r) => r.getAttribute('aria-level') === '1');

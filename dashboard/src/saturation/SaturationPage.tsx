@@ -13,6 +13,7 @@ import { usd } from './format';
 import { LedgerDetail } from './LedgerDetail';
 import { LedgerList } from './LedgerList';
 import { SaturationMap } from './SaturationMap';
+import { heroCountsOf } from './LedgerHero';
 import { ScourNow } from './ScourNow';
 import { ScourQueue } from './ScourQueue';
 import { SATURATION_LIVE_POLL_MS, SATURATION_POLL_MS, useSaturation } from './useSaturation';
@@ -52,13 +53,14 @@ export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: 
   const areaIds = useMemo(() => (map.status === 'ready' ? map.map.areas.map((a) => a.id) : []), [map]);
   const totals = useMemo(() => ({
     defects: ledgers.reduce((n, l) => n + l.distinct, 0),
+    fixed: ledgers.reduce((n, l) => n + heroCountsOf(l).fixed, 0),
     costUsd: ledgers.reduce((n, l) => n + l.costUsd, 0),
   }), [ledgers]);
 
   const heading = tenant !== null ? <TenantTitle names={names} current={tenant} onChoose={choose} /> : <AppTitle />;
   const header = state.status === 'ready' ? (
     <span className={s.stamp}>
-      {ledgers.length.toLocaleString()} ledgers · {totals.defects.toLocaleString()} defects · {usd(totals.costUsd)}
+      {ledgers.length.toLocaleString()} ledgers · {totals.defects.toLocaleString()} defects found · {totals.fixed.toLocaleString()} fixed · {usd(totals.costUsd)}
     </span>
   ) : null;
   return (
