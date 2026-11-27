@@ -8,7 +8,7 @@ export const usdOrDash = (n: number | null): string => (n === null ? '–' : usd
 export const estimate = (n: number | null): string => (n === null ? '–' : n.toFixed(1));
 
 /** A chance as a percent to one decimal, or a dash. */
-export const percent = (n: number | null): string => (n === null ? '–' : (n * 100).toFixed(1));
+export const percent = (n: number | null): string => (n === null ? '–' : `${(n * 100).toFixed(1)}%`);
 
 const SEVERITY_RANK: Readonly<Record<string, number>> = { critical: 4, high: 3, medium: 2, low: 1 };
 
