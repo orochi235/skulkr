@@ -132,6 +132,8 @@ number. The Scour page's queue pane switches between Delve and Fix; Fix shows th
 - **ask** is agents reviewing other agents' work: a fixer's `question` verdicts and declined defects go to a
   reviewing agent, not a person. Anything that needs a person is pulled out of the pipeline and logged (2026-11-25).
 - A defect only a scour found is not handed to a round's fixers until triage and fix exist (2026-11-25).
+- A fix run lands its verified batches on `main` itself, through the batch, gate and merge rounds use, by default; an
+  option hands them to the repository's own batching instead, marked ready and left unmerged (2026-11-27).
 - Collect's verb is **fold**: sightings fold into defects; `skulkr scour fold <area>` reruns it after the matcher
   changes (2026-11-25).
 - The names on disk follow: `saturation/` becomes `scour/` in the state directory and in `.skulkr/`, with the old path
