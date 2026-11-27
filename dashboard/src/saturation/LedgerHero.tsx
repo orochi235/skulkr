@@ -17,11 +17,11 @@ export const heroCountsOf = (ledger: SaturationLedger) => {
   return { found: ledger.distinct, fixed, fixing, open: ledger.defects.length - fixed - ignored - fixing, ignored, unseen: ledger.unseen };
 };
 
-type Stat = readonly [label: string, value: string, tone?: string];
+export type Stat = readonly [label: string, value: string, tone?: string];
 
 /** A row of headline figures, each big over its word. An estimate is set apart by its type (`.estimate`), not a sign
  *  before it. */
-function StatRow({ label, stats }: { label: string; stats: readonly Stat[] }) {
+export function StatRow({ label, stats }: { label: string; stats: readonly Stat[] }) {
   return (
     <dl className={s.row} aria-label={label}>
       {stats.map(([word, value, tone]) => (

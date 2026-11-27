@@ -42,7 +42,7 @@
 
 .job {
   display: grid;
-  grid-template-columns: 12ch 14ch 7ch minmax(0, 1fr);
+  grid-template-columns: 14ch 7ch minmax(0, 1fr);
   align-items: center;
   gap: var(--wzl-space-2);
   font-size: var(--wzl-font-size-sm);
@@ -87,3 +87,14 @@
 
 /* At the row's end whatever the facts' length, so the ticking time before it never moves it. */
 .about { margin-inline-start: auto; }
+
+/* The ledger's hero and this run's figures side by side, wrapping when the box is narrow. */
+.boxes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--wzl-space-4);
+  margin-block: var(--wzl-space-3);
+}
+
+.runBox { composes: box from './box.module.css'; padding: var(--wzl-space-3) var(--wzl-space-6); }

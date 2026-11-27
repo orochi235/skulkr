@@ -50,7 +50,9 @@ describe('SaturationPage', () => {
     window.location.hash = '#weasel/scour';
     renderWithIcons(<WeaselProvider><SaturationPage base="/test/" /></WeaselProvider>);
     const now = await screen.findByRole('region', { name: 'Scouring now' });
-    expect(within(now).getByText(/delve · pid 2804 · 47:0\d · 24\/40 occasions/)).toBeInTheDocument();
+    expect(within(now).getByText('delve · pid 2804')).toBeInTheDocument();
+    expect(within(now).getByText('24/40')).toBeInTheDocument();
+    expect(within(now).getByText(/^47:0\d$/)).toBeInTheDocument();
     expect(within(now).getByText('5/14')).toBeInTheDocument();
     expect(within(now).getByText(/ 24\/40 claude: 3 findings, 0 new$/)).toBeInTheDocument();
     fireEvent.click(within(now).getByText('core.animation'));
