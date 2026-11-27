@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Checkbox } from '@weasel-js/ui/components/Checkbox';
 import { useDashPref } from '@dash/audits/dashPrefs';
 import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
@@ -69,11 +69,15 @@ function statusOf(d: SaturationDefect) {
   return d.registry.sha ? <>{d.registry.status} <code>{d.registry.sha.slice(0, 10)}</code></> : d.registry.status;
 }
 
-/** One ledger: how far its reviews got, and its distinct defects; clicking a tile on its chart scrolls to that defect's
- *  row and marks it. */
-export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
-  // The pick carries a count so picking the same defect again scrolls to it again.
-  const [picked, setPicked] = useState<{ id: string; n: number } | null>(null);
+/** A picked defect, with its area; `n` counts picks, so picking the same defect again scrolls to it again. */
+export type DefectPick = { area: string; id: string; n: number };
+
+/** One ledger: how far its reviews got, and its distinct defects; `picked`, a tile clicked on its chart or elsewhere,
+ *  is the defect whose row it scrolls to and marks. */
+export function LedgerDetail({ ledger, picked: pick, onPickDefect }: {
+  ledger: SaturationLedger; picked: DefectPick | null; onPickDefect: (area: string, id: string) => void;
+}) {
+  const picked = pick?.area === ledger.id ? pick : null;
   const scroll = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!picked) return;
@@ -81,7 +85,7 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
     cell?.closest('tr')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [picked]);
   // The defect hovered on either chart, traced on both, its callout over the header.
-  const { host: head, hostEvents, traced, setTraced, at: pointer, flipX } = useDefectCallout<HTMLElement>();
+  const { hostEvents, traced, setTraced, at: pointer } = useDefectCallout<HTMLElement>();
   const [shelfOrder, setShelfOrder] = useDashPref('saturation.shelfOrder');
   const [hideFixed, setHideFixed] = useDashPref('saturation.collapseResolved');
   const hasFixPlan = Boolean(ledger.fix && ledger.fix.batches.length > 0);
@@ -91,15 +95,13 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
   const summary = useRef<HTMLDivElement>(null);
   const legend = useRef<HTMLElement>(null);
   const legendFits = useFitsInRow(summary, legend);
-  useEffect(() => { setPicked(null); setTraced(null); }, [ledger.id, setTraced]);
+  useEffect(() => setTraced(null), [ledger.id, setTraced]);
   const columns = useMemo(() => columnsFor(ledger.fix), [ledger.fix]);
   const groups = useMemo(() => defectGroupsOf(ledger), [ledger]);
-  const pickDefect = useCallback((id: string) => setPicked((was) => ({ id, n: (was?.n ?? 0) + 1 })), []);
+  const pickDefect = useCallback((id: string) => onPickDefect(ledger.id, id), [onPickDefect, ledger.id]);
   return (
     <section className={s.detail} aria-label={`${ledger.area}'s defects`}>
-      <header
-        ref={head} className={s.head} {...hostEvents}
-      >
+      <header className={s.head} {...hostEvents}>
         <div className={`${s.titleRow} ${s.summaryTitle}`}><h2 className={s.title}>{ledger.id}</h2><DelveAbout ledger={ledger} picks /></div>
         <div ref={summary} className={s.summary}>
           <LedgerHero ledger={ledger} />
@@ -121,7 +123,7 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
           </section>
         </div>
         <div className={s.chart}><DelveChart ledger={ledger} max={delving ? ledger.running!.max : null} live={delving} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} hideFixed={hideFixed && hasFixPlan} /><div className={s.chartFoot}><PassTableButton ledger={ledger} />{hasFixPlan && <Checkbox isSelected={hideFixed} onChange={setHideFixed}>Collapse resolved passes</Checkbox>}</div></div>
-        <DefectCallout ledger={ledger} id={traced} at={pointer} flipX={flipX} />
+        <DefectCallout ledger={ledger} id={traced} at={pointer} />
       </header>
       <div ref={scroll} className={s.scroll}>
         {groups.map((g) => (

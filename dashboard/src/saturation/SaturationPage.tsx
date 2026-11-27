@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ResizeHandle } from '@weasel-js/ui/components/ResizeHandle';
 import { Shell } from '@dash/Shell';
 import { AppTitle } from '@dash/AppTitle';
@@ -10,7 +10,7 @@ import { useTenantChoice, useTenants } from '@dash/tenants/useTenants';
 import { titleFor } from '@dash/title';
 import { readSize, useViewerPref } from '@dash/audits/viewerPref';
 import { usd } from './format';
-import { LedgerDetail } from './LedgerDetail';
+import { LedgerDetail, type DefectPick } from './LedgerDetail';
 import { LedgerList } from './LedgerList';
 import { SaturationMap } from './SaturationMap';
 import { heroCountsOf } from './LedgerHero';
@@ -38,6 +38,12 @@ export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: 
   const anyRunning = state.status === 'ready' && state.ledgers.some((l) => l.running);
   useEffect(() => setEveryMs(anyRunning ? SATURATION_LIVE_POLL_MS : SATURATION_POLL_MS), [anyRunning]);
   const [picked, pick] = useSaturationArea(tenant);
+  // A tile clicked on a live run's chart or the ledger's own: its area picked, its row scrolled to and marked.
+  const [defectPick, setDefectPick] = useState<DefectPick | null>(null);
+  const pickDefect = useCallback((area: string, id: string) => {
+    pick(area);
+    setDefectPick((was) => ({ area, id, n: (was?.n ?? 0) + 1 }));
+  }, [pick]);
   const map = useSkulkrMap({ url: tenant === null ? null : mapUrl(base, tenant), dev });
   const [listWidth, setListWidth, keepListWidth] = useViewerPref('saturation.list', LIST.initial, readSize);
   const [mapHeight, setMapHeight, keepMapHeight] = useViewerPref('saturation.map', MAP.initial, readSize);
@@ -77,7 +83,7 @@ export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: 
         {state.status === 'ready' && !ledgers.length && (
           <p className={s.note}>No saturation ledger yet. <code>skulkr saturate &lt;area&gt;</code> starts one.</p>
         )}
-        {state.status === 'ready' && <ScourNow ledgers={ledgers} onPick={pick} />}
+        {state.status === 'ready' && <ScourNow ledgers={ledgers} onPick={pick} onPickDefect={pickDefect} />}
         {state.status === 'ready' && ledgers.length > 0 && (
           <div className={s.main}>
             <div className={s.left}>
@@ -100,7 +106,7 @@ export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: 
                   onInput={setMapHeight} onChange={keepMapHeight} aria-label="Resize the map"
                 />
               )}
-              {ledger ? <LedgerDetail ledger={ledger} />
+              {ledger ? <LedgerDetail ledger={ledger} picked={defectPick} onPickDefect={pickDefect} />
                 : <p className={s.note}>{picked ? `${picked} has no saturation ledger.` : 'Pick an area for its defects.'}</p>}
             </div>
           </div>

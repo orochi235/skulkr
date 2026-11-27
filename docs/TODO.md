@@ -23,6 +23,12 @@ Open work on skulkr. Each entry says when it closes.
   to a weasel `dist` built from that `main`. Closes when its dashboard typecheck, `liveTime.test.ts` and
   `auditData.test.ts` pass against that build and it merges.
 
+- [ ] (P2) On the Scour page in a window 900px tall with two live runs, the ledger's defects table gets no height at
+  all: the live runs, the map and the ledger's header fill the right column, which does not scroll, so a picked
+  defect's row is marked and scrolled to inside a pane nobody can see (2026-11-27, measured with Playwright at
+  1440×900; at 1440×1500 the pane is 350px and picks show). Closes when the defects table keeps a usable minimum
+  height, or the column scrolls, at 900px with two live runs.
+
 - [ ] (P2) The dashboard's Scour page keeps a headless Chromium tab at 150–180% CPU while nobody touches it
   (2026-11-26, measured with `ps` on two headless browsers left open on it). Closes when an idle Scour page costs
   next to nothing.

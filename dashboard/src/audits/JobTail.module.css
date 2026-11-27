@@ -1,15 +1,11 @@
-.tail {
-  position: fixed;
-  z-index: 20;
-  /* Beside the pointer, below and right of it, held inside the window. */
-  left: clamp(8px, calc(var(--x, 0px) + 14px), calc(100vw - var(--tail-width) - 8px));
-  top: calc(var(--y, 0px) + 18px);
-  --tail-width: min(620px, calc(100vw - 16px));
-  width: var(--tail-width);
+.tail[role='tooltip'] {
+  /* Weasel's Tooltip places it, below the pointer and inside the window; this only dresses it, its arrow too. */
+  --wzl-surface: var(--audit-panel);
+  --wzl-border: var(--audit-rule);
+  inline-size: min(620px, calc(100vw - 16px));
+  max-inline-size: none;
   padding: var(--wzl-space-2) var(--wzl-space-3);
-  border: 1px solid var(--audit-rule);
   border-radius: 6px;
-  background: var(--audit-panel);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.28);
   pointer-events: none;
 }

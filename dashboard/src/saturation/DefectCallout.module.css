@@ -1,22 +1,13 @@
-/* Placed by custom properties (`--x`, `--y`) the pointer sets: a position that changes on every move has no class. */
-.callout {
-  position: absolute;
-  z-index: 10;
-  inset-inline-start: var(--x);
-  inset-block-start: var(--y);
-  inline-size: max-content;
+/* Weasel's Tooltip places it; this only dresses it. The attribute selector outranks the kit's own one-class rule. */
+.callout[role='tooltip'] {
+  --wzl-border: var(--wzl-border-strong);
   max-inline-size: 26rem;
   padding: var(--wzl-space-4) var(--wzl-space-6);
-  border: var(--wzl-border-w) solid var(--wzl-border-strong);
   border-radius: var(--wzl-radius-md);
-  background: var(--wzl-surface);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--wzl-fg) 18%, transparent);
   font-size: var(--wzl-font-size-sm);
+  line-height: normal;
   pointer-events: none;
-  transform: translateY(-100%);
 }
-
-.flip { transform: translate(-100%, -100%); }
 
 .head {
   display: flex;
