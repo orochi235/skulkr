@@ -1,6 +1,6 @@
 # Handoff
 
-For the next session in skulkr. Rewritten 2026-11-27 ~18:30 local. Check each claim against the tree.
+For the next session in skulkr. Updated 2026-11-27 ~19:00 local. Check each claim against the tree.
 
 ## State
 
@@ -19,6 +19,16 @@ Commit each verified change on `main` without asking (Mike, 2026-11-27).
 they run one after the other: each fix run lands on weasel's `main` when its batches end (stacking + landing,
 `docs/scour.md` "Landing"), and the next starts from the landed tip. Report each landing to Mike (did `main`
 fast-forward, did `.skulkr/scour/fix-<N>/` land, were `scour<N>-*` deleted).
+
+Status at ~19:00: run 14 on batch 2; run 15 batch 1 passed after a repair that `git revert`ed D11's fix (the
+3 `smilBinder.test.tsx` failures were the batch's own: the frozen tree passes them), now on batch 2; the delve past
+pass 5. Both fix runs started before `c656e33` (a repair's revert reads as `not fixed`), so run 15 records D11
+fixed: kouhai t-650 corrects it when the run ends. From pass 6 the delve's reviewers log `skulkr: says/reads/
+searches` lines (`bc36f7e`) and read the new "weigh by ordinary use" paragraph (`5dcdd1d`).
+
+Watch spawned jobs from their start (memory `in-flight-is-not-almost-done`): a delve pass normally takes ~7 min
+but pass 4 took 14 and was healthy, so judge a stall by output growth, not time or the file counter alone.
+`.playwright-mcp/stallwatch.sh` (fix run 15 + this delve) is a starting point; re-arm it under Monitor.
 
 Fix run 13 (`core.canvas.SceneCanvas.part2`) was the first scour landing: `main` fast-forwarded to `471ca1528c` and
 pushed, record committed, branches deleted (kouhai t-635, settled).
@@ -53,6 +63,13 @@ verdicts, weasel's verify through `onto adapt vitest`. Run 9 is the first on tha
 repair to confirm laid defects read right.
 
 ## Decisions made in conversation (2026-11-26/27)
+
+- Reviewers weigh defects by how likely ordinary use is to reach them; exotic-script corners (Mandaic missing from an
+  RTL table) are `low` or left out — in all reviewer briefs (`5dcdd1d`). No per-area focus key was built.
+- `text.layout`'s ledger is kept through that brief change, statistics skew accepted ("not scientifically
+  immaculate", Mike, 2026-11-27).
+- The live run's clock toggles between the whole run and the newest pass/batch on click (`956262a`); the opening
+  price stands in as next defect under two passes (`1082d69`).
 
 - No fleet job may fall back to the controller: `on-fleet` now retries 3× then fails (`92dfdc1`). A stream of test runs
   goes to the fleet; one short file locally on a quiet machine is fine.
