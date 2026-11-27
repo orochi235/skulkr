@@ -39,6 +39,8 @@
 
 .colorBy { font: inherit; color: var(--wzl-fg); }
 
+.invert { flex: none; }
+
 .key {
   display: inline-block;
   width: 14px;

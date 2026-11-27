@@ -13,6 +13,7 @@ import { LockMark } from './Marks';
 import { HEAT_METRICS, HEAT_METRIC_SPECS, metricScaleOf, type HeatMetric } from './heatMetrics';
 import { heatStopsOf, type HeatScheme } from './heatSchemes';
 import { OFF_PIPELINE, PHASE_LABEL, SCOUR_PHASES, SWEEP, phaseClass, type AuditPhase } from './phases';
+import { Checkbox } from '@weasel-js/ui/components/Checkbox';
 import { Slider } from '@weasel-js/ui/components/Slider';
 import { MAX_COUNTED, MAX_HALVES, useDashPref } from './dashPrefs';
 import type { AuditArea } from './skulkrMap.types';
@@ -131,10 +132,11 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
   const [scheme] = useDashPref(colorBy === 'left' ? 'map.scheme' : `map.schemes.${colorBy}`) as [HeatScheme, unknown];
   const values = useMemo(() => (colorBy === 'left' ? null : HEAT_METRIC_SPECS[colorBy].valuesIn(areas)), [colorBy, areas]);
   const heat = useMemo(() => (values ? metricScaleOf(colorBy, values) : leftHeat), [values, colorBy, leftHeat]);
-  const shades = useMemo(
-    () => (colorBy === 'left' ? palette : { ...palette, depth: heatStopsOf(scheme) ?? thermal ?? palette.depth }),
-    [colorBy, palette, scheme, thermal],
-  );
+  const [invert, setInvert] = useDashPref('map.invert');
+  const shades = useMemo(() => {
+    const depth = colorBy === 'left' ? palette.depth : heatStopsOf(scheme) ?? thermal ?? palette.depth;
+    return { ...palette, depth: invert ? ([...depth].reverse() as unknown as typeof depth) : depth };
+  }, [colorBy, palette, scheme, thermal, invert]);
   const metric = HEAT_METRIC_SPECS[colorBy];
   const layout = useMemo(() => layoutMap(areas, size.width, size.height), [areas, size]);
   useLayoutEffect(() => {
@@ -204,7 +206,8 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
         <select className={s.colorBy} aria-label="Color the map by" value={colorBy} onChange={(e) => setColorBy(e.currentTarget.value as HeatMetric)}>
           {metrics.map((m) => <option key={m} value={m}>{HEAT_METRIC_SPECS[m].name}</option>)}
         </select>
-        <HeatLegend heat={heat} stops={colorBy === 'left' ? null : shades.depth} />
+        <HeatLegend heat={heat} stops={colorBy === 'left' && !invert ? null : shades.depth} />
+        <Checkbox className={s.invert} isSelected={invert} onChange={setInvert}>invert ramp</Checkbox>
         {legendExtra}
         {!bare && <span>· passes: ● five, ○ one</span>}
         {/* Kept in place, faded and out of reach, for a past round, so the legend and the map above it never move. */}

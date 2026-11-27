@@ -31,6 +31,9 @@ export const DASH_PREFS = pref.group('Dashboard', {
       description: 'The ramp the map shades estimated defects left along, and the rounds and calibration charts with it.',
     }),
     schemes: pref.group('Heat colors by metric', schemePrefs()),
+    invert: pref.boolean('Invert the ramp', false, {
+      description: "Run the map's heat ramp the other way, its legend with it, on both pages; the checkbox under the map switches it too.",
+    }),
     grayOut: pref.boolean('Gray out areas the round shown skipped', false, {
       description: 'The round picked on the slider, or the last round at now.',
     }),
