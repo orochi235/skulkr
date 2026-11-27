@@ -42,6 +42,24 @@ describe('FixShelf', () => {
     expect(isDefectClosed({ status: 'question', run: 1, branch: 'b', verified: true }, { status: 'open' })).toBe(false);
   });
 
+  it('gathers done batches into one group at the end, and orders tiles by status on request', () => {
+    const done: FixShelfData = {
+      batches: [
+        { n: 1, defects: [{ id: 'D1', size: null, recurrent: false }, { id: 'D2', size: null, recurrent: false }] },
+        { n: 2, defects: [{ id: 'D3', size: null, recurrent: false }] },
+        { n: 3, defects: [{ id: 'D4', size: null, recurrent: false }] },
+      ],
+      ask: [],
+      statuses: {
+        D1: { status: 'not a defect', run: 1, branch: 'b' }, D2: { status: 'fixed', run: 1, branch: 'b' },
+        D3: { status: 'fixing', run: 2, branch: null, stage: 'writing' }, D4: { status: 'fixed', run: 1, branch: 'c' },
+      },
+    };
+    const ids = (order: 'batch' | 'status') => shelfLayoutOf(done, order).groups.map((g) => [g.label, g.books.map((b) => b.id)]);
+    expect(ids('batch')).toEqual([['b2', ['D3']], ['done', ['D1', 'D2', 'D4']]]);
+    expect(ids('status')).toEqual([['b2', ['D3']], ['done', ['D2', 'D4', 'D1']]]);
+  });
+
   it("keeps a traced defect's whole batch in color", () => {
     const { container } = render(<FixShelf shelf={shelf} traced="D2" />);
     const groups = [...container.querySelectorAll('svg > g')];

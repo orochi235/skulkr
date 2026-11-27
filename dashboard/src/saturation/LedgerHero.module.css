@@ -1,8 +1,13 @@
 .hero {
   display: flex;
+  flex: none;
   flex-wrap: wrap;
-  gap: var(--wzl-space-1) var(--wzl-space-4);
+  gap: var(--wzl-space-6) var(--wzl-space-8);
   margin: 0;
+  padding: var(--wzl-space-6) var(--wzl-space-8);
+  border: var(--wzl-border-w) solid var(--wzl-border-strong);
+  border-radius: var(--wzl-radius-md);
+  background: var(--wzl-surface);
 }
 
 /* The figure above its word, though the word comes first in the markup for a screen reader. */
@@ -11,8 +16,8 @@
   flex-direction: column-reverse;
   align-items: flex-end;
   min-width: 4ch;
-  padding-block-start: 3px;
-  border-block-start: 3px solid transparent;
+  padding-block-start: var(--wzl-space-1);
+  border-block-start: 4px solid transparent;
 }
 
 /* A count the shelf colors too wears its tile's color as a bar over it. */
@@ -24,13 +29,14 @@
 
 .value {
   margin: 0;
-  font-size: var(--wzl-font-size-lg);
+  font-size: calc(var(--wzl-font-size-xl) * 1.6);
   font-weight: var(--wzl-font-weight-bold);
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
+  line-height: 1;
 }
 
 .label {
-  font-size: var(--wzl-font-size-xs);
+  margin-block-start: var(--wzl-space-1);
+  font-size: var(--wzl-font-size-sm);
   color: var(--wzl-fg-muted);
 }

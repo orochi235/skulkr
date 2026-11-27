@@ -23,15 +23,15 @@
 
 .num { font-variant-numeric: tabular-nums; }
 
-/* The facts beside the headline counts, the counts dropping below once the panel is too narrow for both. */
+/* The headline counts at the left edge, the title and facts beside them, dropping below once the panel is too narrow. */
 .summary {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--wzl-space-2) var(--wzl-space-4);
+  gap: var(--wzl-space-4) var(--wzl-space-8);
 }
 
-.blurb { flex: 1 1 28rem; min-width: 0; }
+.blurb { flex: 1 1 24rem; min-width: 0; }
 
 .scroll {
   flex: 1 1 0;

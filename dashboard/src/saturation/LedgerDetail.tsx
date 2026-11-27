@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
 import { DelveAbout, DelveChart } from './DelveChart';
-import { FixShelf, FixShelfAbout, FixStatusChip, FixSwatch, isDefectClosed, shelfStatusOf } from './FixShelf';
+import { FixShelf, FixShelfAbout, FixStatusChip, FixSwatch, isDefectClosed, ShelfOrderSwitch, shelfStatusOf, type ShelfOrder } from './FixShelf';
 import { LedgerHero } from './LedgerHero';
 import { PassTableButton } from './PassTable';
 import { estimate, linesText, percent, severityRank, sourcesText, usd, usdOrDash } from './format';
@@ -76,6 +76,7 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
   }, [picked]);
   // The defect hovered on either chart, traced on both.
   const [traced, setTraced] = useState<string | null>(null);
+  const [shelfOrder, setShelfOrder] = useState<ShelfOrder>('batch');
   useEffect(() => { setPicked(null); setTraced(null); }, [ledger.id]);
   const columns = useMemo(() => columnsFor(ledger.fix), [ledger.fix]);
   const groups = useMemo(() => defectGroupsOf(ledger), [ledger]);
@@ -83,9 +84,10 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
   return (
     <section className={s.detail} aria-label={`${ledger.area}'s defects`}>
       <header className={s.head}>
-        <div className={s.titleRow}><h2 className={s.title}>{ledger.id}</h2><DelveAbout ledger={ledger} picks /></div>
         <div className={s.summary}>
+          <LedgerHero ledger={ledger} />
           <div className={s.blurb}>
+            <div className={s.titleRow}><h2 className={s.title}>{ledger.id}</h2><DelveAbout ledger={ledger} picks /></div>
             <p className={s.facts}>
               {ledger.files} files{ledger.lines !== null && <>, <span className={s.num}>{linesText(ledger.lines)}</span> lines</>} at{' '}
               <code>{ledger.commit.slice(0, 10)}</code> · {ledger.occasions} occasions ({sourcesText(ledger.sources)}) ·{' '}
@@ -101,13 +103,14 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
             )}
             <p className={s.facts}>{ledger.stopped ? `Stopped: ${ledger.stopped}.` : 'Not saturated yet: the stop rule does not hold.'}</p>
           </div>
-          <LedgerHero ledger={ledger} />
         </div>
         <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} /><div className={s.chartFoot}><PassTableButton ledger={ledger} /></div></div>
         {ledger.fix && ledger.fix.batches.length > 0 && (
           <div className={s.chart}>
-            <div className={s.titleRow}><span className={s.facts}>{fixFactsOf(ledger.fix)}</span><FixShelfAbout /></div>
-            <FixShelf shelf={ledger.fix} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} />
+            <div className={s.titleRow}>
+              <span className={s.facts}>{fixFactsOf(ledger.fix)}</span><FixShelfAbout /><ShelfOrderSwitch order={shelfOrder} onChange={setShelfOrder} />
+            </div>
+            <FixShelf shelf={ledger.fix} order={shelfOrder} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} />
           </div>
         )}
       </header>

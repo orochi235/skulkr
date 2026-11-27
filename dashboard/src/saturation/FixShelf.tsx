@@ -1,4 +1,5 @@
 import { Focusable, Tooltip, TooltipTrigger } from '@weasel-js/ui/components/Tooltip';
+import { SegmentedBar } from '@weasel-js/ui/components/Segmented';
 import { AboutButton } from '@dash/AboutButton';
 import type { FixShelf as FixShelfData, FixStage, FixStatus, FixStatusEntry } from './saturation.types';
 import s from './FixShelf.module.css';
@@ -44,43 +45,65 @@ const CLASS: Readonly<Record<ShelfStatus, string>> = {
 
 const KEY: readonly ShelfStatus[] = ['waiting', 'analyzing', 'writing', 'written', 'checking', 'repairing', 'fixed', 'not a defect', 'question', 'not fixed', 'duplicate', 'unread'];
 
-/** Each batch's tiles laid along the shelf: their x and status, the batch's label x, and the shelf's width. */
-export const shelfLayoutOf = (shelf: FixShelfData) => {
+/** How the shelf orders tiles within a group: as triage batched them, or by status in the key's order. */
+export type ShelfOrder = 'batch' | 'status';
+
+/** Whether a batch is done: every defect in it has a fix run's verdict. */
+const isBatchDone = (shelf: FixShelfData, defects: FixShelfData['batches'][number]['defects']) =>
+  defects.every((d) => { const at = shelf.statuses[d.id]; return at !== undefined && at.status !== 'fixing'; });
+
+/** Each group's tiles laid along the shelf, their x and status, the group's label and its x, and the shelf's width: a
+ *  group per batch still to finish, then every done batch's defects in one group at the end, each in `order`. */
+export const shelfLayoutOf = (shelf: FixShelfData, order: ShelfOrder = 'batch') => {
+  const tiles = (b: FixShelfData['batches'][number]) => b.defects.map((d) => ({ ...d, batch: b.n, status: shelfStatusOf(shelf.statuses[d.id]) }));
+  const done = shelf.batches.filter((b) => isBatchDone(shelf, b.defects));
+  const sets = [
+    ...shelf.batches.filter((b) => !done.includes(b)).map((b) => ({ key: `b${b.n}`, label: `b${b.n}`, tiles: tiles(b) })),
+    ...(done.length ? [{ key: 'done', label: 'done', tiles: done.flatMap(tiles) }] : []),
+  ];
   let x = 0;
-  const groups = shelf.batches.map((b) => {
+  const groups = sets.map((set) => {
     const start = x;
-    const books = b.defects.map((d) => {
-      const book = { ...d, x, h: BOOK_H, status: shelfStatusOf(shelf.statuses[d.id]) };
+    const sorted = order === 'status' ? [...set.tiles].sort((a, b) => KEY.indexOf(a.status) - KEY.indexOf(b.status)) : set.tiles;
+    const books = sorted.map((t) => {
+      const book = { ...t, x, h: BOOK_H };
       x += BOOK_W + GAP;
       return book;
     });
     const end = x - GAP + DEPTH;
     x = end + GROUP_GAP;
-    return { n: b.n, books, labelX: (start + end) / 2 };
+    return { key: set.key, label: set.label, books, labelX: (start + end) / 2 };
   });
   return { groups, width: Math.max(0, x - GROUP_GAP) };
 };
 
+const ORDERS = [{ value: 'batch', label: 'batch' }, { value: 'status', label: 'status' }] as const satisfies readonly { value: ShelfOrder; label: string }[];
+
+/** The switch between the shelf's orders. */
+export function ShelfOrderSwitch({ order, onChange }: { order: ShelfOrder; onChange: (order: ShelfOrder) => void }) {
+  return <SegmentedBar aria-label="Order tiles by" size="sm" items={ORDERS} value={order} onChange={(v) => v && onChange(v)} />;
+}
+
 /** The defects of a ledger's fix plan as tiles stood on end along a shelf, one group per batch, each colored by its fix status. */
-export function FixShelf({ shelf, onPickDefect, traced = null, onTrace }: {
-  shelf: FixShelfData; onPickDefect?: (id: string) => void;
+export function FixShelf({ shelf, order = 'batch', onPickDefect, traced = null, onTrace }: {
+  shelf: FixShelfData; order?: ShelfOrder; onPickDefect?: (id: string) => void;
   /** The defect traced across the page's charts, lit here as the rest fade; `onTrace` hears a hover change it. */
   traced?: string | null; onTrace?: (id: string | null) => void;
 }) {
-  const { groups, width } = shelfLayoutOf(shelf);
+  const { groups, width } = shelfLayoutOf(shelf, order);
   const base = DOT + DEPTH + BOOK_H;
   const total = groups.reduce((n, g) => n + g.books.length, 0);
   const tracing = traced !== null && groups.some((g) => g.books.some((b) => b.id === traced));
   return (
     <svg className={tracing ? `${s.shelf} ${s.tracing}` : s.shelf} viewBox={`0 0 ${width} ${base + LABEL}`} width={width} role="img"
-      aria-label={`${total} defects in ${groups.length} fix batches`}>
+      aria-label={`${total} defects in ${groups.length} fix groups`}>
       <line className={s.board} x1={0} x2={width} y1={base} y2={base} />
       {groups.map((g) => (
-        <g key={g.n} className={g.books.some((b) => b.id === traced) ? s.tracedGroup : undefined}>
+        <g key={g.key} className={g.books.some((b) => b.id === traced) ? s.tracedGroup : undefined}>
           {g.books.map((b) => {
             const top = base - b.h;
             const run = shelf.statuses[b.id];
-            const title = `${b.id} · batch ${g.n} · ${b.status}${run ? ` (fix run ${run.run}${run.branch ? `, ${run.branch}` : ''})` : ''}${b.recurrent ? ' · recurrent' : ''}`;
+            const title = `${b.id} · batch ${b.batch} · ${b.status}${run ? ` (fix run ${run.run}${run.branch ? `, ${run.branch}` : ''})` : ''}${b.recurrent ? ' · recurrent' : ''}`;
             return (
               <g
                 key={b.id} className={[s.tile, CLASS[b.status], b.status in STAGE ? s.out : '', b.id === traced ? s.traced : '', onPickDefect ? s.pickable : ''].filter(Boolean).join(' ')}
@@ -95,7 +118,7 @@ export function FixShelf({ shelf, onPickDefect, traced = null, onTrace }: {
               </g>
             );
           })}
-          <text className={s.label} x={g.labelX} y={base + LABEL - 2}>b{g.n}</text>
+          <text className={s.label} x={g.labelX} y={base + LABEL - 2}>{g.label}</text>
         </g>
       ))}
     </svg>
@@ -110,7 +133,8 @@ export function FixShelfAbout() {
         Each open defect is a tile, grouped by the fix batch triage puts it in, colored by where its fix stands. While
         its batch is out, a tile shows the step it is on: analyzing until the fixer takes it up, writing until its
         commit, written after, then checking (the fixer&apos;s checks and verify) and repairing. A dot
-        above a tile marks a defect most reviews keep finding. Click a tile to jump to its row.
+        above a tile marks a defect most reviews keep finding. A batch whose every defect has a verdict joins the done
+        group at the end. The switch orders each group&apos;s tiles by batch or by status. Click a tile to jump to its row.
       </p>
       <span className={s.key}>
         {KEY.map((k) => <span key={k}><i className={`${s.swatch} ${CLASS[k]}`} />{k}</span>)}

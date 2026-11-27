@@ -121,7 +121,7 @@ describe('SaturationPage', () => {
     window.location.hash = '#weasel/scour/core.animation';
     renderWithIcons(<WeaselProvider><SaturationPage base="/test/" /></WeaselProvider>);
     const detail = await screen.findByRole('region', { name: "core.animation's defects" });
-    const shelf = await within(detail).findByRole('img', { name: /fix batches/ });
+    const shelf = await within(detail).findByRole('img', { name: /fix groups/ });
     const tileOn = (root: Element, start: string) => [...root.querySelectorAll('g')].find((g) => g.querySelector(':scope > title')?.textContent?.startsWith(start))!;
     const lit = (g: Element) => g.getAttribute('class')?.includes('traced');
     fireEvent.pointerEnter(tileOn(detail, 'pass 3 · D1'));
