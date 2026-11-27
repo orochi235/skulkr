@@ -104,6 +104,17 @@ describe('SaturationPage', () => {
     expect(await screen.findByRole('region', { name: "geom.booleans's defects" })).toBeInTheDocument();
   });
 
+  it("lists scour's queue in its own pane, each with its lines and known defects, and picks an area from it", async () => {
+    serve(LEDGERS, ['geom.booleans', 'ui.menu']);
+    window.location.hash = '#weasel/scour';
+    renderWithIcons(<WeaselProvider><SaturationPage base="/test/" /></WeaselProvider>);
+    const pane = await screen.findByRole('region', { name: 'Scour queue' });
+    expect(within(pane).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['1geom.booleans–0', '2ui.menu––']);
+    expect(within(pane).getByText('geom.booleans').closest('button')).toHaveAttribute('title', 'geom.booleans: next defect ≈ $1.20');
+    fireEvent.click(within(pane).getByText('geom.booleans'));
+    expect(window.location.hash).toBe('#weasel/scour/geom.booleans');
+  });
+
   it("scrolls to a chart tile's defect when it is clicked, and marks its row", async () => {
     const scrolled: Element[] = [];
     Element.prototype.scrollIntoView = function scrollIntoView() { scrolled.push(this); };

@@ -14,12 +14,14 @@ import { LedgerDetail } from './LedgerDetail';
 import { LedgerList } from './LedgerList';
 import { SaturationMap } from './SaturationMap';
 import { ScourNow } from './ScourNow';
+import { ScourQueue } from './ScourQueue';
 import { SATURATION_LIVE_POLL_MS, SATURATION_POLL_MS, useSaturation } from './useSaturation';
 import { useSaturationArea } from './useSaturationArea';
 import s from './SaturationPage.module.css';
 
 const LIST = { min: 280, max: 900, initial: 460 } as const;
 const MAP = { min: 160, max: 1200, initial: 360 } as const;
+const QUEUE = { min: 80, max: 600, initial: 160 } as const;
 
 /** Each saturation ledger of a tenant beside the picked one's distinct defects. */
 const NO_QUEUE: readonly string[] = [];
@@ -36,11 +38,13 @@ export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: 
   const map = useSkulkrMap({ url: tenant === null ? null : mapUrl(base, tenant), dev });
   const [listWidth, setListWidth, keepListWidth] = useViewerPref('saturation.list', LIST.initial, readSize);
   const [mapHeight, setMapHeight, keepMapHeight] = useViewerPref('saturation.map', MAP.initial, readSize);
+  const [queueHeight, setQueueHeight, keepQueueHeight] = useViewerPref('saturation.queue', QUEUE.initial, readSize);
   const root = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     root.current?.style.setProperty('--saturation-list-width', `${listWidth}px`);
     root.current?.style.setProperty('--saturation-map-height', `${mapHeight}px`);
-  }, [listWidth, mapHeight]);
+    root.current?.style.setProperty('--saturation-queue-height', `${queueHeight}px`);
+  }, [listWidth, mapHeight, queueHeight]);
 
   const ledgers = state.status === 'ready' ? state.ledgers : [];
   const queue = state.status === 'ready' ? state.queue : NO_QUEUE;
@@ -69,7 +73,14 @@ export function SaturationPage({ base = import.meta.env.BASE_URL, dev = true }: 
         {state.status === 'ready' && <ScourNow ledgers={ledgers} onPick={pick} />}
         {state.status === 'ready' && ledgers.length > 0 && (
           <div className={s.main}>
-            <LedgerList ledgers={ledgers} areas={areaIds} picked={picked} onPick={(id) => pick(id === picked ? null : id)} />
+            <div className={s.left}>
+              <ScourQueue queue={queue} ledgers={ledgers} picked={picked} onPick={pick} />
+              <ResizeHandle
+                orientation="horizontal" value={queueHeight} min={QUEUE.min} max={QUEUE.max}
+                onInput={setQueueHeight} onChange={keepQueueHeight} aria-label="Resize the queue"
+              />
+              <LedgerList ledgers={ledgers} areas={areaIds} picked={picked} onPick={(id) => pick(id === picked ? null : id)} />
+            </div>
             <ResizeHandle value={listWidth} min={LIST.min} max={LIST.max} onInput={setListWidth} onChange={keepListWidth} aria-label="Resize the ledger list" />
             <div className={s.right}>
               {map.status === 'ready' && <SaturationMap areas={map.map.areas} icons={map.map.icons} ledgers={ledgers} queue={queue} picked={picked} onPick={pick} />}

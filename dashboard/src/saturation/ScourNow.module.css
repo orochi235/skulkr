@@ -1,8 +1,8 @@
-/* Two boxes side by side once each can have 44rem, never more than two. */
+/* As many boxes side by side as each can have 44rem, never more than four. */
 .now {
   flex: none;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(44rem, calc(50% - var(--wzl-space-2)))), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(44rem, calc(25% - var(--wzl-space-2) * 3 / 4))), 1fr));
   align-content: start;
   gap: var(--wzl-space-2);
   max-height: 40%;

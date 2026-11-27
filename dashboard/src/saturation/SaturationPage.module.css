@@ -16,6 +16,14 @@
   gap: var(--wzl-space-2);
 }
 
+.left {
+  display: grid;
+  grid-template-rows: var(--saturation-queue-height, 160px) auto minmax(0, 1fr);
+  gap: var(--wzl-space-2);
+  min-height: 0;
+  min-width: 0;
+}
+
 .right {
   display: grid;
   grid-template-rows: var(--saturation-map-height, 360px) auto minmax(0, 1fr);

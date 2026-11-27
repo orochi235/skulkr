@@ -81,7 +81,7 @@ export function DelveChart({ ledger, max = null, live = false, onPickDefect }: {
       )))}
       {stacks.map((stack, i) => stack.map(({ defect, novelty }, k) => (
         <Tile key={`${i}-${defect.id}`} x={colX(i + 1)} y={base - (k + 1) * TILE_H}
-          className={defect.id === traced ? `${s[novelty]} ${s.traced}` : s[novelty]!}
+          className={[s[novelty], defect.id === traced ? s.traced : '', ledger.passes[i]?.source === 'codex' ? s.codex : ''].filter(Boolean).join(' ')}
           title={tileTitleOf(defect, i + 1, novelty)}
           onEnter={() => setTraced(defect.id)} onLeave={() => setTraced((t) => (t === defect.id ? null : t))}
           onPick={onPickDefect ? () => onPickDefect(defect.id) : undefined} />
@@ -91,11 +91,17 @@ export function DelveChart({ ledger, max = null, live = false, onPickDefect }: {
   );
 }
 
-/** The key to the chart's tiles. */
-export function DelveKey() {
+const NOVELTIES = ['again', 'new', 'lone'] as const;
+
+/** The key to the chart's tiles, and, where the ledger has a Codex pass (`codex`), the hues its tiles take. */
+export function DelveKey({ codex = false }: { codex?: boolean }) {
   return (
     <span className={s.key}>
-      {(['again', 'new', 'lone'] as const).map((n) => <span key={n}><i className={`${s.swatch} ${s[n]}`} />{LABEL[n]}</span>)}
+      {NOVELTIES.map((n) => <span key={n}><i className={`${s.swatch} ${s[n]}`} />{LABEL[n]}</span>)}
+      {codex && <span>{NOVELTIES.map((n) => <i key={n} className={`${s.swatch} ${s[n]} ${s.codex}`} />)}codex pass</span>}
     </span>
   );
 }
+
+/** Whether a ledger has a Codex pass, whose tiles the key then explains. */
+export const hasCodexPass = (ledger: SaturationLedger): boolean => (ledger.sources.codex ?? 0) > 0;

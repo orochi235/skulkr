@@ -22,6 +22,11 @@
 
 .lone { --tile: var(--wzl-warning); }
 
+/* A Codex pass's tiles, a little off the Claude passes' hues; its gray ones, having no hue, take a touch of the accent. */
+.codex { filter: hue-rotate(25deg); }
+
+.codex.again { --tile: color-mix(in srgb, color-mix(in srgb, var(--wzl-fg) 70%, var(--wzl-surface)) 82%, var(--wzl-accent)); }
+
 /* Hovering a tile traces its defect: every sighting keeps its color, a repeat taking its first sighting's, and the rest
    fade to the ground's tone (mixed solid, not alpha, for the same reason as `.again`). */
 .tracing g:not(.traced) { --tile: color-mix(in srgb, var(--wzl-fg) 18%, var(--wzl-surface)); }

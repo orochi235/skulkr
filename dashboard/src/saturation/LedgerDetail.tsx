@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
-import { DelveChart, DelveKey } from './DelveChart';
+import { DelveChart, DelveKey, hasCodexPass } from './DelveChart';
 import { PassTableButton } from './PassTable';
 import { estimate, percent, severityRank, sourcesText, usd, usdOrDash } from './format';
 import type { SaturationDefect, SaturationLedger } from './saturation.types';
@@ -53,7 +53,7 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
           </p>
         )}
         <p className={s.facts}>{ledger.stopped ? `Stopped: ${ledger.stopped}.` : 'Not saturated yet: the stop rule does not hold.'}</p>
-        <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} onPickDefect={pickDefect} /><div className={s.chartFoot}><DelveKey /><PassTableButton ledger={ledger} /></div></div>
+        <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} onPickDefect={pickDefect} /><div className={s.chartFoot}><DelveKey codex={hasCodexPass(ledger)} /><PassTableButton ledger={ledger} /></div></div>
       </header>
       <div ref={scroll} className={s.scroll}>
         <DataGrid
