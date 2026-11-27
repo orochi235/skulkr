@@ -60,6 +60,12 @@ export const DASH_PREFS = pref.group('Dashboard', {
     heightBy: pref.enum<HeightMetric>('Height by', 'saturationOpen', ['flat', ...SATURATION_METRICS], {
       description: "What each area of the Scour page's map stands as high as, or flat; the legend under the map switches it too.",
     }),
+    shelfOrder: pref.enum<'batch' | 'status'>('Order the fix shelf by', 'batch', ['batch', 'status'], {
+      description: "Whether an area's fix shelf groups its defects by batch or runs them in one row by status; the switch at the shelf's edge switches it too.",
+    }),
+    collapseResolved: pref.boolean('Collapse resolved passes', false, {
+      description: "Hide each pass of an area's delve chart whose defects are all fixed or closed; the checkbox under the chart switches it too.",
+    }),
   }),
   lanes: pref.group('Lanes', {
     hideComplete: pref.boolean('Hide complete', false, { description: 'Hide a lane once its pass is done.' }),

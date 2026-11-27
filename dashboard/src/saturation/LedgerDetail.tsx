@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Checkbox } from '@weasel-js/ui/components/Checkbox';
+import { useDashPref } from '@dash/audits/dashPrefs';
 import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
 import { DelveAbout, DelveChart, DelveKey, hasCodexPass } from './DelveChart';
-import { FixShelf, FixShelfAbout, FixShelfKey, FixStatusChip, FixSwatch, isDefectClosed, ShelfOrderSwitch, shelfStatusOf, type ShelfOrder } from './FixShelf';
+import { FixShelf, FixShelfAbout, FixShelfKey, FixStatusChip, FixSwatch, isDefectClosed, ShelfOrderSwitch, shelfStatusOf } from './FixShelf';
 import { LedgerHero } from './LedgerHero';
 import { PassTableButton } from './PassTable';
 import { severityRank } from './format';
@@ -80,8 +81,8 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
   }, [picked]);
   // The defect hovered on either chart, traced on both.
   const [traced, setTraced] = useState<string | null>(null);
-  const [shelfOrder, setShelfOrder] = useState<ShelfOrder>('batch');
-  const [hideFixed, setHideFixed] = useState(false);
+  const [shelfOrder, setShelfOrder] = useDashPref('saturation.shelfOrder');
+  const [hideFixed, setHideFixed] = useDashPref('saturation.collapseResolved');
   const hasFixPlan = Boolean(ledger.fix && ledger.fix.batches.length > 0);
   // Only a delve grows the chart toward its cap; a fix run's max counts batches, not passes.
   const delving = ledger.running !== null && ledger.running.does !== 'fix';
