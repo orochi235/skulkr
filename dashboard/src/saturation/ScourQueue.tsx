@@ -14,7 +14,7 @@ export const readQueueMode = (stored: string): QueueMode | undefined => (stored 
  *  project's opening price. */
 export const queueTitleOf = (id: string, ledger: SaturationLedger | undefined): string =>
   ledger && ledger.occasions >= 2 && ledger.nextUsd !== null
-    ? `${id}: next defect ≈ ${usd(ledger.nextUsd)}`
+    ? `${id}: next defect ≈ ${usd(ledger.nextUsd)}${ledger.priceBy === 'kloc' ? ' per defect/kloc' : ''}`
     : `${id}: under two passes, ranked at the opening price`;
 
 /** What a fix queue row says in its figure columns' place while its run is live: its batch's phase, which batch, and

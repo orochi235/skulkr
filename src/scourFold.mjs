@@ -6,21 +6,24 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { allNew, keepReview, ledgerDirOf, withOccasion, writeLedger } from './ledger.mjs';
-import { yieldRows } from './saturation.mjs';
+import { limitText, priceUnitFor, yieldRows } from './saturation.mjs';
 import { nextPriceOf } from './scourPrice.mjs';
 import { writeReport } from './saturationReport.mjs';
 import { matchReport, occasionJobsOf } from './saturateJobs.mjs';
 
 /** The progress line for occasion `o`, the last folded into `ledger`, under the stop rule `rule` (`scourRuleOf`). */
-export const occasionLine = (ledger, o, { max, factor, stopUsdPerDefect }) => {
+export const occasionLine = (ledger, o, rule) => {
+  const { max, factor, priceBy } = rule;
   const r = yieldRows(ledger).find((row) => row.n === o.n);
   const s = r.stats;
   const unseen = s.f0 === undefined ? '–' : s.f0.toFixed(1);
   const next = s.nextNew === undefined ? '–' : `${Math.round(s.nextNew * 100)}%`;
   const perDefect = r.usdPerDefect === undefined ? '–' : `$${r.usdPerDefect.toFixed(2)}`;
-  const price = nextPriceOf(ledger, factor).usd;
-  const nextUsd = price === undefined ? '–' : Number.isFinite(price) ? `$${price.toFixed(2)}` : 'none expected';
-  return `${o.n}/${max} ${o.source}: ${o.findings} findings, ${r.new} new; distinct ${s.S}; unseen ≈ ${unseen}; next-new ${next}; $${o.costUsd.toFixed(2)}; ${perDefect}/defect, next ≈ ${nextUsd} (limit $${stopUsdPerDefect.toFixed(2)})`;
+  const price = nextPriceOf(ledger, factor, priceBy).usd;
+  const unpriced = priceBy === 'kloc' && !ledger.lines && s.m >= 2 ? 'unpriced, lines unknown' : '–';
+  const nextUsd = price === undefined ? unpriced : Number.isFinite(price) ? `$${price.toFixed(2)}${priceUnitFor(priceBy)}` : 'none expected';
+  const limit = priceBy === 'kloc' ? limitText({ ...rule, limit: undefined }) : `$${rule.stopUsdPerDefect.toFixed(2)}`;
+  return `${o.n}/${max} ${o.source}: ${o.findings} findings, ${r.new} new; distinct ${s.S}; unseen ≈ ${unseen}; next-new ${next}; $${o.costUsd.toFixed(2)}; ${perDefect}/defect, next ≈ ${nextUsd} (limit ${limit})`;
 };
 
 /** The file a report waits in until it is folded, relative to the ledger's directory. */

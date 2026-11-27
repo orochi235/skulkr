@@ -30,7 +30,25 @@ describe('skulkr saturate ls', () => {
       { id: 'D2', claim: 'B', where: 'src/y.ts:2', severity: 'low', sightings: 0, recurrent: false, seenAt: [], firstOccasion: null, sources: [], onlyBy: 'codex', registry: null },
     ]);
     expect(ledgerListLines([only])[1]).toMatch(/^src\s+–\s+2\s+2\s+/);
+    expect(only.priceBy).toBe('defect');
+    expect(ledgerListLines([only])).toHaveLength(2);
     expect(only.running).toBeNull();
+  });
+
+  it('gives the price and limit per defect/kloc under priceBy kloc, and no price where the lines are not known', () => {
+    const state = mkdtempSync(join(tmpdir(), 'skulkr-satls-'));
+    dirs.push(state);
+    const cfg = resolveConfig({ name: 'proj', state, saturate: { priceBy: 'kloc', stopUsdPerDefect: 2.5 } });
+    const occ = (n: number) => ({ n, source: 'claude', kind: 'review', file: '', costUsd: 1, minutes: 1 });
+    let ledger = withOccasion(emptyLedger('src', 'c0ffee', ['src/x.ts']), occ(1), allNew([{ claim: 'A', where: 'src/x.ts:1', body: '' }, { claim: 'B', where: 'src/x.ts:2', body: '' }]));
+    ledger = withOccasion(ledger, occ(2), { findings: [{}, {}], sightings: [{ finding: 0, defect: 'D1' }], new: [{ claim: 'C', where: 'src/x.ts:3', body: '' }] });
+    writeLedger(cfg, { ...ledger, lines: 2000 });
+    writeLedger(cfg, { ...ledger, area: 'lib', files: ['lib/x.ts'] });
+    const [lib, src] = ledgerListOf(cfg);
+    expect(src).toMatchObject({ priceBy: 'kloc', limit: { usd: 2.5, text: '$2.50 per defect/kloc' } });
+    expect(src.nextUsd).toBeGreaterThan(0);
+    expect(lib).toMatchObject({ priceBy: 'kloc', lines: null, nextUsd: null });
+    expect(ledgerListLines([lib, src]).at(-1)).toMatch(/per defect\/kloc; – where an area's lines are not known/);
   });
 
   it('says what a live process holding a ledger is doing: its lease, its jobs out, and its own log', () => {

@@ -62,6 +62,8 @@ export interface SaturationLedger {
   readonly nextUsd: number | null;
   /** The per-defect limit a delve stops at: dollars, and where it is a multiple of the going rate, the multiple and rate. */
   readonly limit: { readonly usd: number; readonly times: number | null; readonly goingUsd: number | null; readonly text: string };
+  /** The unit `nextUsd` and `limit` are in: dollars per defect, or per defect per thousand lines (`kloc`). */
+  readonly priceBy?: 'defect' | 'kloc';
   /** Defects found, estimated unseen, and dollars spent, each per thousand lines; null without `lines`. */
   readonly defectsPerKloc: number | null;
   readonly unseenPerKloc: number | null;
@@ -116,6 +118,8 @@ export interface ScourJob {
   readonly step: string | null;
   readonly at: string | null;
   readonly line: string | null;
+  /** Its log's last few `skulkr:` lines, oldest first, the commands it runs left out. */
+  readonly recent?: readonly string[];
   readonly progress: { readonly done: number; readonly of: number } | null;
   /** A fix or repair job verifying its commits: the step it verifies, its step reading `verify`. */
   readonly of?: string;

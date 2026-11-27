@@ -75,9 +75,9 @@ export const yieldRows = (ledger) => {
 /**
  * The stop rule `stopReason` takes: `max` occasions, the config's `saturate.stopNextNew`, the most the next defect may
  * cost (`perDefect`, else `saturate.stopUsdPerDefect`), `usd`, the most one command may spend, if any, and `factor`,
- * the pricing calibration (`scourPrice.mjs`).
+ * the pricing calibration (`scourPrice.mjs`), and `priceBy`, the unit the limit and prices are in.
  */
-export const stopRuleOf = (cfg, max, { perDefect, usd, factor = 1 } = {}) => ({
+export const stopRuleOf = (cfg, max, { perDefect, usd, factor = 1, priceBy = 'defect' } = {}) => ({
   max,
   minPasses: cfg.saturate.minPasses,
   fixAtKnownPerKloc: cfg.saturate.fixAtKnownPerKloc,
@@ -86,17 +86,16 @@ export const stopRuleOf = (cfg, max, { perDefect, usd, factor = 1 } = {}) => ({
   stopUsdPerDefect: perDefect ?? cfg.saturate.stopUsdPerDefect,
   usd,
   factor,
+  priceBy,
 });
 
-/**
- * Why saturation should stop, given the combined estimate `stats`, the rule (`stopRuleOf`), the next defect's `price`
- * (`nextPriceOf`), `spentUsd`, what this command has spent, and `lines`, the area's lines; null to go on. Unseen
- * defects are held to `stopUnseenPerKloc` per thousand lines, or under one where the lines are not known.
- */
-/** How a rule's per-defect limit reads: `$1.48 (4× the $0.37 going rate)`, or `$2.50`. */
-export const limitText = ({ stopUsdPerDefect, limit }) => (limit?.times === undefined
-  ? `$${stopUsdPerDefect.toFixed(2)}`
-  : `$${limit.usd.toFixed(2)} (${limit.times}× the $${limit.goingUsd.toFixed(2)} going rate)`);
+/** What follows a dollar figure in the unit `priceBy` names: nothing per defect, ` per defect/kloc` per density. */
+export const priceUnitFor = (priceBy) => (priceBy === 'kloc' ? ' per defect/kloc' : '');
+
+/** How a rule's per-defect limit reads: `$1.48 (4× the $0.37 going rate)`, or `$2.50`, its unit named under `kloc`. */
+export const limitText = ({ stopUsdPerDefect, limit, priceBy }) => (limit?.times === undefined
+  ? `$${stopUsdPerDefect.toFixed(2)}${priceUnitFor(priceBy)}`
+  : `$${limit.usd.toFixed(2)}${priceUnitFor(priceBy)} (${limit.times}× the $${limit.goingUsd.toFixed(2)} going rate)`);
 
 /** The prefix of a stop reason that hands the area to fixing (`fixReasonOf`), for whoever reads a ledger's stop. */
 export const READY_TO_FIX = 'ready to fix';
@@ -112,6 +111,11 @@ export const fixReasonOf = (stats, { minPasses = 0, fixAtKnownPerKloc }, lines) 
   return known >= fixAtKnownPerKloc ? `${READY_TO_FIX}: ${known.toFixed(1)} known defects per thousand lines, at least ${fixAtKnownPerKloc}` : null;
 };
 
+/**
+ * Why saturation should stop, given the combined estimate `stats`, the rule (`stopRuleOf`), the next defect's `price`
+ * (`nextPriceOf`, in the rule's unit), `spentUsd`, what this command has spent, and `lines`, the area's lines; null to
+ * go on. Unseen defects are held to `stopUnseenPerKloc` per thousand lines, or under one where the lines are not known.
+ */
 export const stopReason = (stats, rule, { price, spentUsd, lines } = {}) => {
   const { max, minPasses = 0, stopNextNew, stopUnseenPerKloc, stopUsdPerDefect, usd } = rule;
   if (stats.m >= max) return `reached the limit of ${max} occasions`;
@@ -124,7 +128,7 @@ export const stopReason = (stats, rule, { price, spentUsd, lines } = {}) => {
     } else if (stats.f0 !== undefined && stats.f0 < 1) return `fewer than one defect estimated unseen (${stats.f0.toFixed(2)})`;
     if (stats.nextNew !== undefined && stats.nextNew < stopNextNew) return `the next occasion's chance of a new finding is under ${Math.round(stopNextNew * 100)}% (${(stats.nextNew * 100).toFixed(1)}%)`;
     if (stopUsdPerDefect !== undefined && price?.usd !== undefined && price.usd > stopUsdPerDefect) {
-      return `the next defect would cost about $${price.usd.toFixed(2)}, over the limit of ${limitText(rule)}`;
+      return `the next defect would cost about $${price.usd.toFixed(2)}${priceUnitFor(rule.priceBy)}, over the limit of ${limitText(rule)}`;
     }
   }
   if (usd !== undefined && spentUsd !== undefined && spentUsd + (price?.passUsd ?? 0) > usd) {

@@ -137,4 +137,9 @@ describe('stopReason', () => {
     expect(stopReason(stats, priced, { price: { usd: 1.2, passUsd: 0.8 }, spentUsd: 9 })).toBeNull();
     expect(stopReason(stats, priced, { price: { usd: undefined, passUsd: 0.8 }, spentUsd: 0 })).toBeNull();
   });
+
+  it('names the unit of the price and limit under kloc', () => {
+    const kloc = { ...rule, stopUsdPerDefect: 1.5, priceBy: 'kloc' };
+    expect(stopReason({ m: 6, f0: 3, nextNew: 0.3 }, kloc, { price: { usd: 2.4 } })).toBe('the next defect would cost about $2.40 per defect/kloc, over the limit of $1.50 per defect/kloc');
+  });
 });

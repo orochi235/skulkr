@@ -29,11 +29,19 @@ export const STAT_TONE = { estimate: s.estimate!, light: s.light!, clock: s.cloc
 /** The tone of a count the fix shelf colors too: its tile's color as a bar over it. */
 export const shelfToneOf = (status: Parameters<typeof tileClassOf>[0]): string => `${s.tiled} ${tileClassOf(status)}`;
 
-/** A ledger's next defect's price in tone `tone`, amber once it passes the limit a delve stops at. */
+const PER_KLOC_TIP = 'Dollars per defect per thousand lines: the price of a defect times the area\'s lines over 1,000.';
+
+/** A ledger's next defect's price in tone `tone`, amber once it passes the limit a delve stops at; both are in the
+ *  ledger's `priceBy` unit, named in the word under `kloc`. */
 export const nextDefectStatOf = (ledger: SaturationLedger, tone: string): Stat => {
   const over = ledger.nextUsd !== null && ledger.nextUsd > ledger.limit.usd;
-  return ['next defect', usdOrDash(ledger.nextUsd), over ? `${tone} ${s.over}` : tone];
+  const kloc = ledger.priceBy === 'kloc';
+  return [kloc ? 'next defect/kloc' : 'next defect', usdOrDash(ledger.nextUsd), over ? `${tone} ${s.over}` : tone, kloc ? PER_KLOC_TIP : undefined];
 };
+
+/** The per-defect limit a ledger's delve stops at, in tone `tone`, its unit named as `nextDefectStatOf` names it. */
+export const limitStatOf = (ledger: SaturationLedger, tone?: string): Stat =>
+  ledger.priceBy === 'kloc' ? ['limit/kloc', usd(ledger.limit.usd), tone, PER_KLOC_TIP] : ['limit', usd(ledger.limit.usd), tone];
 
 /** A row of headline figures, each big over its word. An estimate is set apart by its type (`.estimate`), not a sign
  *  before it. */
@@ -71,7 +79,7 @@ export function LedgerHero({ ledger }: { ledger: SaturationLedger }) {
   const outlook: Stat[] = [
     ['next new', percent(ledger.nextNew), s.estimate],
     nextDefectStatOf(ledger, s.estimate!),
-    ['limit', usd(ledger.limit.usd)],
+    limitStatOf(ledger),
   ];
   return (
     <div className={s.hero}>

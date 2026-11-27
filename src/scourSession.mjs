@@ -205,7 +205,7 @@ const takeAnswer = (cfg, root, ledger, task, args, env, rule, say) => {
 };
 
 /**
- * `skulkr scour next <area> [--agent <id>] [--at <sha>] [--max N] [--per-defect $]`: answers the task to hand a
+ * `skulkr scour next <area> [--agent <id>] [--at <sha>] [--max N] [--per-defect $] [--price-by defect|kloc]`: answers the task to hand a
  * subagent (`{ task, key, model, prompt, out }`), or `{ stop }` once the area's stop rule holds. `env` is the
  * environment Claude Code gives the commands it runs.
  */
@@ -250,7 +250,7 @@ export const scourNext = async (cfg, root, id, args, tell, env = process.env) =>
         continue;
       }
       const rule = ruleNow();
-      const stop = stopReason(chao2(ledger.occasions, ledger.defects), rule, { price: nextPriceOf(ledger, rule.factor), lines: ledger.lines });
+      const stop = stopReason(chao2(ledger.occasions, ledger.defects), rule, { price: nextPriceOf(ledger, rule.factor, rule.priceBy), lines: ledger.lines });
       if (!stop) return give(reviewTask(cfg, root, ledger, say));
       say(`saturate ${id}: stopped, ${stop}`);
       say(`saturate ${id}: report at ${writeReport(cfg, id, ledger, rule)}`);

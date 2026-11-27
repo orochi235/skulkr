@@ -2,7 +2,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ledgerDirOf } from './ledger.mjs';
-import { estimatesOf, stopReason, yieldRows } from './saturation.mjs';
+import { estimatesOf, priceUnitFor, stopReason, yieldRows } from './saturation.mjs';
 import { nextPriceOf } from './scourPrice.mjs';
 
 /** A Markdown table whose columns line up in the raw text too; `right` marks the right-aligned (numeric) columns. */
@@ -54,9 +54,11 @@ const defectTable = (ledger) => {
 /** The report's Markdown for `ledger`, under the stop rule `rule` (`stopRuleOf`). */
 export const reportText = (ledger, rule) => {
   const sources = [...new Set(ledger.occasions.map((o) => o.source))];
-  const price = nextPriceOf(ledger, rule.factor);
+  const price = nextPriceOf(ledger, rule.factor, rule.priceBy);
   const stop = stopReason(estimatesOf(ledger).combined, rule, { price, lines: ledger.lines });
-  const priced = price.usd === undefined ? '' : Number.isFinite(price.usd) ? ` The next defect should cost about $${price.usd.toFixed(2)}.` : ' No new defect is expected.';
+  const unit = priceUnitFor(rule.priceBy);
+  const unpriced = rule.priceBy === 'kloc' && !ledger.lines && ledger.occasions.length >= 2 ? " The next defect has no price: the area's lines are not known, so no price limit stops it." : '';
+  const priced = price.usd === undefined ? unpriced : Number.isFinite(price.usd) ? ` The next defect should cost about $${price.usd.toFixed(2)}${unit}.` : ' No new defect is expected.';
   return [
     `# ${ledger.area}: saturation`,
     '',
@@ -64,7 +66,7 @@ export const reportText = (ledger, rule) => {
     `\`${ledger.commit.slice(0, 10)}\`, with no fixes between them, from ${sources.length ? sources.map((s) => `\`${s}\``).join(', ') : 'no source yet'}.`,
     'Each occasion is one review, or one ingested report; its findings are matched against the ledger of distinct',
     `defects so far. Reviews stop once fewer than ${ledger.lines ? `${rule.stopUnseenPerKloc} ${rule.stopUnseenPerKloc === 1 ? 'defect' : 'defects'} per thousand lines` : 'one defect'} is estimated unseen, the chance that the next occasion`,
-    `finds something new falls under ${Math.round(rule.stopNextNew * 100)}%, the next defect would cost over $${rule.stopUsdPerDefect.toFixed(2)}, or ${rule.max} occasions have run.`,
+    `finds something new falls under ${Math.round(rule.stopNextNew * 100)}%, the next defect would cost over $${rule.stopUsdPerDefect.toFixed(2)}${unit}, or ${rule.max} occasions have run.`,
     `${stop ? `Stopped: ${stop}.` : 'Not stopped yet.'}${priced} \`skulkr scour report ${ledger.area}\` rewrites this file from the ledger.`,
     '',
     '## Yield by occasion',

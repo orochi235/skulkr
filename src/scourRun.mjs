@@ -6,6 +6,7 @@ import { ledgerOf } from './ledger.mjs';
 import { partitionAt } from './partition.mjs';
 import { saturateArea } from './saturate.mjs';
 import { pricingOf, scourRuleOf } from './scourPrice.mjs';
+import { priceUnitFor } from './saturation.mjs';
 import { candidatePricesOf, scourQueueOf } from './scourQueue.mjs';
 
 export const STRATEGIES = ['finish', 'cheapest', 'spread'];
@@ -13,13 +14,14 @@ const SPREAD_PASSES = 10;
 
 const spentOn = (ledger) => (ledger?.occasions ?? []).reduce((sum, o) => sum + (o.costUsd ?? 0), 0);
 
-/** `skulkr scour run [areas…] --by finish|cheapest|spread [--usd N] [--passes N]`, each line to `say`. */
+/** `skulkr scour run [areas…] --by finish|cheapest|spread [--usd N] [--passes N] [--price-by defect|kloc]`, each line to `say`. */
 export const scourRun = async (cfg, runner, root, args, say) => {
   const by = args.by ?? 'finish';
   if (!STRATEGIES.includes(by)) throw new Error(`--by wants one of ${STRATEGIES.join(', ')}, not ${by}`);
   if (args.words.length === 0 && args.usd === undefined) throw new Error('scour run over every area wants --usd <budget>');
   const ids = args.words.length ? args.words : partitionAt(cfg, root, cfg.git.main).map((a) => a.id);
   const budget = args.usd ?? Infinity;
+  const unit = priceUnitFor(args.priceBy ?? cfg.saturate.priceBy);
   let spent = 0;
   const left = () => budget - spent;
   const delve = async (id, passes) => {
@@ -35,7 +37,7 @@ export const scourRun = async (cfg, runner, root, args, say) => {
   };
   const byPrice = () => {
     const rule = scourRuleOf(cfg, root, args);
-    return scourQueueOf(candidatePricesOf(cfg, root, ids, rule, pricingOf(cfg)));
+    return scourQueueOf(candidatePricesOf(cfg, root, ids, rule, pricingOf(cfg, undefined, rule.priceBy)));
   };
   say(`scour run by ${by}: ${ids.length} ${ids.length === 1 ? 'area' : 'areas'}, ${Number.isFinite(budget) ? `$${budget.toFixed(2)} to spend` : 'no budget'}`);
   if (by === 'cheapest') {
@@ -46,7 +48,7 @@ export const scourRun = async (cfg, runner, root, args, say) => {
         say('scour run: every area has stopped');
         break;
       }
-      say(`scour run: ${best.id} next, its next defect ≈ $${best.usd.toFixed(2)}`);
+      say(`scour run: ${best.id} next, its next defect ≈ ${best.usd === undefined ? 'unpriced, lines unknown' : `$${best.usd.toFixed(2)}${unit}`}`);
       const before = spent;
       await delve(best.id, 1);
       if (spent === before) break;

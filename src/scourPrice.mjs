@@ -6,7 +6,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { ledgerOf } from './ledger.mjs';
 import { partitionAt } from './partition.mjs';
 import { chao2, stopRuleOf, yieldRows } from './saturation.mjs';
-import { perKloc } from './scourLines.mjs';
+import { ledgerLinesOf, perKloc } from './scourLines.mjs';
 import { scourStateDirOf } from './scourPaths.mjs';
 
 /** Passes the pass cost averages over, and the passes a ledger's opening price is taken from. */
@@ -42,29 +42,58 @@ export const calibrationOf = (ledgers) => {
   return { factor: passes >= CALIBRATE_FROM && expected > 0 ? found / expected : 1, passes };
 };
 
-/** What a new defect cost over the first passes of every ledger that has had them, pooled; `fallback` with none. */
-export const openingPriceOf = (ledgers, fallback) => {
+/** The units a price can be in: dollars per defect, or per defect per thousand lines (README "Pricing by density"). */
+export const PRICE_BASES = ['defect', 'kloc'];
+
+/** A price basis as the config or `--price-by` gives it, checked; throws on anything but `PRICE_BASES`. */
+export const priceByOf = (given) => {
+  if (!PRICE_BASES.includes(given)) throw new Error(`--price-by wants one of ${PRICE_BASES.join(', ')}, not ${given}`);
+  return given;
+};
+
+const medianOf = (ns) => {
+  const s = [...ns].sort((a, b) => a - b);
+  return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+};
+
+/**
+ * What a new defect cost over the first passes of every ledger that has had them, pooled; `fallback` with none.
+ * Under `kloc`, spend over defects per thousand lines, from ledgers whose `lines` are known; with none, `fallback`
+ * scaled to the median known area, or as given where no ledger's lines are known.
+ */
+export const openingPriceOf = (ledgers, fallback, priceBy = 'defect') => {
+  const kloc = priceBy === 'kloc';
   let spent = 0;
   let found = 0;
   for (const ledger of ledgers) {
     const first = inOrder(ledger).slice(0, WINDOW);
-    if (first.length < WINDOW) continue;
+    if (first.length < WINDOW || (kloc && !ledger.lines)) continue;
     spent += costOf(first);
-    found += first.reduce((sum, o) => sum + newAt(ledger, o.n), 0);
+    const fresh = first.reduce((sum, o) => sum + newAt(ledger, o.n), 0);
+    found += kloc ? (fresh * 1000) / ledger.lines : fresh;
   }
-  return found > 0 ? spent / found : fallback;
+  if (found > 0) return spent / found;
+  const lines = ledgers.map((l) => l.lines).filter((n) => n > 0);
+  return kloc && lines.length ? (fallback * medianOf(lines)) / 1000 : fallback;
 };
 
-/** The ledgers in `cfg`'s state directory, set-aside ones included. */
+/** The ledgers in `cfg`'s state directory, set-aside ones included, each with its `lines` where they are kept. */
 export const stateLedgersOf = (cfg) => {
   const dir = scourStateDirOf(cfg);
-  return existsSync(dir) ? readdirSync(dir).flatMap((id) => ledgerOf(cfg, id) ?? []) : [];
+  return existsSync(dir) ? readdirSync(dir).flatMap((id) => {
+    const ledger = ledgerOf(cfg, id);
+    return ledger ? [ledger.lines === undefined ? { ...ledger, lines: ledgerLinesOf(cfg, undefined, ledger, id) } : ledger] : [];
+  }) : [];
 };
 
-/** The pricing every price in a command goes by: the calibration `factor` and `openingUsd`, a fresh area's price. */
-export const pricingOf = (cfg, ledgers = stateLedgersOf(cfg)) => ({
+/**
+ * The pricing every price in a command goes by: the calibration `factor`, `priceBy`, the unit, and `openingUsd`, a
+ * fresh area's price in it.
+ */
+export const pricingOf = (cfg, ledgers = stateLedgersOf(cfg), priceBy = cfg.saturate.priceBy ?? 'defect') => ({
   factor: calibrationOf(ledgers).factor,
-  openingUsd: openingPriceOf(ledgers, cfg.saturate.openingUsdPerDefect),
+  priceBy,
+  openingUsd: openingPriceOf(ledgers, cfg.saturate.openingUsdPerDefect, priceBy),
 });
 
 /**
@@ -88,11 +117,12 @@ export const limitSpecOf = (given) => {
  * another delve's second pass) and, while any area of the partition under `root` has fewer, the opening price (with
  * no `root`, assumed so).
  */
-export const goingRateOf = (cfg, root, { factor, openingUsd }) => {
+export const goingRateOf = (cfg, root, { factor, openingUsd, priceBy = 'defect' }) => {
   const dir = scourStateDirOf(cfg);
   const deep = (existsSync(dir) ? readdirSync(dir) : []).flatMap((id) => {
     const ledger = ledgerOf(cfg, id);
-    return ledger && ledger.area === id && ledger.occasions.length >= Math.max(2, cfg.saturate.minPasses ?? 0) ? [ledger] : [];
+    if (!(ledger && ledger.area === id && ledger.occasions.length >= Math.max(2, cfg.saturate.minPasses ?? 0))) return [];
+    return [priceBy === 'kloc' && ledger.lines === undefined ? { ...ledger, lines: ledgerLinesOf(cfg, root, ledger, id) } : ledger];
   });
   let fresh = true;
   if (root) {
@@ -101,41 +131,44 @@ export const goingRateOf = (cfg, root, { factor, openingUsd }) => {
       fresh = partitionAt(cfg, root, cfg.git.main).some((a) => !delved.has(a.id));
     } catch { /* no partition to read: assumed fresh */ }
   }
-  const prices = deep.map((l) => nextPriceOf(l, factor).usd).filter((p) => p !== undefined && Number.isFinite(p));
+  const prices = deep.map((l) => nextPriceOf(l, factor, priceBy).usd).filter((p) => p !== undefined && Number.isFinite(p));
   return Math.min(...prices, ...(fresh ? [openingUsd] : []), Infinity);
 };
 
 /**
- * The stop rule for a scour command's flags (`max`, `perDefect`, `usd`), priced by `cfg`'s ledgers; `root` is the
- * project, whose partition says whether fresh areas remain. Its `limit` says how the per-defect limit was set:
- * `{ usd }`, or `{ usd, times, goingUsd }` for a multiple of the going rate.
+ * The stop rule for a scour command's flags (`max`, `perDefect`, `usd`, `priceBy`), priced by `cfg`'s ledgers; `root`
+ * is the project, whose partition says whether fresh areas remain. Its `limit` says how the per-defect limit was set:
+ * `{ usd }`, or `{ usd, times, goingUsd }` for a multiple of the going rate, each in the unit `priceBy` names.
  * @param {any} cfg @param {string | undefined} root
- * @param {{ max?: number, perDefect?: string | number | { times: number }, usd?: number }} [flags] @param {any[]} [ledgers]
+ * @param {{ max?: number, perDefect?: string | number | { times: number }, usd?: number, priceBy?: string }} [flags] @param {any[]} [ledgers]
  */
-export const scourRuleOf = (cfg, root, { max = cfg.saturate.max, perDefect, usd } = {}, ledgers = undefined) => {
-  const pricing = pricingOf(cfg, ledgers);
+export const scourRuleOf = (cfg, root, { max = cfg.saturate.max, perDefect, usd, priceBy } = {}, ledgers = undefined) => {
+  const pricing = pricingOf(cfg, ledgers, priceByOf(priceBy ?? cfg.saturate.priceBy ?? 'defect'));
   const spec = limitSpecOf(perDefect ?? cfg.saturate.stopUsdPerDefect);
   const limit = spec.times === undefined ? spec : (() => {
     const goingUsd = goingRateOf(cfg, root, pricing);
     return { usd: spec.times * goingUsd, times: spec.times, goingUsd };
   })();
-  return { ...stopRuleOf(cfg, max, { perDefect: limit.usd, usd, factor: pricing.factor }), limit };
+  return { ...stopRuleOf(cfg, max, { perDefect: limit.usd, usd, factor: pricing.factor, priceBy: pricing.priceBy }), limit };
 };
 
 
 /**
  * The price of `ledger`'s next defect: `usd`, the average cost of its last five passes over the new defects its next
  * pass should find (`expectedNew`, Chao2's expectation times `factor`), and `passUsd`, that average. `usd` is
- * undefined under two passes and Infinity when no new defect is expected.
+ * undefined under two passes and Infinity when no new defect is expected. Under `priceBy` `kloc` it is per defect per
+ * thousand lines, `usd × lines / 1000`, and undefined where `ledger.lines` is not known.
  */
-export const nextPriceOf = (ledger, factor = 1) => {
+export const nextPriceOf = (ledger, factor = 1, priceBy = 'defect') => {
   const occasions = inOrder(ledger);
   const last = occasions.slice(-WINDOW);
   const passUsd = last.length ? costOf(last) / last.length : undefined;
   const e = expectedNewOf(chao2(occasions, ledger.defects));
   if (e === undefined || passUsd === undefined) return { usd: undefined, expectedNew: undefined, passUsd };
   const expectedNew = e * factor;
-  return { usd: expectedNew > 0 ? passUsd / expectedNew : Infinity, expectedNew, passUsd };
+  const usd = expectedNew > 0 ? passUsd / expectedNew : Infinity;
+  if (priceBy !== 'kloc') return { usd, expectedNew, passUsd };
+  return { usd: ledger.lines ? (usd * ledger.lines) / 1000 : undefined, expectedNew, passUsd };
 };
 
 const orNull = (n) => (n === undefined || !Number.isFinite(n) ? null : n);

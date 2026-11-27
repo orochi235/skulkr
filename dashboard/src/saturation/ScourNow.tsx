@@ -6,7 +6,7 @@ import { DefectCallout, useDefectCallout } from './DefectCallout';
 import { DelveAbout, DelveChart } from './DelveChart';
 import { FixShelf } from './FixShelf';
 import { PassPill } from './PassPill';
-import { STAT_TONE, StatRow, nextDefectStatOf, shelfToneOf, type Stat } from './LedgerHero';
+import { STAT_TONE, StatRow, limitStatOf, nextDefectStatOf, shelfToneOf, type Stat } from './LedgerHero';
 import { percent, usd } from './format';
 import type { ScourJob, SaturationLedger, Tally } from './saturation.types';
 import s from './ScourNow.module.css';
@@ -45,7 +45,7 @@ export const liveStatsOf = (l: SaturationLedger, stamp: Stamp): Stat[] => {
     ['found', String(l.distinct)],
     ['next new', percent(l.nextNew)],
     nextDefectStatOf(l, light),
-    ['limit', usd(l.limit.usd), light],
+    limitStatOf(l, light),
     ['spent', usd(l.costUsd), light],
   ];
 };

@@ -624,6 +624,21 @@ So while fresh areas remain the limit sits at three times the opening price ($1.
 itself once every area has been delved and the cheap defects are gone. It is priced again before each pass, and the
 progress line, `ls --json`'s `limit`, the stop reason and the Scour page say what it is and how it was set.
 
+**Pricing by density.** `saturate.priceBy: 'kloc'`, or `--price-by kloc` on `scour next`, `delve` and `run`, prices the
+next defect per defect per thousand lines: its price times the area's lines over 1,000, what the next pass costs for
+each defect per thousand lines it removes. A pass costs much the same whatever an area's size, so a big area finds
+more defects a pass, reads cheaper per defect, and delves on past a small area of the same density; per defect/kloc
+the two read alike (2026-11-27). Everything priced moves to that unit: the going rate is the cheapest such price, a
+dollar `--per-defect` is read in it, `3x` is three times that going rate, and `scour run` orders areas by it. The
+opening price pools spend over defects per thousand lines from the first five passes of ledgers whose lines are
+known; where none has five passes yet, it is `openingUsdPerDefect` scaled to the median known area (0.40 × 3,000
+lines / 1,000 = $1.20), or the dollars as given where no area's lines are known. An area whose lines are unknown has
+no price, so the price limit never stops it, though the other rules still do; the progress line says
+`unpriced, lines unknown` and the report says so too. The progress line, stop reason, report, `ls`, and the Scour
+page's "next defect/kloc" and "limit/kloc" name the unit (`$4.10 per defect/kloc (3× the $1.37 going rate)`), and
+`ls --json` gives each ledger `priceBy`. The Passes table's next-defect column stays per defect. The default,
+`'defect'`, is the price above.
+
 **Choosing the next pass.** `skulkr scour run` delves several areas within one budget, `--usd`, sending each pass
 where `--by` says. The candidates are the areas named, else every area of the partition, which needs `--usd`. Each
 area still stops by its own rule.

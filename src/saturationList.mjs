@@ -23,7 +23,7 @@ import { fixRunsIn, fixShelfOf } from './scourFixStatus.mjs';
 export const ledgerSummaryOf = (cfg, id, ledger, registered = () => new Map(), rule = scourRuleOf(cfg, undefined)) => {
   const inRegistry = registered(`${ledger.area}@${ledger.commit.slice(0, 10)}`);
   const stats = chao2(ledger.occasions, ledger.defects);
-  const price = nextPriceOf(ledger, rule.factor);
+  const price = nextPriceOf(ledger, rule.factor, rule.priceBy);
   const costUsd = ledger.occasions.reduce((sum, o) => sum + (o.costUsd ?? 0), 0);
   return {
     id,
@@ -40,6 +40,7 @@ export const ledgerSummaryOf = (cfg, id, ledger, registered = () => new Map(), r
     nextNew: stats.nextNew ?? null,
     nextUsd: price.usd === undefined || !Number.isFinite(price.usd) ? null : price.usd,
     limit: { usd: rule.stopUsdPerDefect, times: rule.limit?.times ?? null, goingUsd: rule.limit?.goingUsd ?? null, text: limitText(rule) },
+    priceBy: rule.priceBy ?? 'defect',
     defectsPerKloc: perKloc(ledger.defects.length, ledger.lines),
     unseenPerKloc: perKloc(stats.f0, ledger.lines),
     usdPerKloc: perKloc(costUsd, ledger.lines),
@@ -125,6 +126,7 @@ export const ledgerListLines = (list) => {
   return [
     `${'area'.padEnd(width)}   lines  occ  distinct  /kloc  unseen  /kloc  next-new  next $     cost    /kloc`,
     ...list.map(cells),
+    ...(list.some((l) => l.priceBy === 'kloc') ? ['next $ is per defect/kloc; – where an area\'s lines are not known, and no price limit stops it'] : []),
   ];
 };
 

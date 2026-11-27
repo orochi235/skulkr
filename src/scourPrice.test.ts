@@ -32,6 +32,14 @@ describe('nextPriceOf', () => {
   it('prices a ledger that expects nothing new at Infinity', () => {
     expect(nextPriceOf(ledgerOf([['A', 'B'], ['A', 'B'], ['A', 'B']])).usd).toBe(Infinity);
   });
+
+  it('prices per defect per thousand lines under kloc, and not at all without the lines', () => {
+    const perDefect = nextPriceOf(ledgerOf(SEEN)).usd!;
+    expect(nextPriceOf({ ...ledgerOf(SEEN), lines: 4000 }, 1, 'kloc').usd).toBeCloseTo(perDefect * 4, 10);
+    expect(nextPriceOf({ ...ledgerOf(SEEN), lines: 500 }, 1, 'kloc').usd).toBeCloseTo(perDefect / 2, 10);
+    expect(nextPriceOf(ledgerOf(SEEN), 1, 'kloc').usd).toBeUndefined();
+    expect(nextPriceOf({ ...ledgerOf(SEEN), lines: 4000 }, 1, 'defect').usd).toBe(perDefect);
+  });
 });
 
 describe('calibrationOf', () => {
@@ -57,6 +65,20 @@ describe('openingPriceOf', () => {
     // The worked example finds 13 defects in its first five passes; a ledger with four passes is left out.
     expect(openingPriceOf([ledgerOf(SEEN, [2, 2, 2, 2, 5]), ledgerOf(SEEN.slice(0, 4))], 0.4)).toBeCloseTo(13 / 13, 10);
     expect(openingPriceOf([ledgerOf(SEEN.slice(0, 4))], 0.4)).toBe(0.4);
+  });
+
+  it('pools spend over defects per thousand lines under kloc, from ledgers whose lines are known', () => {
+    // 13 defects in 2,000 lines and 13 in 500: $10 over 6.5 + 26 defects per thousand lines.
+    const big = { ...ledgerOf(SEEN), lines: 2000 };
+    const small = { ...ledgerOf(SEEN), lines: 500 };
+    expect(openingPriceOf([big, small, ledgerOf(SEEN)], 0.4, 'kloc')).toBeCloseTo(10 / 32.5, 10);
+  });
+
+  it('falls back under kloc to the opening dollars scaled to the median known area, else as given', () => {
+    const shallow = (lines?: number) => ({ ...ledgerOf(SEEN.slice(0, 2)), lines });
+    expect(openingPriceOf([shallow(1000), shallow(3000), shallow(8000)], 0.4, 'kloc')).toBeCloseTo(1.2, 10);
+    expect(openingPriceOf([shallow(1000), shallow(3000)], 0.4, 'kloc')).toBeCloseTo(0.8, 10);
+    expect(openingPriceOf([shallow()], 0.4, 'kloc')).toBe(0.4);
   });
 });
 

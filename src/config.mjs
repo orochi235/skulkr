@@ -144,9 +144,10 @@ export const DEFAULTS = {
    * `skulkr scour` (README "Scour"): `max` occasions at most, one review per source in `sources` (agent names)
    * each iteration, stopping once the chance of a new finding falls under `stopNextNew`, or as ready to fix once it
    * holds `fixAtKnownPerKloc` known defects per thousand lines after `minPasses` (null: never). A defect seen in
-   * `recurrent.share` of a ledger's passes or more, and at least `recurrent.min` times, is flagged recurrent.
+   * `recurrent.share` of a ledger's passes or more, and at least `recurrent.min` times, is flagged recurrent. `priceBy`
+   * prices the next defect per `defect` or per defect per thousand lines (`kloc`).
    */
-  saturate: { max: 40, minPasses: 5, fixAtKnownPerKloc: 5, recurrent: { share: 0.25, min: 5 }, sources: ['claude'], stopNextNew: 0.15, stopUnseenPerKloc: 1, stopUsdPerDefect: { times: 3 }, openingUsdPerDefect: 0.4 },
+  saturate: { max: 40, minPasses: 5, fixAtKnownPerKloc: 5, recurrent: { share: 0.25, min: 5 }, sources: ['claude'], stopNextNew: 0.15, stopUnseenPerKloc: 1, stopUsdPerDefect: { times: 3 }, openingUsdPerDefect: 0.4, priceBy: 'defect' },
 
   /**
    * How a batch is tested. `{ref}` in the command is the batch branch; `cwd` is `root` or `batch` (its worktree).

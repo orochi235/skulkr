@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defectGroupsOf } from './LedgerDetail';
-import { heroCountsOf } from './LedgerHero';
+import { heroCountsOf, limitStatOf, nextDefectStatOf } from './LedgerHero';
 import type { SaturationLedger } from './saturation.types';
 
 const defect = (id: string, registry: { id: string; status: string; sha: null } | null = null) => ({
@@ -33,5 +33,18 @@ describe("the defects table's groups", () => {
 
   it('shows one group while nothing is resolved', () => {
     expect(defectGroupsOf(ledgerWith([defect('D1')])).map((g) => g.label)).toEqual(['Unresolved']);
+  });
+});
+
+describe("the hero's price figures", () => {
+  const priced = (priceBy?: 'defect' | 'kloc') => ({ nextUsd: 3, limit: { usd: 2.5 }, priceBy }) as unknown as SaturationLedger;
+
+  it('read the next defect and the limit in one unit, naming kloc where it is the unit', () => {
+    expect(nextDefectStatOf(priced(), 'x')[0]).toBe('next defect');
+    expect(limitStatOf(priced('defect'))[0]).toBe('limit');
+    const [word, , tone, tip] = nextDefectStatOf(priced('kloc'), 'x');
+    expect([word, tip]).toEqual(['next defect/kloc', expect.stringMatching(/per thousand lines/)]);
+    expect(tone).toMatch(/^x \S/);
+    expect(limitStatOf(priced('kloc'))[0]).toBe('limit/kloc');
   });
 });
