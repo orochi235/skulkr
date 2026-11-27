@@ -3,7 +3,7 @@ import { cleanup, fireEvent, screen, within } from '@testing-library/react';
 import { WeaselProvider } from '@weasel-js/core';
 import { renderWithIcons } from '@dash/test/icons';
 import { SaturationPage } from './SaturationPage';
-import type { SaturationLedger } from './saturation.types';
+import type { FixQueueRow, SaturationLedger } from './saturation.types';
 import { fixHoursOf, mapAreasFor, saturationByArea, scourPhasesOf } from './SaturationMap';
 import type { AuditArea } from '@dash/audits/skulkrMap.types';
 import fixture from '@dash/audits/fixture.map.json';
@@ -25,12 +25,12 @@ const LEDGERS = [
   ledger('geom.booleans', 1.2, []),
 ];
 
-function serve(ledgers: readonly SaturationLedger[] = LEDGERS, queue: readonly string[] = []) {
+function serve(ledgers: readonly SaturationLedger[] = LEDGERS, queue: readonly string[] = [], fixQueue: readonly FixQueueRow[] = []) {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => (String(url).endsWith('api/tenants')
     ? new Response('[{"name":"weasel"}]', { status: 200 })
     : String(url).endsWith('/map')
       ? new Response(JSON.stringify(fixture), { status: 200 })
-      : new Response(JSON.stringify({ ledgers, queue }), { status: 200 }))));
+      : new Response(JSON.stringify({ ledgers, queue, fixQueue }), { status: 200 }))));
 }
 
 afterEach(() => {
@@ -130,6 +130,21 @@ describe('SaturationPage', () => {
     expect(within(pane).getByText('geom.booleans').closest('button')).toHaveAttribute('title', 'geom.booleans: next defect ≈ $1.20');
     fireEvent.click(within(pane).getByText('geom.booleans'));
     expect(window.location.hash).toBe('#weasel/scour/geom.booleans');
+  });
+
+  it('switches the queue to the fix queue, its live run first by batch, the rest by open defects and batches', async () => {
+    serve(LEDGERS, ['geom.booleans'], [
+      { area: 'core.animation', running: true, done: 2, batches: 8, open: null },
+      { area: 'geom.booleans', running: false, done: 0, open: 5, batches: 1 },
+    ]);
+    window.location.hash = '#weasel/scour';
+    renderWithIcons(<WeaselProvider><SaturationPage base="/test/" /></WeaselProvider>);
+    const pane = await screen.findByRole('region', { name: 'Scour queue' });
+    fireEvent.click(within(pane).getByRole('radio', { name: 'Fix' }));
+    expect(within(pane).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['▸core.animationfixing 3/8', '1geom.booleans51']);
+    expect(within(pane).getByText('2 areas')).toBeInTheDocument();
+    fireEvent.click(within(pane).getByText('core.animation'));
+    expect(window.location.hash).toBe('#weasel/scour/core.animation');
   });
 
   it('traces a hovered defect on both the delve chart and the fix shelf', async () => {

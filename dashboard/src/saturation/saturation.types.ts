@@ -131,3 +131,13 @@ export interface ScourLive {
   /** The last lines of its `scour.log`, each led by its ISO time. */
   readonly log: readonly string[];
 }
+
+/** One row of the fix queue (`skulkr scour queue ls`): an area a live fix run holds (`running`, `done` of its `batches`),
+ *  or one waiting, with its defects no fix run has settled (`open`) and the batches triage makes of them. */
+export interface FixQueueRow {
+  readonly area: string;
+  readonly running: boolean;
+  readonly done: number;
+  readonly batches: number | null;
+  readonly open: number | null;
+}

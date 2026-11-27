@@ -11,7 +11,7 @@ weasel cutover.
   `sat`, `service`, `config`, `tenants`).
 - `src/defectGraph.mjs` — which findings are one defect, over rounds and landed saturation ledgers; `registry.mjs`
   writes it as `.skulkr/defects/`, `recordIndex.mjs` builds the SQLite index `skulkr q` reads.
-- `src/saturate.mjs` — `skulkr scour` (README "Scour"): session mode's `next` in `scourSession.mjs` (a subagent's cost in
+- `src/saturate.mjs` — `skulkr scour` (README "Scour"): the fix queue in `scourFixQueue.mjs`, session mode's `next` in `scourSession.mjs` (a subagent's cost in
   `agentCost.mjs`), folding in `scourFold.mjs`, `run` in `scourRun.mjs`, prices in `scourPrice.mjs`, fleet mode's jobs in `saturateJobs.mjs`, `import` in
   `saturateImport.mjs`, `land` in `saturateLand.mjs`, `ls` in `saturationList.mjs`, the ledger in `ledger.mjs`, the statistics in `saturation.mjs`, the report in `saturationReport.mjs`. Nothing in rounds reads them.
 - `src/` — the pipeline, plain Node ESM `.mjs` with no build. `config.mjs` holds every default and derives the

@@ -10,8 +10,8 @@
 
 .head {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
+  gap: var(--wzl-space-2);
   padding-inline: var(--wzl-space-2);
 }
 
@@ -23,6 +23,7 @@
 
 .count {
   composes: numeric from '@weasel-js/theme/numeric.module.css';
+  margin-inline-start: auto;
   font-size: var(--wzl-font-size-sm);
   color: var(--wzl-fg-muted);
 }
@@ -96,4 +97,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* A live fix run's batch, across both figure columns. */
+.fixing {
+  grid-column: span 2;
+  color: var(--wzl-accent);
 }

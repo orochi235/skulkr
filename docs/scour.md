@@ -112,6 +112,16 @@ pattern, `branchOf`, `idOf`). A round number runs through all of them: `applyFix
 - **Where it runs.** `skulkr scour fix [<area>…]`, state under `<state>/scour/fix-<N>/`, the record under
   `.skulkr/scour/fix-<N>/`.
 
+### Fix queue
+
+Areas waiting for a fix run, in order, in `<state>/scour/fix-queue.json` (`src/scourFixQueue.mjs`). `skulkr scour queue
+add|drop <area>…` edits it and `queue ls` prints it: the areas a live fix run holds first, by batch, then each queued
+area's defects no fix run has settled and the batches triage makes of them. `skulkr scour fix --queue [--lanes N]`
+drains it: whenever fewer than N fix runs are live, counting runs started by hand, it takes the first area off and
+starts `scour fix <area>` as a detached process logging to `<state>/scour/fix-<area>.log`, and it ends once the queue
+is empty and its runs have ended. Each run claims its own `fix-<N>` directory, so lanes started together never share a
+number. The Scour page's queue pane switches between Delve and Fix; Fix shows the same rows, read-only (2026-11-27).
+
 ## Decided
 
 - The workflow is called **scour**: it both searches an area thoroughly and scrubs it clean. `skulkr scour` is the
