@@ -4,7 +4,33 @@ For the next session in skulkr. Written 2026-11-27 ~12:25 local. Check each clai
 
 ## State
 
-On `main`, pushed except as noted under Loose ends.
+On `main`, pushed except as noted under Loose ends. Updated ~15:10 by skulkr-3d: the sections below this one predate
+it, so check run state with `pgrep -f "scour fix"` and `node scripts/fixRunStats.mjs`.
+
+## Next: two builds, in this order
+
+1. **Stack scour fixer branches per area** (Mike's ask through weasel-7a, 2026-11-27; kouhai t-633). The weasel batch
+   of 21 scour branches failed almost entirely on collisions between branches from one base (Timeline runs 1–6, two
+   adding `flatParentOf`, four changing `onKeysInput`'s signature). In `src/scourFix.mjs`: batch k is fixed on batch
+   k-1's branch tip when k-1 applied, not on the run's frozen `commit` (today every batch cuts from `commit` in one
+   frozen worktree; how the tree moves between batches is our call); and a run given no `--on` defaults to the tip of
+   the newest unmerged `scour*-<area>-b*` branch (highest run, then batch), falling back to today's base, and names
+   its choice in its opening line. Then an area's newest branch holds all its work. **Message weasel-7a when it lands.**
+2. **Scour landing** (kouhai t-630; decided 2026-11-27, `docs/scour.md` "Decided"): a fix run lands its verified
+   batches on `main` itself through the rounds' batch, gate and merge, by default; an option marks them ready and
+   leaves them for the repository's own batching. The design is `docs/scour.md`'s "Unbuilt" list under "Building the
+   fix stage" (`namesFor(prefix)`, `batchAndTest` told its record and its left-out store). With stacking, a run lands
+   only its area's newest branch. Weasel's rounds must stay at parity (`CLAUDE.md` Rules).
+
+The scour branches made before today's batch (`scour1`–`scour11`) are weasel-7a's `batch/2026-11-27-scour`; the
+review-first plan in "In flight: the fix queue" below is superseded by item 2.
+
+## Waiting on weasel's batch
+
+- The dashboard's hover cards (`d9c58f4`) are weasel `Tooltip`s anchored by `anchorRect` (weasel `41906fd420`, in
+  `batch/2026-11-27-scour`). Until that batch lands and `~/src/weasel` is rebuilt (`npm run build` there, on the
+  fleet), the dashboard on :5214 draws the cards at the window's top-left. Then run the dashboard typecheck (fleet),
+  and delete weasel's `.worktrees/tooltip-anchor-rect` and its branch.
 
 ## In flight: the Timeline and registry fix trial
 
