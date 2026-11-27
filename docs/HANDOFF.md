@@ -33,14 +33,6 @@ batches and lands the area's unlanded verified branches: the newest alone when i
 else all of them as one `batchAndTest` with conflict repair, gate and capstone, one mbox per branch. It pushes weasel's
 `main` per area, so it needs his go to build and to run; conflict repairs are local Claude jobs.
 
-## In flight and queued (2026-11-27 evening)
-
-- **Built and unpushed:** `saturate.priceBy: 'defect' | 'kloc'` / `--price-by` (`8a0efe9`, README "Pricing by
-  density"); live jobs' recent `skulkr:` lines in the Scour page's log box (`88e4712`). Push with the rest.
-- **Next, t-648 #opening-price-before-two-passes:** the delve row's "next defect" shows the opening price (lighter, a
-  tooltip saying so) until the area's own price exists at two passes; needs an opening-price field from
-  `scourPrice.mjs`'s `openingPriceOf` (both units now) on `saturationList.mjs`'s `ls --json`.
-
 ## Dashboard, this session (`0a2855f`, `71053f7`, `b5e5d82`, `2f00e57`, `c654dc3`, `d94027c`)
 
 Invert ramp checkbox (`map.invert`), the queue's place column fitted to its digits, batch pills reading `batch 1`, a
