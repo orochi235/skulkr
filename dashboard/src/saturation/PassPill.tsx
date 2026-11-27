@@ -1,7 +1,10 @@
 import s from './PassPill.module.css';
 
-/** A delve job's key, `07-claude`, split into its pass number and its source; a key of any other shape is all name. */
+/** A live job's key split into its number and its name: a delve's `07-claude` (pass and source), a fix run's `b2`
+ *  (batch); a key of any other shape is all name. */
 export const passKeyParts = (key: string): { readonly index: string | null; readonly name: string } => {
+  const batch = /^b(\d+)$/.exec(key);
+  if (batch) return { index: batch[1]!, name: 'batch' };
   const m = /^(\d+)-(.+)$/.exec(key);
   return m ? { index: m[1]!, name: m[2]! } : { index: null, name: key };
 };

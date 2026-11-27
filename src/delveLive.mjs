@@ -6,6 +6,7 @@ import { appendFileSync, closeSync, existsSync, openSync, readSync, readdirSync,
 import { join } from 'node:path';
 import { heldAlive, leaseAt } from './lease.mjs';
 import { ledgerDirOf } from './ledger.mjs';
+import { scourStateDirOf } from './scourPaths.mjs';
 
 /** The scour process's own log in a ledger's directory, started over by each process that holds the ledger. */
 export const scourLogOf = (cfg, area) => join(ledgerDirOf(cfg, area), 'scour.log');
@@ -68,7 +69,7 @@ const jobsIn = (dir) => {
 
 /**
  * What the live process holding ledger `id` is doing: its `pid`, `since` it took the ledger, what it `does` (`delve`,
- * `fold`, `ingest`, or null for a process that did not say), the occasion cap it runs to, its jobs out, and the last
+ * `fold`, `ingest`, `fix`, or null for a process that did not say), the occasion cap it runs to (a fix run's batches), its jobs out, and the last
  * `n` lines of its `scour.log`; null when no live process holds it.
  */
 export const liveScourOf = (cfg, id, n = 8) => {
@@ -76,12 +77,14 @@ export const liveScourOf = (cfg, id, n = 8) => {
   const lease = leaseAt(join(dir, 'lock'));
   if (!heldAlive(lease)) return null;
   const log = scourLogOf(cfg, id);
+  // A fix run keeps its jobs in its own run directory (`fix-<N>`), one per batch, keyed `b<k>`.
+  const jobs = lease.jobs ? jobsIn(join(scourStateDirOf(cfg), lease.jobs)).map((j) => ({ ...j, key: j.key.replace(/^.*~/, '') })) : jobsIn(dir);
   return {
     pid: lease.pid,
     since: lease.at,
     does: lease.does ?? null,
     max: lease.max ?? null,
-    jobs: jobsIn(dir),
+    jobs,
     log: existsSync(log) && statSync(log).mtimeMs >= Date.parse(lease.at) ? lastLines(log, n) : [],
   };
 };

@@ -62,3 +62,22 @@ describe('skulkr saturate ls', () => {
     expect(ledgerListOf(cfg)[0].running).toBeNull();
   });
 });
+
+describe('a live fix run', () => {
+  it("shows its batches' jobs, read from its run directory and keyed by batch", () => {
+    const state = mkdtempSync(join(tmpdir(), 'skulkr-fixlive-'));
+    dirs.push(state);
+    const cfg = resolveConfig({ name: 'proj', state });
+    writeLedger(cfg, emptyLedger('core', 'c0ffee', ['src/x.ts']));
+    const jobs = join(state, 'scour', 'fix-3', 'jobs', 'core~b2');
+    mkdirSync(jobs, { recursive: true });
+    writeFileSync(join(jobs, 'fix.log'), 'skulkr: says: reading useKeyDrag\n');
+    const release = takeLease(join(ledgerDirOf(cfg, 'core'), 'lock'), { saturate: 'core', does: 'fix', max: 5, jobs: 'fix-3' })!;
+    try {
+      const [ledger] = ledgerListOf(cfg, undefined);
+      expect(ledger!.running).toMatchObject({ does: 'fix', max: 5, jobs: [{ key: 'b2', step: 'fix', line: 'skulkr: says: reading useKeyDrag' }] });
+    } finally {
+      release();
+    }
+  });
+});

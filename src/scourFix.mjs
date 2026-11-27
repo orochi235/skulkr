@@ -9,7 +9,8 @@ import { join } from 'node:path';
 import { fixInto, stageIn } from './area.mjs';
 import { addWorktree, gitIn, removeWorktree } from './batch.mjs';
 import { JOB_IN } from './config.mjs';
-import { freezeCommitOf, ledgerOf } from './ledger.mjs';
+import { freezeCommitOf, ledgerOf, withLedgerHeld } from './ledger.mjs';
+import { loggingSay } from './delveLive.mjs';
 import { localFixOf } from './args.mjs';
 import { createSaturateContext } from './saturateJobs.mjs';
 import { scourStateDirOf } from './scourPaths.mjs';
@@ -92,6 +93,12 @@ export const scourFix = async (cfg, runner, root, id, args, say) => {
   const n = nextRunOf(cfg);
   const runDir = join(scourStateDirOf(cfg), `fix-${n}`);
   mkdirSync(runDir, { recursive: true });
+  // Held as a delve holds it, so the Scour page shows the run live and no delve starts on the ledger meanwhile.
+  return withLedgerHeld(cfg, id, { about: { does: 'fix', max: batches.length, jobs: `fix-${n}` } }, () => fixBatches(cfg, root, id, ledger, batches, n, runDir, args, loggingSay(cfg, id, say)));
+};
+
+/** Fix run `n`'s `batches` of ledger `id`, one at a time, recorded in `runDir`. Answers the run's record. */
+const fixBatches = async (cfg, root, id, ledger, batches, n, runDir, args, say) => {
   const commit = freezeCommitOf(cfg, root);
   const git = gitIn(root);
   const frozen = addWorktree(root, `${cfg.naming.prefix}-scour-fix${n}`, commit);

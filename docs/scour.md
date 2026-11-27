@@ -70,7 +70,8 @@ project's `.skulkr/`, never from one machine's state directory.
 `main`'s tip (`area.mjs:fixInto`: verify and up to two repairs), and puts its commits on a branch of its own,
 `scour<N>-<area>-b<k>`. Its record, one row per defect with its verdict, and each batch's commits, verify, repairs
 and cost, is `<state>/scour/fix-<N>/record.json`. `main` is never touched. Locally, fixers run on this machine and
-their verify and checks on the fleet (`runner: 'local'`, so `checksOnFleet` holds).
+their verify and checks on the fleet (`runner: 'local'`, so `checksOnFleet` holds). A run holds its ledger as a delve
+ does (`does: 'fix'`), so the Scour page shows it live, each batch's jobs read from the run's directory.
 
 - **Batches group for the fixer's sake, never by severity**: every open defect is to be fixed, so defects join one
   batch when they share a file a fix would touch or a stated cause, a group past eight split in file and line order

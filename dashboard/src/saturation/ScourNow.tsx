@@ -44,7 +44,7 @@ export function ScourNow({ ledgers, onPick, now = Date.now() }: { ledgers: reado
             <header className={s.head}>
               <span className={s.area} role="button" tabIndex={0} onClick={() => onPick(l.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onPick(l.id)}>{l.id}</span>
               <span className={s.facts}>
-                {r.does ?? 'held'} · pid {r.pid} · {minutesSince(r.since, now)} · {r.max ? `${l.occasions}/${r.max}` : l.occasions} occasions
+                {r.does ?? 'held'} · pid {r.pid} · {minutesSince(r.since, now)} · {r.does === 'fix' ? `${r.jobs.length}/${r.max ?? r.jobs.length} batches` : `${r.max ? `${l.occasions}/${r.max}` : l.occasions} occasions`}
                 {' '}· {usd(l.costUsd)} · next defect ≈ {usdOrDash(l.nextUsd)}, limit {l.limit.text}
               </span>
               <span className={s.about}><DelveAbout ledger={l} /></span>
