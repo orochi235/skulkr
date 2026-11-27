@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fixPlanFor, resolvedFile } from './scourTriage.mjs';
 import { scourVerdictsOf } from './scourFix.mjs';
 import { fixStatusesFor, lastFixRunOf } from './scourFixStatus.mjs';
+import { withFlags } from './scourFlags.mjs';
 import { isRecurrent } from './triageFields.mjs';
 
 const d = (id: string, where: string, extra: Record<string, unknown> = {}, seen = 1) => ({ id, claim: `claim ${id}`, where, sightings: Array.from({ length: seen }, (_, i) => i + 1), ...extra });
@@ -80,5 +81,14 @@ describe("a ledger's last flush", () => {
     expect(lastFixRunOf('core', runs)).toEqual({ n: 3, started: null, finished: null });
     expect(lastFixRunOf('other', runs)).toEqual({ n: 2, started: 'c', finished: null });
     expect(lastFixRunOf('ui', runs)).toBeNull();
+  });
+});
+
+describe('flags for repair', () => {
+  it('adds ids to an area in order, clears them, and drops an area left with none', () => {
+    const one = withFlags({}, 'core', ['D10', 'D9']);
+    expect(one).toEqual({ core: ['D9', 'D10'] });
+    expect(withFlags(one, 'core', ['D9'], true)).toEqual({ core: ['D10'] });
+    expect(withFlags(one, 'core', ['D9', 'D10'], true)).toEqual({});
   });
 });

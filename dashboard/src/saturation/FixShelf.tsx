@@ -40,10 +40,10 @@ const STAGE: Readonly<Record<FixStage | 'fixing', string>> = {
 
 const CLASS: Readonly<Record<ShelfStatus, string>> = {
   ...STAGE, waiting: s.waiting!, fixed: s.fixed!, 'not a defect': s.notDefect!, question: s.question!,
-  'not fixed': s.notFixed!, duplicate: s.duplicate!, unread: s.unread!,
+  'not fixed': s.notFixed!, duplicate: s.duplicate!, unread: s.unread!, 'flagged for repair': s.flagged!,
 };
 
-const KEY: readonly ShelfStatus[] = ['waiting', 'analyzing', 'writing', 'written', 'checking', 'repairing', 'fixed', 'not a defect', 'question', 'not fixed', 'duplicate', 'unread'];
+const KEY: readonly ShelfStatus[] = ['waiting', 'analyzing', 'writing', 'written', 'checking', 'repairing', 'fixed', 'not a defect', 'flagged for repair', 'question', 'not fixed', 'duplicate', 'unread'];
 
 /** How the shelf orders tiles within a group: as triage batched them, or by status in the key's order. */
 export type ShelfOrder = 'batch' | 'status';
@@ -103,7 +103,7 @@ export function FixShelf({ shelf, order = 'batch', onPickDefect, traced = null, 
           {g.books.map((b) => {
             const top = base - b.h;
             const run = shelf.statuses[b.id];
-            const title = `${b.id} · batch ${b.batch} · ${b.status}${run ? ` (fix run ${run.run}${run.branch ? `, ${run.branch}` : ''})` : ''}${b.recurrent ? ' · recurrent' : ''}`;
+            const title = `${b.id} · batch ${b.batch} · ${b.status}${run?.verdict ? ` (fix run said ${run.verdict})` : ''}${run?.run ? ` (fix run ${run.run}${run.branch ? `, ${run.branch}` : ''})` : ''}${b.recurrent ? ' · recurrent' : ''}`;
             return (
               <g
                 key={b.id} className={[s.tile, CLASS[b.status], b.status in STAGE ? s.out : '', b.id === traced ? s.traced : '', onPickDefect ? s.pickable : ''].filter(Boolean).join(' ')}

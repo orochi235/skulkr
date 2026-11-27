@@ -69,7 +69,7 @@
 .grid tbody th { font-weight: inherit; color: var(--wzl-fg-muted); }
 
 /* The figures a size up from their labels, so they read first. */
-.grid td { font-size: var(--wzl-font-size-md); font-weight: 600; }
+.grid td { font-size: var(--wzl-font-size-md); }
 
 .grid .estimate td { padding-inline-end: 0.15em; font-style: italic; color: var(--wzl-fg-muted); }
 

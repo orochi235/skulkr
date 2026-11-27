@@ -36,6 +36,9 @@
 /* Translucent white by request, the one status mixed with alpha. */
 .notDefect { --tile: color-mix(in srgb, white 20%, transparent); }
 
+/* A verdict a person put in doubt, back for repair: magenta, a hue no other status takes. */
+.flagged { --tile: #d63aaf; }
+
 .question { --tile: var(--wzl-warning); }
 
 .notFixed { --tile: var(--wzl-danger); }

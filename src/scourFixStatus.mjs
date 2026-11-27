@@ -5,6 +5,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { scourStateDirOf } from './scourPaths.mjs';
+import { FLAGGED, scourFlagsOf } from './scourFlags.mjs';
 import { fixStagesIn } from './scourFixStage.mjs';
 import { fixPlanFor } from './scourTriage.mjs';
 
@@ -63,8 +64,9 @@ export const lastFixRunOf = (area, runs) => {
 };
 
 /** A ledger's shelf: its plan's batches (ids in order, with each one's size and whether it recurs), what goes to ask,
- *  and each defect's fix status, with its `stage` (`fixStagesIn`) while its batch is out. */
-export const fixShelfOf = (cfg, ledger, runs = fixRunsIn(cfg)) => {
+ *  and each defect's fix status, with its `stage` (`fixStagesIn`) while its batch is out, and `flagged for repair` (with
+ *  the `verdict` it overrides) where a person flagged it (`scourFlags.mjs`). */
+export const fixShelfOf = (cfg, ledger, runs = fixRunsIn(cfg), flags = scourFlagsOf(cfg)) => {
   if (ledger.defects.length === 0) return null;
   const plan = fixPlanFor(ledger, { recurrent: cfg.saturate.recurrent });
   const statuses = fixStatusesFor(ledger.area, runs);
@@ -77,6 +79,11 @@ export const fixShelfOf = (cfg, ledger, runs = fixRunsIn(cfg)) => {
     const stages = fixStagesIn(dir ? join(dir, 'jobs', `${ledger.area}~b${b.n}`) : null, b.defects.map((d) => d.id));
     for (const d of b.defects) statuses[d.id] ??= { ...out, stage: stages[d.id] };
     delete statuses[`b${b.n}`];
+  }
+  // A person's flag outranks a fix run's verdict: the verdict is what is in doubt.
+  for (const id of flags[ledger.area] ?? []) {
+    const was = statuses[id];
+    statuses[id] = { status: FLAGGED, run: was?.run ?? null, branch: was?.branch ?? null, verdict: was?.status ?? null };
   }
   return {
     lastRun: lastFixRunOf(ledger.area, runs),
