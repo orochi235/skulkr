@@ -7,23 +7,18 @@ For the next session in skulkr. Written 2026-11-27 ~12:25 local. Check each clai
 On `main`, pushed except as noted under Loose ends. Updated ~15:10 by skulkr-3d: the sections below this one predate
 it, so check run state with `pgrep -f "scour fix"` and `node scripts/fixRunStats.mjs`.
 
-## Next: two builds, in this order
+## Next
 
-1. **Stack scour fixer branches per area** (Mike's ask through weasel-7a, 2026-11-27; kouhai t-633). The weasel batch
-   of 21 scour branches failed almost entirely on collisions between branches from one base (Timeline runs 1–6, two
-   adding `flatParentOf`, four changing `onKeysInput`'s signature). In `src/scourFix.mjs`: batch k is fixed on batch
-   k-1's branch tip when k-1 applied, not on the run's frozen `commit` (today every batch cuts from `commit` in one
-   frozen worktree; how the tree moves between batches is our call); and a run given no `--on` defaults to the tip of
-   the newest unmerged `scour*-<area>-b*` branch (highest run, then batch), falling back to today's base, and names
-   its choice in its opening line. Then an area's newest branch holds all its work. **Message weasel-7a when it lands.**
-2. **Scour landing** (kouhai t-630; decided 2026-11-27, `docs/scour.md` "Decided"): a fix run lands its verified
-   batches on `main` itself through the rounds' batch, gate and merge, by default; an option marks them ready and
-   leaves them for the repository's own batching. The design is `docs/scour.md`'s "Unbuilt" list under "Building the
-   fix stage" (`namesFor(prefix)`, `batchAndTest` told its record and its left-out store). With stacking, a run lands
-   only its area's newest branch. Weasel's rounds must stay at parity (`CLAUDE.md` Rules).
+Stacking (`77290ea`) and scour landing (`c3620a7`) are built and on `main`; `docs/scour.md` "Stacking" and
+"Landing". Mike chose landing by default for the live queue (2026-11-27), so the next queued fix run,
+`core.canvas.SceneCanvas.part2`, is the **first real scour landing**: it batches `scour<N>-core.canvas.SceneCanvas.part2-b4`
+as `batch/<date>-scour<N>`, gates it, and fast-forwards and pushes weasel's `main`. Watch its log
+(`~/.local/state/weasel-skulkr/scour/fix-core.canvas.SceneCanvas.part2.log`, lines from `land:`) and check the
+record commit landed `.skulkr/scour/fix-<N>/record.json`. Runs 11 and 12 started on the old code and will not land.
+Then: **close** (fixers' verdicts written to the registry as statuses), unbuilt.
 
-The scour branches made before today's batch (`scour1`–`scour11`) are weasel-7a's `batch/2026-11-27-scour`; the
-review-first plan in "In flight: the fix queue" below is superseded by item 2.
+The scour branches made before today's batch (`scour1`–`scour11`) are weasel-7a's `batch/2026-11-27-scour`; they
+were not stacked.
 
 ## Waiting on weasel's batch
 
@@ -64,7 +59,7 @@ review-first plan in "In flight: the fix queue" below is superseded by item 2.
   comparison once runs 9 and 10 end.
 - ⚠️ Batches split past eight defects can share a file and each branches from `main`, so pairs may conflict at landing.
 - **Then:** the user reviews all `scour<N>-*` branches in weasel and the `tile-charts` port
-  (`~/src/weasel/.worktrees/tile-charts`, unpushed); landing is built only after that review.
+  (`~/src/weasel/.worktrees/tile-charts`, unpushed); scour landing is built (see "Next") and no longer waits on that review.
 
 ## Next to build
 
