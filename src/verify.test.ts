@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { TIMED_OUT, failedFilesIn, failedTestsIn, failureExcerpt, fileCountsOf, isTestPath, needsGui, verdictOf, verifyLine, verifyLines } from './verify.mjs';
+import { TIMED_OUT, affectedOf, failedFilesIn, failedTestsIn, failureExcerpt, fileCountsOf, isTestPath, needsGui, testCountsOf, verdictOf, verdictText, verifyLine, verifyLines } from './verify.mjs';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -65,6 +65,29 @@ describe('fileCountsOf, failedFilesIn and failedTestsIn', () => {
     expect([...got.keys()]).toEqual(['scripts/ci-checks.gate.ts', 'a/x.test.ts']);
     expect([...got.get('scripts/ci-checks.gate.ts')!]).toEqual(['the checks ci.yml runs as steps > npm run lint -w @weasel-js/labkit']);
     expect(got.get('a/x.test.ts')!.size).toBe(0);
+  });
+});
+
+describe('test counts', () => {
+  const LOG = [
+    ' Test Files  1 failed | 2911 passed (2912)',
+    '   Affected  2912 of 5601 test files (related to 13 files)',
+    '      Tests  1 failed | 24141 passed | 3 skipped (24145)',
+    ' FAIL  ui  a/x.test.tsx > one',
+    ' Test Files  1 passed (1)',
+    '      Tests  34 passed (34)',
+  ].join('\n');
+
+  it('sum test-level counts over every run, and read what --changed took as affected', () => {
+    expect(testCountsOf(LOG)).toEqual({ failed: 1, passed: 24175, total: 24179 });
+    expect(affectedOf(LOG)).toEqual({ files: 2912, of: 5601 });
+    expect(testCountsOf(' Test Files  3 passed (3)')).toBeUndefined();
+  });
+
+  it('say how many tests ran, and how many failed, in the verdict line', () => {
+    expect(verdictText(verdictOf('1', LOG))).toBe('failed: 1 of 24179 tests failed, in 1 of 2913 test files (a/x.test.tsx)');
+    expect(verdictText(verdictOf('0', LOG.replace(/1 failed \| /g, '')))).toBe('passed (24179 tests in 2913 test files, 2912 of 5601 affected)');
+    expect(verdictText(verdictOf('0', ' Test Files  3 passed (3)'))).toBe('passed (3 test files)');
   });
 });
 

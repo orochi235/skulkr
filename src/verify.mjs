@@ -109,12 +109,10 @@ const TEST_PATH = /([\w@./-]+\.(?:test|spec)\.[cm]?[jt]sx?)\b/;
 /** Whether `path` is a test file's path, rather than a step's name or another file. */
 export const isTestPath = (path) => TEST_PATH.exec(path)?.[1] === path;
 
-/**
- * vitest's file-level counts in `text`, summed over every `Test Files  1 failed | 2 passed (3)` line, one per vitest
- * run the command made; undefined with none.
- */
-export const fileCountsOf = (text) => {
-  const lines = stripAnsi(text).split('\n').filter((l) => /^\s*Test Files\s/.test(l));
+/** vitest's counts on its summary lines headed `head` in `text`, summed over every vitest run the command made
+ *  (`Tests  1 failed | 2 passed (3)`); undefined with none. */
+const summaryCountsOf = (text, head) => {
+  const lines = stripAnsi(text).split('\n').filter((l) => new RegExp(`^\\s*${head}\\s{2,}\\d`).test(l));
   if (!lines.length) return undefined;
   const one = (line) => {
     const n = (word) => Number(new RegExp(`(\\d+) ${word}`).exec(line)?.[1] ?? 0);
@@ -122,6 +120,18 @@ export const fileCountsOf = (text) => {
     return { failed: n('failed'), passed: n('passed'), total };
   };
   return lines.map(one).reduce((a, b) => ({ failed: a.failed + b.failed, passed: a.passed + b.passed, total: a.total + b.total }));
+};
+
+/** vitest's file-level counts in `text` (`Test Files  1 failed | 2 passed (3)`), summed over its runs. */
+export const fileCountsOf = (text) => summaryCountsOf(text, 'Test Files');
+
+/** vitest's test-level counts in `text` (`Tests  1 failed | 2 passed (3)`), summed over its runs. */
+export const testCountsOf = (text) => summaryCountsOf(text, 'Tests');
+
+/** The test files vitest's `--changed` run took as affected (`Affected  2912 of 5601 test files`), summed. */
+export const affectedOf = (text) => {
+  const hits = [...stripAnsi(text).matchAll(/^\s*Affected\s+(\d+) of (\d+) test files/gm)];
+  return hits.length ? { files: hits.reduce((n, m) => n + Number(m[1]), 0), of: Math.max(...hits.map((m) => Number(m[2]))) } : undefined;
 };
 
 /** A script's path as the first token after `FAIL` gives it: a file vitest runs, whatever it is named. */
@@ -162,12 +172,14 @@ export const verdictOf = (exitText, log) => {
   const exit = Number.parseInt(String(exitText).trim(), 10);
   if (!Number.isInteger(exit)) return { ok: false, unrun: true, exit: undefined, counts: undefined, failedFiles: [], why: 'no verdict came home' };
   const counts = fileCountsOf(log);
+  const tests = testCountsOf(log);
+  const affected = affectedOf(log);
   const failedFiles = failedFilesIn(log);
   const ok = exit === 0 && !(counts?.failed > 0);
   const why = ok ? '' : exit === TIMED_OUT ? 'timed out'
-    : counts?.failed ? `${counts.failed} of ${counts.total} test files failed`
+    : counts?.failed ? (tests?.failed ? `${tests.failed} of ${tests.total} tests failed, in ${counts.failed} of ${counts.total} test files` : `${counts.failed} of ${counts.total} test files failed`)
       : `exited ${exit}`;
-  return { ok, exit, counts, failedFiles, why, ...(exit === TIMED_OUT ? { timedOut: true } : {}), ...(unhandledIn(log) ? { unhandled: true } : {}) };
+  return { ok, exit, counts, tests, affected, failedFiles, why, ...(exit === TIMED_OUT ? { timedOut: true } : {}), ...(unhandledIn(log) ? { unhandled: true } : {}) };
 };
 
 /** The verdict a job left in `dir`, with its log and the files it checked. */
@@ -204,11 +216,21 @@ export const failureExcerpt = (log) => {
   return [...tail.slice(0, half), `… ${tail.length - EXCERPT_LINES} lines cut …`, ...tail.slice(-half)].join('\n').trim();
 };
 
-/** One verdict's few words for the log: `passed (12 test files)` or `failed: 1 of 12 test files failed (a.test.ts)`. */
+/** What a passing verdict ran: `24175 tests in 2913 test files, 2912 of 5601 affected`, or less where vitest said
+ *  less; empty with no counts. */
+const ranText = (v) => {
+  if (!v.counts) return '';
+  const tests = v.tests ? `${v.tests.total} tests in ` : '';
+  const affected = v.affected ? `, ${v.affected.files} of ${v.affected.of} affected` : '';
+  return ` (${tests}${v.counts.total} test files${affected})`;
+};
+
+/** One verdict's few words for the log: `passed (40 tests in 12 test files)` or
+ *  `failed: 1 of 40 tests failed, in 1 of 12 test files (a.test.ts)`. */
 export const verdictText = (v) => {
   const some = (list) => `${list.slice(0, 3).join(', ')}${list.length > 3 ? ', …' : ''}`;
   const baseline = v.baseline?.length ? `; ${v.baseline.length} failing on the frozen tree too, set aside (${some(v.baseline)})` : '';
-  if (v.ok) return `passed${v.counts ? ` (${v.counts.total} test files)` : ''}${baseline}`;
+  if (v.ok) return `passed${ranText(v)}${baseline}`;
   const files = v.failedFiles?.length ? ` (${some(v.failedFiles)})` : '';
   return `failed: ${v.why}${files}${baseline}`;
 };
