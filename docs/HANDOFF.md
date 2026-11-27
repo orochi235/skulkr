@@ -44,7 +44,10 @@ On `main`, pushed except as noted under Loose ends.
 
 Built 2026-11-27, this session: the fix queue and the Scour queue's Delve | Fix switch (docs/scour.md "Fix queue"),
 atomic fix-run numbers, `scripts/fixRunStats.mjs`, map lenses "defects fixed", "per 1,000 lines" and "hours since a fix
-run", and the topbar's "N defects found · M fixed". Earlier: per-defect stages, the fixer's reason on non-fixed
+run", the topbar's "N defects found · M fixed", hover callouts on the live runs' tiles, and each fix batch's phase
+(fixing, verifying on fleet with the fleet's test count, repairing), the fixer's test and check tallies, and stage
+counts on the live stat row. The dashboard is on blits 1.7.0 to match weasel; vite's dep cache had to be cleared
+(`rm -rf dashboard/node_modules/.vite`, `emilia restart skulkr/dashboard`). Earlier: per-defect stages, the fixer's reason on non-fixed
 verdicts, weasel's verify through `onto adapt vitest`. Run 9 is the first on that code: watch its shelf through a
 repair to confirm laid defects read right.
 
