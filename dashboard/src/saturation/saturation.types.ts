@@ -118,6 +118,8 @@ export interface FixShelf {
 /** One job a scour process has out: its occasion's key, its newest log's step, and that log's last line. */
 export interface ScourJob {
   readonly key: string;
+  /** When its pass or batch started: its job directory's making. */
+  readonly started?: string;
   readonly step: string | null;
   readonly at: string | null;
   readonly line: string | null;

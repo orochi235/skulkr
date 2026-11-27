@@ -131,3 +131,6 @@
   align-items: center;
   column-gap: var(--wzl-space-4);
 }
+
+/* A figure that flips what it counts when clicked, such as the clock between the run and its step. */
+.toggle { cursor: pointer; }

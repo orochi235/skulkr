@@ -57,7 +57,8 @@ export const newestLogIn = (dir) => {
 };
 
 /**
- * Each job a scour process has out, from its occasion directories under `jobs/`: the occasion's key, the step its
+ * Each job a scour process has out, from its occasion directories under `jobs/`: the occasion's key, when its
+ * directory was made (`started`, the pass or batch's start), the step its
  * newest log is for (`review`, `match1`, …), when that log last changed, its last line worth reading, its last few
  * `skulkr:` lines (`recent`), and onto's
  * progress counter where the job prints one.
@@ -66,12 +67,14 @@ const jobsIn = (dir) => {
   const root = join(dir, 'jobs');
   if (!existsSync(root)) return [];
   return readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name)).flatMap((occasion) => {
+    const started = new Date(statSync(join(root, occasion.name)).birthtimeMs).toISOString();
     const newest = newestLogIn(join(root, occasion.name));
-    if (!newest) return [{ key: occasion.name, step: null, at: null, line: null, recent: [], progress: null }];
+    if (!newest) return [{ key: occasion.name, started, step: null, at: null, line: null, recent: [], progress: null }];
     const lines = newest.size ? lastLines(join(root, occasion.name, newest.f), 40) : [];
     const counter = lines.findLast((l) => PROGRESS.test(l))?.match(PROGRESS);
     return [{
       key: occasion.name,
+      started,
       step: newest.f.replace(/\.log$/, ''),
       at: new Date(newest.mtimeMs).toISOString(),
       line: lines.findLast((l) => !PROGRESS.test(l)) ?? null,

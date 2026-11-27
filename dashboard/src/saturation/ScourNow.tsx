@@ -8,7 +8,8 @@ import { FixShelf } from './FixShelf';
 import { PassPill } from './PassPill';
 import { STAT_TONE, StatRow, limitStatOf, nextDefectStatOf, shelfToneOf, type Stat } from './LedgerHero';
 import { percent, usd } from './format';
-import type { ScourJob, SaturationLedger, Tally } from './saturation.types';
+import { useState } from 'react';
+import type { ScourJob, ScourLive, SaturationLedger, Tally } from './saturation.types';
 import s from './ScourNow.module.css';
 
 /** What each live job's log said last (`recent`), newest first, each led by the job's key: a run's log says nothing
@@ -33,13 +34,37 @@ export const timedLines = (log: readonly string[], since: string, n = 3): string
 
 const HELD = duration();
 
-/** A live delve's figures in one row: how long the process has held it, counting on from `stamp`, its size in
- *  thousands of lines and files, the pass under way (its cap in a tooltip), found, what a next pass looks like, and
- *  the spend, dollars set light. A fix run's are its own. */
-export const liveStatsOf = (l: SaturationLedger, stamp: Stamp): Stat[] => {
+/** Which span a live run's clock counts: the whole run, or the pass or batch under way. */
+export type ClockSpan = 'run' | 'step';
+
+/** When the pass or batch under way started: the newest job out's start; with none out, the log's last line (a pass
+ *  ending), else when the process took the ledger. */
+export const stepSinceOf = (r: ScourLive): string => {
+  const started = r.jobs.map((j) => j.started).filter((t): t is string => !!t).sort().at(-1);
+  return started ?? r.log.at(-1)?.slice(0, r.log.at(-1)!.indexOf(' ')) ?? r.since;
+};
+
+/** The clock's word and tooltip for `span` on a run that `does` a delve or a fix. */
+export const clockWordsOf = (span: ClockSpan, does: string | null): readonly [string, string] => {
+  const step = does === 'fix' ? 'batch' : 'pass';
+  return span === 'run'
+    ? ['elapsed', `Since the run took the area. Click for this ${step}.`]
+    : [`this ${step}`, `Since the newest ${step} out started. Click for the whole run.`];
+};
+
+/** A live delve's figures in one row: its clock (the whole run's, or with `span` `step` the pass or batch under way's,
+ *  counting on from `stamp`; clicking it calls `onSpan`), its size in thousands of lines and files, the pass under way
+ *  (its cap in a tooltip), found, what a next pass looks like, and the spend, dollars set light. A fix run's are its own. */
+export const liveStatsOf = (l: SaturationLedger, stamp: Stamp, span: ClockSpan = 'run', onSpan?: () => void): Stat[] => {
   const r = l.running!;
-  const held = elapsedReading(r.since, null, true, stamp);
-  const elapsed: Stat = ['elapsed', held ? <LiveQuantity reading={held} display={HELD} /> : '', STAT_TONE.clock];
+  const held = elapsedReading(span === 'run' ? r.since : stepSinceOf(r), null, true, stamp);
+  const [word, tip] = clockWordsOf(span, r.does);
+  const clock = held ? <LiveQuantity reading={held} display={HELD} /> : '';
+  const value = onSpan ? (
+    <span className={s.toggle} role="button" tabIndex={0} onClick={onSpan}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSpan(); } }}>{clock}</span>
+  ) : clock;
+  const elapsed: Stat = [word, value, STAT_TONE.clock, tip];
   if (r.does === 'fix') return [elapsed, ...fixStatsOf(l, r.max)];
   const light = STAT_TONE.light;
   return [
@@ -114,6 +139,7 @@ function LiveRun({ ledger: l, onPick, onPickDefect, stamp }: {
   ledger: SaturationLedger; onPick: (id: string) => void; onPickDefect: (area: string, id: string) => void; stamp: Stamp;
 }) {
   const r = l.running!;
+  const [span, setSpan] = useState<ClockSpan>('run');
   const { hostEvents, traced, setTraced, at } = useDefectCallout<HTMLElement>();
   const pickDefect = (id: string) => onPickDefect(l.id, id);
   return (
@@ -126,7 +152,7 @@ function LiveRun({ ledger: l, onPick, onPickDefect, stamp }: {
         <span className={s.about}><DelveAbout ledger={l} /></span>
       </header>
       <div className={s.figures}>
-        <div className={s.liveBox}><StatRow label="This scour" stats={liveStatsOf(l, stamp)} /></div>
+        <div className={s.liveBox}><StatRow label="This scour" stats={liveStatsOf(l, stamp, span, () => setSpan(span === 'run' ? 'step' : 'run'))} /></div>
         {r.does === 'fix' && l.fix && <div className={s.chart}><FixShelf shelf={l.fix} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} /></div>}
       </div>
       {r.does !== 'fix' && <div className={s.chart}><DelveChart ledger={l} max={r.max} live onPickDefect={pickDefect} traced={traced} onTrace={setTraced} /></div>}

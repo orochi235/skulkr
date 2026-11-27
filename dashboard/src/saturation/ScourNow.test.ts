@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fixStatsOf, jobLinesOf, stepWordsOf, tallyText, timedLines } from './ScourNow';
-import type { SaturationLedger, ScourJob } from './saturation.types';
+import { clockWordsOf, fixStatsOf, jobLinesOf, stepSinceOf, stepWordsOf, tallyText, timedLines } from './ScourNow';
+import type { SaturationLedger, ScourJob, ScourLive } from './saturation.types';
 import { passKeyParts } from './PassPill';
 
 describe('jobLinesOf', () => {
@@ -10,6 +10,22 @@ describe('jobLinesOf', () => {
       'b1        commit 1/8 for D4: two',
       'b1        says: one',
     ]);
+  });
+});
+
+describe('the clock span', () => {
+  const live = (jobs: Partial<ScourJob>[], log: string[] = []) => ({ since: '2026-11-26T09:00:00.000Z', jobs, log }) as unknown as ScourLive;
+
+  it("counts a step from its newest job's start, else the last pass's log line, else the run's", () => {
+    expect(stepSinceOf(live([{ started: '2026-11-26T10:00:00.000Z' }, { started: '2026-11-26T10:05:00.000Z' }, {}]))).toBe('2026-11-26T10:05:00.000Z');
+    expect(stepSinceOf(live([], ['2026-11-26T09:30:00.000Z 1/40 claude: 2 findings']))).toBe('2026-11-26T09:30:00.000Z');
+    expect(stepSinceOf(live([]))).toBe('2026-11-26T09:00:00.000Z');
+  });
+
+  it('names a fix run\'s step a batch and a delve\'s a pass', () => {
+    expect(clockWordsOf('run', 'fix')[0]).toBe('elapsed');
+    expect(clockWordsOf('step', 'fix')[0]).toBe('this batch');
+    expect(clockWordsOf('step', 'delve')[0]).toBe('this pass');
   });
 });
 
