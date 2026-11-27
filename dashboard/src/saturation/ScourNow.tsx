@@ -28,8 +28,9 @@ export const timedLines = (log: readonly string[], since: string, n = 3): string
 
 const HELD = duration();
 
-/** A live delve's figures in one row: how long the process has held it, counting on from `stamp`, the pass
- *  under way (its cap in a tooltip), found, what a next pass looks like, and the spend, dollars set light. A fix run's are its own. */
+/** A live delve's figures in one row: how long the process has held it, counting on from `stamp`, its size in
+ *  thousands of lines and files, the pass under way (its cap in a tooltip), found, what a next pass looks like, and
+ *  the spend, dollars set light. A fix run's are its own. */
 export const liveStatsOf = (l: SaturationLedger, stamp: Stamp): Stat[] => {
   const r = l.running!;
   const held = elapsedReading(r.since, null, true, stamp);
@@ -38,6 +39,8 @@ export const liveStatsOf = (l: SaturationLedger, stamp: Stamp): Stat[] => {
   const light = STAT_TONE.light;
   return [
     elapsed,
+    ['kloc', l.lines === null ? '–' : (l.lines / 1000).toFixed(1), light],
+    ['files', String(l.files), light],
     ['pass', String(l.occasions + 1), undefined, r.max ? `up to ${r.max}` : undefined],
     ['found', String(l.distinct)],
     ['next new', percent(l.nextNew)],
