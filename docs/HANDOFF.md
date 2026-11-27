@@ -35,16 +35,11 @@ else all of them as one `batchAndTest` with conflict repair, gate and capstone, 
 
 ## In flight and queued (2026-11-27 evening)
 
-- **A background agent is building `saturate.priceBy: 'defect' | 'kloc'`** (`--price-by`): the delve price gate in
-  dollars per defect-per-kloc (`usd × lines / 1000`), going rate and opening price in the same unit, the unit named
-  wherever a price shows, `priceBy` on `ls --json`, the dashboard's amber next defect in the same unit. Default
-  `defect`. It commits on `main` without pushing. While it edits `src/`, the dashboard's `api/t/weasel/saturation`
-  can 500. If the session that spawned it is gone, check `git log` and `git status` for its work.
-- **t-648 #opening-price-before-two-passes:** the delve row's "next defect" shows the opening price (lighter, a tooltip
-  saying so) until the area's own price exists at two passes; needs an opening-price field in `saturationList.mjs`.
-- **t-649 #live-log-job-lines:** the live run's log box shows only the run's milestones (a fix run's says nothing for
-  a whole batch). Interleave each running job's `skulkr:` lines (commits, says, findings, verifying, on fleet) into
-  it, timed, newest first, a few more lines shown. The job's latest line is already on `running.jobs[].line`.
+- **Built and unpushed:** `saturate.priceBy: 'defect' | 'kloc'` / `--price-by` (`8a0efe9`, README "Pricing by
+  density"); live jobs' recent `skulkr:` lines in the Scour page's log box (`88e4712`). Push with the rest.
+- **Next, t-648 #opening-price-before-two-passes:** the delve row's "next defect" shows the opening price (lighter, a
+  tooltip saying so) until the area's own price exists at two passes; needs an opening-price field from
+  `scourPrice.mjs`'s `openingPriceOf` (both units now) on `saturationList.mjs`'s `ls --json`.
 
 ## Dashboard, this session (`0a2855f`, `71053f7`, `b5e5d82`, `2f00e57`, `c654dc3`, `d94027c`)
 
