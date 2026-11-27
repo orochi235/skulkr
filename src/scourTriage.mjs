@@ -7,8 +7,8 @@ import { isRecurrent } from './triageFields.mjs';
 /** The most defects one fixer is handed. */
 export const BATCH_MAX = 8;
 
-/** A `where` or `fix` entry's file: `src/a.ts:120 (fn)` is `src/a.ts`. */
-export const fileOf = (where) => String(where ?? '').trim().split(/[\s:(]/)[0] ?? '';
+/** A `where` or `fix` entry's file: `src/a.ts:120 (fn)` and `` `src/a.ts` (`fn`) `` are `src/a.ts`. */
+export const fileOf = (where) => String(where ?? '').replace(/`/g, '').trim().split(/[\s:(]/)[0] ?? '';
 
 /** The line a `where` names, for ordering within a file; 0 when it names none. */
 const lineOf = (where) => Number(/:(\d+)/.exec(String(where ?? ''))?.[1] ?? 0);
@@ -45,7 +45,7 @@ export const fixPlanFor = (ledger, { open = () => true, recurrent } = {}) => {
   // The ledger's files, and the full paths reviewers named outside them, which a shorter mention may be the tail of.
   const named = ledger.defects.flatMap((d) => (d.fix ?? []).map(fileOf)).filter((f) => (f.match(/\//g) ?? []).length >= 2);
   const known = [...new Set([...(ledger.files ?? []), ...named])];
-  const defects = ledger.defects.filter(open).map((d) => ({ ...d, recurrent: isRecurrent(d.sightings.length, occasions, recurrent) }));
+  const defects = ledger.defects.filter(open).map((d) => ({ ...d, files: filesOf(d, known), recurrent: isRecurrent(d.sightings.length, occasions, recurrent) }));
   const ask = defects.filter((d) => d.size === 'design');
   const toFix = defects.filter((d) => d.size !== 'design');
   // Union-find over the defects, joined by shared files and shared causes.
@@ -54,7 +54,7 @@ export const fixPlanFor = (ledger, { open = () => true, recurrent } = {}) => {
   const join = (a, b) => { parent[find(a)] = find(b); };
   const firstBy = new Map();
   toFix.forEach((d, i) => {
-    const keys = [...filesOf(d, known).map((f) => `file:${f}`), ...(d.cause ? [`cause:${d.cause.trim().toLowerCase()}`] : [])];
+    const keys = [...d.files.map((f) => `file:${f}`), ...(d.cause ? [`cause:${d.cause.trim().toLowerCase()}`] : [])];
     for (const k of keys) {
       if (firstBy.has(k)) join(i, firstBy.get(k));
       else firstBy.set(k, i);
@@ -79,7 +79,7 @@ export const fixPlanFor = (ledger, { open = () => true, recurrent } = {}) => {
     else packed.push([...b]);
   }
   return {
-    batches: packed.map((ds, k) => ({ n: k + 1, defects: ds, files: [...new Set(ds.flatMap((d) => filesOf(d, known)))].sort() })),
+    batches: packed.map((ds, k) => ({ n: k + 1, defects: ds, files: [...new Set(ds.flatMap((d) => d.files))].sort() })),
     ask,
   };
 };

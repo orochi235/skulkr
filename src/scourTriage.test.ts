@@ -44,6 +44,7 @@ describe('scour fix triage', () => {
     const known = ['packages/ui/src/CurveEditor/x.ts', 'packages/ui/src/T/y.ts'];
     expect(resolvedFile('CurveEditor/x.ts:12', known)).toBe('packages/ui/src/CurveEditor/x.ts');
     expect(resolvedFile('packages/ui/src/T/y.ts (fn)', known)).toBe('packages/ui/src/T/y.ts');
+    expect(resolvedFile('`x.ts` (`fn`)', known)).toBe('packages/ui/src/CurveEditor/x.ts');
     expect(resolvedFile('[track.min', known)).toBeNull();
   });
 
