@@ -1,0 +1,36 @@
+.hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--wzl-space-1) var(--wzl-space-4);
+  margin: 0;
+}
+
+/* The figure above its word, though the word comes first in the markup for a screen reader. */
+.stat {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  min-width: 4ch;
+  padding-block-start: 3px;
+  border-block-start: 3px solid transparent;
+}
+
+/* A count the shelf colors too wears its tile's color as a bar over it. */
+.fixed { border-block-start-color: var(--wzl-success); }
+
+.fixing { border-block-start-color: var(--wzl-accent); }
+
+.open { border-block-start-color: color-mix(in srgb, var(--wzl-fg) 30%, var(--wzl-surface)); }
+
+.value {
+  margin: 0;
+  font-size: var(--wzl-font-size-lg);
+  font-weight: var(--wzl-font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.label {
+  font-size: var(--wzl-font-size-xs);
+  color: var(--wzl-fg-muted);
+}

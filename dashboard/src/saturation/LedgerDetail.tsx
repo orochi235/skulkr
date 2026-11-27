@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
 import { DelveAbout, DelveChart } from './DelveChart';
 import { FixShelf, FixShelfAbout, FixStatusChip, FixSwatch, isDefectClosed, shelfStatusOf } from './FixShelf';
+import { LedgerHero } from './LedgerHero';
 import { PassTableButton } from './PassTable';
 import { estimate, linesText, percent, severityRank, sourcesText, usd, usdOrDash } from './format';
 import type { FixShelf as FixShelfData, SaturationDefect, SaturationLedger } from './saturation.types';
@@ -83,20 +84,25 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
     <section className={s.detail} aria-label={`${ledger.area}'s defects`}>
       <header className={s.head}>
         <div className={s.titleRow}><h2 className={s.title}>{ledger.id}</h2><DelveAbout ledger={ledger} picks /></div>
-        <p className={s.facts}>
-          {ledger.files} files{ledger.lines !== null && <>, <span className={s.num}>{linesText(ledger.lines)}</span> lines</>} at{' '}
-          <code>{ledger.commit.slice(0, 10)}</code> · {ledger.occasions} occasions ({sourcesText(ledger.sources)}) ·{' '}
-          <span className={s.num}>{ledger.distinct}</span> found, ≈<span className={s.num}>{estimate(ledger.total)}</span> held,
-          next new <span className={s.num}>{percent(ledger.nextNew)}</span> · <span className={s.num}>{usd(ledger.costUsd)}</span>,
-          next defect ≈ <span className={s.num}>{usdOrDash(ledger.nextUsd)}</span>, limit <span className={s.num}>{ledger.limit.text}</span>
-        </p>
-        {ledger.lines !== null && (
-          <p className={s.facts}>
-            Per thousand lines: <span className={s.num}>{estimate(ledger.defectsPerKloc)}</span> found,{' '}
-            <span className={s.num}>{estimate(ledger.unseenPerKloc)}</span> estimated unseen, <span className={s.num}>{usdOrDash(ledger.usdPerKloc)}</span> spent
-          </p>
-        )}
-        <p className={s.facts}>{ledger.stopped ? `Stopped: ${ledger.stopped}.` : 'Not saturated yet: the stop rule does not hold.'}</p>
+        <div className={s.summary}>
+          <div className={s.blurb}>
+            <p className={s.facts}>
+              {ledger.files} files{ledger.lines !== null && <>, <span className={s.num}>{linesText(ledger.lines)}</span> lines</>} at{' '}
+              <code>{ledger.commit.slice(0, 10)}</code> · {ledger.occasions} occasions ({sourcesText(ledger.sources)}) ·{' '}
+              <span className={s.num}>{ledger.distinct}</span> found, ≈<span className={s.num}>{estimate(ledger.total)}</span> held,
+              next new <span className={s.num}>{percent(ledger.nextNew)}</span> · <span className={s.num}>{usd(ledger.costUsd)}</span>,
+              next defect ≈ <span className={s.num}>{usdOrDash(ledger.nextUsd)}</span>, limit <span className={s.num}>{ledger.limit.text}</span>
+            </p>
+            {ledger.lines !== null && (
+              <p className={s.facts}>
+                Per thousand lines: <span className={s.num}>{estimate(ledger.defectsPerKloc)}</span> found,{' '}
+                <span className={s.num}>{estimate(ledger.unseenPerKloc)}</span> estimated unseen, <span className={s.num}>{usdOrDash(ledger.usdPerKloc)}</span> spent
+              </p>
+            )}
+            <p className={s.facts}>{ledger.stopped ? `Stopped: ${ledger.stopped}.` : 'Not saturated yet: the stop rule does not hold.'}</p>
+          </div>
+          <LedgerHero ledger={ledger} />
+        </div>
         <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} /><div className={s.chartFoot}><PassTableButton ledger={ledger} /></div></div>
         {ledger.fix && ledger.fix.batches.length > 0 && (
           <div className={s.chart}>
