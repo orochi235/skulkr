@@ -8,7 +8,7 @@ import { FixShelf, FixShelfAbout, FixShelfKey, FixStatusChip, FixSwatch, isDefec
 import { LedgerHero } from './LedgerHero';
 import { PassTableButton } from './PassTable';
 import { severityRank } from './format';
-import { DefectCallout } from './DefectCallout';
+import { DefectCallout, useDefectCallout } from './DefectCallout';
 import { LedgerFacts, StopStatus } from './LedgerFacts';
 import { useFitsInRow } from './useFitsInRow';
 import type { FixShelf as FixShelfData, SaturationDefect, SaturationLedger } from './saturation.types';
@@ -80,33 +80,25 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
     const cell = scroll.current?.querySelector(`[data-defect="${CSS.escape(picked.id)}"]`);
     cell?.closest('tr')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [picked]);
-  // The defect hovered on either chart, traced on both.
-  const [traced, setTraced] = useState<string | null>(null);
+  // The defect hovered on either chart, traced on both, its callout over the header.
+  const { host: head, hostEvents, traced, setTraced, at: pointer, flipX } = useDefectCallout<HTMLElement>();
   const [shelfOrder, setShelfOrder] = useDashPref('saturation.shelfOrder');
   const [hideFixed, setHideFixed] = useDashPref('saturation.collapseResolved');
   const hasFixPlan = Boolean(ledger.fix && ledger.fix.batches.length > 0);
   // Only a delve grows the chart toward its cap; a fix run's max counts batches, not passes.
   const delving = ledger.running !== null && ledger.running.does !== 'fix';
-  // Where the pointer is over the header, for the traced defect's callout.
-  const head = useRef<HTMLElement>(null);
-  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
   // The legend box shows only where it fits beside the others.
   const summary = useRef<HTMLDivElement>(null);
   const legend = useRef<HTMLElement>(null);
   const legendFits = useFitsInRow(summary, legend);
-  useEffect(() => { setPicked(null); setTraced(null); }, [ledger.id]);
+  useEffect(() => { setPicked(null); setTraced(null); }, [ledger.id, setTraced]);
   const columns = useMemo(() => columnsFor(ledger.fix), [ledger.fix]);
   const groups = useMemo(() => defectGroupsOf(ledger), [ledger]);
   const pickDefect = useCallback((id: string) => setPicked((was) => ({ id, n: (was?.n ?? 0) + 1 })), []);
   return (
     <section className={s.detail} aria-label={`${ledger.area}'s defects`}>
       <header
-        ref={head} className={s.head}
-        onPointerMove={(e) => {
-          const box = e.currentTarget.getBoundingClientRect();
-          setPointer({ x: e.clientX - box.left, y: e.clientY - box.top });
-        }}
-        onPointerLeave={() => setPointer(null)}
+        ref={head} className={s.head} {...hostEvents}
       >
         <div className={`${s.titleRow} ${s.summaryTitle}`}><h2 className={s.title}>{ledger.id}</h2><DelveAbout ledger={ledger} picks /></div>
         <div ref={summary} className={s.summary}>
@@ -129,7 +121,7 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
           </section>
         </div>
         <div className={s.chart}><DelveChart ledger={ledger} max={delving ? ledger.running!.max : null} live={delving} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} hideFixed={hideFixed && hasFixPlan} /><div className={s.chartFoot}><PassTableButton ledger={ledger} />{hasFixPlan && <Checkbox isSelected={hideFixed} onChange={setHideFixed}>Collapse resolved passes</Checkbox>}</div></div>
-        <DefectCallout ledger={ledger} id={traced} at={pointer} flipX={(head.current?.clientWidth ?? 0) / 2} />
+        <DefectCallout ledger={ledger} id={traced} at={pointer} flipX={flipX} />
       </header>
       <div ref={scroll} className={s.scroll}>
         {groups.map((g) => (

@@ -1,4 +1,5 @@
 import { minutesSince, minutesText } from '@dash/audits/runData';
+import { DefectCallout, useDefectCallout } from './DefectCallout';
 import { DelveAbout, DelveChart } from './DelveChart';
 import { FixShelf } from './FixShelf';
 import { PassPill } from './PassPill';
@@ -67,32 +68,38 @@ function JobLine({ job }: { job: ScourJob }) {
   );
 }
 
-/** Each ledger a live scour process holds: what it does, for how long, its jobs out, and its last log lines. */
+/** One live scour process's ledger: what it does, for how long, its jobs out, its last log lines, and its chart, a
+ *  hovered tile's defect called out over it as in the ledger's own pane. */
+function LiveRun({ ledger: l, onPick, now }: { ledger: SaturationLedger; onPick: (id: string) => void; now: number }) {
+  const r = l.running!;
+  const { host, hostEvents, traced, setTraced, at, flipX } = useDefectCallout<HTMLElement>();
+  return (
+    <article ref={host} className={s.run} {...hostEvents}>
+      <header className={s.head}>
+        <span className={s.area} role="button" tabIndex={0} onClick={() => onPick(l.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onPick(l.id)}>{l.id}</span>
+        {r.jobs.map((j) => <PassPill key={j.key} jobKey={j.key} />)}
+        <span className={s.facts}>{r.does ?? 'held'} · pid {r.pid}</span>
+        <span className={s.about}><DelveAbout ledger={l} /></span>
+      </header>
+      <div className={s.figures}>
+        <div className={s.liveBox}><StatRow label="This scour" stats={liveStatsOf(l, now)} /></div>
+        {r.does === 'fix' && l.fix && <div className={s.chart}><FixShelf shelf={l.fix} traced={traced} onTrace={setTraced} /></div>}
+      </div>
+      {r.does !== 'fix' && <div className={s.chart}><DelveChart ledger={l} max={r.max} live traced={traced} onTrace={setTraced} /></div>}
+      {r.jobs.length > 0 && <ul className={s.jobs}>{r.jobs.map((j) => <JobLine key={j.key} job={j} />)}</ul>}
+      {r.log.length > 0 && <pre className={s.log}>{timedLines(r.log, r.since).join('\n')}</pre>}
+      <DefectCallout ledger={l} id={traced} at={at} flipX={flipX} />
+    </article>
+  );
+}
+
+/** Each ledger a live scour process holds, as a `LiveRun`. */
 export function ScourNow({ ledgers, onPick, now = Date.now() }: { ledgers: readonly SaturationLedger[]; onPick: (id: string) => void; now?: number }) {
   const live = ledgers.filter((l) => l.running);
   if (!live.length) return null;
   return (
     <section className={s.now} aria-label="Scouring now">
-      {live.map((l) => {
-        const r = l.running!;
-        return (
-          <article key={l.id} className={s.run}>
-            <header className={s.head}>
-              <span className={s.area} role="button" tabIndex={0} onClick={() => onPick(l.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onPick(l.id)}>{l.id}</span>
-              {r.jobs.map((j) => <PassPill key={j.key} jobKey={j.key} />)}
-              <span className={s.facts}>{r.does ?? 'held'} · pid {r.pid}</span>
-              <span className={s.about}><DelveAbout ledger={l} /></span>
-            </header>
-            <div className={s.figures}>
-              <div className={s.liveBox}><StatRow label="This scour" stats={liveStatsOf(l, now)} /></div>
-              {r.does === 'fix' && l.fix && <div className={s.chart}><FixShelf shelf={l.fix} /></div>}
-            </div>
-            {r.does !== 'fix' && <div className={s.chart}><DelveChart ledger={l} max={r.max} live /></div>}
-            {r.jobs.length > 0 && <ul className={s.jobs}>{r.jobs.map((j) => <JobLine key={j.key} job={j} />)}</ul>}
-            {r.log.length > 0 && <pre className={s.log}>{timedLines(r.log, r.since).join('\n')}</pre>}
-          </article>
-        );
-      })}
+      {live.map((l) => <LiveRun key={l.id} ledger={l} onPick={onPick} now={now} />)}
     </section>
   );
 }

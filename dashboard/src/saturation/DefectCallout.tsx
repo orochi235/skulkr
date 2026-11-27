@@ -1,7 +1,26 @@
+import { useRef, useState, type PointerEvent } from 'react';
 import { InlineMarkdown } from '@weasel-js/ui/components/InlineMarkdown';
 import { FixStatusChip, shelfStatusOf } from './FixShelf';
 import type { SaturationLedger } from './saturation.types';
 import s from './DefectCallout.module.css';
+
+/**
+ * A traced defect and the pointer over `host`, for a `DefectCallout` inside it: `host` is the positioned element the
+ * card floats in, `hostEvents` go on it, and `flipX` is where the card flips to the pointer's left.
+ */
+export function useDefectCallout<T extends HTMLElement>() {
+  const host = useRef<T>(null);
+  const [traced, setTraced] = useState<string | null>(null);
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null);
+  const hostEvents = {
+    onPointerMove: (e: PointerEvent<T>) => {
+      const box = e.currentTarget.getBoundingClientRect();
+      setAt({ x: e.clientX - box.left, y: e.clientY - box.top });
+    },
+    onPointerLeave: () => setAt(null),
+  };
+  return { host, hostEvents, traced, setTraced, at, flipX: (host.current?.clientWidth ?? 0) / 2 };
+}
 
 /** How far the card sits from the pointer, so the pointer never covers it. */
 const OFFSET = 14;
