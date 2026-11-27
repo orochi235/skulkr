@@ -94,11 +94,11 @@ export const scourFix = async (cfg, runner, root, id, args, say) => {
   const runDir = join(scourStateDirOf(cfg), `fix-${n}`);
   mkdirSync(runDir, { recursive: true });
   // Held as a delve holds it, so the Scour page shows the run live and no delve starts on the ledger meanwhile.
-  return withLedgerHeld(cfg, id, { about: { does: 'fix', max: batches.length, jobs: `fix-${n}` } }, () => fixBatches(cfg, root, id, ledger, batches, n, runDir, args, loggingSay(cfg, id, say)));
+  return withLedgerHeld(cfg, id, { about: { does: 'fix', max: batches.length, jobs: `fix-${n}` } }, () => fixBatches(cfg, runner, root, id, ledger, batches, n, runDir, args, loggingSay(cfg, id, say)));
 };
 
 /** Fix run `n`'s `batches` of ledger `id`, one at a time, recorded in `runDir`. Answers the run's record. */
-const fixBatches = async (cfg, root, id, ledger, batches, n, runDir, args, say) => {
+const fixBatches = async (cfg, runner, root, id, ledger, batches, n, runDir, args, say) => {
   const commit = freezeCommitOf(cfg, root);
   const git = gitIn(root);
   const frozen = addWorktree(root, `${cfg.naming.prefix}-scour-fix${n}`, commit);
