@@ -20,16 +20,19 @@ Then: **close** (fixers' verdicts written to the registry as statuses), unbuilt.
 The scour branches made before today's batch (`scour1`–`scour11`) are weasel-7a's `batch/2026-11-27-scour`; they
 were not stacked.
 
-## Waiting on weasel's batch
+## Watching: the first scour landing (kouhai t-635)
 
-- The dashboard's hover cards need weasel's `Tooltip` `anchorRect` (`41906fd420`), which is only on weasel-fe's
-  `batch/2026-11-27-scour`. Meanwhile (2026-11-27 16:10) the dashboard on :5214 runs on a weasel build of its own:
-  worktree `~/src/weasel/.worktrees/skulkr-dash-dist` (branch `skulkr-dash-dist`: weasel `main` plus `41906fd420`
-  cherry-picked, built on the fleet, each package linked under its own `node_modules/@weasel-js`), served by
-  `emilia up dashboard -- env ALPO_WEASEL=<that worktree> npm run dev`. Checked: a shelf tile's card opens beside the
-  tile. weasel-fe will message when the batch lands (kouhai t-640); then rebuild `~/src/weasel` on the fleet, restart
-  the dashboard with a plain `emilia up dashboard`, clear `dashboard/node_modules/.vite` if modules 504, and delete
-  the `skulkr-dash-dist` worktree and branch and weasel's `.worktrees/tooltip-anchor-rect` and its branch.
+Fix run 13 (`core.canvas.SceneCanvas.part2`, 4 batches, started ~15:35) runs the new code: batch 1 fixed 8 of 8 and
+verified ($3.78); batch 2 stacked on batch 1's tip. When its batches end it lands `scour13-…-b<k>` on weasel's `main`
+through `batch/<date>-scour13`, the gate and a push. Watch
+`~/.local/state/weasel-skulkr/scour/fix-core.canvas.SceneCanvas.part2.log` (lines from `land:`, `record:`, `capstone`,
+`gate`) and report the outcome to Mike: did `main` fast-forward, did `.skulkr/scour/fix-13/record.json` land, were the
+area's `scour13-*` branches deleted. A watcher script: `/private/tmp/claude-501/-Users-mike-src-skulkr/fb4d90b7-09dc-4b45-be83-91f21416d9e7/scratchpad/watch-land.sh`
+(run under Monitor; it starts at the log's current end). Settle t-635 with what happened.
+
+Also on 2026-11-27, after the sections below were written: live-elapsed merged (`4df6fc8`); scour verdicts read after
+their `(scour):` source (`6d349c7`, D9 and D15 of run 12 were misread as duplicates); weasel `main` took
+`anchorRect` (41f4dcb6de) and `~/src/weasel` was rebuilt, so the dashboard's hover cards anchor correctly.
 
 ## In flight: the Timeline and registry fix trial
 
