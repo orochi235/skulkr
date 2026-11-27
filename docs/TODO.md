@@ -60,6 +60,12 @@ Open work on skulkr. Each entry says when it closes.
   fix's hand-back sends a GUI verify to the fleet whether or not its changes reach a browser test. Every fixer of
   round 83 did. Closes when the probe lists the browser tests related to the changed files (`vitest related` has no
   list mode; the probe may need `--changed` or a module-graph walk) and a fix touching none runs no GUI verify.
+- [ ] (P2) A fix run's ledger lease vanished while the run was alive (found 2026-11-26): `scour fix` on
+  ui.components.Timeline (pid 67599, run 2) took `<state>/scour/ui.components.Timeline/lock` at 02:18Z, and by 02:55Z
+  the file was gone with the process still running, so the Scour page showed no live box and the map no fix outline.
+  Nothing run on that area in between takes the lease (`scour report`, `scour flag`); other scour processes on other
+  areas and another session shared the machine. The lease was rewritten by hand. Closes when what removes a live
+  holder's lease is found (`reclaim` judging a live pid dead, or a cleanup outside `lease.mjs`) and fixed.
 - [ ] (P3) The Scour page's defects table is two tables, unresolved above resolved (`defectGroupsOf` in
   `LedgerDetail.tsx`, 2026-11-26), because weasel's DataGrid cannot group rows; each sorts on its own, so a header
   click in one leaves the other as it was. Closes when DataGrid takes a public row-grouping prop (groups in a fixed

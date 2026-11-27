@@ -31,10 +31,10 @@ export const saturationByArea = (ledgers: readonly SaturationLedger[]) => new Ma
   stopped: l.stopped,
 }]));
 
-/** Each area a live scour process holds, in the phase its jobs are in: `match` while a ledger matcher runs, else
- *  `review`. */
+/** Each area a live scour process holds, in the phase its jobs are in: `fix` for a fix run, `match` while a ledger
+ *  matcher runs, else `review`. */
 export const scourPhasesOf = (ledgers: readonly SaturationLedger[]): ReadonlyMap<string, AuditPhase> => new Map(
-  ledgers.filter((l) => l.id === l.area && l.running).map((l) => [l.area, l.running!.jobs.some((j) => j.step?.startsWith('match')) ? 'match' : 'review']),
+  ledgers.filter((l) => l.id === l.area && l.running).map((l) => [l.area, l.running!.does === 'fix' ? 'fix' : l.running!.jobs.some((j) => j.step?.startsWith('match')) ? 'match' : 'review']),
 );
 
 /** The map's areas as the Scour page shows them: each with its own ledger's figures, its place in `queue` (the rounds'

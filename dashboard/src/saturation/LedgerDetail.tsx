@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Checkbox } from '@weasel-js/ui/components/Checkbox';
 import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
 import { DelveAbout, DelveChart, DelveKey, hasCodexPass } from './DelveChart';
 import { FixShelf, FixShelfAbout, FixShelfKey, FixStatusChip, FixSwatch, isDefectClosed, ShelfOrderSwitch, shelfStatusOf, type ShelfOrder } from './FixShelf';
@@ -80,6 +81,8 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
   // The defect hovered on either chart, traced on both.
   const [traced, setTraced] = useState<string | null>(null);
   const [shelfOrder, setShelfOrder] = useState<ShelfOrder>('batch');
+  const [hideFixed, setHideFixed] = useState(false);
+  const hasFixPlan = Boolean(ledger.fix && ledger.fix.batches.length > 0);
   // Where the pointer is over the header, for the traced defect's callout.
   const head = useRef<HTMLElement>(null);
   const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
@@ -121,7 +124,7 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
             {ledger.fix && ledger.fix.batches.length > 0 && <div className={s.legendFixes}><h3 className={s.legendTitle}>Fixes</h3><FixShelfKey /></div>}
           </section>
         </div>
-        <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} /><div className={s.chartFoot}><PassTableButton ledger={ledger} /></div></div>
+        <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} hideFixed={hideFixed && hasFixPlan} /><div className={s.chartFoot}><PassTableButton ledger={ledger} />{hasFixPlan && <Checkbox isSelected={hideFixed} onChange={setHideFixed}>Collapse fixed passes</Checkbox>}</div></div>
         <DefectCallout ledger={ledger} id={traced} at={pointer} flipX={(head.current?.clientWidth ?? 0) / 2} />
       </header>
       <div ref={scroll} className={s.scroll}>

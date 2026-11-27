@@ -147,13 +147,14 @@ describe('SaturationPage', () => {
     expect(scrolled).toContain(row);
     expect(row.className).toMatch(/picked/);
   });
-  it('lights each area a live scour holds on the map, in match while a matcher runs', () => {
+  it('lights each area a live scour holds on the map, in match while a matcher runs and in fix for a fix run', () => {
     const live = (step: string) => ({ pid: 1, since: '2026-11-25T00:00:00Z', does: 'delve', max: 40, log: [], jobs: [{ key: '03-claude', step, at: null, line: null, progress: null }] });
     expect([...scourPhasesOf([
       { ...LEDGERS[0]!, running: live('review') },
       { ...LEDGERS[1]!, running: live('match1') },
       { ...LEDGERS[1]!, id: 'geom.booleans.9c4522d635', running: live('review') },
     ])]).toEqual([['core.animation', 'review'], ['geom.booleans', 'match']]);
+    expect([...scourPhasesOf([{ ...LEDGERS[0]!, running: { ...live('fix'), does: 'fix' } }])]).toEqual([['core.animation', 'fix']]);
   });
 
   it("numbers the map's areas by scour's queue, not the rounds'", () => {

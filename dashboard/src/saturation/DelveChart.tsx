@@ -52,7 +52,7 @@ function Tile({ x, y, className, title, onEnter, onLeave, onPick }: TileProps) {
 
 /** A ledger's passes along the axis, each a stack of tiles, one per defect it reported, by whether it was new, and the
  *  count of defects the ledger is estimated to hold that no pass has found. */
-export function DelveChart({ ledger, max = null, live = false, onPickDefect, traced: tracedGiven, onTrace }: {
+export function DelveChart({ ledger, max = null, live = false, onPickDefect, traced: tracedGiven, onTrace, hideFixed = false }: {
   ledger: SaturationLedger; max?: number | null; live?: boolean;
   /** Called with a tile's defect when it is clicked; without it, tiles only trace on hover. */
   onPickDefect?: (id: string) => void;
@@ -60,6 +60,8 @@ export function DelveChart({ ledger, max = null, live = false, onPickDefect, tra
    *  shelf); without them the chart keeps its own. */
   traced?: string | null;
   onTrace?: (id: string | null) => void;
+  /** Collapse each pass whose defects are all fixed (`isFixSettled`), labeling every pass still shown with its number. */
+  hideFixed?: boolean;
 }) {
   const [own, setOwn] = useState<string | null>(null);
   const traced = tracedGiven !== undefined ? tracedGiven : own;
@@ -67,31 +69,36 @@ export function DelveChart({ ledger, max = null, live = false, onPickDefect, tra
   const done = ledger.occasions;
   if (done === 0) return null;
   const stacks = stacksOf(ledger.defects, done);
+  const settled = (d: SaturationDefect) => isFixSettled(ledger.fix?.statuses[d.id], d.registry);
+  // The passes drawn, by number: every one, or with `hideFixed` those holding a defect not yet fixed.
+  const shown = stacks.map((_, i) => i + 1).filter((pass) => !hideFixed || stacks[pass - 1]!.some(({ defect }) => !settled(defect)));
   const ghosts = Math.max(0, Math.round(ledger.unseen ?? 0));
-  const span = spanOf(done, max, live);
-  const tallest = Math.max(1, ...stacks.map((st) => st.length));
+  const span = hideFixed ? Math.max(1, shown.length) : spanOf(done, max, live);
+  const tallest = Math.max(1, ...shown.map((pass) => stacks[pass - 1]!.length));
   const base = DEPTH + tallest * TILE_H + 2;
-  const labelX = done * PITCH + 6;
+  const labelX = shown.length * PITCH + 6;
   const width = Math.max(span * PITCH, ghosts ? labelX + 120 : 0);
   const height = base + AXIS;
-  const ticks = [1, ...Array.from({ length: Math.floor(span / 5) }, (_, i) => (i + 1) * 5)].filter((t) => t <= span);
-  const colX = (pass: number) => (pass - 1) * PITCH;
+  // Collapsed, each pass keeps its own number; else ticks every five along the span.
+  const ticks: [at: number, label: number][] = hideFixed ? shown.map((pass, k) => [k, pass])
+    : [1, ...Array.from({ length: Math.floor(span / 5) }, (_, i) => (i + 1) * 5)].filter((t) => t <= span).map((t) => [t - 1, t]);
+  const colX = (k: number) => k * PITCH;
   return (
     <svg className={traced ? `${s.chart} ${s.tracing}` : s.chart} viewBox={`0 0 ${width} ${height}`} width={width} role="img"
       aria-label={`${done} passes, ${ledger.distinct} defects found, about ${ghosts} not found yet`}>
       <line className={s.base} x1={0} x2={span * PITCH} y1={base} y2={base} />
-      {ticks.map((t) => <text key={t} className={s.tick} x={colX(t) + TILE_W / 2} y={height - 1}>{t}</text>)}
-      {stacks.map((stack, i) => (stack.length ? null : (
-        <polygon key={`empty-${i}`} className={s.empty}
-          points={`${colX(i + 1)},${base} ${colX(i + 1) + DEPTH},${base - DEPTH} ${colX(i + 1) + TILE_W + DEPTH},${base - DEPTH} ${colX(i + 1) + TILE_W},${base}`}>
-          <title>{`pass ${i + 1} · no findings`}</title>
+      {ticks.map(([k, label]) => <text key={label} className={s.tick} x={colX(k) + TILE_W / 2} y={height - 1}>{label}</text>)}
+      {shown.map((pass, k) => (stacks[pass - 1]!.length ? null : (
+        <polygon key={`empty-${pass}`} className={s.empty}
+          points={`${colX(k)},${base} ${colX(k) + DEPTH},${base - DEPTH} ${colX(k) + TILE_W + DEPTH},${base - DEPTH} ${colX(k) + TILE_W},${base}`}>
+          <title>{`pass ${pass} · no findings`}</title>
         </polygon>
       )))}
-      {stacks.map((stack, i) => stack.map(({ defect, novelty }, k) => (
-        <Tile key={`${i}-${defect.id}`} x={colX(i + 1)} y={base - (k + 1) * TILE_H}
-          className={[s[novelty], defect.id === traced ? s.traced : '', ledger.passes[i]?.source === 'codex' ? s.codex : '',
-            isFixSettled(ledger.fix?.statuses[defect.id], defect.registry) ? s.settled : ''].filter(Boolean).join(' ')}
-          title={tileTitleOf(defect, i + 1, novelty)}
+      {shown.map((pass, k) => stacks[pass - 1]!.map(({ defect, novelty }, j) => (
+        <Tile key={`${pass}-${defect.id}`} x={colX(k)} y={base - (j + 1) * TILE_H}
+          className={[s[novelty], defect.id === traced ? s.traced : '', ledger.passes[pass - 1]?.source === 'codex' ? s.codex : '',
+            settled(defect) ? s.settled : ''].filter(Boolean).join(' ')}
+          title={tileTitleOf(defect, pass, novelty)}
           onEnter={() => setTraced(defect.id)} onLeave={() => setTraced(null)}
           onPick={onPickDefect ? () => onPickDefect(defect.id) : undefined} />
       )))}

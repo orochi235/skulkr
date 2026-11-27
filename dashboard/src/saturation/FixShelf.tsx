@@ -101,7 +101,7 @@ export function FixShelf({ shelf, order = 'batch', onPickDefect, traced = null, 
       aria-label={`${total} defects in ${groups.length} fix groups`}>
       <line className={s.board} x1={0} x2={width} y1={base} y2={base} />
       {groups.map((g) => (
-        <g key={g.key} className={order === 'batch' && g.books.some((b) => b.id === traced) ? s.tracedGroup : undefined}>
+        <g key={g.key} className={g.books.some((b) => b.id === traced) ? s.tracedGroup : undefined}>
           {g.books.map((b) => {
             const top = base - b.h;
             const run = shelf.statuses[b.id];

@@ -47,6 +47,16 @@ describe('DelveChart', () => {
     expect(settled.map((g) => g.querySelector('title')!.textContent!.split(' · ')[1]!.split(',')[0])).toEqual(['D1', 'D1', 'D1']);
   });
 
+  it('collapses a pass whose defects are all fixed, labeling each pass left with its own number', () => {
+    const fix = { batches: [], ask: [], statuses: { D3: { status: 'fixed' as const, run: 1, branch: 'b', verified: true } } };
+    const { container } = render(<DelveChart ledger={{ ...ledger, fix }} hideFixed />);
+    const passes = [...new Set([...container.querySelectorAll('title')].map((t) => t.textContent!.split(' ·')[0]))];
+    expect(passes).toEqual(['pass 1', 'pass 2', 'pass 3']);
+    const fixAll = { ...fix, statuses: { ...fix.statuses, D1: fix.statuses.D3, D2: fix.statuses.D3 } };
+    const collapsed = render(<DelveChart ledger={{ ...ledger, fix: fixAll }} hideFixed />).container;
+    expect(collapsed.querySelectorAll('title')).toHaveLength(0);
+  });
+
   it('marks a pass that found nothing with a patch on the ground', () => {
     const { container } = render(<DelveChart ledger={{ ...ledger, occasions: 4 }} />);
     expect([...container.querySelectorAll('title')].map((t) => t.textContent)).toContain('pass 4 · no findings');
