@@ -99,8 +99,10 @@
   white-space: nowrap;
 }
 
-/* A live fix run's batch, across both figure columns. */
+/* A live fix run's row: its status at its own width after the area, which gives way first. */
+.live { grid-template-columns: calc(2 * var(--queue-size)) minmax(0, 1fr) auto; }
+
 .fixing {
-  grid-column: span 2;
+  white-space: nowrap;
   color: var(--wzl-accent);
 }

@@ -43,7 +43,7 @@
 
 .job {
   display: grid;
-  grid-template-columns: 14ch 7ch minmax(0, 1fr);
+  grid-template-columns: 22ch 11ch minmax(0, 1fr);
   align-items: center;
   gap: var(--wzl-space-2);
   font-size: var(--wzl-font-size-sm);
@@ -60,6 +60,12 @@
 
 .progress {
   text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.tallies {
+  margin-inline-end: var(--wzl-space-3);
+  color: var(--wzl-fg-muted);
   font-variant-numeric: tabular-nums;
 }
 

@@ -181,7 +181,9 @@ const main = async () => {
       {
         // Fleet mode bills each node's signed-in account; otherwise Claude's passes are the running session's subagents.
         const fleet = rest.includes('--fleet');
-        await saturateCommand(cfg, fleet ? await loadRunner(cfg) : createLocalRunner(cfg), root(), rest.filter((a) => a !== '--fleet'), undefined, { fleet });
+        // `ls` and `queue` read the configured runner too, for the progress of a fix run's verify on the fleet.
+        const runner = fleet || rest[0] === 'ls' || rest[0] === 'queue' ? await loadRunner(cfg) : createLocalRunner(cfg);
+        await saturateCommand(cfg, runner, root(), rest.filter((a) => a !== '--fleet'), undefined, { fleet });
       }
       return 0;
     case 'trial':

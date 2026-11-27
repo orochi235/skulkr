@@ -52,14 +52,18 @@ export const fixWorkOf = (cfg, id, runs = fixRunsIn(cfg)) => {
   return { open: plan.batches.reduce((n, b) => n + b.defects.length, 0) + plan.ask.length, batches: plan.batches.length };
 };
 
+/** What a fix batch's job is doing, from its step: `fixing`, `verifying`, `repairing`, or `starting` before its first log. */
+export const phaseOf = (step) => (!step ? 'starting' : step.startsWith('verify') ? 'verifying' : step.startsWith('repair') ? 'repairing' : 'fixing');
+
 /**
  * The fix queue as the Scour page shows it: each area a live fix run holds first (`running`, with its batches done of
- * its `max`), then the queued ones with `fixWorkOf`'s counts. `list` is `ledgerListOf`'s.
+ * its `max`, and its batch's `phase` and that step's `progress`), then the queued ones with `fixWorkOf`'s counts. `list` is `ledgerListOf`'s.
  */
 export const fixQueueIn = (cfg, list, runs = fixRunsIn(cfg)) => {
   const running = list.filter((l) => l.id === l.area && l.running?.does === 'fix').map((l) => {
     const run = runs.find((r) => r.n === l.fix?.lastRun?.n);
-    return { area: l.area, running: true, done: run?.record?.batches?.length ?? 0, batches: l.running.max ?? null, open: null };
+    const job = l.running.jobs[0];
+    return { area: l.area, running: true, done: run?.record?.batches?.length ?? 0, batches: l.running.max ?? null, open: null, phase: phaseOf(job?.step), progress: job?.progress ?? null };
   });
   const live = new Set(running.map((r) => r.area));
   const queued = fixQueueOf(cfg).filter((id) => !live.has(id)).map((id) => ({ area: id, running: false, done: 0, ...(fixWorkOf(cfg, id, runs) ?? { open: null, batches: null }) }));
@@ -81,7 +85,7 @@ export const fixQueueLines = (rows) => {
   const n = (x, w) => String(x ?? '–').padStart(w);
   return [
     `${'area'.padEnd(width)}  ${'open'.padStart(6)}  ${'batches'.padStart(7)}`,
-    ...rows.map((r) => `${r.area.padEnd(width)}  ${r.running ? `fixing ${r.done + 1}/${r.batches ?? '?'}`.padStart(15) : `${n(r.open, 6)}  ${n(r.batches, 7)}`}`),
+    ...rows.map((r) => `${r.area.padEnd(width)}  ${r.running ? `${r.phase ?? 'fixing'} ${r.done + 1}/${r.batches ?? '?'}${r.progress ? ` · ${r.progress.done}/${r.progress.of}` : ''}`.padStart(15) : `${n(r.open, 6)}  ${n(r.batches, 7)}`}`),
   ];
 };
 

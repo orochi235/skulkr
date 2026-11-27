@@ -22,7 +22,7 @@ import { addWorktree, gitIn, removeWorktree } from './batch.mjs';
 import {
   emptyLedger, freezeCommitOf, keepReview, ledgerDirOf, ledgerOf, removeLedger, requireAreaFilesAt, requireSameCommit, withLedgerHeld, writeLedger,
 } from './ledger.mjs';
-import { loggingSay } from './delveLive.mjs';
+import { loggingSay, withJobProgress } from './delveLive.mjs';
 import { takeLease } from './lease.mjs';
 import { importLedger } from './saturateImport.mjs';
 import { landableIdsOf, landLedgers } from './saturateLand.mjs';
@@ -198,6 +198,11 @@ export const localScourConfigOf = (cfg, { account, metered = false } = {}, env =
   saturate: { ...cfg.saturate, guardMetered: !metered },
 });
 
+/** Each running task's progress as `runner` answers it; none where it cannot. */
+const progressNow = (runner) => {
+  try { return runner.progress?.() ?? new Map(); } catch { return new Map(); }
+};
+
 /**
  * `skulkr scour …`; each line it prints goes to `say`. With `fleet`, its jobs go through `runner` as the config
  * says; without, they run on this machine as `localScourConfigOf` says.
@@ -237,7 +242,7 @@ export const saturateCommand = async (cfg0, runner, root, argv, say = (line) => 
       if (missing.length) throw new Error(`no scour ledger for ${missing.join(', ')}`);
       writeFixQueue(cfg, verb === 'add' ? withQueued(fixQueueOf(cfg), ids) : withDropped(fixQueueOf(cfg), ids));
     } else if (verb !== 'ls' && verb !== undefined) throw new Error(SATURATE_USAGE);
-    const rows = fixQueueIn(cfg, ledgerListOf(cfg, root));
+    const rows = fixQueueIn(cfg, withJobProgress(ledgerListOf(cfg, root), progressNow(runner)));
     for (const line of fixQueueLines(rows)) say(line);
     return rows;
   }
@@ -265,7 +270,8 @@ export const saturateCommand = async (cfg0, runner, root, argv, say = (line) => 
     return ids;
   }
   if (first === 'ls') {
-    const list = ledgerListOf(cfg, root);
+    const read = ledgerListOf(cfg, root);
+    const list = args.json ? withJobProgress(read, read.some((l) => l.running?.jobs.length) ? progressNow(runner) : new Map()) : read;
     if (args.json) say(JSON.stringify({ ledgers: list, queue: scourQueueIn(cfg, root, list), fixQueue: fixQueueIn(cfg, list) }));
     else for (const line of ledgerListLines(list)) say(line);
     return list;

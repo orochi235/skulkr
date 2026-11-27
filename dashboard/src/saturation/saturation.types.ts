@@ -117,7 +117,17 @@ export interface ScourJob {
   readonly at: string | null;
   readonly line: string | null;
   readonly progress: { readonly done: number; readonly of: number } | null;
+  /** A fix or repair job verifying its commits: the step it verifies, its step reading `verify`. */
+  readonly of?: string;
+  /** The fleet task its last line handed work to. */
+  readonly fleet?: string | null;
+  /** The fixer's own test and check tallies from its gate runs, as the runner counts them. */
+  readonly tests?: Tally;
+  readonly checks?: Tally;
 }
+
+/** Of `total`, how many ran and how many of those failed. */
+export interface Tally { readonly done: number; readonly total: number; readonly failed?: number }
 
 /** A live scour process on a ledger, as `skulkr scour ls --json` reads it from the ledger's directory. */
 export interface ScourLive {
@@ -140,4 +150,7 @@ export interface FixQueueRow {
   readonly done: number;
   readonly batches: number | null;
   readonly open: number | null;
+  /** A running row's batch: `fixing`, `verifying`, `repairing` or `starting`, and that step's count. */
+  readonly phase?: string;
+  readonly progress?: { readonly done: number; readonly of: number } | null;
 }

@@ -5,7 +5,7 @@ import { FixShelf } from './FixShelf';
 import { PassPill } from './PassPill';
 import { STAT_TONE, StatRow, type Stat } from './LedgerHero';
 import { percent, usd, usdOrDash } from './format';
-import type { ScourJob, SaturationLedger } from './saturation.types';
+import type { ScourJob, SaturationLedger, Tally } from './saturation.types';
 import s from './ScourNow.module.css';
 
 /**
@@ -41,7 +41,8 @@ export const liveStatsOf = (l: SaturationLedger, now: number): Stat[] => {
   ];
 };
 
-/** A running fix run's tally from its own verdicts: batches back of the run's, and its defects by where they stand. */
+/** A running fix run's tally from its own verdicts: batches back of the run's, and its defects by where they stand,
+ *  those out in a batch by stage (`checking` reads as verifying). */
 export const fixStatsOf = (l: SaturationLedger, max: number | null): Stat[] => {
   const shelf = l.fix;
   const run = shelf?.lastRun?.n;
@@ -49,21 +50,42 @@ export const fixStatsOf = (l: SaturationLedger, max: number | null): Stat[] => {
   const touched = shelf ? shelf.batches.filter((b) => b.defects.some((d) => mine(d.id))) : [];
   const back = touched.filter((b) => b.defects.every((d) => mine(d.id) && mine(d.id)!.status !== 'fixing')).length;
   const count = (...of: string[]) => Object.keys(shelf?.statuses ?? {}).filter((id) => of.includes(mine(id)?.status ?? '')).length;
+  const at = (stage: string) => String(Object.keys(shelf?.statuses ?? {}).filter((id) => mine(id)?.status === 'fixing' && mine(id)?.stage === stage).length);
   return [
     ['batch', max ? `${back}/${max}` : String(back), STAT_TONE.light],
-    ['fixing', String(count('fixing'))],
+    ['analyzing', at('analyzing')],
+    ['writing', at('writing')],
+    ['written', at('written')],
+    ['verifying', at('checking')],
+    ['repairing', at('repairing')],
     ['fixed', String(count('fixed'))],
     ['not a defect', String(count('not a defect'))],
     ['other', String(count('question', 'not fixed', 'duplicate', 'unread', 'flagged'))],
   ];
 };
 
+/** A job's step in words: a fix batch's `fixing`, `verifying` (on the fleet where it went there) or `repairing N`; any
+ *  other step by its own name. */
+export const stepWordsOf = (job: ScourJob): string => {
+  const step = job.step;
+  if (!step) return 'starting';
+  if (step === 'fix') return 'fixing';
+  if (step.startsWith('verify')) return job.fleet ? 'verifying on fleet' : 'verifying';
+  const repair = /^repair-(\d+)$/.exec(step);
+  return repair ? `repairing ${repair[1]}` : step;
+};
+
+/** A tally as `tests 24/24, 1 failed`; empty without one. */
+export const tallyText = (word: string, t: Tally | undefined): string =>
+  t ? `${word} ${t.done.toLocaleString('en-US')}/${t.total.toLocaleString('en-US')}${t.failed ? `, ${t.failed} failed` : ''}` : '';
+
 function JobLine({ job }: { job: ScourJob }) {
+  const tallies = [tallyText('tests', job.tests), tallyText('checks', job.checks)].filter(Boolean).join(' · ');
   return (
     <li className={s.job}>
-      <span className={s.step}>{job.step ?? 'starting'}</span>
-      <span className={s.progress}>{job.progress ? `${job.progress.done}/${job.progress.of}` : ''}</span>
-      <span className={s.line}>{job.line ?? ''}</span>
+      <span className={s.step}>{job.key} {stepWordsOf(job)}</span>
+      <span className={s.progress}>{job.progress ? `${job.progress.done.toLocaleString('en-US')}/${job.progress.of.toLocaleString('en-US')}` : ''}</span>
+      <span className={s.line}>{tallies ? <span className={s.tallies}>{tallies}</span> : null}{job.line ?? ''}</span>
     </li>
   );
 }

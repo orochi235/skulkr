@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { timedLines } from './ScourNow';
+import { fixStatsOf, stepWordsOf, tallyText, timedLines } from './ScourNow';
+import type { SaturationLedger } from './saturation.types';
 import { passKeyParts } from './PassPill';
 
 describe('timedLines', () => {
@@ -28,5 +29,32 @@ describe('passKeyParts', () => {
     expect(passKeyParts('12-codex')).toEqual({ index: '12', name: 'codex' });
     expect(passKeyParts('b3')).toEqual({ index: '3', name: 'batch' });
     expect(passKeyParts('match')).toEqual({ index: null, name: 'match' });
+  });
+});
+
+describe('stepWordsOf and tallyText', () => {
+  const job = (step: string | null, fleet?: string) => ({ key: 'b1', step, at: null, line: null, progress: null, ...(fleet ? { fleet } : {}) });
+  it('names a fix batch step in words, its verify on the fleet where it went there', () => {
+    expect([job(null), job('fix'), job('verify'), job('verify-fix-gui', 'weasel-verify-gui-1'), job('repair-2'), job('review')].map(stepWordsOf))
+      .toEqual(['starting', 'fixing', 'verifying', 'verifying on fleet', 'repairing 2', 'review']);
+  });
+  it('writes a tally with its failures, and nothing without one', () => {
+    expect(tallyText('tests', { done: 24, total: 1812, failed: 1 })).toBe('tests 24/1,812, 1 failed');
+    expect(tallyText('checks', { done: 2, total: 2 })).toBe('checks 2/2');
+    expect(tallyText('tests', undefined)).toBe('');
+  });
+});
+
+describe('fixStatsOf', () => {
+  it('counts the defects out in a batch by stage, checking as verifying', () => {
+    const statuses = {
+      D1: { status: 'fixing', run: 3, branch: null, stage: 'analyzing' }, D2: { status: 'fixing', run: 3, branch: null, stage: 'writing' },
+      D3: { status: 'fixing', run: 3, branch: null, stage: 'checking' }, D4: { status: 'fixing', run: 3, branch: null, stage: 'checking' },
+      D5: { status: 'fixed', run: 3, branch: 'b', verified: true },
+    };
+    const l = { fix: { lastRun: { n: 3, started: null, finished: null }, batches: [], ask: [], statuses } } as unknown as SaturationLedger;
+    expect(Object.fromEntries(fixStatsOf(l, 4).map(([word, value]) => [word, value]))).toMatchObject({
+      analyzing: '1', writing: '1', written: '0', verifying: '2', repairing: '0', fixed: '1',
+    });
   });
 });

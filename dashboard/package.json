@@ -18,7 +18,7 @@
     "snapshot": "node scripts/snapshot.mjs"
   },
   "dependencies": {
-    "@msb235/blits": "^1.5.2",
+    "@msb235/blits": "^1.7.0",
     "@weasel-js/animator": "2.0.0",
     "@weasel-js/core": "2.0.0",
     "@weasel-js/editing": "2.0.0",

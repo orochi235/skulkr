@@ -17,8 +17,10 @@ export const queueTitleOf = (id: string, ledger: SaturationLedger | undefined): 
     ? `${id}: next defect ≈ ${usd(ledger.nextUsd)}`
     : `${id}: under two passes, ranked at the opening price`;
 
-/** What a fix queue row says in its figure columns' place while its run is live. */
-export const fixingText = (row: FixQueueRow): string => `fixing ${row.done + 1}/${row.batches ?? '?'}`;
+/** What a fix queue row says in its figure columns' place while its run is live: its batch's phase, which batch, and
+ *  that step's count. */
+export const fixingText = (row: FixQueueRow): string =>
+  `${row.phase ?? 'fixing'} ${row.done + 1}/${row.batches ?? '?'}${row.progress ? ` · ${row.progress.done.toLocaleString('en-US')}/${row.progress.of.toLocaleString('en-US')}` : ''}`;
 
 /** The areas a mode's queue lists, in its order: for the map's numbers and for picking. */
 export const queueIdsFor = (mode: QueueMode, queue: readonly string[], fixQueue: readonly FixQueueRow[]): readonly string[] =>
@@ -89,7 +91,7 @@ function FixList({ rows, picked, onPick }: { rows: readonly FixQueueRow[]; picke
       <ol className={s.list}>
         {rows.map((row) => (
           <li key={row.area} className={row.area === picked ? `${s.row} ${s.picked}` : s.row}>
-            <button type="button" className={`${s.cells} ${s.pick}`} onClick={() => onPick(row.area)}>
+            <button type="button" className={`${s.cells} ${s.pick}${row.running ? ` ${s.live}` : ''}`} onClick={() => onPick(row.area)}>
               <span className={`${s.num} ${s.place}`}>{row.running ? '▸' : waiting.indexOf(row) + 1}</span>
               <span className={s.area}>{row.area}</span>
               {row.running

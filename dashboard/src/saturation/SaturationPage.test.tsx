@@ -132,16 +132,16 @@ describe('SaturationPage', () => {
     expect(window.location.hash).toBe('#weasel/scour/geom.booleans');
   });
 
-  it('switches the queue to the fix queue, its live run first by batch, the rest by open defects and batches', async () => {
+  it("switches the queue to the fix queue, its live run first by phase, batch and that step's count, the rest by open defects and batches", async () => {
     serve(LEDGERS, ['geom.booleans'], [
-      { area: 'core.animation', running: true, done: 2, batches: 8, open: null },
+      { area: 'core.animation', running: true, done: 2, batches: 8, open: null, phase: 'verifying', progress: { done: 208, of: 1812 } },
       { area: 'geom.booleans', running: false, done: 0, open: 5, batches: 1 },
     ]);
     window.location.hash = '#weasel/scour';
     renderWithIcons(<WeaselProvider><SaturationPage base="/test/" /></WeaselProvider>);
     const pane = await screen.findByRole('region', { name: 'Scour queue' });
     fireEvent.click(within(pane).getByRole('radio', { name: 'Fix' }));
-    expect(within(pane).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['▸core.animationfixing 3/8', '1geom.booleans51']);
+    expect(within(pane).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['▸core.animationverifying 3/8 · 208/1,812', '1geom.booleans51']);
     expect(within(pane).getByText('2 areas')).toBeInTheDocument();
     fireEvent.click(within(pane).getByText('core.animation'));
     expect(window.location.hash).toBe('#weasel/scour/core.animation');

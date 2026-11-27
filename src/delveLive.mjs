@@ -81,8 +81,48 @@ const fixJobsIn = (runDir) => {
   try {
     done = new Set(JSON.parse(readFileSync(path, 'utf8')).batches.map((b) => `b${b.n}`));
   } catch { /* no record yet */ }
-  return jobsIn(runDir).map((j) => ({ ...j, key: j.key.replace(/^.*~/, '') })).filter((j) => !done.has(j.key));
+  return jobsIn(runDir).map((j) => ({ ...verifyingOf(j), key: j.key.replace(/^.*~/, '') })).filter((j) => !done.has(j.key));
 };
+
+const VERIFYING = /^skulkr: verifying the fixer/;
+const ON_FLEET = /^skulkr: on the fleet as (\S+)/;
+
+/**
+ * A job as the Scour page reads it: `fleet`, the fleet task its last line hands work to, where it does; and a fix or
+ * repair job whose last line hands its commits to their verify, as on that verify: `step` `verify`, `of` the step it
+ * verifies, and no progress until the fleet's is added (the log's last counter is the fixer's commits).
+ */
+export const verifyingOf = (job) => {
+  const fleet = ON_FLEET.exec(job.line ?? '')?.[1] ?? null;
+  const handed = job.step && /^(fix|repair-.+)$/.test(job.step) && (fleet || VERIFYING.test(job.line ?? ''));
+  if (handed) return { ...job, step: 'verify', of: job.step, fleet, progress: null };
+  return fleet ? { ...job, fleet } : job;
+};
+
+/**
+ * `list`'s (`ledgerListOf`'s) live jobs with what `progress` (a runner's `progress()`: task to `{ done, total, tests,
+ * checks }`) knows of them: a job on the fleet takes its fleet task's count; any other, the runner's own job for that
+ * batch and step (a task ending `<area>~<key>-<step>`), its count where the log gave none, and its `tests` and `checks`.
+ */
+export const withJobProgress = (list, progress) => list.map((l) => {
+  if (!l.running?.jobs.length || progress.size === 0) return l;
+  const own = (j) => [...progress].find(([task]) => task.endsWith(`${l.area}~${j.key}-${(j.of ?? j.step ?? '').replace(/^verify-.*/, 'verify')}`))?.[1];
+  return {
+    ...l,
+    running: { ...l.running, jobs: l.running.jobs.map((j) => {
+      const fleet = j.fleet ? progress.get(j.fleet) : undefined;
+      if (fleet?.total) return { ...j, progress: { done: fleet.done, of: fleet.total } };
+      const p = own(j);
+      if (!p) return j;
+      return {
+        ...j,
+        ...(j.progress === null && j.step !== 'verify' && p.total ? { progress: { done: p.done, of: p.total } } : {}),
+        ...(p.tests ? { tests: p.tests } : {}),
+        ...(p.checks ? { checks: p.checks } : {}),
+      };
+    }) },
+  };
+});
 
 /**
  * What the live process holding ledger `id` is doing: its `pid`, `since` it took the ledger, what it `does` (`delve`,
