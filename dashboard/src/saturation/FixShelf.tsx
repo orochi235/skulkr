@@ -42,12 +42,17 @@ export const shelfLayoutOf = (shelf: FixShelfData) => {
 };
 
 /** The defects of a ledger's fix plan as tiles stood on end along a shelf, one group per batch, each colored by its fix status. */
-export function FixShelf({ shelf, onPickDefect }: { shelf: FixShelfData; onPickDefect?: (id: string) => void }) {
+export function FixShelf({ shelf, onPickDefect, traced = null, onTrace }: {
+  shelf: FixShelfData; onPickDefect?: (id: string) => void;
+  /** The defect traced across the page's charts, lit here as the rest fade; `onTrace` hears a hover change it. */
+  traced?: string | null; onTrace?: (id: string | null) => void;
+}) {
   const { groups, width } = shelfLayoutOf(shelf);
   const base = DOT + DEPTH + BOOK_H;
   const total = groups.reduce((n, g) => n + g.books.length, 0);
+  const tracing = traced !== null && groups.some((g) => g.books.some((b) => b.id === traced));
   return (
-    <svg className={s.shelf} viewBox={`0 0 ${width} ${base + LABEL}`} width={width} role="img"
+    <svg className={tracing ? `${s.shelf} ${s.tracing}` : s.shelf} viewBox={`0 0 ${width} ${base + LABEL}`} width={width} role="img"
       aria-label={`${total} defects in ${groups.length} fix batches`}>
       <line className={s.board} x1={0} x2={width} y1={base} y2={base} />
       {groups.map((g) => (
@@ -57,7 +62,11 @@ export function FixShelf({ shelf, onPickDefect }: { shelf: FixShelfData; onPickD
             const run = shelf.statuses[b.id];
             const title = `${b.id} · batch ${g.n} · ${b.status}${run ? ` (fix run ${run.run}${run.branch ? `, ${run.branch}` : ''})` : ''}${b.recurrent ? ' · recurrent' : ''}`;
             return (
-              <g key={b.id} className={onPickDefect ? `${CLASS[b.status]} ${s.pickable}` : CLASS[b.status]} onClick={onPickDefect ? () => onPickDefect(b.id) : undefined}>
+              <g
+                key={b.id} className={[s.tile, CLASS[b.status], b.id === traced ? s.traced : '', onPickDefect ? s.pickable : ''].filter(Boolean).join(' ')}
+                onClick={onPickDefect ? () => onPickDefect(b.id) : undefined}
+                onPointerEnter={onTrace ? () => onTrace(b.id) : undefined} onPointerLeave={onTrace ? () => onTrace(null) : undefined}
+              >
                 <title>{title}</title>
                 <rect className={s.front} x={b.x} y={top} width={BOOK_W} height={b.h} />
                 <polygon className={s.top} points={`${b.x},${top} ${b.x + DEPTH},${top - DEPTH} ${b.x + BOOK_W + DEPTH},${top - DEPTH} ${b.x + BOOK_W},${top}`} />

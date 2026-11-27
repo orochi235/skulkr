@@ -83,3 +83,9 @@
   text-underline-offset: 3px;
   cursor: default;
 }
+
+/* Tracing a defect from either chart: its tile keeps its color, the rest fade to the shelf's ground, mixed solid as
+   the statuses are. */
+.tracing .tile:not(.traced) { --tile: color-mix(in srgb, var(--wzl-fg) 14%, var(--wzl-surface)); }
+
+.tracing .tile:not(.traced) .dot { fill: color-mix(in srgb, var(--wzl-fg) 25%, var(--wzl-surface)); }

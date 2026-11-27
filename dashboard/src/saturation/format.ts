@@ -18,3 +18,7 @@ export const severityRank = (severity: string): number => SEVERITY_RANK[severity
 /** Occasions by source as prose: `claude 22, codex 1`. */
 export const sourcesText = (sources: Readonly<Record<string, number>>): string =>
   Object.entries(sources).map(([source, n]) => `${source} ${n}`).join(', ');
+
+/** Lines of code compactly: thousands to one decimal (`11.2k`), fewer as they are, or a dash where there is no count. */
+export const linesText = (n: number | null | undefined): string =>
+  (n == null ? '–' : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));

@@ -51,12 +51,18 @@ function Tile({ x, y, className, title, onEnter, onLeave, onPick }: TileProps) {
 
 /** A ledger's passes along the axis, each a stack of tiles, one per defect it reported, by whether it was new, and the
  *  count of defects the ledger is estimated to hold that no pass has found. */
-export function DelveChart({ ledger, max = null, live = false, onPickDefect }: {
+export function DelveChart({ ledger, max = null, live = false, onPickDefect, traced: tracedGiven, onTrace }: {
   ledger: SaturationLedger; max?: number | null; live?: boolean;
   /** Called with a tile's defect when it is clicked; without it, tiles only trace on hover. */
   onPickDefect?: (id: string) => void;
+  /** The defect traced, and what hears a hover change it, when the page shares the trace with another chart (the fix
+   *  shelf); without them the chart keeps its own. */
+  traced?: string | null;
+  onTrace?: (id: string | null) => void;
 }) {
-  const [traced, setTraced] = useState<string | null>(null);
+  const [own, setOwn] = useState<string | null>(null);
+  const traced = tracedGiven !== undefined ? tracedGiven : own;
+  const setTraced = (id: string | null) => (onTrace ?? setOwn)(id);
   const done = ledger.occasions;
   if (done === 0) return null;
   const stacks = stacksOf(ledger.defects, done);
@@ -84,7 +90,7 @@ export function DelveChart({ ledger, max = null, live = false, onPickDefect }: {
         <Tile key={`${i}-${defect.id}`} x={colX(i + 1)} y={base - (k + 1) * TILE_H}
           className={[s[novelty], defect.id === traced ? s.traced : '', ledger.passes[i]?.source === 'codex' ? s.codex : ''].filter(Boolean).join(' ')}
           title={tileTitleOf(defect, i + 1, novelty)}
-          onEnter={() => setTraced(defect.id)} onLeave={() => setTraced((t) => (t === defect.id ? null : t))}
+          onEnter={() => setTraced(defect.id)} onLeave={() => setTraced(null)}
           onPick={onPickDefect ? () => onPickDefect(defect.id) : undefined} />
       )))}
       {ghosts > 0 && <text className={s.ghostLabel} x={labelX} y={base - 2}>≈ {ghosts} not found yet</text>}

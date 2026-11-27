@@ -115,6 +115,23 @@ describe('SaturationPage', () => {
     expect(window.location.hash).toBe('#weasel/scour/geom.booleans');
   });
 
+  it('traces a hovered defect on both the delve chart and the fix shelf', async () => {
+    const fix = { batches: [{ n: 1, defects: [{ id: 'D1', size: 'line', recurrent: false }, { id: 'D2', size: 'line', recurrent: false }] }], ask: [], statuses: {} };
+    serve([{ ...LEDGERS[0]!, fix }, LEDGERS[1]!]);
+    window.location.hash = '#weasel/scour/core.animation';
+    renderWithIcons(<WeaselProvider><SaturationPage base="/test/" /></WeaselProvider>);
+    const detail = await screen.findByRole('region', { name: "core.animation's defects" });
+    const shelf = await within(detail).findByRole('img', { name: /fix batches/ });
+    const tileOn = (root: Element, start: string) => [...root.querySelectorAll('g')].find((g) => g.querySelector(':scope > title')?.textContent?.startsWith(start))!;
+    const lit = (g: Element) => g.getAttribute('class')?.includes('traced');
+    fireEvent.pointerEnter(tileOn(detail, 'pass 3 · D1'));
+    expect(lit(tileOn(shelf, 'D1 · '))).toBe(true);
+    expect(lit(tileOn(shelf, 'D2 · '))).toBe(false);
+    fireEvent.pointerLeave(tileOn(detail, 'pass 3 · D1'));
+    fireEvent.pointerEnter(tileOn(shelf, 'D1 · '));
+    expect(lit(tileOn(detail, 'pass 3 · D1'))).toBe(true);
+  });
+
   it("scrolls to a chart tile's defect when it is clicked, and marks its row", async () => {
     const scrolled: Element[] = [];
     Element.prototype.scrollIntoView = function scrollIntoView() { scrolled.push(this); };

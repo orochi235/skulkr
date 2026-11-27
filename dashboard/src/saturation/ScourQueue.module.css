@@ -1,4 +1,6 @@
+/* Set as the ledger tree below it is: its rows' font, a smaller muted head, columns sized by the rows' font. */
 .pane {
+  --queue-size: calc(var(--wzl-font-size-md) + 1px);
   display: flex;
   flex-direction: column;
   gap: var(--wzl-space-1);
@@ -32,13 +34,36 @@
   color: var(--wzl-fg-muted);
 }
 
-.list {
+/* The heads scroll inside this with the rows, so both share the width the scrollbar leaves. */
+.scroll {
   flex: 1 1 0;
   min-height: 0;
   overflow: auto;
+}
+
+.list {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* One grid for the heads and every row; the figure columns' widths in the rows' font, as the tree's are. */
+.cells {
+  display: grid;
+  grid-template-columns: calc(2 * var(--queue-size)) minmax(0, 1fr) calc(3.4 * var(--queue-size)) calc(4.2 * var(--queue-size));
+  gap: var(--wzl-space-2);
+  align-items: baseline;
+  padding: 1px var(--wzl-space-2);
+}
+
+/* The column heads: the tree's head, pinned above the rows as they scroll. */
+.columns {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-size: var(--wzl-font-size-sm);
+  color: var(--wzl-fg-muted);
+  background: var(--wzl-surface);
 }
 
 .row { border-radius: var(--wzl-radius-sm, 3px); }
@@ -50,16 +75,12 @@
 
 /* One line per row, so the button never wraps. */
 .pick {
-  display: grid;
-  grid-template-columns: 3ch minmax(0, 1fr) 6ch 6ch;
-  gap: var(--wzl-space-2);
   inline-size: 100%;
-  padding: 1px var(--wzl-space-2);
   border: 0;
   background: none;
   color: inherit;
   font: inherit;
-  font-size: var(--wzl-font-size-sm);
+  font-size: var(--queue-size);
   text-align: start;
   cursor: pointer;
 }
@@ -69,13 +90,7 @@
   text-align: end;
 }
 
-/* The column heads, set like the rows but muted and not clickable. */
-.columns {
-  color: var(--wzl-fg-muted);
-  cursor: default;
-}
-
-.row .num:first-child { color: var(--wzl-fg-muted); }
+.place { color: var(--wzl-fg-muted); }
 
 .area {
   overflow: hidden;
