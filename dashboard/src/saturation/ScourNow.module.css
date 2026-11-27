@@ -95,3 +95,11 @@
   margin-block: var(--wzl-space-3);
   padding: var(--wzl-space-3) var(--wzl-space-6);
 }
+
+/* The figures' box with a fix run's shelf beside it, the shelf wrapping below only when the row is too narrow. */
+.figures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--wzl-space-4);
+}
