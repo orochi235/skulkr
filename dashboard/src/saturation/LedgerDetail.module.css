@@ -28,7 +28,7 @@
 .summary {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: stretch; /* every box in the row as tall as the tallest */
   gap: var(--wzl-space-4);
 }
 

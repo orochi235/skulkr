@@ -1,20 +1,21 @@
 .hero {
   composes: box from './box.module.css';
   flex: none;
+  padding: var(--wzl-space-3) var(--wzl-space-6);
 }
 
 /* Each row of figures, the outlook under the counts past a rule. */
 .row {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
-  gap: var(--wzl-space-6) var(--wzl-space-8);
+  justify-content: flex-start;
+  gap: var(--wzl-space-3) var(--wzl-space-7);
   margin: 0;
 }
 
 .row + .row {
-  margin-block-start: var(--wzl-space-6);
-  padding-block-start: var(--wzl-space-6);
+  margin-block-start: var(--wzl-space-3);
+  padding-block-start: var(--wzl-space-3);
   border-block-start: var(--wzl-border-w) solid var(--wzl-border);
 }
 

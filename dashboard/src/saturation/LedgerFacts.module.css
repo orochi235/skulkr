@@ -7,7 +7,7 @@
 .groups {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: stretch;
   gap: var(--wzl-space-4);
 }
 
