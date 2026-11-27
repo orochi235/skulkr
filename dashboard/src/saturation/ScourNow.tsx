@@ -97,6 +97,9 @@ function JobLine({ job }: { job: ScourJob }) {
   );
 }
 
+/** What a live scour process does, as its pill's color. */
+const DOES: Readonly<Record<string, string>> = { delve: s.delve!, fix: s.fix!, held: s.held! };
+
 /** One live scour process's ledger: what it does, for how long (counting on from `stamp`), its jobs out, its last log
  *  lines, and its chart, a hovered tile's defect called out over it and a clicked one picked in the ledger's own pane. */
 function LiveRun({ ledger: l, onPick, onPickDefect, stamp }: {
@@ -108,9 +111,10 @@ function LiveRun({ ledger: l, onPick, onPickDefect, stamp }: {
   return (
     <article className={s.run} {...hostEvents}>
       <header className={s.head}>
+        <span className={`${s.does} ${DOES[r.does ?? 'held'] ?? s.held}`}>{r.does ?? 'held'}</span>
         <span className={s.area} role="button" tabIndex={0} onClick={() => onPick(l.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onPick(l.id)}>{l.id}</span>
         {r.jobs.map((j) => <PassPill key={j.key} jobKey={j.key} />)}
-        <span className={s.facts}>{r.does ?? 'held'} · pid {r.pid}</span>
+        <span className={s.facts}>pid {r.pid}</span>
         <span className={s.about}><DelveAbout ledger={l} /></span>
       </header>
       <div className={s.figures}>

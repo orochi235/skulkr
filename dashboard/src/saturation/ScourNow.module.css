@@ -29,6 +29,27 @@
   cursor: pointer;
 }
 
+/* What the process does, black on its color, as a tag leading the row. */
+.does {
+  align-self: center;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: var(--does);
+  color: #000;
+  font-size: var(--wzl-font-size-xs);
+  /* 700 outright: the theme's bold token is 400 on this face. */
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  text-transform: uppercase;
+}
+
+.delve { --does: color-mix(in srgb, var(--wzl-accent) 45%, white); }
+
+.fix { --does: var(--wzl-success); }
+
+.held { --does: color-mix(in srgb, var(--wzl-fg) 30%, var(--wzl-surface)); }
+
 .facts {
   font-size: var(--wzl-font-size-sm);
   font-variant-numeric: tabular-nums;
