@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Checkbox } from '@weasel-js/ui/components/Checkbox';
 import { useDashPref } from '@dash/audits/dashPrefs';
 import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
+import { InlineMarkdown } from '@weasel-js/ui/components/InlineMarkdown';
 import { DelveAbout, DelveChart, DelveKey, hasCodexPass } from './DelveChart';
 import { FixShelf, FixShelfAbout, FixShelfKey, FixStatusChip, FixSwatch, isDefectClosed, ShelfOrderSwitch, shelfStatusOf } from './FixShelf';
 import { LedgerHero } from './LedgerHero';
@@ -16,8 +17,8 @@ import s from './LedgerDetail.module.css';
 const COLUMNS: readonly DataGridColumn<SaturationDefect>[] = [
   { id: 'id', header: 'ID', accessor: (d) => Number(d.id.slice(1)), render: (d) => <span data-defect={d.id}>{d.id}</span>, className: s.id },
   { id: 'severity', header: 'Severity', accessor: (d) => severityRank(d.severity), render: (d) => d.severity || '–' },
-  { id: 'claim', header: 'Defect', className: s.claim },
-  { id: 'where', header: 'Where', className: s.where },
+  { id: 'claim', header: 'Defect', render: (d) => <InlineMarkdown text={d.claim} />, className: s.claim },
+  { id: 'where', header: 'Where', render: (d) => <InlineMarkdown text={d.where} />, className: s.where },
   { id: 'sightings', header: 'Seen', numeric: true, render: (d) => (d.recurrent ? <><span className={s.recurrent}>recurrent</span> {d.sightings}</> : d.sightings) },
   { id: 'sources', header: 'By', accessor: (d) => (d.onlyBy ? `${d.onlyBy} only` : d.sources.join(', ')), sortable: false },
   { id: 'status', header: 'Status', accessor: (d) => d.registry?.status ?? 'not landed', render: statusOf },

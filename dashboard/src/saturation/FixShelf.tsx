@@ -173,7 +173,7 @@ export function FixStatusChip({ status, branch = null }: { status: ShelfStatus; 
   if (!branch) return chip;
   return (
     <TooltipTrigger>
-      <Focusable><span className={s.tipped} tabIndex={0}>{chip}</span></Focusable>
+      <Focusable><span className={s.tipped} role="button" tabIndex={0}>{chip}</span></Focusable>
       <Tooltip placement="top"><code>{branch}</code></Tooltip>
     </TooltipTrigger>
   );

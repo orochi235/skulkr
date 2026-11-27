@@ -35,7 +35,7 @@ export function StatRow({ label, stats }: { label: string; stats: readonly Stat[
           <dt className={s.label}>
             {tip ? (
               <TooltipTrigger>
-                <Focusable><span className={s.tipped} tabIndex={0}>{word}</span></Focusable>
+                <Focusable><span className={s.tipped} role="button" tabIndex={0}>{word}</span></Focusable>
                 <Tooltip placement="top">{tip}</Tooltip>
               </TooltipTrigger>
             ) : word}

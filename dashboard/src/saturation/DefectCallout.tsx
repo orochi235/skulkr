@@ -1,3 +1,4 @@
+import { InlineMarkdown } from '@weasel-js/ui/components/InlineMarkdown';
 import { FixStatusChip, shelfStatusOf } from './FixShelf';
 import type { SaturationLedger } from './saturation.types';
 import s from './DefectCallout.module.css';
@@ -24,8 +25,8 @@ export function DefectCallout({ ledger, id, at, flipX }: {
         {d.severity && <span>{d.severity}</span>}
         {ledger.fix && <FixStatusChip status={shelfStatusOf(entry)} />}
       </div>
-      <p className={s.claim}>{d.claim}</p>
-      <p className={s.where}>{d.where}</p>
+      <p className={s.claim}><InlineMarkdown text={d.claim} /></p>
+      <p className={s.where}><InlineMarkdown text={d.where} /></p>
       <p className={s.seen}>seen in {d.sightings} of {ledger.occasions} passes{d.recurrent ? ' · recurrent' : ''}</p>
     </div>
   );
