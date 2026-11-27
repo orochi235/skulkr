@@ -34,7 +34,7 @@
 
 .summaryTitle { margin-block-end: var(--wzl-space-3); }
 
-.fixBox { composes: box from './box.module.css'; min-width: 0; padding: var(--wzl-space-3) var(--wzl-space-5); }
+.fixBox { composes: box from './box.module.css'; flex: 1 1 auto; min-width: 0; padding: var(--wzl-space-3) var(--wzl-space-5); }
 
 /* The stop rule's status over the fix plan, both the plan's width: the status wraps rather than widening the column. */
 .stack {
