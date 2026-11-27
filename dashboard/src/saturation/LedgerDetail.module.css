@@ -113,3 +113,38 @@
   background: color-mix(in srgb, var(--wzl-warning) 30%, transparent);
   font-size: var(--wzl-font-size-xs);
 }
+
+/* The color legend, last in the top row and shown only while it fits there (`useFitsInRow`): out of the flow and
+   hidden otherwise, so it is measured at its own width and leaves no gap. */
+.legend {
+  composes: box from './box.module.css';
+  display: flex;
+  gap: var(--wzl-space-7);
+  padding: var(--wzl-space-3) var(--wzl-space-5);
+  white-space: nowrap;
+}
+
+/* Each key a column of swatches; the fixes' key in two, so the legend stays no taller than the boxes beside it. */
+.legend span:has(> span) { display: grid; gap: 1px var(--wzl-space-5); }
+
+.legendFixes span:has(> span) { grid-template-rows: repeat(6, auto); grid-auto-flow: column; }
+
+.legendOut {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.legendTitle {
+  margin: 0;
+  font-size: var(--wzl-font-size-2xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wzl-fg-muted);
+}
+
+.legendTitle { margin-block-end: var(--wzl-space-1); }
+
+/* Pushed to the far end of its row: the fix plan's order switch. */
+.end { margin-inline-start: auto; }

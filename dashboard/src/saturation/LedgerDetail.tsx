@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
-import { DelveAbout, DelveChart } from './DelveChart';
-import { FixShelf, FixShelfAbout, FixStatusChip, FixSwatch, isDefectClosed, ShelfOrderSwitch, shelfStatusOf, type ShelfOrder } from './FixShelf';
+import { DelveAbout, DelveChart, DelveKey, hasCodexPass } from './DelveChart';
+import { FixShelf, FixShelfAbout, FixShelfKey, FixStatusChip, FixSwatch, isDefectClosed, ShelfOrderSwitch, shelfStatusOf, type ShelfOrder } from './FixShelf';
 import { LedgerHero } from './LedgerHero';
 import { PassTableButton } from './PassTable';
 import { severityRank } from './format';
 import { DefectCallout } from './DefectCallout';
 import { LedgerFacts, StopStatus } from './LedgerFacts';
+import { useFitsInRow } from './useFitsInRow';
 import type { FixShelf as FixShelfData, SaturationDefect, SaturationLedger } from './saturation.types';
 import s from './LedgerDetail.module.css';
 
@@ -82,6 +83,10 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
   // Where the pointer is over the header, for the traced defect's callout.
   const head = useRef<HTMLElement>(null);
   const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
+  // The legend box shows only where it fits beside the others.
+  const summary = useRef<HTMLDivElement>(null);
+  const legend = useRef<HTMLElement>(null);
+  const legendFits = useFitsInRow(summary, legend);
   useEffect(() => { setPicked(null); setTraced(null); }, [ledger.id]);
   const columns = useMemo(() => columnsFor(ledger.fix), [ledger.fix]);
   const groups = useMemo(() => defectGroupsOf(ledger), [ledger]);
@@ -97,7 +102,7 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
         onPointerLeave={() => setPointer(null)}
       >
         <div className={`${s.titleRow} ${s.summaryTitle}`}><h2 className={s.title}>{ledger.id}</h2><DelveAbout ledger={ledger} picks /></div>
-        <div className={s.summary}>
+        <div ref={summary} className={s.summary}>
           <LedgerHero ledger={ledger} />
           <LedgerFacts ledger={ledger} />
           <div className={s.stack}>
@@ -105,12 +110,16 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
             {ledger.fix && ledger.fix.batches.length > 0 && (
               <section className={s.fixBox} aria-label="Fix plan">
                 <div className={s.titleRow}>
-                  <span className={s.facts}>{fixFactsOf(ledger.fix)}</span><FixShelfAbout /><ShelfOrderSwitch order={shelfOrder} onChange={setShelfOrder} />
+                  <span className={s.facts}>{fixFactsOf(ledger.fix)}</span><FixShelfAbout /><span className={s.end}><ShelfOrderSwitch order={shelfOrder} onChange={setShelfOrder} /></span>
                 </div>
                 <FixShelf shelf={ledger.fix} order={shelfOrder} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} />
               </section>
             )}
           </div>
+          <section ref={legend} className={legendFits ? s.legend : `${s.legend} ${s.legendOut}`} aria-label="Legend" aria-hidden={!legendFits}>
+            <div><h3 className={s.legendTitle}>Passes</h3><DelveKey codex={hasCodexPass(ledger)} /></div>
+            {ledger.fix && ledger.fix.batches.length > 0 && <div className={s.legendFixes}><h3 className={s.legendTitle}>Fixes</h3><FixShelfKey /></div>}
+          </section>
         </div>
         <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} /><div className={s.chartFoot}><PassTableButton ledger={ledger} /></div></div>
         <DefectCallout ledger={ledger} id={traced} at={pointer} flipX={(head.current?.clientWidth ?? 0) / 2} />

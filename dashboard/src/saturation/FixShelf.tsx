@@ -145,10 +145,17 @@ export function FixShelfAbout() {
         above a tile marks a defect most reviews keep finding. A batch whose every defect has a verdict joins the done
         group at the end. The switch orders each group&apos;s tiles by batch or by status. Click a tile to jump to its row.
       </p>
-      <span className={s.key}>
-        {KEY.map((k) => <span key={k}><i className={`${s.swatch} ${CLASS[k]}`} />{k}</span>)}
-      </span>
+      <FixShelfKey />
     </AboutButton>
+  );
+}
+
+/** The key to the shelf's colors: a swatch and the word for each status and stage. */
+export function FixShelfKey() {
+  return (
+    <span className={s.key}>
+      {KEY.map((k) => <span key={k}><i className={`${s.swatch} ${CLASS[k]}`} />{k}</span>)}
+    </span>
   );
 }
 
