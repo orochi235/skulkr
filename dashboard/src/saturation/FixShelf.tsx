@@ -121,6 +121,15 @@ export function FixShelf({ shelf, order = 'batch', onPickDefect, traced = null, 
           <text className={s.label} x={g.labelX} y={base + LABEL - 2}>{g.label}</text>
         </g>
       ))}
+      {/* The traced tile's outline, around all three faces and drawn after every tile so its neighbor's faces never
+          cover an edge of it. */}
+      {groups.flatMap((g) => g.books.filter((b) => b.id === traced)).map((b) => {
+        const top = base - b.h;
+        return (
+          <polygon key="outline" className={s.outline}
+            points={`${b.x},${base} ${b.x},${top} ${b.x + DEPTH},${top - DEPTH} ${b.x + BOOK_W + DEPTH},${top - DEPTH} ${b.x + BOOK_W + DEPTH},${base - DEPTH} ${b.x + BOOK_W},${base}`} />
+        );
+      })}
     </svg>
   );
 }

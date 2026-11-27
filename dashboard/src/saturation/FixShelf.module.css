@@ -99,6 +99,12 @@
    solid as the statuses are. */
 .tracing g:not(.tracedGroup) > .tile { --tile: color-mix(in srgb, var(--wzl-fg) 14%, var(--wzl-surface)); }
 
-.traced .front { stroke: var(--wzl-fg); stroke-width: 1; }
+.outline {
+  fill: none;
+  stroke: var(--wzl-fg);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
 
 .tracing g:not(.tracedGroup) > .tile .dot { fill: color-mix(in srgb, var(--wzl-fg) 25%, var(--wzl-surface)); }
