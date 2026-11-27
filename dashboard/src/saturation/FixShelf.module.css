@@ -26,7 +26,8 @@
 
 .written { --tile: color-mix(in srgb, var(--wzl-accent) 50%, var(--wzl-success)); }
 
-.checking { --tile: color-mix(in srgb, var(--wzl-success) 55%, var(--wzl-surface)); }
+/* Cyan, a hue of its own beside fixed's green; the theme has no cyan token. */
+.checking { --tile: #19b8cc; }
 
 .repairing { --tile: color-mix(in srgb, var(--wzl-warning) 60%, var(--wzl-danger)); }
 

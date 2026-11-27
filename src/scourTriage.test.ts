@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fixPlanFor, resolvedFile } from './scourTriage.mjs';
 import { scourVerdictsOf } from './scourFix.mjs';
-import { fixStatusesFor } from './scourFixStatus.mjs';
+import { fixStatusesFor, lastFixRunOf } from './scourFixStatus.mjs';
 import { isRecurrent } from './triageFields.mjs';
 
 const d = (id: string, where: string, extra: Record<string, unknown> = {}, seen = 1) => ({ id, claim: `claim ${id}`, where, sightings: Array.from({ length: seen }, (_, i) => i + 1), ...extra });
@@ -67,5 +67,18 @@ describe("a fix shelf's statuses", () => {
       D5: { status: 'unread', run: 1, branch: 'scour1-core-b2', verified: true },
       b1: { status: 'fixing', run: 2, branch: null },
     });
+  });
+});
+
+describe("a ledger's last flush", () => {
+  it('is the latest fix run on the area, finished or not, and none for an area no run touched', () => {
+    const runs = [
+      { n: 1, jobs: ['core~b1'], record: { area: 'core', started: 'a', finished: 'b' } },
+      { n: 2, jobs: ['other~b1'], record: { area: 'other', started: 'c', finished: null } },
+      { n: 3, jobs: ['core~b2'], record: null },
+    ];
+    expect(lastFixRunOf('core', runs)).toEqual({ n: 3, started: null, finished: null });
+    expect(lastFixRunOf('other', runs)).toEqual({ n: 2, started: 'c', finished: null });
+    expect(lastFixRunOf('ui', runs)).toBeNull();
   });
 });

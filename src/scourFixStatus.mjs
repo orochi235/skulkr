@@ -52,6 +52,16 @@ export const fixStatusesFor = (area, runs) => {
   return out;
 };
 
+/** The latest fix run (a flush) on ledger `area` from the `runs` (`fixRunsIn`): its number, when it started, and when it
+ *  finished, null while it runs; null when no run has touched the area. A run counts from its record, or before its
+ *  first batch ends, from a job out on the area. */
+export const lastFixRunOf = (area, runs) => {
+  const jobOn = new RegExp(`^${area.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}~b\\d+$`);
+  const run = runs.filter((r) => r.record?.area === area || (!r.record && r.jobs.some((j) => jobOn.test(j)))).at(-1);
+  if (!run) return null;
+  return { n: run.n, started: run.record?.started ?? null, finished: run.record?.finished ?? null };
+};
+
 /** A ledger's shelf: its plan's batches (ids in order, with each one's size and whether it recurs), what goes to ask,
  *  and each defect's fix status, with its `stage` (`fixStagesIn`) while its batch is out. */
 export const fixShelfOf = (cfg, ledger, runs = fixRunsIn(cfg)) => {
@@ -69,6 +79,7 @@ export const fixShelfOf = (cfg, ledger, runs = fixRunsIn(cfg)) => {
     delete statuses[`b${b.n}`];
   }
   return {
+    lastRun: lastFixRunOf(ledger.area, runs),
     batches: plan.batches.map((b) => ({ n: b.n, defects: b.defects.map((d) => ({ id: d.id, size: d.size ?? null, recurrent: d.recurrent })) })),
     ask: plan.ask.map((d) => d.id),
     statuses,

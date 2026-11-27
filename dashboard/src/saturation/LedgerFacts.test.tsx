@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { yieldGridOf } from './LedgerFacts';
+import { lastFlushText, yieldGridOf } from './LedgerFacts';
 import type { SaturationLedger } from './saturation.types';
 
 const ledger = {
@@ -19,5 +19,14 @@ describe('the yield grid', () => {
 
   it('drops the per-thousand-lines column where lines are unknown', () => {
     expect(yieldGridOf({ ...ledger, lines: null }).cols).toEqual(['area', '/ pass']);
+  });
+});
+
+describe("a ledger's last flush", () => {
+  it('reads never before any fix run, running while one is out, and its finish time after', () => {
+    expect(lastFlushText(null, 0)).toBe('never');
+    expect(lastFlushText({ finished: null }, 0)).toBe('running');
+    const now = Date.parse('2026-11-26T22:00:00');
+    expect(lastFlushText({ finished: '2026-11-26T21:17:45' }, now)).toMatch(/9:17/);
   });
 });

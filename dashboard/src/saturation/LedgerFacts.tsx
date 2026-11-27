@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { estimate, linesText, sourcesText, usd, usdOrDash } from './format';
+import { startedText } from '@dash/audits/runData';
 import { heroCountsOf } from './LedgerHero';
 import type { SaturationLedger } from './saturation.types';
 import s from './LedgerFacts.module.css';
@@ -7,14 +8,20 @@ import s from './LedgerFacts.module.css';
 /** A label, its value, and whether the value is an estimate (set in italic, as the hero's are). */
 type Fact = readonly [label: string, value: ReactNode, estimated?: boolean];
 
-/** A ledger's single-valued facts: what the area is and what has run on it. What a next pass looks like is the hero's. */
+/** A ledger's single-valued facts: what the area is and what has run on it, its last flush included. What a next pass
+ *  looks like is the hero's. */
 export const scopeFactsOf = (ledger: SaturationLedger): readonly Fact[] => [
   ['files', ledger.files],
   ['lines', linesText(ledger.lines)],
   ['commit', <code key="c">{ledger.commit.slice(0, 10)}</code>],
   ['passes', ledger.occasions],
   ['by', sourcesText(ledger.sources)],
+  ['last flush', lastFlushText(ledger.fix?.lastRun ?? null, Date.now())],
 ];
+
+/** When the area's latest fix run (flush) finished, "running" while it is out, and "never" before any. */
+export const lastFlushText = (run: { finished: string | null } | null, now: number): string =>
+  !run ? 'never' : run.finished ? startedText(run.finished, now) : 'running';
 
 /** The yield grid: found, fixed (the hero's count), left and spent, each for the whole area, per thousand lines (where
  *  lines are known), and per pass. Fixed and left have no per-pass figure. */

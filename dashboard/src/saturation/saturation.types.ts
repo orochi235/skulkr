@@ -98,6 +98,8 @@ export interface FixStatusEntry {
 
 /** A ledger's fix plan, for the shelf: batches of defects in order, what goes to ask, and each touched defect's status. */
 export interface FixShelf {
+  /** The latest fix run (flush) on the area: its number, start, and finish (null while it runs); null before any. */
+  readonly lastRun?: { readonly n: number; readonly started: string | null; readonly finished: string | null } | null;
   readonly batches: readonly { readonly n: number; readonly defects: readonly { readonly id: string; readonly size: string | null; readonly recurrent: boolean }[] }[];
   readonly ask: readonly string[];
   readonly statuses: Readonly<Record<string, FixStatusEntry>>;
