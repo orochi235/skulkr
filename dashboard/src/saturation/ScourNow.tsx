@@ -22,21 +22,38 @@ export const timedLines = (log: readonly string[], since: string, n = 3): string
   return rows.map(([took, text]) => `${took.padStart(width)}  ${text}`);
 };
 
-/** A live ledger's figures in one row: how long the process has held it (pinned to a width, as it changes), its passes
- *  (or a fix run's batches) against its cap, found, what a next pass looks like, and the spend, dollars set light. */
+/** A live delve's figures in one row: how long the process has held it (pinned to a width, as it changes), its passes
+ *  against its cap, found, what a next pass looks like, and the spend, dollars set light. A fix run's are its own. */
 export const liveStatsOf = (l: SaturationLedger, now: number): Stat[] => {
   const r = l.running!;
-  const fix = r.does === 'fix';
-  const done = fix ? r.jobs.length : l.occasions;
+  const elapsed: Stat = ['elapsed', minutesSince(r.since, now), STAT_TONE.clock];
+  if (r.does === 'fix') return [elapsed, ...fixStatsOf(l, r.max)];
   const light = STAT_TONE.light;
   return [
-    ['elapsed', minutesSince(r.since, now), STAT_TONE.clock],
-    [fix ? 'batches' : 'passes', String(done), undefined, r.max ? `up to ${r.max}` : undefined],
+    elapsed,
+    ['passes', String(l.occasions), undefined, r.max ? `up to ${r.max}` : undefined],
     ['found', String(l.distinct)],
     ['next new', percent(l.nextNew)],
     ['next defect', usdOrDash(l.nextUsd), light],
     ['limit', usd(l.limit.usd), light],
     ['spent', usd(l.costUsd), light],
+  ];
+};
+
+/** A running fix run's tally from its own verdicts: batches back (of the run's), and its defects by where they stand. */
+export const fixStatsOf = (l: SaturationLedger, max: number | null): Stat[] => {
+  const shelf = l.fix;
+  const run = shelf?.lastRun?.n;
+  const mine = (id: string) => { const e = shelf?.statuses[id]; return e && e.run === run ? e : undefined; };
+  const touched = shelf ? shelf.batches.filter((b) => b.defects.some((d) => mine(d.id))) : [];
+  const back = touched.filter((b) => b.defects.every((d) => mine(d.id) && mine(d.id)!.status !== 'fixing')).length;
+  const count = (...of: string[]) => Object.keys(shelf?.statuses ?? {}).filter((id) => of.includes(mine(id)?.status ?? '')).length;
+  return [
+    ['batches', String(back), undefined, max ? `of ${max}` : undefined],
+    ['fixing', String(count('fixing'))],
+    ['fixed', String(count('fixed'))],
+    ['not a defect', String(count('not a defect'))],
+    ['other', String(count('question', 'not fixed', 'duplicate', 'unread', 'flagged'))],
   ];
 };
 

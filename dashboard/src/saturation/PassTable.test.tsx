@@ -20,7 +20,7 @@ describe('PassTableButton', () => {
     const dialog = screen.getByRole('dialog', { name: 'core: passes' });
     const rows = within(dialog).getAllByRole('row');
     expect(rows).toHaveLength(3);
-    expect(within(rows[2]!).getAllByRole('cell').map((c) => c.textContent)).toEqual(['2', 'claude', '3', '1', '2', '1.0', '4.3', '2.1', '50.0%', '$1.00', '$0.50', '$2.00', '$1.00', '$2.30']);
+    expect(within(rows[2]!).getAllByRole('cell').map((c) => c.textContent)).toEqual(['2', 'claude', '3', '1', '2', '1.0', '4.3', '2.1', '50.0', '$1.00', '$0.50', '$2.00', '$1.00', '$2.30']);
     expect(within(rows[1]!).getAllByRole('cell').at(-1)?.textContent).toBe('–');
   });
 
