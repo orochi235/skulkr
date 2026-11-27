@@ -24,6 +24,11 @@ On `main`, pushed except as noted under Loose ends.
   `fix-chain.sh`'s shell died mid-run, so `.playwright-mcp/fix-chain2.sh` (`pgrep -f fix-chain2`) waits for pid 66169
   and starts forge; logs `logs/fix-chain.log`, `logs/fix-<area>.log`. b1: 8 fixed, verify passed, $2.18. b2: 6 fixed,
   2 not a defect, one repair, verify passed, $2.06. Report each run's outcome to the user when it ends. The areas were my pick after viewport, at the user's "start another, and another".
+- **Then `routing.tools`, `core.canvas.nodeShapes`, `core.canvas.part4`**, queued 2026-11-27 12:10 at the user's "keep
+  the fixes rolling for a few more hours so there's always one running": `.playwright-mcp/fix-chain3.sh`
+  (`pgrep -f fix-chain3`) waits for fix-chain2 and runs them in turn; `touch .playwright-mcp/logs/stop-chain` stops it
+  before the next area starts. `core.animation` was skipped: its coast files overlap weasel-7a's pending
+  `coast-on-glide` branch.
 - ⚠️ Batches split past eight defects can share a file (routing b1/b2 share `elementAt.ts`; forge b2/b3 share
   `plugin.ts`), and each branches from `main`, so those pairs may conflict at landing.
 - Runs 3 and 4's records were filled in by hand: both fixers were killed at the 45-minute limit (`docs/TODO.md` P1).
