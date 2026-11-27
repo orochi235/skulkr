@@ -20,36 +20,26 @@ On `main`, pushed except as noted under Loose ends.
 ## In flight: fix runs 8–9 (unattended)
 
 - **Run 7, `core.core.viewport`: done.** All 27 fixed, every verify passed, $6.36; `scour7-core.core.viewport-b1..b4`.
-- **Run 8, `routing.interactions`** (5 batches) is running; then **`forge.vite.part2`** (8 batches), chained by
-  `.playwright-mcp/fix-chain.sh` (`pgrep -f fix-chain.sh`; `logs/fix-chain.log`, `logs/fix-<area>.log`). b1 all fixed,
-  verify passed. b2's verify failed one file, `packages/editing/src/integration/core/canvas/SceneCanvas/kitActionParams.test.tsx`
-  ("state no number outside a params leaf that the allowlist does not explain"), and is in repair. Report each run's
-  outcome to the user when it ends. The areas were my pick after viewport, at the user's "start another, and another".
+- **Run 8, `routing.interactions`** (5 batches, pid 66169) is running; then **`forge.vite.part2`** (8 batches).
+  `fix-chain.sh`'s shell died mid-run, so `.playwright-mcp/fix-chain2.sh` (`pgrep -f fix-chain2`) waits for pid 66169
+  and starts forge; logs `logs/fix-chain.log`, `logs/fix-<area>.log`. b1: 8 fixed, verify passed, $2.18. b2: 6 fixed,
+  2 not a defect, one repair, verify passed, $2.06. Report each run's outcome to the user when it ends. The areas were my pick after viewport, at the user's "start another, and another".
 - ⚠️ Batches split past eight defects can share a file (routing b1/b2 share `elementAt.ts`; forge b2/b3 share
   `plugin.ts`), and each branches from `main`, so those pairs may conflict at landing.
 - Runs 3 and 4's records were filled in by hand: both fixers were killed at the 45-minute limit (`docs/TODO.md` P1).
 - **Then:** the user reviews all `scour<N>-*` branches in weasel and the `tile-charts` port
   (`~/src/weasel/.worktrees/tile-charts`, unpushed); landing is built only after that review.
 
-## Next to build (approved 2026-11-27, "go")
+## Next to build
 
-1. **Each defect's own stage on the fix shelf, through verify and repair**, not the batch's. Today
-   `fixStagesIn` (`src/scourFixStage.mjs`) paints every defect `checking` or `repairing` while its batch verifies or
-   repairs, and fixer commits name no defect. Design the user approved:
-   - `scour fix` adds to the fixer's prompt (not the shared `fixer.md`, so rounds stay at parity): end each commit
-     message with a `Defect: D12` trailer, several ids for a commit covering several. A commit without one falls back
-     to today's reading.
-   - `stagesFromFixLog` reads stages from those commits rather than guessing from `says:` lines.
-   - During verify, a committed defect is `checking`; one the fixer left uncommitted keeps its own stage.
-   - During repair, the failing test files are laid at the commits whose changed files they import or sit beside,
-     by extending weasel's `gate.blame` hook (in `examples/weasel`) to answer commits as well as branches; only those
-     commits' defects show `repairing`, the rest `checking`; no match falls back to the whole batch. Path-only matching
-     would miss today's case (an `editing/` test failing for `routing/` commits), hence the hook.
-2. **A "defects fixed" map metric** on the Scour page: `saturationFixed` in `dashboard/src/audits/heatMetrics.ts`
-   (`SATURATION_METRICS`), counting defects `isFixSettled` on the ledger's fix shelf, maybe with a per-kloc twin. The
-   user asked whether it could be one; I said yes and proposed this, not yet confirmed as wanted.
-3. Add the verify-line wording change (`7ba18db`: tests, files, affected) to `CLAUDE.md`'s parity list; no reader
-   parses past `passed`/`failed` (`src/nightLog.mjs`), so nothing else changes.
+1. **A "defects fixed" map metric** on the Scour page: `saturationFixed` in `dashboard/src/audits/heatMetrics.ts`
+   (`SATURATION_METRICS`), counting defects `isFixSettled` on the ledger's fix shelf, maybe with a per-kloc twin.
+   Proposed, not yet confirmed as wanted.
+
+Built 2026-11-27: per-defect stages (`8ae7440`, docs/scour.md "Each defect's own stage"), the fixer's reason on
+non-fixed verdicts (`75222a7`), weasel's verify through `onto adapt vitest` (`f9b7a6c`). The first run to show
+trailers, reasons asked for, and onto's test-count bar is `forge.vite.part2`, since run 8's process loaded the
+older code; watch its shelf through a repair to confirm the laid defects read right.
 
 ## Decisions made in conversation (2026-11-26/27)
 
