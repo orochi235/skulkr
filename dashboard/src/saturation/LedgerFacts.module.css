@@ -1,17 +1,19 @@
 .facts {
   container-type: inline-size;
-  margin-block-start: var(--wzl-space-3);
   font-size: var(--wzl-font-size-sm);
 }
 
-/* Scope and effort beside the yield grid, the grid dropping below once there is no room for both. */
+/* The yield grid beside scope and effort, scope dropping below once there is no room for both. */
 .groups {
   display: grid;
-  grid-template-columns: minmax(9rem, 13rem) auto;
+  grid-template-columns: auto minmax(9rem, 13rem);
   align-items: start;
   justify-content: start;
-  gap: var(--wzl-space-6) var(--wzl-space-8);
+  gap: var(--wzl-space-4);
 }
+
+/* The fact boxes, tighter than the hero's. */
+.box { composes: box from './box.module.css'; padding: var(--wzl-space-3) var(--wzl-space-5); }
 
 @container (max-width: 24rem) {
   .groups { grid-template-columns: minmax(0, 1fr); }
@@ -68,6 +70,9 @@
 }
 
 .grid tbody th { font-weight: inherit; color: var(--wzl-fg-muted); }
+
+/* The figures a size up from their labels, so they read first. */
+.grid td { font-size: var(--wzl-font-size-md); font-weight: 600; }
 
 .grid .estimate td { padding-inline-end: 0.15em; font-style: italic; color: var(--wzl-fg-muted); }
 

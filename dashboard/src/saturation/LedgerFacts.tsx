@@ -39,7 +39,7 @@ export const yieldGridOf = (ledger: SaturationLedger) => {
 
 function FactList({ title, facts }: { title: string; facts: readonly Fact[] }) {
   return (
-    <section aria-label={title}>
+    <section className={s.box} aria-label={title}>
       <h3 className={s.title}>{title}</h3>
       <dl className={s.list}>
         {facts.map(([label, value, estimated]) => (
@@ -53,7 +53,7 @@ function FactList({ title, facts }: { title: string; facts: readonly Fact[] }) {
 function YieldGrid({ ledger }: { ledger: SaturationLedger }) {
   const { cols, rows } = yieldGridOf(ledger);
   return (
-    <section aria-label="Yield">
+    <section className={s.box} aria-label="Yield">
       <table className={s.grid}>
         <thead>
           <tr><th scope="col" className={s.title}>Yield</th>{cols.map((c) => <th key={c} scope="col">{c}</th>)}</tr>
@@ -71,13 +71,13 @@ function YieldGrid({ ledger }: { ledger: SaturationLedger }) {
   );
 }
 
-/** The facts under a ledger's name: its single-valued facts beside the yield grid, and its stop rule's state. */
+/** The facts under a ledger's name: the yield grid beside its single-valued facts, and its stop rule's state. */
 export function LedgerFacts({ ledger }: { ledger: SaturationLedger }) {
   return (
     <div className={s.facts}>
       <div className={s.groups}>
-        <FactList title="Scope & effort" facts={scopeFactsOf(ledger)} />
         <YieldGrid ledger={ledger} />
+        <FactList title="Scope & effort" facts={scopeFactsOf(ledger)} />
       </div>
       <p className={ledger.stopped ? `${s.stop} ${s.stopped}` : s.stop}>
         {ledger.stopped ? <>Stopped: {ledger.stopped}.</> : 'Not saturated yet: the stop rule does not hold.'}

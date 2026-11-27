@@ -97,11 +97,9 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
         onPointerLeave={() => setPointer(null)}
       >
         <div className={s.summary}>
-          <LedgerHero ledger={ledger} />
-          <div className={s.blurb}>
-            <div className={s.titleRow}><h2 className={s.title}>{ledger.id}</h2><DelveAbout ledger={ledger} picks /></div>
-            <LedgerFacts ledger={ledger} />
-          </div>
+          <div className={`${s.titleRow} ${s.summaryTitle}`}><h2 className={s.title}>{ledger.id}</h2><DelveAbout ledger={ledger} picks /></div>
+          <div className={s.heroCell}><LedgerHero ledger={ledger} /></div>
+          <div className={s.blurb}><LedgerFacts ledger={ledger} /></div>
         </div>
         <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} onPickDefect={pickDefect} traced={traced} onTrace={setTraced} /><div className={s.chartFoot}><PassTableButton ledger={ledger} /></div></div>
         {ledger.fix && ledger.fix.batches.length > 0 && (

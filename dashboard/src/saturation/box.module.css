@@ -1,0 +1,7 @@
+/* The outlined box a ledger's headline figures and facts each sit in. */
+.box {
+  padding: var(--wzl-space-6) var(--wzl-space-8);
+  border: var(--wzl-border-w) solid var(--wzl-border-strong);
+  border-radius: var(--wzl-radius-md);
+  background: var(--wzl-surface);
+}

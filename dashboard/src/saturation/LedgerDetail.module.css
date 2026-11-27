@@ -6,7 +6,7 @@
   min-width: 0;
 }
 
-.head { position: relative; flex: none; }
+.head { position: relative; flex: none; container-type: inline-size; }
 
 .title {
   margin: 0;
@@ -23,15 +23,24 @@
 
 .num { font-variant-numeric: tabular-nums; }
 
-/* The headline counts at the left edge, the title and facts beside them, dropping below once the panel is too narrow. */
+/* The title over the hero box, the facts beside the hero; one column once the panel is too narrow for both. */
 .summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--wzl-space-4) var(--wzl-space-8);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'title .' 'hero facts';
+  align-items: start;
+  gap: var(--wzl-space-3) var(--wzl-space-4);
 }
 
-.blurb { flex: 1 1 24rem; min-width: 0; }
+.summaryTitle { grid-area: title; }
+
+.heroCell { grid-area: hero; }
+
+.blurb { grid-area: facts; min-width: 0; }
+
+@container (max-width: 40rem) {
+  .summary { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'title' 'hero' 'facts'; }
+}
 
 .scroll {
   flex: 1 1 0;
