@@ -19,11 +19,21 @@ import { fixPlanFor, fixPlanLines, filesOf } from './scourTriage.mjs';
 
 const VERDICTS = ['not a defect', 'not fixed', 'duplicate', 'question', 'fixed'];
 
-/** The next fix run's number: one past the highest `fix-<N>` in the scour state directory. */
-const nextRunOf = (cfg) => {
+/** Claims the next fix run: one past the highest `fix-<N>` in the scour state directory, its directory made here.
+ *  Answers its number and directory. Two runs started at once each take their own (fix runs may share a queue's lanes). */
+export const claimFixRunIn = (cfg) => {
   const dir = scourStateDirOf(cfg);
-  const taken = existsSync(dir) ? readdirSync(dir).map((n) => Number(/^fix-(\d+)$/.exec(n)?.[1] ?? 0)) : [];
-  return Math.max(0, ...taken) + 1;
+  mkdirSync(dir, { recursive: true });
+  for (;;) {
+    const taken = readdirSync(dir).map((n) => Number(/^fix-(\d+)$/.exec(n)?.[1] ?? 0));
+    const n = Math.max(0, ...taken) + 1;
+    try {
+      mkdirSync(join(dir, `fix-${n}`));
+      return { n, runDir: join(dir, `fix-${n}`) };
+    } catch (e) {
+      if (/** @type {any} */ (e).code !== 'EEXIST') throw e;
+    }
+  }
 };
 
 /** The defects a batch's fixer is handed, as a findings file, each headed by its ledger id. */
@@ -107,9 +117,7 @@ export const scourFix = async (cfg, runner, root, id, args, say) => {
   const batches = args.defects !== undefined ? [defectsBatchOf(plan, String(args.defects).split(',').map((x) => x.trim()).filter(Boolean))]
     : wanted ? plan.batches.filter((b) => wanted.has(b.n)) : plan.batches;
   if (batches.length === 0) throw new Error(`${id} has no batch ${args.batch}`);
-  const n = nextRunOf(cfg);
-  const runDir = join(scourStateDirOf(cfg), `fix-${n}`);
-  mkdirSync(runDir, { recursive: true });
+  const { n, runDir } = claimFixRunIn(cfg);
   // Held as a delve holds it, so the Scour page shows the run live and no delve starts on the ledger meanwhile.
   return withLedgerHeld(cfg, id, { about: { does: 'fix', max: batches.length, jobs: `fix-${n}` } }, () => fixBatches(cfg, runner, root, id, ledger, batches, n, runDir, args, loggingSay(cfg, id, say)));
 };
