@@ -1,6 +1,6 @@
 # Handoff
 
-For the next session in skulkr. Written 2026-11-27 ~00:40 local by `skulkr-03`. Check each claim against the tree.
+For the next session in skulkr. Written 2026-11-27 ~11:20 local. Check each claim against the tree.
 
 ## State
 
@@ -17,19 +17,39 @@ On `main`, pushed except as noted under Loose ends.
 | 5 | b5 | 7 fixed | `scour5-ui.components.Timeline-b5` (based on main `1f25c27a41`) | passed |
 | 6 | b4 rerun: D37 D22 D27 D38, `--on scour3-…-b4` | 3 fixed, 1 not a defect | `scour6-ui.components.Timeline-b4` | passed |
 
-## In flight: fix runs 7–9 (started 2026-11-27, unattended)
+## In flight: fix runs 8–9 (unattended)
 
-- **Run 7, `core.core.viewport`** (pid 3165), 27 defects in 4 batches: b1 and b2 all fixed, verify passed
-  (`scour7-core.core.viewport-b1`, `-b2`, $3.04); b3 and b4 were still running at the time of writing. Log:
-  `.playwright-mcp/logs/fix-viewport.log`.
-- **Then `routing.interactions`, then `forge.vite.part2`**, chained by `.playwright-mcp/fix-chain.sh` (pid 60470;
-  `logs/fix-chain.log`, `logs/fix-<area>.log`). The user asked for two more runs to follow it;
-  the areas were my pick, the other two large ones from the list the user chose viewport from.
+- **Run 7, `core.core.viewport`: done.** All 27 fixed, every verify passed, $6.36; `scour7-core.core.viewport-b1..b4`.
+- **Run 8, `routing.interactions`** (5 batches) is running; then **`forge.vite.part2`** (8 batches), chained by
+  `.playwright-mcp/fix-chain.sh` (`pgrep -f fix-chain.sh`; `logs/fix-chain.log`, `logs/fix-<area>.log`). b1 all fixed,
+  verify passed. b2's verify failed one file, `packages/editing/src/integration/core/canvas/SceneCanvas/kitActionParams.test.tsx`
+  ("state no number outside a params leaf that the allowlist does not explain"), and is in repair. Report each run's
+  outcome to the user when it ends. The areas were my pick after viewport, at the user's "start another, and another".
 - ⚠️ Batches split past eight defects can share a file (routing b1/b2 share `elementAt.ts`; forge b2/b3 share
   `plugin.ts`), and each branches from `main`, so those pairs may conflict at landing.
 - Runs 3 and 4's records were filled in by hand: both fixers were killed at the 45-minute limit (`docs/TODO.md` P1).
-- **Next:** the user reviews all `scour<N>-*` branches in weasel and the `tile-charts` port
+- **Then:** the user reviews all `scour<N>-*` branches in weasel and the `tile-charts` port
   (`~/src/weasel/.worktrees/tile-charts`, unpushed); landing is built only after that review.
+
+## Next to build (approved 2026-11-27, "go")
+
+1. **Each defect's own stage on the fix shelf, through verify and repair**, not the batch's. Today
+   `fixStagesIn` (`src/scourFixStage.mjs`) paints every defect `checking` or `repairing` while its batch verifies or
+   repairs, and fixer commits name no defect. Design the user approved:
+   - `scour fix` adds to the fixer's prompt (not the shared `fixer.md`, so rounds stay at parity): end each commit
+     message with a `Defect: D12` trailer, several ids for a commit covering several. A commit without one falls back
+     to today's reading.
+   - `stagesFromFixLog` reads stages from those commits rather than guessing from `says:` lines.
+   - During verify, a committed defect is `checking`; one the fixer left uncommitted keeps its own stage.
+   - During repair, the failing test files are laid at the commits whose changed files they import or sit beside,
+     by extending weasel's `gate.blame` hook (in `examples/weasel`) to answer commits as well as branches; only those
+     commits' defects show `repairing`, the rest `checking`; no match falls back to the whole batch. Path-only matching
+     would miss today's case (an `editing/` test failing for `routing/` commits), hence the hook.
+2. **A "defects fixed" map metric** on the Scour page: `saturationFixed` in `dashboard/src/audits/heatMetrics.ts`
+   (`SATURATION_METRICS`), counting defects `isFixSettled` on the ledger's fix shelf, maybe with a per-kloc twin. The
+   user asked whether it could be one; I said yes and proposed this, not yet confirmed as wanted.
+3. Add the verify-line wording change (`7ba18db`: tests, files, affected) to `CLAUDE.md`'s parity list; no reader
+   parses past `passed`/`failed` (`src/nightLog.mjs`), so nothing else changes.
 
 ## Decisions made in conversation (2026-11-26/27)
 
