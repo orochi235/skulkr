@@ -165,6 +165,9 @@ weasel cutover.
     2026-11-25); open findings unchanged.
   - weasel's scour ledgers landing under `.skulkr/scour/` on a `<prefix>-scour` branch, those under `.skulkr/saturation/`
     still read and moved by their next landing, and `scour ls --ids` (README "Scour", 2026-11-25).
+  - a verify's log line naming its tests, test files and what `--changed` took as affected, and how many tests failed
+    (2026-11-27); and weasel's verify running vitest through `onto adapt vitest` where onto is on PATH, so its log
+    carries `onto: progress` and `onto: tests` lines beside vitest's own output (2026-11-27).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

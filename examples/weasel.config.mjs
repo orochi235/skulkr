@@ -47,8 +47,11 @@ export const blameStep = (text, step) => {
   return [...new Set(section.flatMap((l) => named(l).map((m) => `packages/${m[1]}`)))];
 };
 
+/** vitest run through `onto adapt` where onto is on PATH, so onto's bar counts tests rather than time (2026-11-27). */
+const VITEST = '$(command -v onto >/dev/null && echo onto adapt vitest -- node_modules/.bin/vitest || echo npx vitest)';
+
 /** ci.yml's checks as vitest tests, three at once (the `gate` project's `maxConcurrency`). */
-const CHECKS = 'npx vitest run --project=gate scripts/ci-checks.gate.ts';
+const CHECKS = `${VITEST} run --project=gate scripts/ci-checks.gate.ts`;
 
 /** The changed files `{files}` lists matching `re`, one a line, with `strip` cut from each. */
 const pick = (re, strip = '') => `$(printf '%s\\n' {files} | grep -E '${re}'${strip ? ` | sed 's#^${strip}##'` : ''})`;
@@ -135,10 +138,10 @@ const config = {
     // in, built first: it reads `dist`, so it otherwise first ran at the gate's full build (2026-11-23).
     verify: {
       // The checks are skipped where the fixer's own `checks:gate`, the same checks, passed at this commit (2026-11-24).
-      command: `npx vitest related --run --maxWorkers=4 ${['!gate', ...BROWSER_PROJECTS.map((p) => `!${p}`)].map((p) => `--project='${p}'`).join(' ')} {files}; s=$?; if [ -n "$VERIFY_PROVEN" ]; then echo "skulkr: checks:gate passed at this commit in the fixer's own run; not run again"; else ${CHECKS} || s=1; fi; npm run -s check:unnameable -- --build {files} || s=1; exit $s`,
+      command: `${VITEST} related --run --maxWorkers=4 ${['!gate', ...BROWSER_PROJECTS.map((p) => `!${p}`)].map((p) => `--project='${p}'`).join(' ')} {files}; s=$?; if [ -n "$VERIFY_PROVEN" ]; then echo "skulkr: checks:gate passed at this commit in the fixer's own run; not run again"; else ${CHECKS} || s=1; fi; npm run -s check:unnameable -- --build {files} || s=1; exit $s`,
       gui: {
         probe: `npx vitest list --filesOnly ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {related}`,
-        command: `npx vitest related --run --maxWorkers=2 ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {files}`,
+        command: `${VITEST} related --run --maxWorkers=2 ${BROWSER_PROJECTS.map((p) => `--project='${p}'`).join(' ')} {files}`,
       },
       timeoutMin: 30,
     },
