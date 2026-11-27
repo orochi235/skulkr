@@ -15,12 +15,18 @@ On `main`, pushed except as noted under Loose ends.
 | 3 | b4 | D13 D12 D30 fixed; D37 D22 D27 D38 not fixed | `scour3-ui.components.Timeline-b4` | passed by hand on the fleet, browser tests not run |
 | 4 | registry b1 | all 7 fixed | `scour4-registry-b1` (9 commits; 2 answer no defect) | passed |
 | 5 | b5 | 7 fixed | `scour5-ui.components.Timeline-b5` (based on main `1f25c27a41`) | passed |
-| 6 | b4 rerun: D37 D22 D27 D38, `--on scour3-…-b4` | waiting | — | — |
+| 6 | b4 rerun: D37 D22 D27 D38, `--on scour3-…-b4` | 3 fixed, 1 not a defect | `scour6-ui.components.Timeline-b4` | passed |
 
-- **Run 6 (pid 81426, detached)** hit the usage limit and waits to retry after 2026-11-27T06:40Z. Its log line says
-  "over 0 files": `defectsBatchOf` (`src/scourFix.mjs`, `b2e5171`) unions `d.files`, which planned defects apparently
-  lack. Check and fix (union the plan batch's `files` filtered to these defects, or `filesOf` per defect) before
-  trusting run 6's staging. Log: `.playwright-mcp/logs/fix-timeline-b4r.log`.
+## In flight: fix runs 7–9 (started 2026-11-27, unattended)
+
+- **Run 7, `core.core.viewport`** (pid 3165), 27 defects in 4 batches: b1 and b2 all fixed, verify passed
+  (`scour7-core.core.viewport-b1`, `-b2`, $3.04); b3 and b4 were still running at the time of writing. Log:
+  `.playwright-mcp/logs/fix-viewport.log`.
+- **Then `routing.interactions`, then `forge.vite.part2`**, chained by `.playwright-mcp/fix-chain.sh` (pid 60470;
+  `logs/fix-chain.log`, `logs/fix-<area>.log`). The user asked for two more runs to follow it;
+  the areas were my pick, the other two large ones from the list the user chose viewport from.
+- ⚠️ Batches split past eight defects can share a file (routing b1/b2 share `elementAt.ts`; forge b2/b3 share
+  `plugin.ts`), and each branches from `main`, so those pairs may conflict at landing.
 - Runs 3 and 4's records were filled in by hand: both fixers were killed at the 45-minute limit (`docs/TODO.md` P1).
 - **Next:** the user reviews all `scour<N>-*` branches in weasel and the `tile-charts` port
   (`~/src/weasel/.worktrees/tile-charts`, unpushed); landing is built only after that review.
