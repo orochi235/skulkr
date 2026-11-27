@@ -69,7 +69,7 @@ export interface AuditArea {
   readonly open?: readonly OpenFinding[];
   /** What its saturation ledger says, set by the saturation page alone (never by `skulkr map`): its defects no fixer
    *  has resolved, and the estimate of those no review found yet (null under two occasions). */
-  readonly saturation?: { readonly open: number; readonly fixed?: number; readonly fixedPerKloc?: number | null; readonly fixHours?: number | null; readonly unseen: number | null; readonly distinct: number; readonly occasions: number; readonly nextNew: number | null;
+  readonly saturation?: { readonly open: number; readonly fixed?: number; readonly fixedPerKloc?: number | null; readonly kloc?: number | null; readonly fixHours?: number | null; readonly unseen: number | null; readonly distinct: number; readonly occasions: number; readonly nextNew: number | null;
     readonly total: number | null; readonly costUsd: number;
     readonly unseenPerKloc?: number | null; readonly defectsPerKloc?: number | null; readonly usdPerKloc?: number | null;
     readonly nextUsd?: number | null; readonly limitUsd?: number | null; readonly goingUsd?: number | null; readonly stopped?: string | null };

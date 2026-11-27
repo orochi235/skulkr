@@ -5,7 +5,7 @@ import type { AuditArea } from './skulkrMap.types';
 
 export const HEAT_METRICS = ['left', 'density', 'fixed', 'found', 'queue', 'open', 'stale', 'age', 'rounds', 'files'] as const;
 /** What the saturation page's map can shade by besides: its areas' saturation ledgers, which the audit map lacks. */
-export const SATURATION_METRICS = ['saturation', 'saturationNextNew', 'saturationUnseen', 'saturationUnseenPerKloc', 'saturationOpen', 'saturationFixed', 'saturationFixedPerKloc', 'saturationFixHours', 'saturationDefects', 'saturationDefectsPerKloc', 'saturationTotal', 'saturationReviews', 'saturationSpend', 'saturationSpendPerKloc'] as const;
+export const SATURATION_METRICS = ['saturation', 'saturationNextNew', 'saturationUnseen', 'saturationUnseenPerKloc', 'saturationOpen', 'saturationFixed', 'saturationFixedPerKloc', 'saturationFixHours', 'saturationDefects', 'saturationDefectsPerKloc', 'saturationTotal', 'saturationReviews', 'saturationSpend', 'saturationSpendPerKloc', 'saturationKloc'] as const;
 export type HeatMetric = (typeof HEAT_METRICS)[number] | (typeof SATURATION_METRICS)[number];
 /** Every metric, each with a ramp the viewer may choose. */
 export const ALL_METRICS: readonly HeatMetric[] = [...SATURATION_METRICS, ...HEAT_METRICS];
@@ -130,6 +130,10 @@ export const HEAT_METRIC_SPECS: Readonly<Record<HeatMetric, HeatMetricSpec>> = {
   saturationTotal: {
     name: 'defects it holds (est.)', legend: 'defects the scour estimates the area holds, found or not', none: 'no estimate yet', scheme: 'ember', floor: 10,
     valuesIn: (areas) => each(areas, (a) => a.saturation?.total ?? null),
+  },
+  saturationKloc: {
+    name: 'thousands of lines', legend: 'thousands of lines at its ledger\'s commit', none: 'no scour ledger', scheme: 'ice', floor: 5,
+    valuesIn: (areas) => each(areas, (a) => a.saturation?.kloc ?? null),
   },
   saturationSpend: {
     name: 'spend', legend: 'dollars its scour reviews and matchers cost', none: 'no scour ledger', scheme: 'viridis', floor: 20,

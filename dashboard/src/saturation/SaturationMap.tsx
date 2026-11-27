@@ -26,6 +26,7 @@ export const saturationByArea = (ledgers: readonly SaturationLedger[], now: numb
   open: counts.open,
   fixed: counts.fixed,
   fixedPerKloc: l.lines ? (1000 * counts.fixed) / l.lines : null,
+  kloc: l.lines ? l.lines / 1000 : null,
   fixHours: fixHoursOf(l.fix?.lastRun, now),
   unseen: l.unseen,
   distinct: l.distinct,
