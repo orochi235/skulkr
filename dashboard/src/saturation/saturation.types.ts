@@ -6,6 +6,8 @@ export interface SaturationDefect {
   readonly severity: string;
   /** How many occasions reported it. */
   readonly sightings: number;
+  /** Seen in so many of its ledger's passes (`saturate.recurrent`) that it may one day go straight to fix. */
+  readonly recurrent?: boolean;
   /** The occasions that reported it, by number. */
   readonly seenAt: readonly number[];
   readonly firstOccasion: number | null;

@@ -2,6 +2,11 @@
 
 Open work on skulkr. Each entry says when it closes.
 
+- [ ] (P2) A local fixer's usage record reads its tokens from the job's last turn alone: scour fix 1's fixer, ten
+  minutes and two commits, recorded 1 turn, 331 output tokens and 0.01M weighted tokens, while its `claude.json`
+  `total_cost_usd` ($0.82) was right (2026-11-26). Costs stay correct; turns, tokens and weighted tokens do not.
+  Closes when a fixer's record sums every turn, as a reviewer's does.
+
 - [ ] (P2) A flag a command doesn't know is ignored, not refused: `skulkr night --dyr` runs a real round. Each command
   reads its flags out of `rest` itself (`rest.includes('--dry')`), so nothing knows the full set. Closes when every
   command declares its flags beside its usage in `src/cliHelp.mjs` and an unknown one exits 2 with that usage.

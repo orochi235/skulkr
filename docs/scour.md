@@ -2,8 +2,9 @@
 
 **Status: designed 2026-11-25, part built.** Built: the `scour/` paths, `delve` and `fold` as separate commands, the
 triage fields, the Scour page's tree, and the trigger that stops a delve as `ready to fix` (README "Ready to fix",
-2026-11-26). Unbuilt: landing as a shared library, then triage, fix, ask and close, then
-the page's fix queue and "needs you" list; "Building the fix stage" below is the design for them. What runs today is the README's "Saturation" section: one
+2026-11-26), and triage and fix up to verified branches (`skulkr scour fix`, 2026-11-26). Unbuilt: landing as a
+shared library, then ask and close, then the page's fix queue and "needs you" list; "Building the fix stage" below
+says what is built of it and is the design for the rest. What runs today is the README's "Saturation" section: one
 `skulkr scour` command that delves and folds in a loop, plus `ingest`, `import`, `land` and `ls`. This document is
 the plan for splitting it into stages that run on their own. The table under "Stages" says which parts exist.
 
@@ -63,6 +64,23 @@ project's `.skulkr/`, never from one machine's state directory.
 | fix → close | scour's own fix record: the fixers' verdicts, naming registry ids |
 
 ## Building the fix stage
+
+**Built (2026-11-26): triage and fix, stopping at verified branches.** `skulkr scour fix <area> [--dry] [--batch k,…]`
+(`src/scourFix.mjs`) plans the area's batches (`src/scourTriage.mjs`), runs each through a round's fixer job on
+`main`'s tip (`area.mjs:fixInto`: verify and up to two repairs), and puts its commits on a branch of its own,
+`scour<N>-<area>-b<k>`. Its record, one row per defect with its verdict, and each batch's commits, verify, repairs
+and cost, is `<state>/scour/fix-<N>/record.json`. `main` is never touched. Locally, fixers run on this machine and
+their verify and checks on the fleet (`runner: 'local'`, so `checksOnFleet` holds).
+
+- **Batches group for the fixer's sake, never by severity**: every open defect is to be fixed, so defects join one
+  batch when they share a file a fix would touch or a stated cause, a group past eight split in file and line order
+  (2026-11-26). A reviewer's file mention is resolved against the ledger's files and the full paths other defects
+  name; prose in it is dropped.
+- **A recurrent defect is flagged, nothing more**: one seen in a quarter of its ledger's passes and at least five
+  times (`saturate.recurrent`) is marked in `ls --json`, the defects table and the plan, and may later go straight
+  to fix (2026-11-26).
+- **First trial** (ui.components.Timeline, 39 defects in six batches, 2026-11-26): batch 6's two CSS defects, both
+  fixed, one only after a repair, since the fixer cannot run browser tests and its fix failed in Chromium; $1.44.
 
 Unbuilt (2026-11-25). Every landing step reads its names from `cfg.names`, which `config.mjs` derives from
 `naming.prefix` (`audit<N>-<area>` branches, `batch/<date>-audit<N>`, `audit<N>-am-<area>` trees, the gate's job

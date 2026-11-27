@@ -13,6 +13,7 @@ import { nextPriceOf, passRowsOf, pricingOf, scourRuleOf } from './scourPrice.mj
 import { candidatePricesOf, scourQueueOf } from './scourQueue.mjs';
 import { ledgerLinesOf, perKloc } from './scourLines.mjs';
 import { landedLedgersUnder, scourStateDirOf } from './scourPaths.mjs';
+import { isRecurrent } from './triageFields.mjs';
 
 /**
  * One ledger's summary and defects; `id` is its directory, an area or a set-aside `<area>.<commit>`. `registered`
@@ -50,6 +51,7 @@ export const ledgerSummaryOf = (cfg, id, ledger, registered = () => new Map(), r
       where: d.where,
       severity: d.severity ?? '',
       sightings: d.sightings.length,
+      recurrent: isRecurrent(d.sightings.length, ledger.occasions.length, cfg.saturate.recurrent),
       seenAt: [...d.sightings],
       firstOccasion: d.firstOccasion ?? null,
       sources: Object.keys(d.sources ?? {}).filter((s) => d.sources[s].length),

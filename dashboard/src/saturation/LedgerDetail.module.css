@@ -66,3 +66,11 @@
   align-items: center;
   gap: var(--wzl-space-2);
 }
+
+/* A defect most passes keep finding. */
+.recurrent {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--wzl-warning) 30%, transparent);
+  font-size: var(--wzl-font-size-xs);
+}

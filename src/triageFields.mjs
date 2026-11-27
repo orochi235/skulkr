@@ -54,3 +54,10 @@ export const triageFieldsOf = (defect) => {
   const t = triageFrom(defect);
   return Object.keys(t).length ? t : undefined;
 };
+
+/**
+ * Whether a defect keeps coming back: seen in `rule.share` of the ledger's `occasions` passes or more, and at least
+ * `rule.min` times. Flagged only, for now; such a defect may one day go straight to fix.
+ */
+export const isRecurrent = (sightings, occasions, rule = { share: 0.25, min: 5 }) =>
+  occasions > 0 && sightings >= rule.min && sightings / occasions >= rule.share;

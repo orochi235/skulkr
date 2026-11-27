@@ -11,7 +11,7 @@ const COLUMNS: readonly DataGridColumn<SaturationDefect>[] = [
   { id: 'severity', header: 'Severity', accessor: (d) => severityRank(d.severity), render: (d) => d.severity || '–' },
   { id: 'claim', header: 'Defect', className: s.claim },
   { id: 'where', header: 'Where', className: s.where },
-  { id: 'sightings', header: 'Seen', numeric: true },
+  { id: 'sightings', header: 'Seen', numeric: true, render: (d) => (d.recurrent ? <><span className={s.recurrent}>recurrent</span> {d.sightings}</> : d.sightings) },
   { id: 'sources', header: 'By', accessor: (d) => (d.onlyBy ? `${d.onlyBy} only` : d.sources.join(', ')), sortable: false },
   { id: 'status', header: 'Status', accessor: (d) => d.registry?.status ?? 'not landed', render: statusOf },
 ];
