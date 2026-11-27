@@ -193,7 +193,7 @@ describe('verifyLines on the fleet', () => {
     dirs.push(bin);
     if (script !== null) writeFileSync(join(bin, 'onto'), `#!/bin/bash\necho "$@" > ${join(bin, 'args')}\n${script}\n`, { mode: 0o755 });
     const lines = verifyLines({ command: 'echo "ran here: {files}"; exit 4' }, { fleet: 'proj', probe: null });
-    execFileSync('bash', ['-c', ['mkdir -p .skulkr/out', 'set +e', ...lines].join('\n')], { cwd: dir, env: { ...process.env, BASE: base, PATH: `${bin}:/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin` } });
+    execFileSync('bash', ['-c', ['mkdir -p .skulkr/out', 'set +e', ...lines].join('\n')], { cwd: dir, env: { ...process.env, BASE: base, SKULKR_FLEET_RETRY_SECONDS: '0', PATH: `${bin}:/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin` } });
     const out = (f: string) => readFileSync(join(dir, '.skulkr/out', f), 'utf8').trim();
     return { exit: out('verify.exit'), log: out('verify.log'), args: existsSync(join(bin, 'args')) ? readFileSync(join(bin, 'args'), 'utf8') : '', remote: git(dir, 'remote', 'get-url', 'fleet') };
   };
@@ -209,10 +209,14 @@ describe('verifyLines on the fleet', () => {
     expect(r.remote).toBe('git@example.com:me/project.git');
   });
 
-  it('runs the command here where onto fails before its job runs', () => {
+  it('asks the fleet three times where onto fails before its job runs, then fails without running it here', () => {
     const r = run('echo "onto do: no node has room"; exit 1');
-    expect(r.exit).toBe('4');
-    expect(r.log.split('\n')).toEqual(['onto do: no node has room', 'skulkr: the fleet did not take verify; running it here', 'ran here: a.ts']);
+    expect(r.exit).toBe('75');
+    expect(r.log.split('\n')).toEqual([
+      'onto do: no node has room', 'skulkr: the fleet did not take verify (try 1 of 3); asking again',
+      'onto do: no node has room', 'skulkr: the fleet did not take verify (try 2 of 3); asking again',
+      'onto do: no node has room', 'skulkr: the fleet did not take verify in 3 tries; not running it here',
+    ]);
   });
 });
 

@@ -68,8 +68,9 @@ export const ON_FLEET = `${JOB_IN}/on-fleet`;
  * only to a remote the tree names, so commits never pushed reach the node all the same; its task named
  * `<project>-<name>-<sha>`, announced as `skulkr: on the fleet as <task>` on fd 3 where the caller opens it (the job's own
  * log, which the dashboard's tail reads it from, as onto holds a job's output until it ends), and `VERIFY_*` and
- * `PREFLIGHT_TESTS` passed along. Where `onto` is missing, `origin` is no URL, or onto fails
- * before its job runs, it runs the command here.
+ * `PREFLIGHT_TESTS` passed along. Where `onto` is missing or `origin` is no URL, it runs the command here. Where onto
+ * fails before its job runs (no node has room), it asks again, three tries a minute apart
+ * (`SKULKR_FLEET_RETRY_SECONDS`), then fails with 75 rather than run a fleet job on the machine running the round.
  */
 export const onFleetScript = (project) => `#!/bin/bash
 kind=$1 minutes=$2 name=$3; shift 3
@@ -80,13 +81,16 @@ if [ -n "$url" ] && command -v onto >/dev/null; then
   git remote get-url fleet >/dev/null 2>&1 || git remote add fleet "$url"
   out=$(mktemp) task="${project}-$name-$(git rev-parse --short=10 HEAD)"
   { echo "skulkr: on the fleet as $task" >&3; } 2>/dev/null
-  onto do --kind "$kind" --task "$task" --expect "\${minutes}m" --timeout "\${minutes}m" \\
-    --about "skulkr: ${project} $name, off the machine running the round" --repo "$url" $gui \\
-    --env VERIFY_FILES="$VERIFY_FILES" --env VERIFY_RELATED="$VERIFY_RELATED" --env VERIFY_PROVEN="$VERIFY_PROVEN" \\
-    --env PREFLIGHT_TESTS="$PREFLIGHT_TESTS" -- "$@" 2>&1 | tee "$out"
-  s=\${PIPESTATUS[0]}
-  if [ "$s" = 0 ] || grep -qE ${q(ONTO_RAN)} "$out"; then rm -f "$out"; exit "$s"; fi
-  rm -f "$out"; echo "skulkr: the fleet did not take $name; running it here"
+  for try in 1 2 3; do
+    onto do --kind "$kind" --task "$task" --expect "\${minutes}m" --timeout "\${minutes}m" \\
+      --about "skulkr: ${project} $name, off the machine running the round" --repo "$url" $gui \\
+      --env VERIFY_FILES="$VERIFY_FILES" --env VERIFY_RELATED="$VERIFY_RELATED" --env VERIFY_PROVEN="$VERIFY_PROVEN" \\
+      --env PREFLIGHT_TESTS="$PREFLIGHT_TESTS" -- "$@" 2>&1 | tee "$out"
+    s=\${PIPESTATUS[0]}
+    if [ "$s" = 0 ] || grep -qE ${q(ONTO_RAN)} "$out"; then rm -f "$out"; exit "$s"; fi
+    [ "$try" = 3 ] || { echo "skulkr: the fleet did not take $name (try $try of 3); asking again"; sleep "\${SKULKR_FLEET_RETRY_SECONDS:-60}"; }
+  done
+  rm -f "$out"; echo "skulkr: the fleet did not take $name in 3 tries; not running it here"; exit 75
 fi
 exec "$@"
 `;
