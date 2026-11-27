@@ -1,8 +1,9 @@
 /**
  * `skulkr scour fix <area>`: a fix run over one ledger's defects (docs/scour.md "Building the fix stage"). Triage
- * batches them (`scourTriage.mjs`); each batch goes to a round's fixer job on `main`'s tip, verified and repaired as a
- * round's is, and its commits land on a branch of their own, `scour<N>-<area>-b<k>`. `main` is never touched: landing
- * and closing the registry's lines are not built yet.
+ * batches them (`scourTriage.mjs`); each batch goes to a round's fixer job, verified and repaired as a round's is, and
+ * its commits land on a branch of their own, `scour<N>-<area>-b<k>`. Batches stack (`scourFixBase.mjs`): each is fixed
+ * on the tip of the last one that applied and verified, so the area's newest branch holds all its fixes. `main` is
+ * never touched: landing and closing the registry's lines are not built yet.
  */
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -14,6 +15,7 @@ import { loggingSay } from './delveLive.mjs';
 import { localFixOf } from './args.mjs';
 import { createSaturateContext } from './saturateJobs.mjs';
 import { scourStateDirOf } from './scourPaths.mjs';
+import { stackBranchFor } from './scourFixBase.mjs';
 import { createRepairLayer } from './scourFixLay.mjs';
 import { fixPlanFor, fixPlanLines, filesOf } from './scourTriage.mjs';
 
@@ -51,10 +53,10 @@ export const scourFindingsMarkdown = (defects) => defects.map((d) => [
 ].join('\n')).join('\n');
 
 /** What the fixer's brief says its findings are. */
-const scourSource = (id, commit, ledgerCommit, n) => [
+const scourSource = (id, commit, at, ledgerCommit, n) => [
   `No round's reviewers ran here. These ${n} defects come from this area's saturation ledger: many blind`,
   `reviews of it at ${ledgerCommit.slice(0, 10)}, folded into distinct defects. They are in \`${JOB_IN}/${id}/scour.md\`,`,
-  `each headed by its id in brackets. You are at ${commit.slice(0, 10)}, \`main\`'s tip, and the code may have`,
+  `each headed by its id in brackets. You are at ${commit.slice(0, 10)}, ${at}, and the code may have`,
   'changed since the ledger: check each still applies first (`not a defect (no longer applies)` when it is gone).',
   'Lead each verdict line with its id in brackets, `[D7]`, and give `scour` as where it came from. They count in N.',
   'After any verdict but `fixed`, say why in a sentence or two on the same line: it is kept as the reason.',
@@ -101,7 +103,8 @@ const branchWith = (root, branch, commit, mbox) => {
 
 /**
  * `skulkr scour fix <area> [--dry] [--batch k,…] [--defects D1,…] [--on <ref>]`: the plan with `--dry`, else every batch
- * (those listed, or one of exactly the defects named) through a fixer, one at a time, from `main`'s tip or `--on`'s.
+ * (those listed, or one of exactly the defects named) through a fixer, one at a time, from `--on`'s tip, else the
+ * area's newest fix branch (`stackBranchFor`), else `main`'s.
  * Answers the run's record.
  */
 export const scourFix = async (cfg, runner, root, id, args, say) => {
@@ -122,19 +125,28 @@ export const scourFix = async (cfg, runner, root, id, args, say) => {
   return withLedgerHeld(cfg, id, { about: { does: 'fix', max: batches.length, jobs: `fix-${n}` } }, () => fixBatches(cfg, runner, root, id, ledger, batches, n, runDir, args, loggingSay(cfg, id, say)));
 };
 
+/** Moves the run's frozen tree to `tip`, and its jobs with it: what they sync from, check against, and are told. */
+const moveTo = (ctx, tip, base) => {
+  gitIn(ctx.frozen)('checkout', '--quiet', '--detach', tip);
+  Object.assign(ctx, { commit: tip, base, frozenTree: gitIn(ctx.frozen)('rev-parse', 'HEAD^{tree}') });
+};
+
 /** Fix run `n`'s `batches` of ledger `id`, one at a time, recorded in `runDir`. Answers the run's record. */
 const fixBatches = async (cfg, runner, root, id, ledger, batches, n, runDir, args, say) => {
-  // `--on <branch>` stacks the run on an earlier batch's branch, so batches touching the same files land in order.
-  const commit = freezeCommitOf(cfg, root, args.on);
+  const stacked = args.on === undefined ? stackBranchFor(cfg, root, id) : null;
+  const on = args.on ?? stacked ?? cfg.git.main;
+  const commit = freezeCommitOf(cfg, root, on);
   const git = gitIn(root);
   const frozen = addWorktree(root, `${cfg.naming.prefix}-scour-fix${n}`, commit);
-  const record = { run: n, area: id, commit, ledgerCommit: ledger.commit, started: new Date().toISOString(), batches: [] };
+  const record = { run: n, area: id, commit, on, ledgerCommit: ledger.commit, started: new Date().toISOString(), batches: [] };
   const keep = () => writeFileSync(join(runDir, 'record.json'), `${JSON.stringify(record, null, 1)}\n`);
+  const baseOf = (tip) => {
+    try { return git('merge-base', tip, `${cfg.git.remote}/${cfg.git.main}`); } catch { return tip; /* no remote */ }
+  };
+  const tipOf = (ref) => (ref === cfg.git.main ? `\`${ref}\`'s tip` : `the tip of \`${ref}\``);
   try {
-    let base = commit;
-    try { base = git('merge-base', commit, `${cfg.git.remote}/${cfg.git.main}`); } catch { /* no remote */ }
     const ctx = {
-      ...createSaturateContext({ cfg, runner, frozen, base, commit, area: id, say }),
+      ...createSaturateContext({ cfg, runner, frozen, base: baseOf(commit), commit, area: id, say }),
       round: `scour fix ${n}`, nightDir: runDir, date: record.started.slice(0, 10),
       frozenTree: git('rev-parse', `${commit}^{tree}`),
       identity: Object.fromEntries(['NAME', 'EMAIL'].flatMap((k) => {
@@ -146,21 +158,27 @@ const fixBatches = async (cfg, runner, root, id, ledger, batches, n, runDir, arg
       progress: (kind, msg, total) => say(`${kind} ${msg}${total ? ` (of ${total})` : ''}`),
       layRepair: createRepairLayer(cfg, frozen),
     };
-    say(`scour fix ${n} on ${id} at ${commit.slice(0, 10)} (ledger at ${ledger.commit.slice(0, 10)}): ${batches.length} batches`);
+    const why = stacked ? ', the area\'s newest fix branch' : '';
+    say(`scour fix ${n} on ${id} at ${commit.slice(0, 10)}, ${tipOf(on)}${why} (ledger at ${ledger.commit.slice(0, 10)}): ${batches.length} batches`);
+    let at = on;
     for (const b of batches) {
+      const tip = git('rev-parse', `${at}^{commit}`);
+      if (tip !== ctx.commit) moveTo(ctx, tip, baseOf(tip));
       const area = { id: `${id}~b${b.n}`, files: [...new Set([...ledger.files, ...b.files])] };
       const inDir = stageIn(ctx, area);
       writeFileSync(join(inDir, 'scour.md'), scourFindingsMarkdown(b.defects));
       const dir = join(runDir, 'batches', `b${b.n}`);
       mkdirSync(dir, { recursive: true });
-      say(`batch ${b.n}: ${b.defects.length} defects (${b.defects.map((d) => d.id).join(' ')}) over ${b.files.length} files`);
-      const fixed = await fixInto(ctx, area, dir, b.defects.length, scourSource(area.id, commit, ledger.commit, b.defects.length));
+      say(`batch ${b.n}: ${b.defects.length} defects (${b.defects.map((d) => d.id).join(' ')}) over ${b.files.length} files, on ${tipOf(at)}`);
+      const fixed = await fixInto(ctx, area, dir, b.defects.length, scourSource(area.id, ctx.commit, tipOf(at), ledger.commit, b.defects.length));
       const verdicts = scourVerdictsOf(fixed.report, b.defects.map((d) => d.id));
       const branch = `scour${n}-${id}-b${b.n}`;
-      const applied = fixed.mbox ? branchWith(root, branch, commit, fixed.mbox) : false;
+      const applied = fixed.mbox ? branchWith(root, branch, ctx.commit, fixed.mbox) : false;
+      // The next batch stacks on this one only if it is sound: a failed verify is kept on its branch for a look, not built on.
+      if (applied && fixed.verify?.ok !== false) at = branch;
       const costUsd = [fixed.usage, ...(fixed.repairUsage ?? [])].reduce((sum, u) => sum + (u?.costUsd ?? 0), 0);
       const result = {
-        n: b.n, defects: b.defects.map((d) => ({ id: d.id, recurrent: d.recurrent, files: filesOf(d, ledger.files) })), verdicts,
+        n: b.n, on: ctx.commit, defects: b.defects.map((d) => ({ id: d.id, recurrent: d.recurrent, files: filesOf(d, ledger.files) })), verdicts,
         commits: fixed.patches ?? 0, branch: applied ? branch : null, verify: fixed.verify ?? null, repairs: fixed.repairs?.length ?? 0,
         costUsd, minutes: fixed.minutes ?? 0,
       };

@@ -66,16 +66,21 @@ project's `.skulkr/`, never from one machine's state directory.
 ## Building the fix stage
 
 **Built (2026-11-26): triage and fix, stopping at verified branches.** `skulkr scour fix <area> [--dry] [--batch k,…] [--defects D1,…] [--on <ref>]`
-(`src/scourFix.mjs`) plans the area's batches (`src/scourTriage.mjs`), runs each through a round's fixer job on
-`main`'s tip (`area.mjs:fixInto`: verify and up to two repairs), and puts its commits on a branch of its own,
+(`src/scourFix.mjs`) plans the area's batches (`src/scourTriage.mjs`), runs each through a round's fixer job
+(`area.mjs:fixInto`: verify and up to two repairs), and puts its commits on a branch of its own,
 `scour<N>-<area>-b<k>`. Its record, one row per defect with its verdict, and each batch's commits, verify, repairs
 and cost, is `<state>/scour/fix-<N>/record.json`. `main` is never touched. Locally, fixers run on this machine and
 their verify and checks on the fleet (`runner: 'local'`, so `checksOnFleet` holds). A run holds its ledger as a delve
  does (`does: 'fix'`), so the Scour page shows it live, each batch's jobs read from the run's directory.
 
 - **Sending defects again** (2026-11-27): `--defects D37,D22,…` makes one batch of exactly those defects, numbered as
-  the first one's batch, for what a batch left unfixed. `--on <ref>` starts the run from that ref instead of `main`'s tip,
-  so a batch touching an earlier batch's files stacks on its branch and lands after it without conflicts.
+  the first one's batch, for what a batch left unfixed.
+- **Stacking** (2026-11-27, `src/scourFixBase.mjs`): an area's fixes build on each other, so its newest
+  `scour<N>-<area>-b<k>` branch holds all of them and lands alone. Each batch is fixed on the tip of the run's last
+  batch that applied and did not fail its verify (a failed one keeps its branch, for a look, but nothing builds on it).
+  A run starts from `--on <ref>` if given, else from the newest such branch the area's fix records name, unless `main`
+  already holds it or it is gone, else from `main`'s tip; its opening line says which. Branches from one base had
+  collided: weasel's batch of 21 pre-stacking branches failed almost wholly on conflicts between them.
 
 - **Each defect's own stage** (2026-11-27): a scour fixer ends each commit with a `Defect: D12` trailer, which its log's
   commit line carries (`skulkr: commit 2/8 for D12: …`), so the shelf marks written, then checking, only the defects
