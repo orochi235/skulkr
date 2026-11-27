@@ -27,6 +27,7 @@ export function DefectCallout({ ledger, id, at, flipX }: {
       </div>
       <p className={s.claim}><InlineMarkdown text={d.claim} /></p>
       <p className={s.where}><InlineMarkdown text={d.where} /></p>
+      {entry?.why && <p className={s.why}><InlineMarkdown text={entry.why} /></p>}
       <p className={s.seen}>seen in {d.sightings} of {ledger.occasions} passes{d.recurrent ? ' · recurrent' : ''}</p>
     </div>
   );

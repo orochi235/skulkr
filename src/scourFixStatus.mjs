@@ -25,21 +25,33 @@ export const fixRunsIn = (cfg) => {
   }).sort((a, b) => a.n - b.n);
 };
 
+/** What a verdict line says after its verdict, for any verdict but `fixed`: the fixer's reason, `(no longer applies).
+ *  On release, …`; null where it gives none. */
+export const whyOf = ({ verdict, line }) => {
+  if (!verdict || verdict === 'fixed' || !line) return null;
+  const at = line.toLowerCase().indexOf(verdict);
+  const rest = at < 0 ? '' : line.slice(at + verdict.length).replace(/^[\s:.,;—–-]+/, '').trim();
+  return rest || null;
+};
+
 /**
  * Each defect's fix status for ledger `area` from the `runs` (`fixRunsIn`): the latest run's verdict (`fixed`, `not a
  * defect`, `question`, `not fixed`, `duplicate`, or `unread` when its line could not be read), with the run, branch, and
- * whether the batch's verify passed.
+ * whether the batch's verify passed, and `why`, the fixer's reason for any verdict but `fixed` where it gave one.
  * A batch with a job out in an unfinished run that has not recorded it is entered as `b<k>`, `fixing`. A defect no run
  * has touched has no entry.
  */
 export const fixStatusesFor = (area, runs) => {
-  const out = {};
+  const out = /** @type {Record<string, any>} */ ({});
   for (const run of runs) {
     const done = new Set();
     if (run.record?.area === area) {
       for (const b of run.record.batches ?? []) {
         done.add(b.n);
-        for (const v of b.verdicts ?? []) out[v.id] = { status: v.verdict ?? 'unread', run: run.n, branch: b.branch ?? null, verified: b.verify?.ok === true };
+        for (const v of b.verdicts ?? []) {
+          const why = whyOf(v);
+          out[v.id] = { status: v.verdict ?? 'unread', run: run.n, branch: b.branch ?? null, verified: b.verify?.ok === true, ...(why ? { why } : {}) };
+        }
       }
     }
     if (run.record?.finished) continue;
@@ -83,7 +95,7 @@ export const fixShelfOf = (cfg, ledger, runs = fixRunsIn(cfg), flags = scourFlag
   // A person's flag outranks a fix run's verdict: the verdict is what is in doubt.
   for (const id of flags[ledger.area] ?? []) {
     const was = statuses[id];
-    statuses[id] = { status: FLAGGED, run: was?.run ?? null, branch: was?.branch ?? null, verdict: was?.status ?? null };
+    statuses[id] = { status: FLAGGED, run: was?.run ?? null, branch: was?.branch ?? null, verdict: was?.status ?? null, ...(was?.why ? { why: was.why } : {}) };
   }
   return {
     lastRun: lastFixRunOf(ledger.area, runs),

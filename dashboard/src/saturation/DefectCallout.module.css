@@ -33,6 +33,14 @@
 
 .claim { margin: var(--wzl-space-2) 0 0; }
 
+/* The fixer's reason for a verdict other than fixed, set off from the defect's own claim. */
+.why {
+  margin: var(--wzl-space-2) 0 0;
+  padding-inline-start: var(--wzl-space-4);
+  border-inline-start: 2px solid var(--wzl-border-strong);
+  color: var(--wzl-fg-muted);
+}
+
 .where {
   margin: var(--wzl-space-2) 0 0;
   font-family: var(--wzl-font-mono);

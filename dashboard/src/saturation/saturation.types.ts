@@ -97,6 +97,8 @@ export interface FixStatusEntry {
   /** Whether its batch's verify passed; absent while the batch is out. */
   readonly verified?: boolean;
   readonly stage?: FixStage;
+  /** The fixer's reason, for any verdict but `fixed`, where it gave one. */
+  readonly why?: string;
 }
 
 /** A ledger's fix plan, for the shelf: batches of defects in order, what goes to ask, and each touched defect's status. */

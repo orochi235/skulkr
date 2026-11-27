@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fixPlanFor, resolvedFile } from './scourTriage.mjs';
 import { defectsBatchOf, scourVerdictsOf } from './scourFix.mjs';
-import { fixStatusesFor, lastFixRunOf } from './scourFixStatus.mjs';
+import { fixStatusesFor, lastFixRunOf, whyOf } from './scourFixStatus.mjs';
 import { withFlags } from './scourFlags.mjs';
 import { isRecurrent } from './triageFields.mjs';
 
@@ -81,6 +81,23 @@ describe("a fix shelf's statuses", () => {
       D5: { status: 'unread', run: 1, branch: 'scour1-core-b2', verified: true },
       b1: { status: 'fixing', run: 2, branch: null },
     });
+  });
+});
+
+describe("a verdict's reason", () => {
+  it('reads what the line says after its verdict, keeping a parenthesis that qualifies it', () => {
+    expect(whyOf({ verdict: 'not a defect', line: '[D30] steps over an item (scour): not a defect. The line between events is a guess.' }))
+      .toBe('The line between events is a guess.');
+    expect(whyOf({ verdict: 'not a defect', line: '[D7] cursor (scour): not a defect (no longer applies). Commit abc filters it.' }))
+      .toBe('(no longer applies). Commit abc filters it.');
+    expect(whyOf({ verdict: 'question', line: '[D9] question — whether a hold cancels the drag' })).toBe('whether a hold cancels the drag');
+    expect(whyOf({ verdict: 'not a defect', line: '[D2] x (scour): not a defect' })).toBeNull();
+    expect(whyOf({ verdict: 'fixed', line: '[D3] x: fixed 1a2b3c4 — clamps it' })).toBeNull();
+  });
+
+  it('rides on the status', () => {
+    const runs = [{ n: 1, jobs: [], record: { area: 'core', finished: 'x', batches: [{ n: 1, branch: null, verify: { ok: true }, verdicts: [{ id: 'D1', verdict: 'not a defect', line: '[D1] y (scour): not a defect: it is deliberate.' }] }] } }];
+    expect(fixStatusesFor('core', runs).D1).toEqual({ status: 'not a defect', run: 1, branch: null, verified: true, why: 'it is deliberate.' });
   });
 });
 

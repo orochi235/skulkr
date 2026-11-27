@@ -46,6 +46,7 @@ const scourSource = (id, commit, ledgerCommit, n) => [
   `each headed by its id in brackets. You are at ${commit.slice(0, 10)}, \`main\`'s tip, and the code may have`,
   'changed since the ledger: check each still applies first (`not a defect (no longer applies)` when it is gone).',
   'Lead each verdict line with its id in brackets, `[D7]`, and give `scour` as where it came from. They count in N.',
+  'After any verdict but `fixed`, say why in a sentence or two on the same line: it is kept as the reason.',
 ].join('\n');
 
 /** Each defect's verdict from a fixer's report: the line led by its `[D<n>]`, its first verdict word, and the rest. */
