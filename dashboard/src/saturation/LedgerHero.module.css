@@ -53,7 +53,10 @@
 }
 
 /* A figure set lighter than the counts, such as a clock that keeps changing. */
-.light .value { font-weight: var(--wzl-font-weight-light, 300); }
+.light .value,
+.clock .value { font-weight: var(--wzl-font-weight-light, 300); }
+
+.clock .value { min-width: 5ch; text-align: end; }
 
 .label {
   margin-block-start: var(--wzl-space-1);

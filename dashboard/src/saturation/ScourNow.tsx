@@ -22,22 +22,21 @@ export const timedLines = (log: readonly string[], since: string, n = 3): string
   return rows.map(([took, text]) => `${took.padStart(width)}  ${text}`);
 };
 
-/** A live ledger's figures in one row: found and left, what a next pass looks like, then this run's passes (or a fix
- *  run's batches) against its cap, the spend, and how long it has held the ledger, last so its changing width moves
- *  nothing. */
+/** A live ledger's figures in one row: how long the process has held it (pinned to a width, as it changes), its passes
+ *  (or a fix run's batches) against its cap, found, what a next pass looks like, and the spend, dollars set light. */
 export const liveStatsOf = (l: SaturationLedger, now: number): Stat[] => {
   const r = l.running!;
   const fix = r.does === 'fix';
   const done = fix ? r.jobs.length : l.occasions;
+  const light = STAT_TONE.light;
   return [
-    ['found', String(l.distinct)],
-    ['left (est.)', l.unseen === null ? '–' : String(Math.round(l.unseen)), STAT_TONE.estimate],
-    ['next new', percent(l.nextNew), STAT_TONE.estimate],
-    ['next defect', usdOrDash(l.nextUsd), STAT_TONE.estimate],
-    ['limit', usd(l.limit.usd)],
+    ['elapsed', minutesSince(r.since, now), STAT_TONE.clock],
     [fix ? 'batches' : 'passes', r.max ? `${done}/${r.max}` : String(done)],
-    ['spent', usd(l.costUsd)],
-    ['running', minutesSince(r.since, now), STAT_TONE.light],
+    ['found', String(l.distinct)],
+    ['next new', percent(l.nextNew), STAT_TONE.estimate],
+    ['next defect', usdOrDash(l.nextUsd), `${STAT_TONE.estimate} ${light}`],
+    ['limit', usd(l.limit.usd), light],
+    ['spent', usd(l.costUsd), light],
   ];
 };
 
