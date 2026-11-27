@@ -7,14 +7,14 @@ import s from './LedgerHero.module.css';
  *  fix (no defect, a duplicate), and the estimate of those no pass has found. */
 export const heroCountsOf = (ledger: SaturationLedger) => {
   const statuses = ledger.fix?.statuses ?? {};
-  let fixed = 0, fixing = 0, dismissed = 0;
+  let fixed = 0, fixing = 0, ignored = 0;
   for (const d of ledger.defects) {
     const at = statuses[d.id];
     if (isFixSettled(at, d.registry)) fixed++;
-    else if (isDefectClosed(at, d.registry)) dismissed++;
+    else if (isDefectClosed(at, d.registry)) ignored++;
     else if (at?.status === 'fixing') fixing++;
   }
-  return { found: ledger.distinct, fixed, fixing, open: ledger.defects.length - fixed - dismissed - fixing, dismissed, unseen: ledger.unseen };
+  return { found: ledger.distinct, fixed, fixing, open: ledger.defects.length - fixed - ignored - fixing, ignored, unseen: ledger.unseen };
 };
 
 type Stat = readonly [label: string, value: string, tone?: string];
@@ -42,7 +42,7 @@ export function LedgerHero({ ledger }: { ledger: SaturationLedger }) {
     ['fixed', String(c.fixed), s.fixed],
     ...(c.fixing ? [['fixing', String(c.fixing), s.fixing] as Stat] : []),
     ['open', String(c.open), s.open],
-    ...(c.dismissed ? [['dismissed', String(c.dismissed)] as Stat] : []),
+    ...(c.ignored ? [['ignored', String(c.ignored)] as Stat] : []),
     ['left (est.)', c.unseen === null ? '–' : String(Math.round(c.unseen)), s.estimate],
   ];
   const outlook: Stat[] = [

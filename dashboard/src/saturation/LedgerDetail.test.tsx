@@ -20,7 +20,7 @@ describe("the defects table's groups", () => {
     expect(groups.map((g) => [g.label, g.rows.map((d) => d.id)])).toEqual([['Unresolved', ['D1', 'D4']], ['Resolved', ['D2', 'D3']]]);
   });
 
-  it('counts found, fixed, fixing, open and dismissed so they add up', () => {
+  it('counts found, fixed, fixing, open and ignored so they add up', () => {
     const ledger = {
       ...ledgerWith([defect('D1'), defect('D2'), defect('D3'), defect('D4')], {
         D1: { status: 'fixed', run: 1, branch: 'b', verified: true }, D2: { status: 'fixing', run: 2, branch: null, stage: 'writing' },
@@ -28,7 +28,7 @@ describe("the defects table's groups", () => {
       }),
       distinct: 4, unseen: 2.5,
     } as unknown as SaturationLedger;
-    expect(heroCountsOf(ledger)).toEqual({ found: 4, fixed: 1, fixing: 1, open: 1, dismissed: 1, unseen: 2.5 });
+    expect(heroCountsOf(ledger)).toEqual({ found: 4, fixed: 1, fixing: 1, open: 1, ignored: 1, unseen: 2.5 });
   });
 
   it('shows one group while nothing is resolved', () => {
