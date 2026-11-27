@@ -1,6 +1,6 @@
 # Handoff
 
-For the next session in skulkr. Updated 2026-11-27 ~19:00 local. Check each claim against the tree.
+For the next session in skulkr. Updated 2026-11-27 ~19:05 local. Check each claim against the tree.
 
 ## State
 
@@ -13,22 +13,24 @@ Commit each verified change on `main` without asking (Mike, 2026-11-27).
 |---|---|---|
 | Fix run 14 `animator.engine` (3 batches), then `animator` (2 batches) | `.playwright-mcp/fix-lane.sh animator-a …` | `.playwright-mcp/logs/fix-<area>.log`, lane in `fix-animator-a.log` |
 | Fix run 15 `animator.timeline` (2 batches) | `.playwright-mcp/fix-lane.sh animator-b …` | same, `fix-animator-b.log` |
-| Delve `text.layout` (31 files, no `--max`: runs to the stop rule) | `nohup … scour delve text.layout` | `.playwright-mcp/logs/delve-text.layout.log` |
 
 `animator` and `animator.engine` share `createHostedAnimator.ts`, `engine/animatorApi.ts` and `engine/core.ts`, so
 they run one after the other: each fix run lands on weasel's `main` when its batches end (stacking + landing,
 `docs/scour.md` "Landing"), and the next starts from the landed tip. Report each landing to Mike (did `main`
 fast-forward, did `.skulkr/scour/fix-<N>/` land, were `scour<N>-*` deleted).
 
-Status at ~19:00: run 14 on batch 2; run 15 batch 1 passed after a repair that `git revert`ed D11's fix (the
-3 `smilBinder.test.tsx` failures were the batch's own: the frozen tree passes them), now on batch 2; the delve past
-pass 5. Both fix runs started before `c656e33` (a repair's revert reads as `not fixed`), so run 15 records D11
-fixed: kouhai t-650 corrects it when the run ends. From pass 6 the delve's reviewers log `skulkr: says/reads/
-searches` lines (`bc36f7e`) and read the new "weigh by ordinary use" paragraph (`5dcdd1d`).
+Status at ~19:05: both fix runs on batch 2. Both started before `c656e33` (a repair's revert reads as `not fixed`), so
+run 15 records D11 fixed although its batch-1 repair `git revert`ed that fix: kouhai t-650 corrects it when the run ends.
+
+The `text.layout` delve stopped at pass 5 on the cost rule (next defect ≈ $1.50 over the $1.49 limit): 12 distinct
+defects, $11.31, report in `<state>/scour/text.layout/report.md`. It is not landed: weasel's `main` holds 126 landed
+ledgers against ~260 in the state directory, no `text.*` among them. `skulkr scour land --all` would land them all in
+one commit and push weasel's `main` — waiting on Mike's go.
 
 Watch spawned jobs from their start (memory `in-flight-is-not-almost-done`): a delve pass normally takes ~7 min
 but pass 4 took 14 and was healthy, so judge a stall by output growth, not time or the file counter alone.
-`.playwright-mcp/stallwatch.sh` (fix run 15 + this delve) is a starting point; re-arm it under Monitor.
+`.playwright-mcp/stallwatch.sh 14 animator.engine 15 animator.timeline` watches both fix runs; re-arm it under Monitor
+(30-minute expiry).
 
 Fix run 13 (`core.canvas.SceneCanvas.part2`) was the first scour landing: `main` fast-forwarded to `471ca1528c` and
 pushed, record committed, branches deleted (kouhai t-635, settled).
