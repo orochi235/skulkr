@@ -84,6 +84,16 @@ describe('verifyAndRepair', () => {
     expect(h.said.at(-1)).toBe('verify a: did not run (no verdict came home); left out of the batch, no repair tried');
   });
 
+  it('takes the GUI verdict the fixer job ran beside its own, dispatching no GUI job', async () => {
+    const verify = { command: 'run {files}', gui: { probe: 'list {related}', command: 'run-gui {files}' } };
+    const h = harness(verify, { verify: [] });
+    write(h.fixDir, { ...PASSING, 'fix.mbox': mbox(1), 'gui.exit': '0', 'gui.txt': '[browser] a/Bar.browser.test.tsx' });
+    write(join(h.fixDir, 'gui'), { 'verify.exit': '0', 'verify.log': ' Test Files  2 passed (2)' });
+    const got = await verifyAndRepair(h.ctx, h.area, { mbox: join(h.fixDir, 'fix.mbox') }, h.fixDir);
+    expect(h.jobs).toEqual([]);
+    expect(got).toMatchObject({ ok: true, verify: { ok: true, gui: true, testFiles: { passed: 5, total: 5 } } });
+  });
+
   it('runs the GUI part on a GUI node where the probe lists a browser test, and repairs what fails there', async () => {
     const verify = { command: 'run {files}', gui: { probe: 'list {related}', command: 'run-gui {files}' } };
     const h = harness(verify, {

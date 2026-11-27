@@ -116,7 +116,7 @@ const handBackLines = (cfg, local) => {
     ...fixupLines(cfg.checks.fixup),
     `git format-patch --stdout "$BASE..HEAD" > ${JOB_OUT}/fix.mbox`,
     // The progress reader's `now`: the fixer is done, and what runs now is skulkr's verify.
-    ...(verify ? ['echo "skulkr: verifying the fixer\'s commits"', ...verifyLines(verify, { fleet })] : []),
+    ...(verify ? ['echo "skulkr: verifying the fixer\'s commits"', ...verifyLines(verify, { fleet, alongside: true })] : []),
     'exit 0',
   ];
 };

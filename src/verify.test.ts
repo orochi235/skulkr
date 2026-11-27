@@ -243,6 +243,52 @@ describe('verifyLines on the fleet', () => {
   });
 });
 
+describe('verifyLines alongside', () => {
+  const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+
+  /** A local runner's tree with one commit since BASE, its lines run with a fake onto; answers what each part wrote. */
+  const run = (probeSays: string) => {
+    const project = jobOut({});
+    git(project, 'init', '-q', '-b', 'main');
+    git(project, 'remote', 'add', 'origin', 'git@example.com:me/project.git');
+    writeFileSync(join(project, 'a.ts'), '1');
+    git(project, 'add', '-A');
+    git(project, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'base');
+    const dir = mkdtempSync(join(tmpdir(), 'skulkr-fleet-tree-'));
+    dirs.push(dir);
+    execFileSync('git', ['clone', '-q', '--shared', project, dir]);
+    const base = git(dir, 'rev-parse', 'HEAD');
+    writeFileSync(join(dir, 'a.ts'), '2');
+    git(dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qam', 'fix');
+    const bin = jobOut({});
+    // Each part waits up to 2 s for the other to have started: run one after the other, the first times out.
+    writeFileSync(join(bin, 'onto'), [
+      '#!/bin/bash',
+      `m=${bin}; case "$*" in *--gui*) me=gui other=plain ;; *) me=plain other=gui ;; esac`,
+      'touch "$m/$me"; for i in $(seq 20); do [ -e "$m/$other" ] && break; sleep 0.1; done',
+      '[ -e "$m/$other" ] && echo "onto do: job exited 0 on n ($me beside $other)" || echo "onto do: job exited 0 on n ($me alone)"',
+    ].join('\n'), { mode: 0o755 });
+    const verify = { command: 'run {files}', gui: { probe: `echo '${probeSays}'`, command: 'run-gui {files}' } };
+    const lines = verifyLines(verify, { fleet: 'proj', alongside: true });
+    execFileSync('bash', ['-c', ['mkdir -p .skulkr/out', 'set +e', ...lines].join('\n')], { cwd: dir, env: { ...process.env, BASE: base, PATH: `${bin}:/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin` } });
+    const out = (f: string) => (existsSync(join(dir, '.skulkr/out', f)) ? readFileSync(join(dir, '.skulkr/out', f), 'utf8').trim() : null);
+    return { plain: out('verify.log'), gui: out('gui/verify.log'), guiExit: out('gui/verify.exit') };
+  };
+
+  it('runs the GUI part beside the plain one where the probe lists a browser test', () => {
+    const r = run('[browser] a/Bar.browser.test.tsx');
+    expect(r.plain).toBe('onto do: job exited 0 on n (plain beside gui)');
+    expect(r.gui).toContain('onto do: job exited 0 on n (gui beside plain)');
+    expect(r.guiExit).toBe('0');
+  });
+
+  it('runs no GUI part where the probe lists none', () => {
+    const r = run('');
+    expect(r.plain).toBe('onto do: job exited 0 on n (plain alone)');
+    expect(r.gui).toBeNull();
+  }, 10_000);
+});
+
 describe('verifyLine', () => {
   it('counts the areas that passed at once and names the rest by how they ended', () => {
     const areas = [

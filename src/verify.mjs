@@ -1,8 +1,9 @@
 /**
  * The tenant's verify step (`checks.verify` in the config), run by skulkr itself over the files a fixer's commits
  * changed, never taken from the fixer's report. It runs at the end of every fixer and repair job, after the model
- * exits, and in a job of its own where it needs a GUI node (`gui`) or where a model job left no verdict. The
- * verdict is the command's exit status and the runner's file-level counts.
+ * exits, and in a job of its own where a model job left no verdict. Its GUI part (`gui`) runs on a GUI node: beside
+ * the plain part where the model job sends both to the fleet, else in a job of its own after it. The verdict is the
+ * command's exit status and the runner's file-level counts.
  */
 import { join } from 'node:path';
 import { CHECKS_PROOF, JOB_IN, JOB_OUT } from './config.mjs';
@@ -28,7 +29,7 @@ const filled = (template) => template.replaceAll('{files}', '$VERIFY_FILES').rep
  * is what the commits hold: a model job records them before. They expect `set +e`. With `fleet`, the project's name,
  * the command runs on the onto fleet ({@link fleetRunLines}), on a GUI node with `gui`, and here where it cannot.
  */
-export const verifyLines = (verify, { command = verify.command, probe = verify.gui?.probe, fleet = /** @type {string | false} */ (false), gui = false } = {}) => [
+export const verifyLines = (verify, { command = verify.command, probe = verify.gui?.probe, fleet = /** @type {string | false} */ (false), gui = false, alongside = false } = {}) => [
   'git reset -q --hard HEAD && git clean -qfd -e .skulkr/',
   `VERIFY_FILES=$( { git diff --name-only --diff-filter=d "$BASE..HEAD"; for f in \${VERIFY_EXTRA:-}; do [ -e "$f" ] && echo "$f"; done; } | sort -u | tr '\\n' ' ' | sed 's/ *$//')`,
   'VERIFY_RELATED=$(for f in $VERIFY_FILES; do printf -- "--related=%s " "$f"; done)',
@@ -40,10 +41,40 @@ export const verifyLines = (verify, { command = verify.command, probe = verify.g
   'if [ -z "$VERIFY_FILES" ]; then',
   `  echo "no files changed" > ${JOB_OUT}/verify.log; echo 0 > ${JOB_OUT}/verify.exit`,
   'else',
-  ...(fleet ? fleetRunLines(filled(command), verify.timeoutMin ?? 20, { gui, project: fleet }) : [`  ${localRun(filled(command), verify.timeoutMin ?? 20)}`]),
-  ...(probe ? [`  perl -e 'alarm shift; exec @ARGV' ${PROBE_SECONDS} bash -c ${q(filled(probe))} > ${JOB_OUT}/gui.txt 2> ${JOB_OUT}/gui.err; echo $? > ${JOB_OUT}/gui.exit`] : []),
+  ...(fleet && alongside && verify.gui?.command
+    ? [
+      ...probeLines(probe), ...onFleetLines(fleet), ...guiAlongsideLines(verify, fleet, probe),
+      `  ${fleetRun(filled(command), verify.timeoutMin ?? 20, { gui })}`, '  if [ -n "$GUI_PID" ]; then wait "$GUI_PID"; fi',
+    ]
+    : [
+      ...(fleet ? fleetRunLines(filled(command), verify.timeoutMin ?? 20, { gui, project: fleet }) : [`  ${localRun(filled(command), verify.timeoutMin ?? 20)}`]),
+      ...probeLines(probe),
+    ]),
   'fi',
 ];
+
+const probeLines = (probe) =>
+  (probe ? [`  perl -e 'alarm shift; exec @ARGV' ${PROBE_SECONDS} bash -c ${q(filled(probe))} > ${JOB_OUT}/gui.txt 2> ${JOB_OUT}/gui.err; echo $? > ${JOB_OUT}/gui.exit`] : []);
+
+/** Where a model job puts the GUI part it ran beside its own verify: `verify.log` and `verify.exit` under it. */
+export const GUI_OUT = 'gui';
+
+/**
+ * The GUI part started on a GUI node in the background, where the probe says the changes need it (as
+ * {@link needsGui} reads it), so it runs beside the plain part rather than after it; its pid in `$GUI_PID`.
+ */
+const guiAlongsideLines = (verify, fleet, probe) => {
+  const out = `${JOB_OUT}/${GUI_OUT}`;
+  const needed = probe ? `[ "$(cat ${JOB_OUT}/gui.exit)" != 0 ] || grep -qE ${q(TEST_PATH_ERE)} ${JOB_OUT}/gui.txt` : 'true';
+  return [
+    '  GUI_PID=',
+    `  if ${needed}; then`,
+    `    mkdir -p ${out}`,
+    `    ( ${fleetRun(filled(verify.gui.command), verify.timeoutMin ?? 20, { gui: true, project: fleet, out })} ) &`,
+    '    GUI_PID=$!',
+    '  fi',
+  ];
+};
 
 /** `command` run here, killed after `minutes`, its output in `verify.log` and its exit in `verify.exit`. */
 const localRun = (command, minutes) =>
@@ -78,7 +109,7 @@ gui=; [ "$1" = --gui ] && { gui=--gui; shift; }
 [ "$1" = -- ] && shift
 url=$(git -C "$(git remote get-url origin)" remote get-url origin 2>/dev/null); case "$url" in /*) url= ;; esac
 if [ -n "$url" ] && command -v onto >/dev/null; then
-  git remote get-url fleet >/dev/null 2>&1 || git remote add fleet "$url"
+  git remote get-url fleet >/dev/null 2>&1 || git remote add fleet "$url" 2>/dev/null  # a run beside this one may add it first
   out=$(mktemp) task="${project}-$name-$(git rev-parse --short=10 HEAD)"
   { echo "skulkr: on the fleet as $task" >&3; } 2>/dev/null
   for try in 1 2 3; do
@@ -101,11 +132,23 @@ export const onFleetLines = (project) => [`mkdir -p ${JOB_IN} && cat > ${ON_FLEE
 /** `command` on the fleet through {@link onFleetScript}, its output in `verify.log` and its exit in `verify.exit`. */
 const fleetRunLines = (command, minutes, { gui = false, project = 'skulkr' } = {}) => [
   ...onFleetLines(project),
-  `  perl -e 'alarm shift; exec @ARGV' ${(minutes + 15) * 60} ${ON_FLEET} test ${minutes} verify${gui ? '-gui --gui' : ''} -- bash -c ${q(command)} 3>&1 > ${JOB_OUT}/verify.log 2>&1; echo $? > ${JOB_OUT}/verify.exit`,
+  `  ${fleetRun(command, minutes, { gui })}`,
 ];
+
+/**
+ * One {@link onFleetScript} run writing `verify.log` and `verify.exit` under `out`. The job's own run sends the
+ * script's progress line to the job's output (fd 3); one run beside it keeps that line in its own log, so the
+ * job's output names the plain part's fleet job alone.
+ */
+const fleetRun = (command, minutes, { gui = false, out = JOB_OUT } = {}) => {
+  const progress = out === JOB_OUT ? `3>&1 > ${out}/verify.log 2>&1` : `> ${out}/verify.log 2>&1 3>&1`;
+  return `perl -e 'alarm shift; exec @ARGV' ${(minutes + 15) * 60} ${ON_FLEET} test ${minutes} verify${gui ? '-gui --gui' : ''} -- bash -c ${q(command)} ${progress}; echo $? > ${out}/verify.exit`;
+};
 
 /** A test file's path in a line of runner output. */
 const TEST_PATH = /([\w@./-]+\.(?:test|spec)\.[cm]?[jt]sx?)\b/;
+/** {@link TEST_PATH} for `grep -E`, which the job's shell reads the probe's answer with. */
+const TEST_PATH_ERE = String.raw`[[:alnum:]_@./-]+\.(test|spec)\.[cm]?[jt]sx?`;
 /** Whether `path` is a test file's path, rather than a step's name or another file. */
 export const isTestPath = (path) => TEST_PATH.exec(path)?.[1] === path;
 

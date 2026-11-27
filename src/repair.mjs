@@ -1,6 +1,7 @@
 /**
- * Verify and repair: after a fixer's job, skulkr reads the verdict of the verify step that job ran itself, runs the
- * GUI part in a job of its own where the changes need it, and, while the verdict is failing, hands the failing output
+ * Verify and repair: after a fixer's job, skulkr reads the verdict of the verify step that job ran itself, and of its
+ * GUI part where the changes need it (run in a job of its own where the fixer's job left none), and, while the verdict
+ * is failing, hands the failing output
  * to a repair job on the same area's commits, up to {@link MAX_REPAIRS} times. Nothing here reads the fixer's report.
  */
 import { createHash } from 'node:crypto';
@@ -10,7 +11,7 @@ import { brief, fill, projectVars } from './brief.mjs';
 import { JOB_IN } from './config.mjs';
 import { dispatch } from './dispatch.mjs';
 import { AREA_MBOX, baselineShell, jobDir, repairShell, stoppedBeforeModel, timeoutOf, verifyShell } from './jobs.mjs';
-import { failedTestsIn, failureExcerpt, needsGui, verdictIn, verdictText, verifyOf } from './verify.mjs';
+import { GUI_OUT, failedTestsIn, failureExcerpt, needsGui, verdictIn, verdictText, verifyOf } from './verify.mjs';
 
 export const MAX_REPAIRS = 2;
 
@@ -110,7 +111,11 @@ export const checkedIn = async (ctx, area, dir, mbox, label, extra = []) => {
   if (plain.unrun) plain = await verifyJob(ctx, area, mbox, { gui: false, label, extra });
   plain = await judged(ctx, area, plain);
   if (!plain.ok || !needsGui(verify, plain.dir)) return plain;
-  const gui = await judged(ctx, area, await verifyJob(ctx, area, mbox, { gui: true, label, extra }));
+  // The model job may have run the GUI part beside its own (`verifyLines`' `alongside`); a job of its own otherwise.
+  const beside = join(plain.dir, GUI_OUT);
+  let ran = { ...verdictIn(beside), dir: beside, gui: true };
+  if (ran.unrun) ran = await verifyJob(ctx, area, mbox, { gui: true, label, extra });
+  const gui = await judged(ctx, area, ran);
   const sum = (k) => (plain.counts?.[k] ?? 0) + (gui.counts?.[k] ?? 0);
   const counts = plain.counts || gui.counts ? { failed: sum('failed'), passed: sum('passed'), total: sum('total') } : undefined;
   const baseline = [...(plain.baseline ?? []), ...(gui.baseline ?? [])];
