@@ -4,6 +4,8 @@ import type { SaturationLedger } from './saturation.types';
 
 const ledger = {
   occasions: 4, distinct: 6, unseen: 3.4, costUsd: 8, lines: 2000, defectsPerKloc: 3, unseenPerKloc: 1.7, usdPerKloc: 4,
+  defects: [{ id: 'D1', registry: null }, { id: 'D2', registry: { status: 'fixed' } }],
+  fix: { batches: [], ask: [], statuses: { D1: { status: 'fixed', run: 1, branch: 'b', verified: true } } },
 } as unknown as SaturationLedger;
 
 describe('the yield grid', () => {
@@ -11,7 +13,7 @@ describe('the yield grid', () => {
     const { cols, rows } = yieldGridOf(ledger);
     expect(cols).toEqual(['area', '/ kloc', '/ pass']);
     expect(rows.map((r) => [r.label, ...r.cells])).toEqual([
-      ['found', '6', '3.0', '1.5'], ['left', '3', '1.7', '–'], ['spent', '$8.00', '$4.00', '$2.00'],
+      ['found', '6', '3.0', '1.5'], ['fixed', '2', '1.0', '–'], ['left', '3', '1.7', '–'], ['spent', '$8.00', '$4.00', '$2.00'],
     ]);
   });
 

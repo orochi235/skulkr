@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { estimate, linesText, percent, sourcesText, usd, usdOrDash } from './format';
+import { heroCountsOf } from './LedgerHero';
 import type { SaturationLedger } from './saturation.types';
 import s from './LedgerFacts.module.css';
 
@@ -29,12 +30,13 @@ export const factListsOf = (ledger: SaturationLedger): readonly { title: string;
   },
 ];
 
-/** The yield grid: found, left and spent, each for the whole area, per thousand lines (where lines are known), and per
- *  pass. Left has no per-pass figure. */
+/** The yield grid: found, fixed (the hero's count), left and spent, each for the whole area, per thousand lines (where
+ *  lines are known), and per pass. Fixed and left have no per-pass figure. */
 export const yieldGridOf = (ledger: SaturationLedger) => {
   const passes = ledger.occasions;
   const kloc = ledger.lines !== null;
   const per = (n: number | null) => (n === null || passes === 0 ? null : n / passes);
+  const { fixed } = heroCountsOf(ledger);
   const cols = ['area', ...(kloc ? ['/ kloc'] : []), '/ pass'];
   const row = (label: string, area: string, perKloc: string, perPass: string, estimated = false) =>
     ({ label, estimated, cells: [area, ...(kloc ? [perKloc] : []), perPass] });
@@ -42,6 +44,7 @@ export const yieldGridOf = (ledger: SaturationLedger) => {
     cols,
     rows: [
       row('found', String(ledger.distinct), estimate(ledger.defectsPerKloc), estimate(per(ledger.distinct))),
+      row('fixed', String(fixed), kloc ? estimate(fixed / (ledger.lines! / 1000)) : '–', '–'),
       row('left', ledger.unseen === null ? '–' : String(Math.round(ledger.unseen)), estimate(ledger.unseenPerKloc), '–', true),
       row('spent', usd(ledger.costUsd), usdOrDash(ledger.usdPerKloc), usdOrDash(per(ledger.costUsd))),
     ],
