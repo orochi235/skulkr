@@ -61,7 +61,7 @@ export function FixShelf({ shelf, onPickDefect }: { shelf: FixShelfData; onPickD
                 <rect className={s.front} x={b.x} y={top} width={BOOK_W} height={b.h} />
                 <polygon className={s.top} points={`${b.x},${top} ${b.x + DEPTH},${top - DEPTH} ${b.x + BOOK_W + DEPTH},${top - DEPTH} ${b.x + BOOK_W},${top}`} />
                 <polygon className={s.side} points={`${b.x + BOOK_W},${top} ${b.x + BOOK_W + DEPTH},${top - DEPTH} ${b.x + BOOK_W + DEPTH},${base - DEPTH} ${b.x + BOOK_W},${base}`} />
-                {b.recurrent && <circle className={s.dot} cx={b.x + (BOOK_W + DEPTH) / 2} cy={top - DEPTH - 3.5} r={1.8} />}
+                {b.recurrent && <circle className={s.dot} cx={b.x + DEPTH + BOOK_W / 2} cy={top - DEPTH - 3.5} r={1.8} />}
               </g>
             );
           })}
