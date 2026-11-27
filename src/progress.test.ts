@@ -47,8 +47,21 @@ describe('createProgress', () => {
     const { start, feed } = createProgress(FILES, ROOT);
     const out = STREAM.map((line) => feed(line));
     expect(start).toBe('onto: progress 0/3');
-    expect(out.flatMap((o) => (o.progress ? [o.progress] : []))).toEqual(['onto: progress 1/3', 'onto: progress 2/3', 'onto: progress 3/3']);
+    expect(out.flatMap((o) => (o.progress ? o.progress.split('\n').filter((l) => l.startsWith('onto:')) : []))).toEqual(['onto: progress 1/3', 'onto: progress 2/3', 'onto: progress 3/3']);
     expect(out.flatMap((o) => (o.result !== undefined ? [o.result] : []))).toEqual([RESULT]);
+  });
+
+  it('says what the reviewer says and each file it reads or searches, so a preloaded one shows it is working', () => {
+    const { feed } = createProgress(FILES, ROOT);
+    const say = JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'Checking the  layout\ncache.' }] } });
+    const notes = [say, ...STREAM.slice(1, 6)].flatMap((line) => (feed(line).progress ?? '').split('\n').filter((l) => l.startsWith('skulkr:')));
+    expect(notes).toEqual([
+      'skulkr: says: Checking the layout cache.',
+      'skulkr: reads packages/core/src/a.ts',
+      'skulkr: reads packages/core/src/a.ts',
+      'skulkr: reads packages/core/package.json',
+      'skulkr: searches x in package.json',
+    ]);
   });
 });
 
@@ -83,7 +96,7 @@ describe('progress.mjs', () => {
     const run = spawnSync(process.execPath, [SCRIPT, 'files.txt', 'claude.json'], { cwd: dir, input: stream, encoding: 'utf8' });
     expect(run.stderr).toBe('');
     expect(run.status).toBe(0);
-    expect(run.stdout.split('\n').filter(Boolean)).toEqual(['onto: progress 0/3', 'onto: progress 1/3', 'onto: progress 2/3', 'onto: progress 3/3']);
+    expect(run.stdout.split('\n').filter((l) => l.startsWith('onto:'))).toEqual(['onto: progress 0/3', 'onto: progress 1/3', 'onto: progress 2/3', 'onto: progress 3/3']);
     const raw = readFileSync(join(dir, 'claude.json'), 'utf8');
     expect(raw).toBe(`${RESULT}\n`);
     expect(parseEnvelope(raw).record).toMatchObject({ terminalReason: 'completed', budgetHit: false, costUsd: 0.51, weightedTokens: 121779 });

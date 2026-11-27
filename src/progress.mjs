@@ -72,11 +72,25 @@ export const createFindingsEcho = () => {
   return { see };
 };
 
+/** A reviewer's `skulkr:` line for each file it reads or searches in the event, its findings file left to the echo;
+ *  a preloaded reviewer reads few listed files, so these, not the counter, show it working. */
+const lookNotesOf = (event, root) => {
+  if (event?.type !== 'assistant' || !Array.isArray(event.message?.content)) return [];
+  const rel = (p) => (typeof p === 'string' ? relative(root, resolve(root, p)) || '.' : '');
+  return event.message.content.flatMap((c) => {
+    if (c?.type !== 'tool_use' || /(^|\/)findings\.md$/.test(c.input?.file_path ?? '')) return [];
+    if (c.name === 'Read') return [`skulkr: reads ${rel(c.input?.file_path)}`];
+    if (c.name === 'Grep') return [`skulkr: searches ${clip(c.input?.pattern ?? '', 60)}${c.input?.path ? ` in ${rel(c.input.path)}` : ''}`];
+    if (c.name === 'Glob') return [`skulkr: lists ${clip(c.input?.pattern ?? '', 60)}`];
+    return [`skulkr: uses ${c.name}`];
+  });
+};
+
 /**
  * Answers `feed(line)`, which takes one line of the stream and answers `{ progress, result }`: the
  * progress line to print, if the line read a listed file for the first time, with a finding line for each finding
- * the reviewer wrote, and the line itself when it is the result event. `root` is the tree the listed paths are
- * relative to.
+ * the reviewer wrote, a `says:` line for what it says between tool calls and a line for each file it reads or
+ * searches, and the line itself when it is the result event. `root` is the tree the listed paths are relative to.
  */
 export const createProgress = (files, root = process.cwd()) => {
   const listed = new Set(files);
@@ -98,7 +112,9 @@ export const createProgress = (files, root = process.cwd()) => {
       seen.add(rel);
       progress = `onto: progress ${seen.size}/${listed.size}`;
     }
-    const lines = [...echo.see(event), ...(progress ? [progress] : [])];
+    const text = assistantText(event);
+    const notes = [...(text.trim() ? [`skulkr: says: ${clip(text, SAYS_CHARS)}`] : []), ...lookNotesOf(event, root)];
+    const lines = [...notes, ...echo.see(event), ...(progress ? [progress] : [])];
     return { progress: lines.length ? lines.join('\n') : undefined };
   };
   return { start, feed };
