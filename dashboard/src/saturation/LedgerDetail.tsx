@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
 import { DelveChart, DelveKey } from './DelveChart';
 import { PassTableButton } from './PassTable';
@@ -6,7 +7,7 @@ import type { SaturationDefect, SaturationLedger } from './saturation.types';
 import s from './LedgerDetail.module.css';
 
 const COLUMNS: readonly DataGridColumn<SaturationDefect>[] = [
-  { id: 'id', header: 'ID', accessor: (d) => Number(d.id.slice(1)), render: (d) => d.id, className: s.id },
+  { id: 'id', header: 'ID', accessor: (d) => Number(d.id.slice(1)), render: (d) => <span data-defect={d.id}>{d.id}</span>, className: s.id },
   { id: 'severity', header: 'Severity', accessor: (d) => severityRank(d.severity), render: (d) => d.severity || '–' },
   { id: 'claim', header: 'Defect', className: s.claim },
   { id: 'where', header: 'Where', className: s.where },
@@ -21,8 +22,19 @@ function statusOf(d: SaturationDefect) {
   return d.registry.sha ? <>{d.registry.status} <code>{d.registry.sha.slice(0, 10)}</code></> : d.registry.status;
 }
 
-/** One ledger: how far its reviews got, and its distinct defects. */
+/** One ledger: how far its reviews got, and its distinct defects; clicking a tile on its chart scrolls to that defect's
+ *  row and marks it. */
 export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
+  // The pick carries a count so picking the same defect again scrolls to it again.
+  const [picked, setPicked] = useState<{ id: string; n: number } | null>(null);
+  const scroll = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!picked) return;
+    const cell = scroll.current?.querySelector(`[data-defect="${CSS.escape(picked.id)}"]`);
+    cell?.closest('tr')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [picked]);
+  useEffect(() => setPicked(null), [ledger.id]);
+  const pickDefect = useCallback((id: string) => setPicked((was) => ({ id, n: (was?.n ?? 0) + 1 })), []);
   return (
     <section className={s.detail} aria-label={`${ledger.area}'s defects`}>
       <header className={s.head}>
@@ -41,10 +53,13 @@ export function LedgerDetail({ ledger }: { ledger: SaturationLedger }) {
           </p>
         )}
         <p className={s.facts}>{ledger.stopped ? `Stopped: ${ledger.stopped}.` : 'Not saturated yet: the stop rule does not hold.'}</p>
-        <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} /><div className={s.chartFoot}><DelveKey /><PassTableButton ledger={ledger} /></div></div>
+        <div className={s.chart}><DelveChart ledger={ledger} max={ledger.running?.max ?? null} live={ledger.running !== null} onPickDefect={pickDefect} /><div className={s.chartFoot}><DelveKey /><PassTableButton ledger={ledger} /></div></div>
       </header>
-      <div className={s.scroll}>
-        <DataGrid rows={ledger.defects} columns={COLUMNS} defaultSort={{ columnId: 'sightings', direction: 'desc' }} empty="No defects." />
+      <div ref={scroll} className={s.scroll}>
+        <DataGrid
+          rows={ledger.defects} columns={COLUMNS} defaultSort={{ columnId: 'sightings', direction: 'desc' }} empty="No defects."
+          rowClassName={(d) => (d.id === picked?.id ? s.picked : undefined)}
+        />
       </div>
     </section>
   );

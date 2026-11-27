@@ -1,7 +1,7 @@
 /** The audit map as a scene: a frame per package, a cell per area, kept in step with the map's data. */
 import { asNodeId, contrastRatio, createScene, nodeShapesOf, type NodeId, type RectPose, type Scene } from '@weasel-js/core';
 import { deepEqual } from '@weasel-js/registry';
-import { AUDIT_PAINTER, pipCountOf, pipsPerRowIn, type AuditCellData, type AuditFrameData, type AuditNodeData } from './auditPainter';
+import { AUDIT_PAINTER, pipCountOf, pipsPerRowIn, riseOffsetOf, type AuditCellData, type AuditFrameData, type AuditNodeData } from './auditPainter';
 import { glyphPathsOf } from './glyph';
 import { changedSincePass, heatScaleOf, roundCountOf, labelIn, toneOf, wrapAtDots, type HeatScale } from './areaData';
 import { grayOf, heatColorOf, rampAt } from './heat';
@@ -193,7 +193,7 @@ export function auditNodeSpecs(
     };
     out.push({ id: frameIdOf(f.name), parent: f.parent === null ? null : frameIdOf(f.parent), pickable: false, pose: poseIn(f, parent), data });
   }
-  for (const c of rises ? backToFront(layout.cells) : layout.cells) {
+  for (const c of rises ? backToFront(layout.cells, rises) : layout.cells) {
     const area = byId.get(c.id);
     if (!area) continue;
     const parent = rises || c.parent === null ? undefined : frameBox.get(c.parent);
@@ -209,9 +209,35 @@ export function auditNodeSpecs(
   return out;
 }
 
-/** Cells in the order a raised map draws them: those further up and to the right first, as a lid rises that way. */
-export const backToFront = <T extends Box>(cells: readonly T[]): T[] =>
-  [...cells].sort((a, b) => (a.y + a.height / 2 - a.x - a.width / 2) - (b.y + b.height / 2 - b.x - b.width / 2));
+/** Whether `b` sits where `a`'s walls and lid rise into, above or to the right of it, so `a` must be drawn after `b`. */
+const behind = (b: Box, a: Box, rise: number): boolean => {
+  const { dx, dy } = riseOffsetOf(rise);
+  const overlaps = (lo: number, hi: number, from: number, to: number) => lo < to && hi > from;
+  const above = b.y + b.height <= a.y + 0.5 && b.y + b.height > a.y + dy && overlaps(b.x, b.x + b.width, a.x, a.x + a.width + dx);
+  const right = b.x >= a.x + a.width - 0.5 && b.x < a.x + a.width + dx && overlaps(b.y, b.y + b.height, a.y + dy, a.y + a.height);
+  return above || right;
+};
+
+/**
+ * Cells in the order a raised map draws them. Flat ones first, since nothing of theirs leaves their own footprint;
+ * then the raised, each after every cell its walls and lid rise into, so it covers them and nothing behind it covers
+ * it. A pinwheel of raised cells with no such order falls back to drawing those further up and right first.
+ */
+export const backToFront = <T extends Box & { id: string }>(cells: readonly T[], rises: ReadonlyMap<string, number>): T[] => {
+  const riseOf = (c: T) => rises.get(c.id) ?? 0;
+  const key = (c: T) => c.y + c.height / 2 - c.x - c.width / 2;
+  const left = cells.filter((c) => riseOf(c) > 0).sort((a, b) => key(a) - key(b));
+  const after = new Map(left.map((a) => [a, left.filter((b) => b !== a && behind(b, a, riseOf(a)))]));
+  const raised: T[] = [];
+  const drawn = new Set<T>();
+  while (left.length > 0) {
+    const i = Math.max(0, left.findIndex((a) => after.get(a)!.every((b) => drawn.has(b))));
+    const [next] = left.splice(i, 1);
+    raised.push(next!);
+    drawn.add(next!);
+  }
+  return [...cells.filter((c) => riseOf(c) === 0), ...raised];
+};
 
 const samePose = (a: RectPose, b: RectPose) => a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 

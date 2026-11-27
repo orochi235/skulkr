@@ -3,12 +3,16 @@
  * copied 2026-11-22, since pezlie is no dependency). Each is resampled to the map's five stops in oklch, the form the
  * map mixes between.
  */
+const MAGMA = ['#000004', '#1c1044', '#4f127b', '#812581', '#b5367a', '#e55964', '#fb8761', '#fec287'] as const;
+
 export const HEAT_RAMPS = {
   ember: ['#3a3a3f', '#e8c478'],
   ice: ['#12233a', '#a9e2f3'],
   moss: ['#16281c', '#b7e07a'],
   viridis: ['#440154', '#472d7b', '#3b528b', '#2c728e', '#21918c', '#28ae80', '#5ec962', '#addc30'],
-  magma: ['#000004', '#1c1044', '#4f127b', '#812581', '#b5367a', '#e55964', '#fb8761', '#fec287'],
+  magma: MAGMA,
+  // Magma without its near-black end, for a lens whose far end should still read as a color.
+  dusk: MAGMA.slice(1),
   inferno: ['#000004', '#1b0c41', '#4a0c6b', '#781c6d', '#a52c60', '#cf4446', '#ed6925', '#fcffa4'],
   ironbow: ['#00000a', '#1a0a52', '#4a0a7a', '#8a1a6a', '#c43e2f', '#e8721a', '#f9b70a', '#ffffe0'],
   whitehot: ['#000000', '#ffffff'],

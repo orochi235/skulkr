@@ -108,7 +108,7 @@ export const HEAT_METRIC_SPECS: Readonly<Record<HeatMetric, HeatMetricSpec>> = {
     valuesIn: (areas) => each(areas, (a) => a.saturation?.occasions ?? null),
   },
   saturation: {
-    name: 'saturation', legend: "next defect's price, from the going rate (0%) to the limit where a delve stops (100%)", none: 'no scour ledger', scheme: 'magma', floor: 100, linear: true, reverse: true,
+    name: 'saturation', legend: "next defect's price, from the going rate (0%) to the limit where a delve stops (100%)", none: 'no scour ledger', scheme: 'dusk', floor: 100, linear: true, reverse: true,
     valuesIn: (areas) => each(areas, (a) => saturationOf(a.saturation)),
   },
   saturationNextNew: {

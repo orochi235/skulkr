@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { asNodeId } from '@weasel-js/core';
 import { useSelection } from '@weasel-js/editing';
 import { createAuditScene } from '@dash/audits/auditScene';
-import { SATURATION_METRICS } from '@dash/audits/heatMetrics';
+import { useDashPref, type HeightMetric } from '@dash/audits/dashPrefs';
+import { HEAT_METRIC_SPECS, SATURATION_METRICS } from '@dash/audits/heatMetrics';
 import { Treemap } from '@dash/audits/Treemap';
 import { useAuditPalette } from '@dash/audits/useAuditPalette';
 import type { AuditArea } from '@dash/audits/skulkrMap.types';
@@ -47,17 +48,15 @@ export const mapAreasFor = (areas: readonly AuditArea[], ledgers: readonly Satur
   });
 };
 
-/** The most pixels a cell stands off the map, and the most per open defect: the area with the most open stands
- *  `MAX_RISE` high, unless every area has so few that each takes `PER_DEFECT`. */
+/** The most pixels a cell stands off the map: the area highest on the metric stands this high. */
 const MAX_RISE = 28;
-const PER_DEFECT = 3;
 
-/** How high each area stands: its own ledger's open defects, scaled so the most stands `MAX_RISE` at most. */
-export const risesFor = (areas: readonly AuditArea[]): ReadonlyMap<string, number> => {
-  const open = areas.map((a) => [a.id, a.saturation?.open ?? 0] as const);
-  const most = Math.max(1, ...open.map(([, n]) => n));
-  const per = Math.min(PER_DEFECT, MAX_RISE / most);
-  return new Map(open.filter(([, n]) => n > 0).map(([id, n]) => [id, n * per]));
+/** How high each area stands on `metric`, in proportion to its value, the highest `MAX_RISE`; null for flat. */
+export const risesFor = (areas: readonly AuditArea[], metric: HeightMetric): ReadonlyMap<string, number> | null => {
+  if (metric === 'flat') return null;
+  const values = [...HEAT_METRIC_SPECS[metric].valuesIn(areas)].filter((e): e is [string, number] => e[1] !== null && e[1] > 0);
+  const most = Math.max(0, ...values.map(([, v]) => v));
+  return most > 0 ? new Map(values.map(([id, v]) => [id, (v / most) * MAX_RISE])) : null;
 };
 
 /** The audit map's treemap, shaded by what each area's saturation ledger says and numbered by `queue`, the order
@@ -72,7 +71,8 @@ export function SaturationMap({ areas, icons, ledgers, queue, picked, onPick }: 
   const phases = useMemo(() => scourPhasesOf(ledgers), [ledgers]);
   // The treemap outlines the areas a live run holds; here a live scour holds them.
   const shaded = useMemo(() => mapAreasFor(areas, ledgers, queue, phases), [areas, ledgers, queue, phases]);
-  const rises = useMemo(() => risesFor(shaded), [shaded]);
+  const [heightBy, setHeightBy] = useDashPref('saturation.heightBy');
+  const rises = useMemo(() => risesFor(shaded, heightBy), [heightBy, shaded]);
   const selected = selection.current[0] ?? null;
   // The page's pick and the map's selection follow each other. A change the map's own clicks make picks (or unpicks);
   // one this component makes to follow the pick is noted first, so it never picks back.
@@ -94,7 +94,13 @@ export function SaturationMap({ areas, icons, ledgers, queue, picked, onPick }: 
       {probes}
       <Treemap
         scene={scene} selection={selection} areas={shaded} palette={colors} phases={phases} onHover={() => {}}
-        colorByPref="saturation.colorBy" metrics={SATURATION_METRICS} bare numbered rises={rises} {...(icons ? { glyphs: icons } : {})}
+        colorByPref="saturation.colorBy" metrics={SATURATION_METRICS} bare numbered byOnes rises={rises} {...(icons ? { glyphs: icons } : {})}
+        legendExtra={(
+          <select className={s.heightBy} aria-label="Raise the map by" value={heightBy} onChange={(e) => setHeightBy(e.currentTarget.value as HeightMetric)}>
+            <option value="flat">flat</option>
+            {SATURATION_METRICS.map((m) => <option key={m} value={m}>height: {HEAT_METRIC_SPECS[m].name}</option>)}
+          </select>
+        )}
       />
     </div>
   );

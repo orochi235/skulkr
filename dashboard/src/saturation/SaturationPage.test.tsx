@@ -103,6 +103,20 @@ describe('SaturationPage', () => {
     renderWithIcons(<WeaselProvider><SaturationPage base="/test/" /></WeaselProvider>);
     expect(await screen.findByRole('region', { name: "geom.booleans's defects" })).toBeInTheDocument();
   });
+
+  it("scrolls to a chart tile's defect when it is clicked, and marks its row", async () => {
+    const scrolled: Element[] = [];
+    Element.prototype.scrollIntoView = function scrollIntoView() { scrolled.push(this); };
+    serve();
+    window.location.hash = '#weasel/scour/core.animation';
+    renderWithIcons(<WeaselProvider><SaturationPage base="/test/" /></WeaselProvider>);
+    const detail = await screen.findByRole('region', { name: "core.animation's defects" });
+    const tile = [...detail.querySelectorAll('g')].find((g) => g.querySelector('title')?.textContent?.startsWith('pass 3 · D1'))!;
+    fireEvent.click(tile);
+    const row = within(detail).getByText('A rejected tween still records its pose').closest('tr')!;
+    expect(scrolled).toContain(row);
+    expect(row.className).toMatch(/picked/);
+  });
   it('lights each area a live scour holds on the map, in match while a matcher runs', () => {
     const live = (step: string) => ({ pid: 1, since: '2026-11-25T00:00:00Z', does: 'delve', max: 40, log: [], jobs: [{ key: '03-claude', step, at: null, line: null, progress: null }] });
     expect([...scourPhasesOf([

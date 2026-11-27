@@ -158,21 +158,29 @@ const prismOf = (p: RectPose, rise: number): Path => {
   return pathFromD(`M ${p.x} ${y1} L ${x1} ${y1} L ${x1 + dx} ${y1 + dy} L ${x1 + dx} ${p.y + dy} L ${p.x + dx} ${p.y + dy} L ${p.x} ${p.y} Z`);
 };
 
-/** A raised cell: its footprint in the edge color, its left and bottom walls shaded from its fill, then the flat
- *  cell's own drawing moved up onto its lid. */
+/** How opaque a raised cell is, so the cells behind it show through. */
+const RAISED_ALPHA = 0.8;
+
+/** A raised cell, at `RAISED_ALPHA`: its left and bottom walls shaded from its fill, then the flat cell's own drawing
+ *  moved up onto its lid. Its footprint is left to the panel under the map, since a group's alpha applies to each
+ *  thing it draws, and a fill under the walls would show through them. While a live run holds it, its walls take the
+ *  live outline's color, breathing with it, so the outline wraps the whole box. */
 function paintRaised(d: AuditCellData, p: RectPose, rise: number): DrawCommand[] {
   const { dx, dy } = riseOffsetOf(rise);
   const x1 = p.x + p.width, y1 = p.y + p.height;
   const base = 'color' in d.fill && typeof d.fill.color === 'string' ? d.fill.color : d.edge;
   // A fill not in oklch (a fallback hex) keeps its walls in the edge color.
-  const wall = (shade: number) => ({ color: shadeOf(base, shade) ?? d.edge });
-  return [
-    ...filled(rect(p), { color: d.edge }),
+  const wall = (shade: number) => {
+    const own = shadeOf(base, shade) ?? d.edge;
+    const live = d.live ? shadeOf(d.live, shade * 0.6) ?? d.live : null;
+    return { color: live ? mixOf(own, live, d.pulse) ?? live : own };
+  };
+  return [{ kind: 'group', alpha: RAISED_ALPHA, children: [
     ...filled(pathFromD(`M ${p.x} ${p.y} L ${p.x + dx} ${p.y + dy} L ${p.x + dx} ${y1 + dy} L ${p.x} ${y1} Z`), wall(0.45)),
     ...filled(pathFromD(`M ${p.x} ${y1} L ${p.x + dx} ${y1 + dy} L ${x1 + dx} ${y1 + dy} L ${x1} ${y1} Z`), wall(0.25)),
     { kind: 'path', path: prismOf(p, rise), stroke: { paint: { color: d.edge }, width: 0.5 } },
     { kind: 'group', transform: new Float32Array([1, 0, 0, 0, 1, 0, dx, dy, 1]), children: paintFlat(d, p) },
-  ];
+  ] }];
 }
 
 function paintCell(d: AuditCellData, p: RectPose): DrawCommand[] {

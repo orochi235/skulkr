@@ -12,3 +12,5 @@
   flex: 1 1 0;
   min-height: 0;
 }
+
+.heightBy { font: inherit; color: var(--wzl-fg); }

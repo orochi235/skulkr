@@ -14,12 +14,14 @@ import { HEAT_METRICS, HEAT_METRIC_SPECS, metricScaleOf, type HeatMetric } from 
 import { heatStopsOf, type HeatScheme } from './heatSchemes';
 import { OFF_PIPELINE, PHASE_LABEL, SCOUR_PHASES, SWEEP, phaseClass, type AuditPhase } from './phases';
 import { Slider } from '@weasel-js/ui/components/Slider';
-import { MAX_HALVES, useDashPref } from './dashPrefs';
+import { MAX_COUNTED, MAX_HALVES, useDashPref } from './dashPrefs';
 import type { AuditArea } from './skulkrMap.types';
 import s from './Treemap.module.css';
 
 const FEATURES = [presets.pick];
 const SELECTION_OPTIONS = { mode: 'single' } as const;
+// The selection traces each cell's silhouette, so a raised one is outlined as the block it is drawn as.
+const LAYERS = { selectionOverlay: { outline: { follow: 'shape' as const, width: 2 } } };
 
 export interface TreemapProps {
   readonly scene: AuditScene;
@@ -57,8 +59,12 @@ export interface TreemapProps {
   readonly bare?: boolean;
   /** Number the head of whatever queue `areas` carry (by default all but a bare map), with the legend's slider. */
   readonly numbered?: boolean;
+  /** Count the numbered places one area at a time (`saturation.upcoming`), not in half rounds (`map.upcoming`). */
+  readonly byOnes?: boolean;
   /** How high each area stands off the map, in pixels; null draws it flat. */
   readonly rises?: ReadonlyMap<string, number> | null;
+  /** A control the page adds to the legend, after the heat scale. */
+  readonly legendExtra?: ReactNode;
 }
 
 /** Every audit area as a cell of a treemap drawn on the scene graph: hover and click pick through the canvas's
@@ -68,11 +74,15 @@ const NO_GLYPHS: Readonly<Record<string, string>> = {};
 const RECUT_FADE_MS = 1800;
 const HALF_STOPS = Array.from({ length: MAX_HALVES + 1 }, (_, i) => i);
 
-export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, inColor = null, heat: heatGiven, recut = null, header, thermal, colorByPref = 'map.colorBy', metrics = HEAT_METRICS, bare = false, numbered = !bare, rises = null }: TreemapProps) {
-  // How many half-rounds of the queue's head to number on the map, each in its area's corner.
+export function Treemap({ scene, selection, areas, palette, phases, estimates, onHover, lit = null, areasPerRound = 16, glyphs = NO_GLYPHS, asOf = null, inColor = null, heat: heatGiven, recut = null, header, thermal, colorByPref = 'map.colorBy', metrics = HEAT_METRICS, bare = false, numbered = !bare, byOnes = false, rises = null, legendExtra = null }: TreemapProps) {
+  // How much of the queue's head to number on the map, each in its area's corner: half rounds of it, or areas one by one.
   const [halves, setHalves] = useDashPref('map.upcoming');
+  const [counted, setCounted] = useDashPref('saturation.upcoming');
   const [gray] = useDashPref('map.gray');
-  const places = numbered ? halves * (areasPerRound / 2) : 0;
+  const upcoming: Upcoming = byOnes
+    ? { value: counted, set: setCounted, max: MAX_COUNTED, label: 'Upcoming areas to number on the map', text: `${counted} areas` }
+    : { value: halves, set: setHalves, max: MAX_HALVES, stops: HALF_STOPS, label: 'Upcoming areas to number on the map, in half rounds', text: `${halves * (areasPerRound / 2)} areas, ${halves / 2} rounds` };
+  const places = !numbered ? 0 : byOnes ? counted : halves * (areasPerRound / 2);
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<SceneCanvasApi>(null);
   const hud = useHud();
@@ -183,6 +193,7 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
           features={FEATURES}
           selection={selection}
           selectionOptions={SELECTION_OPTIONS}
+          layers={LAYERS}
           backgroundFill={{ color: palette.panel }}
           animator={animator}
           onHover={onHover}
@@ -194,10 +205,11 @@ export function Treemap({ scene, selection, areas, palette, phases, estimates, o
           {metrics.map((m) => <option key={m} value={m}>{HEAT_METRIC_SPECS[m].name}</option>)}
         </select>
         <HeatLegend heat={heat} stops={colorBy === 'left' ? null : shades.depth} />
+        {legendExtra}
         {!bare && <span>· passes: ● five, ○ one</span>}
         {/* Kept in place, faded and out of reach, for a past round, so the legend and the map above it never move. */}
         <span className={asOf === null ? s.nowKeys : `${s.nowKeys} ${s.nowOff}`} inert={asOf !== null} aria-hidden={asOf !== null || undefined}>
-          <NowLegend halves={halves} places={places} onInput={setHalves} onChange={setHalves} none={metric.none} bare={bare} numbered={numbered} />
+          <NowLegend upcoming={upcoming} places={places} none={metric.none} bare={bare} numbered={numbered} />
         </span>
       </div>
     </div>
@@ -217,8 +229,11 @@ function MapLoupe({ canvasRef, hud, visible, onClose }: {
 }
 
 /** The legend's keys for what is known only of now: changes since a pass, settling, live runs, the queue numbers. */
-function NowLegend({ halves, places, onInput, onChange, none, bare, numbered }: {
-  halves: number; places: number; onInput: (halves: number) => void; onChange: (halves: number) => void; bare: boolean; numbered: boolean;
+/** The legend's slider over how much of the queue to number: the setting it moves, its range and stops, and its words. */
+type Upcoming = { value: number; set: (value: number) => void; max: number; stops?: readonly number[]; label: string; text: string };
+
+function NowLegend({ upcoming, places, none, bare, numbered }: {
+  upcoming: Upcoming; places: number; bare: boolean; numbered: boolean;
   /** What a hatched cell means under the metric the map is shaded by: never audited, or no value of it. */
   none: string;
 }) {
@@ -254,11 +269,11 @@ function NowLegend({ halves, places, onInput, onChange, none, bare, numbered }: 
       {numbered && <span className={s.upcoming}>
         numbered upcoming:
         <Slider
-          className={s.upcomingSlider} aria-label={bare ? 'Upcoming areas to number on the map' : 'Upcoming areas to number on the map, in half rounds'}
-          min={0} max={MAX_HALVES} step={1} stops={HALF_STOPS} showStops snap="strict" thumbShape="dot"
+          className={s.upcomingSlider} aria-label={upcoming.label}
+          min={0} max={upcoming.max} step={1} {...(upcoming.stops ? { stops: upcoming.stops, showStops: true, snap: 'strict' as const } : {})} thumbShape="dot"
           trackHeight="var(--wzl-slider-track-h)" thumbSize="var(--wzl-slider-thumb-size)"
-          thumbs={[{ value: halves, valueText: bare ? `${places} areas` : `${places} areas, ${halves / 2} rounds` }]}
-          onInput={([t]) => onInput(t!.value)} onChange={([t]) => onChange(t!.value)}
+          thumbs={[{ value: upcoming.value, valueText: upcoming.text }]}
+          onInput={([t]) => upcoming.set(t!.value)} onChange={([t]) => upcoming.set(t!.value)}
           readoutPlacement="none"
         />
         <span className={s.upcomingCount}>{places}</span>

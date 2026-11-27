@@ -5,8 +5,14 @@ import { localStorageAdapter } from '@weasel-js/storage';
 import { ALL_METRICS, HEAT_METRIC_SPECS, HEAT_METRICS, SATURATION_METRICS, type HeatMetric } from './heatMetrics';
 import { HEAT_SCHEMES, type HeatScheme } from './heatSchemes';
 
+/** What the Scour page's map raises its areas by: one of its metrics, or nothing. */
+export type HeightMetric = 'flat' | (typeof SATURATION_METRICS)[number];
+
 /** The most the map numbers: eight rounds of the queue, in half rounds. */
 export const MAX_HALVES = 16;
+
+/** The most areas the Scour page's map numbers, counted one by one. */
+export const MAX_COUNTED = 64;
 
 /** A ramp to choose for each metric the map can shade by but defects left, whose ramp the charts share (`map.scheme`). */
 function schemePrefs() {
@@ -46,6 +52,13 @@ export const DASH_PREFS = pref.group('Dashboard', {
   saturation: pref.group('Scour', {
     colorBy: pref.enum<HeatMetric>('Color by', 'saturation', SATURATION_METRICS, {
       description: "What the Scour page's map shades its areas by; the legend under the map switches it too.",
+    }),
+    upcoming: pref.number('Number the queue', 24, {
+      description: "How many areas of scour's queue to number on the Scour page's map.",
+      min: 0, max: MAX_COUNTED, step: 1, control: 'slider',
+    }),
+    heightBy: pref.enum<HeightMetric>('Height by', 'saturationOpen', ['flat', ...SATURATION_METRICS], {
+      description: "What each area of the Scour page's map stands as high as, or flat; the legend under the map switches it too.",
     }),
   }),
   lanes: pref.group('Lanes', {

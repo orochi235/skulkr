@@ -58,3 +58,5 @@
   margin-inline-end: 4px;
   background: var(--tile);
 }
+
+.pickable { cursor: pointer; }

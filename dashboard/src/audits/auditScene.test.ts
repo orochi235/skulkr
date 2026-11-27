@@ -198,7 +198,7 @@ describe('outline', () => {
 });
 
 describe('a raised map', () => {
-  it('stands each area its rise high at the top level, drawing those up and to the right first', () => {
+  it('stands each area its rise high at the top level, the flat ones drawn before the raised', () => {
     const scene = createAuditScene();
     const layout = layoutMap(map.areas, 900, 400);
     syncAuditScene(scene, auditNodeSpecs(map.areas, layout, PALETTE, new Map(), null, Infinity, new Map(), {}, null, 1, undefined, null, false,
@@ -207,15 +207,26 @@ describe('a raised map', () => {
     expect(cellOf(scene, 'core.debug').rise).toBeUndefined();
     const cells = scene.roots.filter((id) => map.areas.some((a) => a.id === id));
     expect(cells).toHaveLength(map.areas.length);
-    const boxes = new Map(layout.cells.map((c) => [c.id, c]));
-    expect(cells).toEqual(backToFront(cells.map((id) => boxes.get(id)!)).map((c) => c.id));
+    expect(cells.at(-1)).toBe('core.ops');
+  });
+
+  it('draws a raised cell after every cell its walls and lid rise into, wherever their centers lie', () => {
+    // `above` is flat and mostly to the left, over `box`'s left wall; `right` is raised, beside `box`; `front` is raised,
+    // below `box`, which rises into it.
+    const box = { id: 'box', x: 100, y: 100, width: 40, height: 40 };
+    const above = { id: 'above', x: 0, y: 60, width: 110, height: 40 };
+    const right = { id: 'right', x: 140, y: 100, width: 40, height: 40 };
+    const front = { id: 'front', x: 60, y: 140, width: 60, height: 40 };
+    const rises = new Map([['box', 20], ['right', 20], ['front', 20]]);
+    expect(backToFront([box, front, above, right], rises).map((c) => c.id)).toEqual(['above', 'right', 'box', 'front']);
   });
 
   it("draws a raised cell's walls and its lid above its footprint, and picks by the whole block", () => {
     const cell = { kind: 'audit-cell', fill: { color: 'oklch(0.8 0.1 80)' }, edge: '#fff', ink: '#000', dots: 0, pulse: 1, font: 'a', numericFont: 'a', rise: 8 } as AuditCellData;
     const pose = { x: 0, y: 20, width: 30, height: 10 };
-    const commands = AUDIT_PAINTER.paint({ data: cell } as never, pose);
-    expect(Array.from((commands.at(-1) as { transform: Float32Array }).transform)).toEqual([1, 0, 0, 0, 1, 0, 4, -6, 1]);
+    const [box] = AUDIT_PAINTER.paint({ data: cell } as never, pose) as unknown as [{ alpha: number; children: { transform?: Float32Array }[] }];
+    expect(box.alpha).toBe(0.8);
+    expect(Array.from(box.children.at(-1)!.transform!)).toEqual([1, 0, 0, 0, 1, 0, 4, -6, 1]);
     expect(AUDIT_PAINTER.bounds!({ data: cell } as never, pose)).toEqual({ x: -2, y: 12, width: 38, height: 20 });
   });
 });

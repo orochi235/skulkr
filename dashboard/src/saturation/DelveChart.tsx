@@ -35,11 +35,11 @@ export const spanOf = (done: number, max: number | null, live: boolean): number 
 export const tileTitleOf = (d: SaturationDefect, pass: number, novelty: Novelty): string =>
   `pass ${pass} · ${d.id}, ${LABEL[novelty]}${novelty === 'again' ? ` in pass ${d.firstOccasion}` : ''} · ${d.claim}`;
 
-type TileProps = { x: number; y: number; className: string; title: string; onEnter: () => void; onLeave: () => void };
+type TileProps = { x: number; y: number; className: string; title: string; onEnter: () => void; onLeave: () => void; onPick?: (() => void) | undefined };
 
-function Tile({ x, y, className, title, onEnter, onLeave }: TileProps) {
+function Tile({ x, y, className, title, onEnter, onLeave, onPick }: TileProps) {
   return (
-    <g className={className} onPointerEnter={onEnter} onPointerLeave={onLeave}>
+    <g className={onPick ? `${className} ${s.pickable}` : className} onPointerEnter={onEnter} onPointerLeave={onLeave} onClick={onPick}>
       <title>{title}</title>
       <rect className={s.front} x={x} y={y} width={TILE_W} height={TILE_H} />
       <polygon className={s.top} points={`${x},${y} ${x + DEPTH},${y - DEPTH} ${x + TILE_W + DEPTH},${y - DEPTH} ${x + TILE_W},${y}`} />
@@ -50,7 +50,11 @@ function Tile({ x, y, className, title, onEnter, onLeave }: TileProps) {
 
 /** A ledger's passes along the axis, each a stack of tiles, one per defect it reported, by whether it was new, and the
  *  count of defects the ledger is estimated to hold that no pass has found. */
-export function DelveChart({ ledger, max = null, live = false }: { ledger: SaturationLedger; max?: number | null; live?: boolean }) {
+export function DelveChart({ ledger, max = null, live = false, onPickDefect }: {
+  ledger: SaturationLedger; max?: number | null; live?: boolean;
+  /** Called with a tile's defect when it is clicked; without it, tiles only trace on hover. */
+  onPickDefect?: (id: string) => void;
+}) {
   const [traced, setTraced] = useState<string | null>(null);
   const done = ledger.occasions;
   if (done === 0) return null;
@@ -79,7 +83,8 @@ export function DelveChart({ ledger, max = null, live = false }: { ledger: Satur
         <Tile key={`${i}-${defect.id}`} x={colX(i + 1)} y={base - (k + 1) * TILE_H}
           className={defect.id === traced ? `${s[novelty]} ${s.traced}` : s[novelty]!}
           title={tileTitleOf(defect, i + 1, novelty)}
-          onEnter={() => setTraced(defect.id)} onLeave={() => setTraced((t) => (t === defect.id ? null : t))} />
+          onEnter={() => setTraced(defect.id)} onLeave={() => setTraced((t) => (t === defect.id ? null : t))}
+          onPick={onPickDefect ? () => onPickDefect(defect.id) : undefined} />
       )))}
       {ghosts > 0 && <text className={s.ghostLabel} x={labelX} y={base - 2}>≈ {ghosts} not found yet</text>}
     </svg>
