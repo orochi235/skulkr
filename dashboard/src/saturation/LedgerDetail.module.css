@@ -29,6 +29,9 @@
   overflow: auto;
 }
 
+/* Rows read from their top line, however many lines a claim or path wraps to. */
+.scroll table td { vertical-align: top; }
+
 .id {
   font-family: var(--wzl-font-mono);
   white-space: nowrap;

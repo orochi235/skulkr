@@ -77,8 +77,9 @@
 
 .chip { white-space: nowrap; }
 
-.branch {
-  margin-inline-start: var(--wzl-space-1);
-  font-size: var(--wzl-font-size-xs);
-  color: var(--wzl-fg-muted);
+/* A status whose tooltip names its branch: dotted underline, as a term with a definition. */
+.tipped {
+  text-decoration: underline dotted var(--wzl-fg-muted);
+  text-underline-offset: 3px;
+  cursor: default;
 }

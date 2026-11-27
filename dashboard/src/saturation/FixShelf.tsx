@@ -1,3 +1,4 @@
+import { Focusable, Tooltip, TooltipTrigger } from '@weasel-js/ui/components/Tooltip';
 import { AboutButton } from '@dash/AboutButton';
 import type { FixShelf as FixShelfData, FixStatus } from './saturation.types';
 import s from './FixShelf.module.css';
@@ -87,11 +88,15 @@ export function FixShelfAbout() {
   );
 }
 
-/** A defect's fix status as a swatch in its shelf color and its word, with the branch its fix is on. */
+/** A defect's fix status as a swatch in its shelf color and its word; where its fix is on a branch, the word names it
+ *  in a tooltip. */
 export function FixStatusChip({ status, branch = null }: { status: ShelfStatus; branch?: string | null }) {
+  const chip = <span className={s.chip}><i className={`${s.swatch} ${CLASS[status]}`} />{status}</span>;
+  if (!branch) return chip;
   return (
-    <span className={s.chip}>
-      <i className={`${s.swatch} ${CLASS[status]}`} />{status}{branch && <code className={s.branch}>{branch}</code>}
-    </span>
+    <TooltipTrigger>
+      <Focusable><span className={s.tipped} tabIndex={0}>{chip}</span></Focusable>
+      <Tooltip placement="top"><code>{branch}</code></Tooltip>
+    </TooltipTrigger>
   );
 }
