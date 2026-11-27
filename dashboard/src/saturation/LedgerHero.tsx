@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Focusable, Tooltip, TooltipTrigger } from '@weasel-js/ui/components/Tooltip';
-import { isDefectClosed, isFixSettled } from './FixShelf';
+import { isDefectClosed, isFixSettled, tileClassOf } from './FixShelf';
 import { percent, usd, usdOrDash } from './format';
 import type { SaturationLedger } from './saturation.types';
 import s from './LedgerHero.module.css';
@@ -26,6 +26,15 @@ export type Stat = readonly [label: string, value: ReactNode, tone?: string, tip
  *  `LiveQuantity` keeps its width, so its changing digits never move what follows). */
 export const STAT_TONE = { estimate: s.estimate!, light: s.light!, clock: s.clock! } as const;
 
+/** The tone of a count the fix shelf colors too: its tile's color as a bar over it. */
+export const shelfToneOf = (status: Parameters<typeof tileClassOf>[0]): string => `${s.tiled} ${tileClassOf(status)}`;
+
+/** A ledger's next defect's price in tone `tone`, amber once it passes the limit a delve stops at. */
+export const nextDefectStatOf = (ledger: SaturationLedger, tone: string): Stat => {
+  const over = ledger.nextUsd !== null && ledger.nextUsd > ledger.limit.usd;
+  return ['next defect', usdOrDash(ledger.nextUsd), over ? `${tone} ${s.over}` : tone];
+};
+
 /** A row of headline figures, each big over its word. An estimate is set apart by its type (`.estimate`), not a sign
  *  before it. */
 export function StatRow({ label, stats }: { label: string; stats: readonly Stat[] }) {
@@ -41,7 +50,7 @@ export function StatRow({ label, stats }: { label: string; stats: readonly Stat[
               </TooltipTrigger>
             ) : word}
           </dt>
-          <dd className={s.value} title={tone === s.estimate ? 'an estimate' : undefined}>{value}</dd>
+          <dd className={s.value} title={tone?.split(' ').includes(s.estimate!) ? 'an estimate' : undefined}>{value}</dd>
         </div>
       ))}
     </dl>
@@ -53,15 +62,15 @@ export function LedgerHero({ ledger }: { ledger: SaturationLedger }) {
   const c = heroCountsOf(ledger);
   const counts: Stat[] = [
     ['found', String(c.found)],
-    ['fixed', String(c.fixed), s.fixed],
-    ...(c.fixing ? [['fixing', String(c.fixing), s.fixing] as Stat] : []),
-    ['open', String(c.open), s.open],
+    ['fixed', String(c.fixed), shelfToneOf('fixed')],
+    ...(c.fixing ? [['fixing', String(c.fixing), shelfToneOf('fixing')] as Stat] : []),
+    ['open', String(c.open), shelfToneOf('waiting')],
     ...(c.ignored ? [['ignored', String(c.ignored)] as Stat] : []),
     ['left (est.)', c.unseen === null ? '–' : String(Math.round(c.unseen)), s.estimate],
   ];
   const outlook: Stat[] = [
     ['next new', percent(ledger.nextNew), s.estimate],
-    ['next defect', usdOrDash(ledger.nextUsd), s.estimate],
+    nextDefectStatOf(ledger, s.estimate!),
     ['limit', usd(ledger.limit.usd)],
   ];
   return (

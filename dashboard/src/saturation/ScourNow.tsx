@@ -6,8 +6,8 @@ import { DefectCallout, useDefectCallout } from './DefectCallout';
 import { DelveAbout, DelveChart } from './DelveChart';
 import { FixShelf } from './FixShelf';
 import { PassPill } from './PassPill';
-import { STAT_TONE, StatRow, type Stat } from './LedgerHero';
-import { percent, usd, usdOrDash } from './format';
+import { STAT_TONE, StatRow, nextDefectStatOf, shelfToneOf, type Stat } from './LedgerHero';
+import { percent, usd } from './format';
 import type { ScourJob, SaturationLedger, Tally } from './saturation.types';
 import s from './ScourNow.module.css';
 
@@ -28,8 +28,8 @@ export const timedLines = (log: readonly string[], since: string, n = 3): string
 
 const HELD = duration();
 
-/** A live delve's figures in one row: how long the process has held it, counting on from `stamp`, its passes
- *  against its cap, found, what a next pass looks like, and the spend, dollars set light. A fix run's are its own. */
+/** A live delve's figures in one row: how long the process has held it, counting on from `stamp`, the pass
+ *  under way (its cap in a tooltip), found, what a next pass looks like, and the spend, dollars set light. A fix run's are its own. */
 export const liveStatsOf = (l: SaturationLedger, stamp: Stamp): Stat[] => {
   const r = l.running!;
   const held = elapsedReading(r.since, null, true, stamp);
@@ -38,17 +38,17 @@ export const liveStatsOf = (l: SaturationLedger, stamp: Stamp): Stat[] => {
   const light = STAT_TONE.light;
   return [
     elapsed,
-    ['passes', String(l.occasions), undefined, r.max ? `up to ${r.max}` : undefined],
+    ['pass', String(l.occasions + 1), undefined, r.max ? `up to ${r.max}` : undefined],
     ['found', String(l.distinct)],
     ['next new', percent(l.nextNew)],
-    ['next defect', usdOrDash(l.nextUsd), light],
+    nextDefectStatOf(l, light),
     ['limit', usd(l.limit.usd), light],
     ['spent', usd(l.costUsd), light],
   ];
 };
 
 /** A running fix run's tally from its own verdicts: batches back of the run's, and its defects by where they stand,
- *  those out in a batch by stage (`checking` reads as verifying). */
+ *  those out in a batch by stage (`checking` reads as verifying); a count at 0 is left out. */
 export const fixStatsOf = (l: SaturationLedger, max: number | null): Stat[] => {
   const shelf = l.fix;
   const run = shelf?.lastRun?.n;
@@ -57,17 +57,18 @@ export const fixStatsOf = (l: SaturationLedger, max: number | null): Stat[] => {
   const back = touched.filter((b) => b.defects.every((d) => mine(d.id) && mine(d.id)!.status !== 'fixing')).length;
   const count = (...of: string[]) => Object.keys(shelf?.statuses ?? {}).filter((id) => of.includes(mine(id)?.status ?? '')).length;
   const at = (stage: string) => String(Object.keys(shelf?.statuses ?? {}).filter((id) => mine(id)?.status === 'fixing' && mine(id)?.stage === stage).length);
-  return [
+  const stats: Stat[] = [
     ['batch', max ? `${back}/${max}` : String(back), STAT_TONE.light],
-    ['analyzing', at('analyzing')],
-    ['writing', at('writing')],
-    ['written', at('written')],
-    ['verifying', at('checking')],
-    ['repairing', at('repairing')],
-    ['fixed', String(count('fixed'))],
-    ['not a defect', String(count('not a defect'))],
+    ['analyzing', at('analyzing'), shelfToneOf('analyzing')],
+    ['writing', at('writing'), shelfToneOf('writing')],
+    ['written', at('written'), shelfToneOf('written')],
+    ['verifying', at('checking'), shelfToneOf('checking')],
+    ['repairing', at('repairing'), shelfToneOf('repairing')],
+    ['fixed', String(count('fixed')), shelfToneOf('fixed')],
+    ['not a defect', String(count('not a defect')), shelfToneOf('not a defect')],
     ['other', String(count('question', 'not fixed', 'duplicate', 'unread', 'flagged'))],
   ];
+  return stats.filter(([word, value]) => word === 'batch' || value !== '0');
 };
 
 /** A job's step in words: a fix batch's `fixing`, `verifying` (on the fleet where it went there) or `repairing N`; any

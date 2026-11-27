@@ -27,7 +27,7 @@ describe('passKeyParts', () => {
   it("splits a delve job's key into its pass number and source, and keeps any other key whole", () => {
     expect(passKeyParts('07-claude')).toEqual({ index: '07', name: 'claude' });
     expect(passKeyParts('12-codex')).toEqual({ index: '12', name: 'codex' });
-    expect(passKeyParts('b3')).toEqual({ index: '3', name: 'batch' });
+    expect(passKeyParts('b3')).toEqual({ index: '3', name: 'batch', nameFirst: true });
     expect(passKeyParts('match')).toEqual({ index: null, name: 'match' });
   });
 });
@@ -46,15 +46,15 @@ describe('stepWordsOf and tallyText', () => {
 });
 
 describe('fixStatsOf', () => {
-  it('counts the defects out in a batch by stage, checking as verifying', () => {
+  it('counts the defects out in a batch by stage, checking as verifying, leaving out a count at 0', () => {
     const statuses = {
       D1: { status: 'fixing', run: 3, branch: null, stage: 'analyzing' }, D2: { status: 'fixing', run: 3, branch: null, stage: 'writing' },
       D3: { status: 'fixing', run: 3, branch: null, stage: 'checking' }, D4: { status: 'fixing', run: 3, branch: null, stage: 'checking' },
       D5: { status: 'fixed', run: 3, branch: 'b', verified: true },
     };
     const l = { fix: { lastRun: { n: 3, started: null, finished: null }, batches: [], ask: [], statuses } } as unknown as SaturationLedger;
-    expect(Object.fromEntries(fixStatsOf(l, 4).map(([word, value]) => [word, value]))).toMatchObject({
-      analyzing: '1', writing: '1', written: '0', verifying: '2', repairing: '0', fixed: '1',
+    expect(Object.fromEntries(fixStatsOf(l, 4).map(([word, value]) => [word, value]))).toEqual({
+      batch: '0/4', analyzing: '1', writing: '1', verifying: '2', fixed: '1',
     });
   });
 });

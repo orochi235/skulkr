@@ -43,6 +43,9 @@ const CLASS: Readonly<Record<ShelfStatus, string>> = {
   'not fixed': s.notFixed!, duplicate: s.duplicate!, unread: s.unread!, 'flagged': s.flagged!,
 };
 
+/** The class that sets a status's tile color as `--tile`, for anything else that wears it. */
+export const tileClassOf = (status: ShelfStatus): string => CLASS[status];
+
 const KEY: readonly ShelfStatus[] = ['waiting', 'analyzing', 'writing', 'written', 'checking', 'repairing', 'fixed', 'not a defect', 'flagged', 'question', 'not fixed', 'duplicate', 'unread'];
 
 /** How the shelf orders tiles within a group: as triage batched them, or by status in the key's order. */

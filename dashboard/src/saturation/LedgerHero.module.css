@@ -30,12 +30,8 @@
   border-block-start: 4px solid transparent;
 }
 
-/* A count the shelf colors too wears its tile's color as a bar over it. */
-.fixed { border-block-start-color: var(--wzl-success); }
-
-.fixing { border-block-start-color: var(--wzl-accent); }
-
-.open { border-block-start-color: color-mix(in srgb, var(--wzl-fg) 30%, var(--wzl-surface)); }
+/* A count the shelf colors too wears its tile's color (`tileClassOf`'s `--tile`) as a bar over it. */
+.tiled { border-block-start-color: var(--tile); }
 
 .value {
   margin: 0;
@@ -47,6 +43,9 @@
 
 /* An estimated count: set lighter than the counted ones. */
 .estimate .value { font-weight: var(--wzl-font-weight-normal, 400); }
+
+/* A next defect priced past the limit a delve stops at. */
+.over .value { color: var(--wzl-warning); }
 
 /* A figure set lighter than the counts, such as a clock that keeps changing. */
 .light .value,
