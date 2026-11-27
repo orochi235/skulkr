@@ -22,10 +22,14 @@ were not stacked.
 
 ## Waiting on weasel's batch
 
-- The dashboard's hover cards (`d9c58f4`) are weasel `Tooltip`s anchored by `anchorRect` (weasel `41906fd420`, in
-  `batch/2026-11-27-scour`). Until that batch lands and `~/src/weasel` is rebuilt (`npm run build` there, on the
-  fleet), the dashboard on :5214 draws the cards at the window's top-left. Then run the dashboard typecheck (fleet),
-  and delete weasel's `.worktrees/tooltip-anchor-rect` and its branch.
+- The dashboard's hover cards need weasel's `Tooltip` `anchorRect` (`41906fd420`), which is only on weasel-fe's
+  `batch/2026-11-27-scour`. Meanwhile (2026-11-27 16:10) the dashboard on :5214 runs on a weasel build of its own:
+  worktree `~/src/weasel/.worktrees/skulkr-dash-dist` (branch `skulkr-dash-dist`: weasel `main` plus `41906fd420`
+  cherry-picked, built on the fleet, each package linked under its own `node_modules/@weasel-js`), served by
+  `emilia up dashboard -- env ALPO_WEASEL=<that worktree> npm run dev`. Checked: a shelf tile's card opens beside the
+  tile. weasel-fe will message when the batch lands (kouhai t-640); then rebuild `~/src/weasel` on the fleet, restart
+  the dashboard with a plain `emilia up dashboard`, clear `dashboard/node_modules/.vite` if modules 504, and delete
+  the `skulkr-dash-dist` worktree and branch and weasel's `.worktrees/tooltip-anchor-rect` and its branch.
 
 ## In flight: the Timeline and registry fix trial
 
