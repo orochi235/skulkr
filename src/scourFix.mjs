@@ -14,6 +14,7 @@ import { loggingSay } from './delveLive.mjs';
 import { localFixOf } from './args.mjs';
 import { createSaturateContext } from './saturateJobs.mjs';
 import { scourStateDirOf } from './scourPaths.mjs';
+import { createRepairLayer } from './scourFixLay.mjs';
 import { fixPlanFor, fixPlanLines, filesOf } from './scourTriage.mjs';
 
 const VERDICTS = ['not a defect', 'not fixed', 'duplicate', 'question', 'fixed'];
@@ -47,6 +48,8 @@ const scourSource = (id, commit, ledgerCommit, n) => [
   'changed since the ledger: check each still applies first (`not a defect (no longer applies)` when it is gone).',
   'Lead each verdict line with its id in brackets, `[D7]`, and give `scour` as where it came from. They count in N.',
   'After any verdict but `fixed`, say why in a sentence or two on the same line: it is kept as the reason.',
+  'End each commit message with a trailer naming the defects it fixes, `Defect: D7`, or `Defect: D3, D7` for one',
+  'commit covering several; a commit fixing none, such as a lint fix, takes no trailer.',
 ].join('\n');
 
 /** Each defect's verdict from a fixer's report: the line led by its `[D<n>]`, its first verdict word, and the rest. */
@@ -133,6 +136,7 @@ const fixBatches = async (cfg, runner, root, id, ledger, batches, n, runDir, arg
       localFix: localFixOf(cfg, { localFix: Boolean(args.localFix) }),
       total: { fix: batches.length },
       progress: (kind, msg, total) => say(`${kind} ${msg}${total ? ` (of ${total})` : ''}`),
+      layRepair: createRepairLayer(cfg, frozen),
     };
     say(`scour fix ${n} on ${id} at ${commit.slice(0, 10)} (ledger at ${ledger.commit.slice(0, 10)}): ${batches.length} batches`);
     for (const b of batches) {

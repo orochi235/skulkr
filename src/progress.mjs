@@ -111,6 +111,11 @@ export const commitSubject = (command) => {
   return clip(message.split('\n')[0], 72);
 };
 
+/** The defect ids a commit message's `Defect:` trailers name (`Defect: D3, D7`; `Defects:` too), read from the whole
+ *  `git commit` command however it quotes the message, or from an mbox's message. */
+export const trailerDefectsOf = (message) =>
+  [...new Set([...String(message).replace(/\\n/g, '\n').matchAll(/\bDefects?:\s*(D\d+(?:\s*,?\s*D\d+)*)/gi)].flatMap((m) => m[1].match(/\bD\d+\b/g) ?? []))];
+
 /** The Bash tool calls the event's assistant message makes: each call's id and command. */
 const bashCalls = (event) => {
   if (event?.type !== 'assistant' || !Array.isArray(event.message?.content)) return [];
@@ -267,11 +272,14 @@ export const createCommitProgress = (findings, tally = null) => {
         continue;
       }
       const subject = commitSubject(command);
+      // A scour fixer names each commit's defects in a trailer; a round's fixer names none, and its line is as before.
+      const ids = trailerDefectsOf(command);
+      const of = ids.length ? ` for ${ids.join(' ')}` : '';
       if (made < total) {
         made += 1;
         counted = true;
-        notes.push(`skulkr: commit ${made}/${total}${subject ? `: ${subject}` : ''}`);
-      } else notes.push(`skulkr: fixup commit${subject ? `: ${subject}` : ''}`);
+        notes.push(`skulkr: commit ${made}/${total}${of}${subject ? `: ${subject}` : ''}`);
+      } else notes.push(`skulkr: fixup commit${of}${subject ? `: ${subject}` : ''}`);
     }
     if (counted) lines.unshift(`onto: progress ${made}/${total}`);
     lines.unshift(...notes);

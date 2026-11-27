@@ -227,6 +227,13 @@ describe('createCommitProgress checks', () => {
     ]);
   });
 
+  it('names the defects a commit trailer gives, and nothing more where it gives none', () => {
+    const { feed } = createCommitProgress(2);
+    const notes = [bash('c1', 'git commit -q -m "clamp the key" -m "Defect: D3, D7"'), bash('c2', 'git commit -m "lint"')]
+      .flatMap((line) => (feed(line).progress ?? '').split('\n').filter((l) => l.startsWith('skulkr:')));
+    expect(notes).toEqual(['skulkr: commit 1/2 for D3 D7: clamp the key', 'skulkr: commit 2/2: lint']);
+  });
+
   it('reads a commit subject from each way a message is quoted', () => {
     expect(commitSubject('git commit -m "a b"')).toBe('a b');
     expect(commitSubject("git commit -qm 'a b' -- x")).toBe('a b');

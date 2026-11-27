@@ -143,7 +143,8 @@ export function FixShelfAbout() {
       <p className={s.aboutPara}>
         Each open defect is a tile, grouped by the fix batch triage puts it in, colored by where its fix stands. While
         its batch is out, a tile shows the step it is on: analyzing until the fixer takes it up, writing until its
-        commit, written after, then checking (the fixer&apos;s checks and verify) and repairing. A dot
+        commit, written after, then checking (the fixer&apos;s checks and verify), and repairing only where a failing
+        test is laid at its commits; a fixer&apos;s commit names its defects in a <code>Defect:</code> trailer. A dot
         above a tile marks a defect most reviews keep finding. A batch whose every defect has a verdict joins the done
         group at the end. The switch orders each group&apos;s tiles by batch or by status. Click a tile to jump to its row.
       </p>

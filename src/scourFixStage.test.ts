@@ -26,6 +26,18 @@ describe("a fix batch's stages", () => {
     expect(stagesFromFixLog(log('skulkr: says: D1', "skulkr: verifying the fixer's commits"), ids).D3).toBe('checking');
   });
 
+  it("reads written defects from commits' trailers, and on a verify checks only those, leaving the rest where they were", () => {
+    const text = log(
+      'skulkr: says: Starting with D2, then D1.',
+      'skulkr: says: D1 is the clamp.',
+      'skulkr: commit 1/3 for D2: say what the key does',
+      'skulkr: commit 2/3 for D1 D2: clamp the key',
+    );
+    expect(stagesFromFixLog(text, ids)).toEqual({ D1: 'written', D2: 'written', D3: 'analyzing' });
+    expect(stagesFromFixLog(log(text, "skulkr: verifying the fixer's commits"), ids)).toEqual({ D1: 'checking', D2: 'checking', D3: 'analyzing' });
+    expect(stagesFromFixLog(log(text, 'skulkr: commit 3/3 for D3: c'), ids)).toEqual({ D1: 'checking', D2: 'checking', D3: 'checking' });
+  });
+
   describe('from a job directory', () => {
     let dir = '';
     afterEach(() => rmSync(dir, { recursive: true, force: true }));
@@ -45,6 +57,18 @@ describe("a fix batch's stages", () => {
       expect(fixStagesIn(dir, ids).D2).toBe('repairing');
       write('repair-1.log', "skulkr: running: npm test\nskulkr: verifying the fixer's commits\n", 3000);
       expect(fixStagesIn(dir, ids).D2).toBe('checking');
+    });
+
+    it('repairs only the defects the failure is laid at, the rest checking or where they were', () => {
+      dir = mkdtempSync(join(tmpdir(), 'skulkr-stage-'));
+      write('fix.log', log('skulkr: commit 1/2 for D1: a', 'skulkr: commit 2/2 for D2: b'), 1000);
+      write('verify-fix.log', '', 2000);
+      expect(fixStagesIn(dir, ids)).toEqual({ D1: 'checking', D2: 'checking', D3: 'analyzing' });
+      writeFileSync(join(dir, 'repair-1.defects.json'), JSON.stringify({ defects: ['D2'], commits: ['abc'] }));
+      write('repair-1.log', 'skulkr: running: npm test', 3000);
+      expect(fixStagesIn(dir, ids)).toEqual({ D1: 'checking', D2: 'repairing', D3: 'analyzing' });
+      writeFileSync(join(dir, 'repair-1.defects.json'), JSON.stringify({ defects: null }));
+      expect(fixStagesIn(dir, ids)).toEqual({ D1: 'repairing', D2: 'repairing', D3: 'repairing' });
     });
   });
 });

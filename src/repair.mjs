@@ -163,6 +163,12 @@ export const verifyAndRepair = async (ctx, area, fixed, dir) => {
   // never ran (a failed install, a tree mismatch) fails the same way for a repair job, so none is paid for.
   while (!verdict.ok && !verdict.timedOut && !verdict.unrun && repairs.length < MAX_REPAIRS) {
     const attempt = repairs.length + 1;
+    // A scour fix says which of its defects the failure is laid at, for the Scour page; a round's passes no hook.
+    try {
+      ctx.layRepair?.({ jobsDir: join(ctx.nightDir, 'jobs', area.id), verdict, mbox, label: String(attempt) });
+    } catch (error) {
+      ctx.say(`repair ${area.id}: could not lay the failure at defects (${error.message ?? error})`);
+    }
     const run = await repairJob(ctx, area, { mbox, log: verdict.log, label: String(attempt), attempt, baseline: verdict.baseline });
     if (run.usage) usage.push(run.usage);
     mbox = run.mbox;

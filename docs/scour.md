@@ -77,6 +77,13 @@ their verify and checks on the fleet (`runner: 'local'`, so `checksOnFleet` hold
   the first one's batch, for what a batch left unfixed. `--on <ref>` starts the run from that ref instead of `main`'s tip,
   so a batch touching an earlier batch's files stacks on its branch and lands after it without conflicts.
 
+- **Each defect's own stage** (2026-11-27): a scour fixer ends each commit with a `Defect: D12` trailer, which its log's
+  commit line carries (`skulkr: commit 2/8 for D12: …`), so the shelf marks written, then checking, only the defects
+  committed. Before a repair, `src/scourFixLay.mjs` lays the failing files at the batch's commits by the narrowest
+  evidence (the file itself, a commit that added what the failure flags as `path: 64`, a file it names, the config's
+  `gate.blame`, then import reach) and writes `repair-<k>.defects.json`; only those commits' defects show repairing.
+  A batch without trailers, or a failure laid at none, reads as before. Each verdict other than fixed keeps the
+  fixer's reason, shown on the defect's hover card.
 - **Batches group for the fixer's sake, never by severity**: every open defect is to be fixed, so defects join one
   batch when they share a file a fix would touch or a stated cause, a group past eight split in file and line order
   (2026-11-26). A reviewer's file mention is resolved against the ledger's files and the full paths other defects
