@@ -2,6 +2,17 @@
 
 Open work on skulkr. Each entry says when it closes.
 
+- [ ] (P1) A fleet verify from a local tree was refused by onto with "trees/t1 is not inside a git repository" while
+  t1 is a working `git clone --shared` (2026-11-26, Timeline fix run 3's batch 4, logged in t1's
+  `.skulkr/out/verify.log`). The same `onto do` from t1 ran fine minutes later, so it looks transient. My guess, not
+  proven, is a race with the controller writing t1's `.git` (`fix.mbox` and `fixup.log` were written that minute).
+  Until 92dfdc1 the wrapper then ran the verify on the controller. Now it asks three times and fails. Closes when the
+  cause is found and fixed.
+
+- [ ] (P2) The dashboard's Scour page keeps a headless Chromium tab at 150–180% CPU while nobody touches it
+  (2026-11-26, measured with `ps` on two headless browsers left open on it). Closes when an idle Scour page costs
+  next to nothing.
+
 - [ ] (P2) A local fixer's usage record reads its tokens from the job's last turn alone: scour fix 1's fixer, ten
   minutes and two commits, recorded 1 turn, 331 output tokens and 0.01M weighted tokens, while its `claude.json`
   `total_cost_usd` ($0.82) was right (2026-11-26). Costs stay correct; turns, tokens and weighted tokens do not.
