@@ -8,13 +8,13 @@ On `main`; unpushed commits: `git log --oneline @{u}..HEAD`. Live jobs: `pgrep -
 step times `node scripts/fixRunStats.mjs`; cost per defect by batch size `skulkr scour batches`.
 Commit each verified change on `main` without asking (Mike, 2026-11-27).
 
-## Running now (2026-11-28 ~07:30 local, all local mode)
+## Running now (2026-11-28 ~09:00 local)
 
-The fix queue (`skulkr scour fix --queue`, pid 50815, one lane, log `.playwright-mcp/logs/fix-queue.log`) is draining
-`rig` (fix 23), the last; `scale` (fix 21) and `headless` (fix 22) landed, weasel `main` at `f2c7e2dfd4` after 22. Each run lands itself on weasel `main`; per-area logs are
-`<state>/scour/fix-<area>.log` (`<state>` = `~/.local/state/weasel-skulkr`). `skulkr scour queue ls` shows where it is.
-Watch with Monitor on those logs (`grep -E "^fix queue|^(batch [0-9]+:.*(fixed|failed)|repair|land|gate|capstone)|rror|failed|limit"`),
-30-minute expiry; this session's watchers die with it.
+Nothing. The fix queue drained: its last run, fix 23 on `rig`, landed and weasel `main` is at `f30993007a`. Per-area
+fix logs are `<state>/scour/fix-<area>.log` (`<state>` = `~/.local/state/weasel-skulkr`).
+
+**Open question:** `rig`'s delve found 11 distinct, but fix 23 batched 9 (D1–D6, D9–D11); D7 and D8 were left out
+and I didn't find why. Check `skulkr scour fix rig --dry` and the ledger before re-sending them with `--defects D7,D8`.
 
 Done since 2026-11-27 evening (all local `claude -p`, Mike's account):
 
@@ -25,13 +25,14 @@ Done since 2026-11-27 evening (all local `claude -p`, Mike's account):
 | Delves `ui.components.Field`, `scale`, `headless`, `rig` (log `.playwright-mcp/logs/delve-field-scale-headless-rig.log`) | all ready to fix after 5 passes: 6, 12, 4, 11 distinct |
 | Fix 18 `select`, 19 `parallax`, 20 `ui.components.Field` | all fixed, each landed (weasel `main` → `bb201046c7` after 20) |
 | Fix 21 `scale` | 12 fixed in 2 batches, landed (weasel `main` → `4a3dcd2e38`) |
+| Fix 22 `headless`, 23 `rig` | 4 and 9 fixed, landed (weasel `main` → `f30993007a`) |
 
 Decisions from conversation:
 
 - "A couple"/"four more" delves counts areas, run uncapped, next in `scour ls --json`'s `queue` (2026-11-27).
 - Mike asked for fix runs on "the ready areas" (2026-11-28); I added each delve that later stopped ready to fix
   (`scale`, `headless`, `rig`) to the queue on that reading. He hasn't objected.
-- **`scale` wants another delve after fix 21 lands:** at its ready-to-fix stop it was still finding 3 new per pass,
+- **`scale` wants another delve now that fix 21 landed:** at its ready-to-fix stop it was still finding 3 new per pass,
   ≈16 unseen. The ready-to-fix stop fires at `minPasses` (5) regardless of how far from saturated an area is, and no
   stop (cost or saturation) applies before pass 5 (`src/saturation.mjs`).
 
