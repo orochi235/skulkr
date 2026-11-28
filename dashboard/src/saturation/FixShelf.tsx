@@ -27,6 +27,11 @@ export const shelfStatusOf = (entry: FixStatusEntry | undefined): ShelfStatus =>
 export const isFixSettled = (entry: FixStatusEntry | undefined, registry: { readonly status: string } | null = null): boolean =>
   (entry?.status === 'fixed' && entry.branch !== null && entry.verified === true) || registry?.status === 'fixed';
 
+/** Whether a defect waits on a person's decision rather than a fixer: set aside to ask (design-sized), or answered
+ *  with a question. */
+export const isDefectHeld = (fix: { readonly ask: readonly string[]; readonly statuses: Readonly<Record<string, FixStatusEntry>> } | null | undefined, id: string): boolean =>
+  Boolean(fix && (fix.ask.includes(id) || fix.statuses[id]?.status === 'question'));
+
 /** Whether a defect is closed: its fix settled, a verified run calling it no defect or a duplicate, or its registry
  *  line past `open`. */
 export const isDefectClosed = (entry: FixStatusEntry | undefined, registry: { readonly status: string } | null = null): boolean =>

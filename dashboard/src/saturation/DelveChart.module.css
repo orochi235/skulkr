@@ -22,6 +22,9 @@
 
 .lone { --tile: var(--wzl-warning); }
 
+/* A defect waiting on a person's decision, not a fixer (`isDefectHeld`), at its first sighting; repeats stay gray. */
+.held { --tile: var(--sk-held); }
+
 /* A Codex pass's tiles, a little off the Claude passes' hues; its gray ones, having no hue, take a touch of the accent. */
 .codex { filter: hue-rotate(25deg); }
 
@@ -32,6 +35,9 @@
 .tracing g:not(.traced) { --tile: color-mix(in srgb, var(--wzl-fg) 18%, var(--wzl-surface)); }
 
 .tracing .traced.again { --tile: var(--wzl-accent); }
+
+.tracing .traced.held,
+.tracing .traced.again.heldAgain { --tile: var(--sk-held); }
 
 /* A defect whose fix is settled (`isFixSettled`) steps back unless it is the one traced. */
 .settled:not(.traced) { opacity: 0.3; }

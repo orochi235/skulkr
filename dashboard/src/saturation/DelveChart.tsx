@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AboutButton } from '@dash/AboutButton';
-import { isDefectClosed } from './FixShelf';
+import { isDefectClosed, isDefectHeld } from './FixShelf';
 import type { SaturationDefect, SaturationLedger } from './saturation.types';
 import s from './DelveChart.module.css';
 
@@ -70,6 +70,7 @@ export function DelveChart({ ledger, max = null, live = false, onPickDefect, tra
   if (done === 0) return null;
   const stacks = stacksOf(ledger.defects, done);
   const settled = (d: SaturationDefect) => isDefectClosed(ledger.fix?.statuses[d.id], d.registry);
+  const held = (d: SaturationDefect) => !settled(d) && isDefectHeld(ledger.fix, d.id);
   // The passes drawn, by number: every one, or with `hideFixed` those holding a defect not yet fixed.
   const shown = stacks.map((_, i) => i + 1).filter((pass) => !hideFixed || stacks[pass - 1]!.some(({ defect }) => !settled(defect)));
   const ghosts = Math.max(0, Math.round(ledger.unseen ?? 0));
@@ -97,7 +98,7 @@ export function DelveChart({ ledger, max = null, live = false, onPickDefect, tra
       {shown.map((pass, k) => stacks[pass - 1]!.map(({ defect, novelty }, j) => (
         <Tile key={`${pass}-${defect.id}`} x={colX(k)} y={base - (j + 1) * TILE_H}
           className={[s[novelty], defect.id === traced ? s.traced : '', ledger.passes[pass - 1]?.source === 'codex' ? s.codex : '',
-            settled(defect) ? s.settled : ''].filter(Boolean).join(' ')}
+            settled(defect) ? s.settled : '', held(defect) ? (novelty === 'again' ? s.heldAgain : s.held) : ''].filter(Boolean).join(' ')}
           title={tileTitleOf(defect, pass, novelty)}
           onEnter={() => setTraced(defect.id)} onLeave={() => setTraced(null)}
           onPick={onPickDefect ? () => onPickDefect(defect.id) : undefined} />
@@ -110,10 +111,11 @@ export function DelveChart({ ledger, max = null, live = false, onPickDefect, tra
 const NOVELTIES = ['again', 'new', 'lone'] as const;
 
 /** The key to the chart's tiles, and, where the ledger has a Codex pass (`codex`), the hues its tiles take. */
-export function DelveKey({ codex = false }: { codex?: boolean }) {
+export function DelveKey({ codex = false, held = false }: { codex?: boolean; held?: boolean }) {
   return (
     <span className={s.key}>
       {NOVELTIES.map((n) => <span key={n}><i className={`${s.swatch} ${s[n]}`} />{LABEL[n]}</span>)}
+      {held && <span><i className={`${s.swatch} ${s.held}`} />needs a decision</span>}
       {codex && <span>{NOVELTIES.map((n) => <i key={n} className={`${s.swatch} ${s[n]} ${s.codex}`} />)}codex pass</span>}
     </span>
   );
@@ -126,12 +128,17 @@ export function DelveAbout({ ledger, picks = false }: { ledger: SaturationLedger
       <p className={s.aboutPara}>
         Each pass is a stack, one tile per defect it reported: those an earlier pass found at the bottom, then the new ones.
         Hover a tile to trace its defect across every pass{picks ? '; click it to jump to its row' : ''}. A defect
-        fixed on a verified branch, or in the registry, shows faint.
+        fixed on a verified branch, or in the registry, shows faint; one waiting on a decision rather than a fixer (a
+        design question, or a fixer's question) takes its own color.
       </p>
-      <DelveKey codex={hasCodexPass(ledger)} />
+      <DelveKey codex={hasCodexPass(ledger)} held={hasHeldDefect(ledger)} />
     </AboutButton>
   );
 }
+
+/** Whether a ledger has an open defect waiting on a decision, whose tiles the key then explains. */
+export const hasHeldDefect = (ledger: SaturationLedger): boolean =>
+  ledger.defects.some((d) => !isDefectClosed(ledger.fix?.statuses[d.id], d.registry) && isDefectHeld(ledger.fix, d.id));
 
 /** Whether a ledger has a Codex pass, whose tiles the key then explains. */
 export const hasCodexPass = (ledger: SaturationLedger): boolean => (ledger.sources.codex ?? 0) > 0;

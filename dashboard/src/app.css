@@ -12,3 +12,6 @@ body { background: var(--wzl-surface); }
 
 /* An estimate's color: light sky blue on dark, a deeper sky blue on light for contrast. */
 .app-theme { --sk-estimate: light-dark(#0369a1, lightskyblue); }
+
+/* A defect waiting on a decision rather than a fixer: pink, apart from the accent, warning and gray tiles. */
+.app-theme { --sk-held: light-dark(#be185d, #f472b6); }

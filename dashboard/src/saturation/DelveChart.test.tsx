@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { DelveChart, spanOf, stacksOf } from './DelveChart';
+import { DelveChart, DelveKey, spanOf, stacksOf } from './DelveChart';
 import type { SaturationLedger } from './saturation.types';
 
 const defect = (id: string, seenAt: number[]) => ({
@@ -14,6 +14,17 @@ const ledger: SaturationLedger = {
 };
 
 describe('DelveChart', () => {
+  it('colors the first sighting of a defect set aside to ask, or answered with a question, as waiting on a decision, and keys it', () => {
+    const fix = { lastRun: null, batches: [], ask: ['D1', 'D2'], statuses: { D3: { status: 'question' as const, run: 1, branch: null } } };
+    const { container } = render(<DelveChart ledger={{ ...ledger, fix } as SaturationLedger} />);
+    const held = [...container.querySelectorAll('g')].filter((g) => g.className.baseVal.split(' ').some((c) => /held/.test(c)));
+    const first = held.filter((g) => g.className.baseVal.split(' ').some((c) => /^_?held(_|$)/.test(c)));
+    expect(first.map((g) => g.querySelector('title')!.textContent!.split(' · ').slice(0, 2).join(' ')).sort()).toEqual(['pass 1 D1, new, seen again since', 'pass 2 D3, new, not seen again', 'pass 3 D2, new, not seen again']);
+    expect(held).toHaveLength(5);
+    render(<DelveKey held />);
+    expect(screen.getByText('needs a decision')).toBeInTheDocument();
+  });
+
   it("stacks each pass's own findings, the ones seen before at the bottom, by whether each was new", () => {
     expect(stacksOf(defects, 3).map((st) => st.map(({ defect: d, novelty }) => `${d.id}:${novelty}`))).toEqual([
       ['D1:new'], ['D1:again', 'D3:lone'], ['D1:again', 'D2:lone'],

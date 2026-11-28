@@ -3,7 +3,7 @@ import { Checkbox } from '@weasel-js/ui/components/Checkbox';
 import { useDashPref } from '@dash/audits/dashPrefs';
 import { DataGrid, type DataGridColumn } from '@weasel-js/ui/components/DataGrid';
 import { InlineMarkdown } from '@weasel-js/ui/components/InlineMarkdown';
-import { DelveAbout, DelveChart, DelveKey, hasCodexPass } from './DelveChart';
+import { DelveAbout, DelveChart, DelveKey, hasCodexPass, hasHeldDefect } from './DelveChart';
 import { FixShelf, FixShelfAbout, FixShelfKey, FixStatusChip, FixSwatch, isDefectClosed, ShelfOrderSwitch, shelfStatusOf } from './FixShelf';
 import { LedgerHero } from './LedgerHero';
 import { PassTableButton } from './PassTable';
@@ -118,7 +118,7 @@ export function LedgerDetail({ ledger, picked: pick, onPickDefect }: {
             )}
           </div>
           <section ref={legend} className={legendFits ? s.legend : `${s.legend} ${s.legendOut}`} aria-label="Legend" aria-hidden={!legendFits}>
-            <div><h3 className={s.legendTitle}>Passes</h3><DelveKey codex={hasCodexPass(ledger)} /></div>
+            <div><h3 className={s.legendTitle}>Passes</h3><DelveKey codex={hasCodexPass(ledger)} held={hasHeldDefect(ledger)} /></div>
             {ledger.fix && ledger.fix.batches.length > 0 && <div className={s.legendFixes}><h3 className={s.legendTitle}>Fixes</h3><FixShelfKey /></div>}
           </section>
         </div>
