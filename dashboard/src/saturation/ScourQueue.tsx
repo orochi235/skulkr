@@ -18,9 +18,9 @@ export const queueTitleOf = (id: string, ledger: SaturationLedger | undefined): 
     : `${id}: under two passes, ranked at the opening price`;
 
 /** What a fix queue row says in its figure columns' place while its run is live: its batch's phase, which batch, and
- *  that step's count. */
+ *  that step's count. The batch is an index, never past the last: a run landing has every batch done. */
 export const fixingText = (row: FixQueueRow): string =>
-  `${row.phase ?? 'fixing'} ${row.done + 1}/${row.batches ?? '?'}${row.progress ? ` · ${row.progress.done.toLocaleString('en-US')}/${row.progress.of.toLocaleString('en-US')}` : ''}`;
+  `${row.phase ?? 'fixing'} ${row.batches ? Math.min(row.done + 1, row.batches) : row.done + 1}/${row.batches ?? '?'}${row.progress ? ` · ${row.progress.done.toLocaleString('en-US')}/${row.progress.of.toLocaleString('en-US')}` : ''}`;
 
 const DIGITS = [s.digits1!, s.digits2!, s.digits3!, s.digits4!];
 
