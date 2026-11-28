@@ -12,14 +12,14 @@ Commit each verified change on `main` without asking (Mike, 2026-11-27).
 | What | Log |
 |---|---|
 | Fix run 14 `animator.engine` batch 3 of 3, then the lane starts `animator` (2 batches) | `.playwright-mcp/logs/fix-animator.engine.log`, lane in `fix-animator-a.log` |
-| Delve `apps.theme-editor.src` (resumed from 13 passes at `9c4522d635`) | `.playwright-mcp/logs/delve-apps.theme-editor.src.log` |
 | `scour run geom.paths.part1 geom.paths.part2` (Mike: "delve the rest of geom.paths in order"; part1 already stopped, part2 delving from 1 pass) | `.playwright-mcp/logs/delve-geom.paths.log` |
 
 Re-arm watches under Monitor (30-minute expiry): `.playwright-mcp/stallwatch.sh 14 animator.engine`, and a
 `tail -F … | grep -E "^[0-9]+/[0-9]+ |stopped|rror|failed"` on the delve log. Judge a stall by output growth, not time
 (memory `in-flight-is-not-almost-done`). Report fix run 14's landing to Mike: did `main` fast-forward, did
 `.skulkr/scour/fix-14/` land, were `scour14-*` deleted. Then land its ledger and `animator.timeline`'s
-(`skulkr scour land animator.engine animator.timeline`; kouhai t-652). Land `apps.theme-editor.src` and `geom.paths.part2` when their delves stop.
+(`skulkr scour land animator.engine animator.timeline`; kouhai t-652). `apps.theme-editor.src` stopped at pass 14 on the 4× limit (20 defects) and is not landed yet; land it with
+`geom.paths.part2` when that delve stops (Mike has approved each ledger landing asked so far).
 
 ## Handed to weasel-63: merging what's ready (Mike, 2026-11-27)
 
