@@ -9,3 +9,6 @@ body,
 }
 
 body { background: var(--wzl-surface); }
+
+/* An estimate's color: light sky blue on dark, a deeper sky blue on light for contrast. */
+.app-theme { --sk-estimate: light-dark(#0369a1, lightskyblue); }

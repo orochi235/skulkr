@@ -5,7 +5,7 @@ import { heroCountsOf } from './LedgerHero';
 import type { SaturationLedger } from './saturation.types';
 import s from './LedgerFacts.module.css';
 
-/** A label, its value, and whether the value is an estimate (set in italic, as the hero's are). */
+/** A label, its value, and whether the value is an estimate (set in sky blue, as the hero's are). */
 type Fact = readonly [label: string, value: ReactNode, estimated?: boolean];
 
 /** A ledger's single-valued facts: what the area is and what has run on it, its last flush included. What a next pass

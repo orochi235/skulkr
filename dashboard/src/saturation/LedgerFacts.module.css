@@ -71,10 +71,10 @@
 /* The figures a size up from their labels, so they read first. */
 .grid td { font-size: var(--wzl-font-size-md); }
 
-.grid .estimate td { padding-inline-end: 0.15em; font-style: italic; color: var(--wzl-fg-muted); }
+.grid .estimate td { color: var(--sk-estimate); }
 
-/* An estimate, set apart as the hero's are: italic and muted. */
-.estimate { padding-inline-end: 0.15em; font-style: italic; color: var(--wzl-fg-muted); }
+/* An estimate, set apart as the hero's are: in sky blue. */
+.estimate { color: var(--sk-estimate); }
 
 .status {
   composes: box from './box.module.css';

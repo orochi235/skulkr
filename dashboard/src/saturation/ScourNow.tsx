@@ -69,13 +69,11 @@ export const liveStatsOf = (l: SaturationLedger, stamp: Stamp, span: ClockSpan =
   const light = STAT_TONE.light;
   return [
     elapsed,
-    ['kloc', l.lines === null ? '–' : (l.lines / 1000).toFixed(1), light],
-    ['files', String(l.files), light],
     ['pass', String(l.occasions + 1), undefined, r.max ? `up to ${r.max}` : undefined],
     ['found', String(l.distinct)],
     leftStatOf(l),
-    ['next new', percent(l.nextNew)],
-    nextDefectStatOf(l, light),
+    ['next new', percent(l.nextNew), STAT_TONE.estimate],
+    nextDefectStatOf(l, STAT_TONE.estimate),
     limitStatOf(l, light),
     ['spent', usd(l.costUsd), light],
   ];
@@ -150,7 +148,7 @@ function LiveRun({ ledger: l, onPick, onPickDefect, stamp }: {
         <span className={`${s.does} ${DOES[r.does ?? 'held'] ?? s.held}`}>{r.does ?? 'held'}</span>
         <span className={s.area} role="button" tabIndex={0} onClick={() => onPick(l.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onPick(l.id)}>{l.id}</span>
         {r.jobs.map((j) => <PassPill key={j.key} jobKey={j.key} />)}
-        <span className={s.facts}>pid {r.pid}</span>
+        <span className={s.facts}>{r.does === 'fix' ? '' : `${sizeOf(l)} · `}pid {r.pid}</span>
         <span className={s.about}><DelveAbout ledger={l} /></span>
       </header>
       <div className={s.figures}>
@@ -177,3 +175,7 @@ export function ScourNow({ ledgers, stamp, onPick, onPickDefect }: {
     </section>
   );
 }
+
+/** An area's size, as a delve's header gives it before its pid: `12.3 kloc · 40 files`. */
+const sizeOf = (l: SaturationLedger): string =>
+  `${l.lines === null ? '–' : (l.lines / 1000).toFixed(1)} kloc · ${l.files} files`;

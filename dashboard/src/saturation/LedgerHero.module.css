@@ -41,8 +41,8 @@
   line-height: 1;
 }
 
-/* An estimated count: set lighter than the counted ones. */
-.estimate .value { font-weight: var(--wzl-font-weight-normal, 400); }
+/* An estimated count: set in sky blue, apart from the counted ones. */
+.estimate .value { color: var(--sk-estimate); }
 
 /* A next defect priced past the limit a delve stops at. */
 .over .value { color: var(--wzl-warning); }

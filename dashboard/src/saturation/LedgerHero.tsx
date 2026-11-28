@@ -22,7 +22,7 @@ export const heroCountsOf = (ledger: SaturationLedger) => {
 /** A figure: its word, its value, a tone class, and a note shown in a tooltip over its word. */
 export type Stat = readonly [label: string, value: ReactNode, tone?: string, tip?: string];
 
-/** The tones a figure can take beyond plain: an estimate (a lighter weight), a light one, or a clock (light; a
+/** The tones a figure can take beyond plain: an estimate (sky blue), a light one, or a clock (light; a
  *  `LiveQuantity` keeps its width, so its changing digits never move what follows). */
 export const STAT_TONE = { estimate: s.estimate!, light: s.light!, clock: s.clock! } as const;
 
