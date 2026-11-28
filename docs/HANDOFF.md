@@ -21,10 +21,13 @@ Watch each with Monitor (`tail -F … | grep -E "^(record|preflight|gate|main|la
 Fix run 14 relanded: weasel `main` fast-forwarded to `d7ad6e6c8b`. The dispatcher's `--deep` delve has finished
 (report at `<state>/scour/routing.interactions.dispatcher/report.md`).
 
-**Ledgers to land** (Mike has approved each landing asked so far): check `skulkr scour ls` first, then
-`skulkr scour land` for whichever of these are still unlanded — `animator.engine animator.timeline` (kouhai t-652),
-`apps.theme-editor.src` (stopped at pass 14), `geom.paths.part1`, `geom.paths.part2` once its delve stops, and
-`routing.interactions.dispatcher` (t-657; its fix run 17 holds the ledger until it ends, and `land --all` skips held ones).
+Both runs were stopped by the usage limit at ~21:00 local and retry on their own after 02:40Z (21:40 local).
+
+**Ledgers to land** (Mike has approved each landing asked so far): `animator.engine`, `animator.timeline`,
+`apps.theme-editor.src` and `geom.paths.part1` landed at weasel `fa11f1f06b`. Still to land: `geom.paths.part2` once
+its delve stops, and `routing.interactions.dispatcher` (t-657) once fix run 17 ends, since the run holds its ledger.
+
+**Outline mask:** weasel-63's inflight register shows `outline-mask` ready at `a9a929275f`, awaiting its batch.
 
 The `animator` fix lane never ran: fix run 14's crash killed `fix-lane.sh`'s loop before it reached `animator`.
 
