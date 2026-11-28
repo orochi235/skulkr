@@ -7,7 +7,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } fro
 import { join } from 'node:path';
 import { addWorktree, fastForwardMain, gitIn, pushMain, removeWorktree } from './batch.mjs';
 import { ledgerDirOf, ledgerOf, withLedgerHeld } from './ledger.mjs';
-import { waitForLease } from './lease.mjs';
+import { heldAlive, leaseAt, waitForLease } from './lease.mjs';
 import { mergeLock } from './runs.mjs';
 import { scourRuleOf } from './scourPrice.mjs';
 import { reportText } from './saturationReport.mjs';
@@ -32,6 +32,9 @@ export const landableIdsOf = (cfg) => {
   if (!existsSync(dir)) return [];
   return readdirSync(dir).filter((id) => ledgerOf(cfg, id)?.occasions.length > 0).sort();
 };
+
+/** Which of `ids` a live scour holds (a fix run, a delve), so a landing now would refuse. */
+export const heldLedgerIdsOf = (cfg, ids) => ids.filter((id) => heldAlive(leaseAt(join(ledgerDirOf(cfg, id), 'lock'))));
 
 /** Writes `ledger`, its report, and the raw reports its occasions name into `to`, replacing an earlier landing. */
 const writeLanded = (cfg, root, id, ledger, to) => {

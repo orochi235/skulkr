@@ -25,7 +25,7 @@ import {
 import { loggingSay, withJobProgress } from './delveLive.mjs';
 import { takeLease } from './lease.mjs';
 import { importLedger } from './saturateImport.mjs';
-import { landableIdsOf, landLedgers } from './saturateLand.mjs';
+import { heldLedgerIdsOf, landableIdsOf, landLedgers } from './saturateLand.mjs';
 import { ledgerListLines, ledgerListOf, scourQueueIn, scouredAreasOf } from './saturationList.mjs';
 import { moveFormerScourState } from './scourPaths.mjs';
 import { chao2, stopReason } from './saturation.mjs';
@@ -260,8 +260,13 @@ export const saturateCommand = async (cfg0, runner, root, argv, say = (line) => 
     return flagDefects(cfg, ledger, ids, args.clear, say);
   }
   if (first === 'land') {
-    const ids = args.all ? landableIdsOf(cfg) : rest;
+    let ids = args.all ? landableIdsOf(cfg) : rest;
     if (ids.length === 0 && !args.all) throw new Error(SATURATE_USAGE);
+    if (args.all) {
+      const held = heldLedgerIdsOf(cfg, ids);
+      if (held.length) say(`land: left out, held by a running scour: ${held.join(', ')}`);
+      ids = ids.filter((id) => !held.includes(id));
+    }
     say(await landLedgers(cfg, root, ids, say));
     return ids.map((id) => ledgerOf(cfg, id));
   }

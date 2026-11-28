@@ -712,7 +712,7 @@ set-aside `<area>.<commit>`) commits it to the project's `main` as `<record.dir>
 `ledger.json`, `report.md`, and the raw reports its occasions name under `reviews/`, on a branch
 `<prefix>-scour-<area>` from `main` that `main` fast-forwards to under the merge lock, then pushed as `git.push`
 says. Several areas, or `--all` for every ledger with occasions, land in one commit on `<prefix>-scour`
-(2026-11-25). A ledger landed under `<record.dir>/saturation/`, as every one was before 2026-11-25, is still read there, and moves to
+(2026-11-25); `--all` leaves out, and names, any ledger a running scour holds, such as a fix run's (2026-11-27). A ledger landed under `<record.dir>/saturation/`, as every one was before 2026-11-25, is still read there, and moves to
 `scour/` in the commit that next lands it. Landing the same ledger again replaces that directory, so it can land part way and land again when it
 stops; a ledger already landed unchanged commits nothing. When `main` cannot fast-forward (the main checkout off
 `main`, or with uncommitted changes), the branch is kept and named. Nothing reads a landed ledger yet: rounds, the map
