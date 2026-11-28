@@ -97,11 +97,23 @@ describe("a fix shelf's statuses", () => {
       { n: 1, jobs: ['core~b2'], record: { area: 'core', finished: 'x', batches: [{ n: 2, branch: 'scour1-core-b2', verify: { ok: true }, verdicts: [{ id: 'D4', verdict: 'fixed' }, { id: 'D5', verdict: null }] }] } },
       { n: 2, jobs: ['core~b1', 'other~b1'], record: null },
     ];
-    expect(fixStatusesFor('core', runs)).toEqual({
+    expect(fixStatusesFor({ area: 'core' }, runs)).toEqual({
       D4: { status: 'fixed', run: 1, branch: 'scour1-core-b2', verified: true },
       D5: { status: 'unread', run: 1, branch: 'scour1-core-b2', verified: true },
       b1: { status: 'fixing', run: 2, branch: null },
     });
+  });
+});
+
+describe("a fresh ledger's statuses", () => {
+  it('leaves out runs on an earlier ledger of the area, whose ids name other defects', () => {
+    const runs = [
+      { n: 21, jobs: [], record: { area: 'scale', ledgerCommit: 'old', started: 'a', finished: 'b', batches: [{ n: 1, branch: 'x', verify: { ok: true }, verdicts: [{ id: 'D1', verdict: 'fixed' }] }] } },
+      { n: 24, jobs: [], record: { area: 'scale', ledgerCommit: 'new', started: 'c', finished: 'd', batches: [{ n: 1, branch: 'y', verify: { ok: true }, verdicts: [{ id: 'D2', verdict: 'fixed' }] }] } },
+    ];
+    expect(Object.keys(fixStatusesFor({ area: 'scale', commit: 'new' }, runs))).toEqual(['D2']);
+    expect(Object.keys(fixStatusesFor({ area: 'scale', commit: 'old' }, runs))).toEqual(['D1']);
+    expect(lastFixRunOf({ area: 'scale', commit: 'old' }, runs)?.n).toBe(21);
   });
 });
 
@@ -118,7 +130,7 @@ describe("a verdict's reason", () => {
 
   it('rides on the status', () => {
     const runs = [{ n: 1, jobs: [], record: { area: 'core', finished: 'x', batches: [{ n: 1, branch: null, verify: { ok: true }, verdicts: [{ id: 'D1', verdict: 'not a defect', line: '[D1] y (scour): not a defect: it is deliberate.' }] }] } }];
-    expect(fixStatusesFor('core', runs).D1).toEqual({ status: 'not a defect', run: 1, branch: null, verified: true, why: 'it is deliberate.' });
+    expect(fixStatusesFor({ area: 'core' }, runs).D1).toEqual({ status: 'not a defect', run: 1, branch: null, verified: true, why: 'it is deliberate.' });
   });
 });
 
@@ -129,9 +141,9 @@ describe("a ledger's last flush", () => {
       { n: 2, jobs: ['other~b1'], record: { area: 'other', started: 'c', finished: null } },
       { n: 3, jobs: ['core~b2'], record: null },
     ];
-    expect(lastFixRunOf('core', runs)).toEqual({ n: 3, started: null, finished: null });
-    expect(lastFixRunOf('other', runs)).toEqual({ n: 2, started: 'c', finished: null });
-    expect(lastFixRunOf('ui', runs)).toBeNull();
+    expect(lastFixRunOf({ area: 'core' }, runs)).toEqual({ n: 3, started: null, finished: null });
+    expect(lastFixRunOf({ area: 'other' }, runs)).toEqual({ n: 2, started: 'c', finished: null });
+    expect(lastFixRunOf({ area: 'ui' }, runs)).toBeNull();
   });
 });
 

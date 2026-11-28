@@ -48,7 +48,7 @@ export const withDropped = (queue, ids) => queue.filter((id) => !ids.includes(id
 export const fixWorkOf = (cfg, id, runs = fixRunsIn(cfg), fixedElsewhere = new Set()) => {
   const ledger = ledgerOf(cfg, id);
   if (!ledger) return null;
-  const statuses = fixStatusesFor(ledger.area, runs);
+  const statuses = fixStatusesFor(ledger, runs);
   const open = (d) => !fixedElsewhere.has(d.id) && !SETTLED.has(statuses[d.id]?.status);
   const plan = fixPlanFor(ledger, { open, recurrent: cfg.saturate.recurrent });
   return { open: plan.batches.reduce((n, b) => n + b.defects.length, 0) + plan.ask.length, batches: plan.batches.length };

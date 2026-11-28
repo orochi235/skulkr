@@ -56,17 +56,19 @@ export const whyOf = ({ verdict, line }) => {
 };
 
 /**
- * Each defect's fix status for ledger `area` from the `runs` (`fixRunsIn`): the latest run's verdict (`fixed`, `not a
+ * Each defect's fix status for `ledger` (its `area` and `commit`) from the `runs` (`fixRunsIn`): the latest run's verdict (`fixed`, `not a
  * defect`, `question`, `not fixed`, `duplicate`, or `unread` when its line could not be read), with the run, branch, and
  * whether the batch's verify passed, and `why`, the fixer's reason for any verdict but `fixed` where it gave one.
  * A batch with a job out in an unfinished run that has not recorded it is entered as `b<k>`, `fixing`. A defect no run
- * has touched has no entry.
+ * has touched has no entry. A run on an earlier ledger of the area counts for nothing: a fresh ledger numbers its
+ * defects from D1 again.
  */
-export const fixStatusesFor = (area, runs) => {
+export const fixStatusesFor = (ledger, runs) => {
+  const { area } = ledger;
   const out = /** @type {Record<string, any>} */ ({});
   for (const run of runs) {
     const done = new Set();
-    if (run.record?.area === area) {
+    if (isRunOn(run.record, ledger)) {
       for (const b of run.record.batches ?? []) {
         done.add(b.n);
         for (const v of b.verdicts ?? []) {
@@ -86,12 +88,15 @@ export const fixStatusesFor = (area, runs) => {
   return out;
 };
 
-/** The latest fix run (a flush) on ledger `area` from the `runs` (`fixRunsIn`): its number, when it started, and when it
+/** Whether a fix run's `record` is of `ledger`: its area, and its ledger's commit where it names one. */
+const isRunOn = (record, ledger) => record?.area === ledger.area && (!record.ledgerCommit || !ledger.commit || record.ledgerCommit === ledger.commit);
+
+/** The latest fix run (a flush) on `ledger` from the `runs` (`fixRunsIn`): its number, when it started, and when it
  *  finished, null while it runs; null when no run has touched the area. A run counts from its record, or before its
  *  first batch ends, from a job out on the area. */
-export const lastFixRunOf = (area, runs) => {
-  const jobOn = new RegExp(`^${area.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}~b\\d+$`);
-  const run = runs.filter((r) => r.record?.area === area || (!r.record && r.jobs.some((j) => jobOn.test(j)))).at(-1);
+export const lastFixRunOf = (ledger, runs) => {
+  const jobOn = new RegExp(`^${ledger.area.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}~b\\d+$`);
+  const run = runs.filter((r) => isRunOn(r.record, ledger) || (!r.record && r.jobs.some((j) => jobOn.test(j)))).at(-1);
   if (!run) return null;
   return { n: run.n, started: run.record?.started ?? null, finished: run.record?.finished ?? null };
 };
@@ -102,7 +107,7 @@ export const lastFixRunOf = (area, runs) => {
 export const fixShelfOf = (cfg, ledger, runs = fixRunsIn(cfg), flags = scourFlagsOf(cfg), fixedElsewhere = new Set()) => {
   if (ledger.defects.length === 0) return null;
   const plan = fixPlanFor(ledger, { open: (d) => !fixedElsewhere.has(d.id), recurrent: cfg.saturate.recurrent });
-  const statuses = fixStatusesFor(ledger.area, runs);
+  const statuses = fixStatusesFor(ledger, runs);
   // A batch out with no record yet names no ids; the plan, computed the same way, says which they are, and its job
   // directory where each one stands.
   for (const b of plan.batches) {
@@ -119,7 +124,7 @@ export const fixShelfOf = (cfg, ledger, runs = fixRunsIn(cfg), flags = scourFlag
     statuses[id] = { status: FLAGGED, run: was?.run ?? null, branch: was?.branch ?? null, verdict: was?.status ?? null, ...(was?.why ? { why: was.why } : {}) };
   }
   return {
-    lastRun: lastFixRunOf(ledger.area, runs),
+    lastRun: lastFixRunOf(ledger, runs),
     batches: plan.batches.map((b) => ({ n: b.n, defects: b.defects.map((d) => ({ id: d.id, size: d.size ?? null, recurrent: d.recurrent })) })),
     ask: plan.ask.map((d) => d.id),
     statuses,
