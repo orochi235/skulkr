@@ -170,6 +170,8 @@ weasel cutover.
     carries `onto: progress` and `onto: tests` lines beside vitest's own output (2026-11-27).
   - a Claude reviewer's log carrying `skulkr: says:`, `reads`, `searches`, `lists` and `uses` lines as it works, so a
     preloaded reviewer shows progress before its findings (2026-11-27).
+  - weasel's fixer brief running `check:size` before any test, and its verify running it first and stopping there when
+    it fails, unless the fixer's `checks:gate` passed at that commit (2026-11-27).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

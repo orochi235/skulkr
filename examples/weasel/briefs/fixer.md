@@ -29,6 +29,8 @@ What you write ships under the repo owner's name.
    defect.
 2. Reproduce it with a test that fails before the fix (plain example test beside the code).
 3. Fix it, the general way: if the same mistake sits elsewhere in your area, fix those too.
+   Then `npm run check:size` (about five seconds) before running any test: the gate fails a function past 120
+   lines or a source file past 400, and splitting one after the tests means running them again.
 4. Commit each fix on its own. The subject is lowercase imperative, as in this repo's `git log`: "end a color
    cycle when cancelAll ends its keep-alive entry", never "End a color cycle …". It says what the change
    does, for a reader with no session context; end the message with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
