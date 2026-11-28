@@ -8,9 +8,13 @@ On `main`; unpushed commits: `git log --oneline @{u}..HEAD`. Live jobs: `pgrep -
 step times `node scripts/fixRunStats.mjs`; cost per defect by batch size `skulkr scour batches`.
 Commit each verified change on `main` without asking (Mike, 2026-11-27).
 
-## Running now (2026-11-28 ~09:00 local)
+## Running now (2026-11-28)
 
-Nothing. The fix queue drained: its last run, fix 23 on `rig`, landed and weasel `main` is at `f30993007a`. Per-area
+A fresh `scale` delve at weasel `5343c0a1cb` (log `.playwright-mcp/logs/delve-scale-2.log`; the old ledger set aside
+as `scale.<commit>`). Before it, `scour land --all` landed 237 ledgers (weasel `5343c0a1cb`, 1325 defects), so the
+"Ledgers to land" list below is done.
+
+Before that: The fix queue drained: its last run, fix 23 on `rig`, landed and weasel `main` is at `f30993007a`. Per-area
 fix logs are `<state>/scour/fix-<area>.log` (`<state>` = `~/.local/state/weasel-skulkr`).
 
 **Open question:** `rig`'s delve found 11 distinct, but fix 23 batched 9 (D1–D6, D9–D11); D7 and D8 were left out
