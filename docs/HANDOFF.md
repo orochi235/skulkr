@@ -12,7 +12,8 @@ Commit each verified change on `main` without asking (Mike, 2026-11-27).
 
 The fix queue (log `.playwright-mcp/logs/fix-queue-2.log`, one lane, each run landing): `scale`, then the 20 ready-to-fix
 areas never fixed, smallest first, ≈400 defects at ≈$0.31 each. `scour queue ls` shows what is left.
-Delves on `prefs-editor`, `simulation`, `labkit.clock` (next in the queue; log `.playwright-mcp/logs/delve-prefs-sim-clock.log`).
+Delves on `prefs-editor`, `simulation`, `labkit.clock` all stopped ready to fix after 5 passes (10, 9, 9 distinct;
+$9.72), landed at weasel `a81a066aae`, and were added to the fix queue's end.
 The batch-size split (docs/scour.md "Whether batching saves"; Mike's go 2026-11-28), one `scour fix` run per arm, arms
 run in turn by `.playwright-mcp/split.mjs` (gitignored), logs `.playwright-mcp/logs/split-<area>.log` holding each
 arm's defects: `labkit.loupe.lens` sizes 1, 8, 16 (8, 8, 16 defects), `diagram-formats` sizes 16, 8, 1 (16, 16, 19).
