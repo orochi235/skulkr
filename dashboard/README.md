@@ -54,6 +54,7 @@ it needs the alpo link below until a release carries it. So do the hover cards o
 lanes' job logs, which are weasel `Tooltip`s anchored to the pointer by `anchorRect` (weasel 41906fd420, unreleased),
 and the running times that count on between snapshots (`@weasel-js/ui`'s `LiveQuantity`, `@weasel-js/quantity`'s
 `instant` and `relative`, `@weasel-js/clock`'s readings; weasel 2e6a59c4be, unreleased).
+So does the map's selection outline giving way to cells drawn over it (`outline.mask`; weasel 2d9b3912cd, unreleased).
 
 On a machine with weasel checked out, alpo can serve the checkout over the published packages:
 

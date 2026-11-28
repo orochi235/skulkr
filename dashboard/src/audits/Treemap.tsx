@@ -21,8 +21,8 @@ import s from './Treemap.module.css';
 
 const FEATURES = [presets.pick];
 const SELECTION_OPTIONS = { mode: 'single' } as const;
-// The selection traces each cell's silhouette, so a raised one is outlined as the block it is drawn as.
-const LAYERS = { selectionOverlay: { outline: { follow: 'shape' as const, width: 2 } } };
+// The selection traces each cell's silhouette, so a raised one is outlined as the block it is drawn as, and cells drawn over it cover it.
+const LAYERS = { selectionOverlay: { outline: { follow: 'shape' as const, width: 2, mask: true } } };
 
 export interface TreemapProps {
   readonly scene: AuditScene;
