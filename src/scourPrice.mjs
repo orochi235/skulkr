@@ -139,18 +139,18 @@ export const goingRateOf = (cfg, root, { factor, openingUsd, priceBy = 'defect' 
  * The stop rule for a scour command's flags (`max`, `perDefect`, `usd`, `priceBy`), priced by `cfg`'s ledgers; `root`
  * is the project, whose partition says whether fresh areas remain. Its `limit` says how the per-defect limit was set:
  * `{ usd }`, or `{ usd, times, goingUsd }` for a multiple of the going rate, each in the unit `priceBy` names; its
- * `openingUsd` is `pricingOf`'s, a fresh area's price in that unit.
+ * `openingUsd` is `pricingOf`'s, a fresh area's price in that unit. `deep` turns off the ready-to-fix stop.
  * @param {any} cfg @param {string | undefined} root
- * @param {{ max?: number, perDefect?: string | number | { times: number }, usd?: number, priceBy?: string }} [flags] @param {any[]} [ledgers]
+ * @param {{ max?: number, perDefect?: string | number | { times: number }, usd?: number, priceBy?: string, deep?: boolean }} [flags] @param {any[]} [ledgers]
  */
-export const scourRuleOf = (cfg, root, { max = cfg.saturate.max, perDefect, usd, priceBy } = {}, ledgers = undefined) => {
+export const scourRuleOf = (cfg, root, { max = cfg.saturate.max, perDefect, usd, priceBy, deep = false } = {}, ledgers = undefined) => {
   const pricing = pricingOf(cfg, ledgers, priceByOf(priceBy ?? cfg.saturate.priceBy ?? 'defect'));
   const spec = limitSpecOf(perDefect ?? cfg.saturate.stopUsdPerDefect);
   const limit = spec.times === undefined ? spec : (() => {
     const goingUsd = goingRateOf(cfg, root, pricing);
     return { usd: spec.times * goingUsd, times: spec.times, goingUsd };
   })();
-  return { ...stopRuleOf(cfg, max, { perDefect: limit.usd, usd, factor: pricing.factor, priceBy: pricing.priceBy }), limit, openingUsd: pricing.openingUsd };
+  return { ...stopRuleOf(cfg, max, { perDefect: limit.usd, usd, factor: pricing.factor, priceBy: pricing.priceBy }), ...(deep ? { fixAtKnownPerKloc: null } : {}), limit, openingUsd: pricing.openingUsd };
 };
 
 

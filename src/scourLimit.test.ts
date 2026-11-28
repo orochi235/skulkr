@@ -57,6 +57,12 @@ describe('scourRuleOf', () => {
     expect(limitText(fixed)).toBe('$2.50');
   });
 
+  it('keeps the ready-to-fix stop unless told --deep', () => {
+    const { root, cfg } = project();
+    expect(scourRuleOf(cfg, root).fixAtKnownPerKloc).toBe(cfg.saturate.fixAtKnownPerKloc);
+    expect(scourRuleOf(cfg, root, saturateArgsOf(cfg, ['src', '--deep'])).fixAtKnownPerKloc).toBeNull();
+  });
+
   it('defaults to four times the going rate', () => {
     const { root, cfg } = project();
     expect(scourRuleOf(cfg, root).limit.times).toBe(4);

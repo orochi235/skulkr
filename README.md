@@ -528,7 +528,7 @@ until capture–recapture says further reviews would find little new. Nothing it
 calibration, the queue, or the map.
 
     skulkr scour next <area> [--agent <id>] [--metered] [--release] [--max 40] [--per-defect 4x|<$>] [--at <sha>]
-    skulkr scour [delve] <area> [--fleet] [--account <config dir>] [--metered] [--sources claude,codex] [--max 40] [--per-defect 4x|<$>] [--usd <n>] [--at <sha>] [--fresh]
+    skulkr scour [delve] <area> [--fleet] [--account <config dir>] [--metered] [--sources claude,codex] [--max 40] [--per-defect 4x|<$>] [--usd <n>] [--at <sha>] [--fresh] [--deep]
     skulkr scour run [areas…] [--fleet] [--account <config dir>] [--metered] [--by finish|cheapest|spread] [--usd <n>] [--passes 10] [--per-defect 4x|<$>]
     skulkr scour fold <area>
     skulkr scour ingest <area> <report.md> --source <name> [--at <sha>]
@@ -597,7 +597,8 @@ lines or more after `minPasses`, the delve stops with `ready to fix: …`. Past 
 defects already known, and the cheaper course is to fix them and delve a fresh ledger on the fixed commit, which finds
 what this one missed and tests its estimate (2026-11-26). Of the ledgers then, `core.canvas.nodeShapes`, `cursor`,
 `forge.vite.part2` and `diagram-formats` crossed 5 by their fifth pass, and areas holding 2–4 per thousand lines never
-did. Nothing fixes them yet: the stop marks the area for the fix stage (`docs/scour.md`). `null` turns the trigger off.
+did. Nothing fixes them yet: the stop marks the area for the fix stage (`docs/scour.md`). `null` turns the trigger off, and `--deep` turns it off for one delve
+(2026-11-27).
 
 **Per thousand lines.** Areas differ in size by five times and more, so the unseen estimate is held to a density,
 and `ls`, the report, the Scour page's ledger panel and Passes table, and its map lenses also give found, unseen and
