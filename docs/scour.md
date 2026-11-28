@@ -100,9 +100,13 @@ their verify and checks on the fleet (`runner: 'local'`, so `checksOnFleet` hold
   `skulkr scour batches [--json]` lists every fix run's batches from `<state>/scour/fix-*/record.json` (its cap,
   defects, files, fixes, dollars, minutes, repairs), then dollars, minutes and the share fixed per defect at each
   batch size.
-- **Whether batching saves** is open. As of 2026-11-27 (fix runs 1–15), a defect cost about $0.31 at every size
-  from 3 to 8, and time per defect fell from about 4 minutes to 2.8. But batch size there follows the work: a small
-  batch is mostly unrelated leftovers packed at a plan's end, and only one batch each held 1 or 2 defects. The test
+- **Whether batching saves** is open, but the stakes look small. A least-squares fit over fix runs 1–24 (61
+  batches, `scripts/fixBatchFit.mjs`, 2026-11-28) puts a batch at about $0.20 + $0.29 per defect, and 4.9 + 2.4
+  minutes per defect. The bootstrap's 90% range for the per-batch overhead is −$0.14 to $0.50, and 2.1 to 7.6
+  minutes. At the point estimates, a defect costs $0.48 alone, $0.34 at size 4, $0.31 at 8 and $0.30 at 16: past
+  about 5, size barely moves cost. The fixed share was 93% at sizes 1–3, 95% at 4–6 and 88% at 7–8, too few
+  batches to tell apart. No batch has held more than 8, the default cap. Batch size here still follows the work: a
+  small batch is mostly unrelated leftovers packed at a plan's end, and only three batches held 1 or 2. The test
   is a split: on two or three areas with 16 or more open defects, divide each area's open defects in half at random,
   fix one half as usual (`scour fix <area> --defects <half> --size 8`) and the other one to a batch (`--defects
   <other half> --size 1`), then compare `scour batches` by cap, counting each batch's verify. It has not been run,
