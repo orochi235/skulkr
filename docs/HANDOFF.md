@@ -16,7 +16,7 @@ Commit each verified change on `main` without asking (Mike, 2026-11-27).
 | `scour delve routing.interactions.dispatcher --deep` (Mike: delve to the cost cap; pid 53571), pass 32/40, 50 distinct | `.playwright-mcp/logs/delve-routing.interactions.dispatcher.log` |
 
 Watch each with Monitor (`tail -F … | grep -E "^(record|preflight|gate|main|land|capstone):|rror|failed|^[0-9]+/[0-9]+ |stopped"`),
-30-minute expiry. weasel-63 holds off `main` until told fix run 14 has landed: message it either way.
+30-minute expiry. weasel keeps `main` still until told fix run 14 has landed or gone red: message whichever weasel session is active (weasel-63 is handing off). Local `main` moved to `47eb723686` (quantity-tones, five commits, unpushed) mid-landing; the gate merges it in and gates again.
 
 When fix run 14 lands, report to Mike: did `main` fast-forward, did `.skulkr/scour/fix-14/` land, were `scour14-*`
 and `batch/2026-11-28-scour14` deleted. If it goes red, triage with `failingOnMain` in the log before anything else.
