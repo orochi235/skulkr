@@ -1,6 +1,6 @@
 # Handoff
 
-For the next session in skulkr. Updated 2026-11-28 ~07:30 local. Check each claim against the tree.
+For the next session in skulkr. Updated 2026-11-28 ~12:00 local. Check each claim against the tree.
 
 ## State
 
@@ -8,34 +8,44 @@ On `main`; unpushed commits: `git log --oneline @{u}..HEAD`. Live jobs: `pgrep -
 step times `node scripts/fixRunStats.mjs`; cost per defect by batch size `skulkr scour batches`.
 Commit each verified change on `main` without asking (Mike, 2026-11-27).
 
-## Running now (2026-11-28)
+## Running now (2026-11-28 ~12:00 local)
 
-The fix queue (log `.playwright-mcp/logs/fix-queue-2.log`, one lane, each run landing): `scale`, then the 20 ready-to-fix
-areas never fixed, smallest first, ≈400 defects at ≈$0.31 each. `scour queue ls` shows what is left.
-Delves on `prefs-editor`, `simulation`, `labkit.clock` all stopped ready to fix after 5 passes (10, 9, 9 distinct;
-$9.72), landed at weasel `a81a066aae`, and were added to the fix queue's end.
-**To correct once fix 30 and fix 31 land:** their batch 1 verdicts read `null` (unread), the fixer's woken
-tally-only reply displaced its report (fixed for later runs in `5c9b55d`). The commits' `Defect:` trailers say all 13
-of fix 30 b1 and fix 31 b1's D2 were fixed; rewrite those verdicts in `<state>/scour/fix-30|31/record.json` and in
-weasel's `.skulkr/scour/fix-30|31/record.json` with `withTrailersRead` over each batch's `fix.mbox`, then rerun
-`scripts/fixBatchFit.mjs` (its fixed share counts them).
-Delves on `core.core.layers` and `core.core.geometry` stopped ready to fix after 5 passes, both near saturated
-(10 and 6 distinct, unseen ≈ 0.4 and 0.5; $5.94), landed at weasel `dd947f643c`, and added to the fix queue's end.
-The batch-size split (docs/scour.md "Whether batching saves"; Mike's go 2026-11-28), one `scour fix` run per arm, arms
-run in turn by `.playwright-mcp/split.mjs` (gitignored), logs `.playwright-mcp/logs/split-<area>.log` holding each
-arm's defects: `labkit.loupe.lens` sizes 1, 8, 16 (8, 8, 16 defects), `diagram-formats` sizes 16, 8, 1 (16, 16, 19).
-Both areas were dropped from the fix queue. When both end, rerun `scripts/fixBatchFit.mjs`, update that doc section,
-and retire the TODO P3 entry. Minutes are inflated by the fix queue running beside them.
+Started from this session as background shell jobs, so a `/clear` may kill them (the earlier monitor died with exit
+144 on one). First thing: `pgrep -fl "scour fix"`.
 
-Before that: A fresh `scale` delve at weasel `5343c0a1cb` stopped ready to fix after 5 passes: 5 distinct (5.4 per kloc),
-unseen ≈ 0.8, next-new 15%, $4.22; landed at weasel `cb221bc44a` (log `.playwright-mcp/logs/delve-scale-2.log`). Before it, `scour land --all` landed 237 ledgers (weasel `5343c0a1cb`, 1325 defects), so the
-"Ledgers to land" list below is done.
+- **Fix queue** (`skulkr scour fix --queue --tenant weasel`, one lane, each run landing; log
+  `.playwright-mcp/logs/fix-queue-2.log`, per-area `<state>/scour/fix-<area>.log`). Holds the ready-to-fix areas never
+  fixed, smallest first, then `prefs-editor`, `simulation`, `labkit.clock`, `core.core.layers`, `core.core.geometry`
+  (added without asking, on "fix the ready areas"). `scour queue ls` shows what's left. If the queue process is
+  gone, start it again with the same command; it takes the next queued area.
+- **Batch-size split** (Mike's go 2026-11-28; docs/scour.md "Whether batching saves"). `labkit.loupe.lens` is done
+  (fixes 26, 29, 30: sizes 1, 8, 16). `diagram-formats` is on its last arm, fix 31 at size 1 (fixes 27, 28 were 16
+  and 8). Each arm's defects are in `.playwright-mcp/logs/split-<area>.log`. When fix 31 lands:
+  `node scripts/fixUnreadVerdicts.mjs 31` (its b1 D2 reads unread; see below), then `node scripts/fixBatchFit.mjs`,
+  rewrite that doc section with the result, retire TODO P3, settle kouhai t-666 and t-669. Minutes are inflated by
+  the fix queue running beside the split; cost is the cleaner measure.
 
-Before that: The fix queue drained: its last run, fix 23 on `rig`, landed and weasel `main` is at `f30993007a`. Per-area
-fix logs are `<state>/scour/fix-<area>.log` (`<state>` = `~/.local/state/weasel-skulkr`).
+## This session (2026-11-28)
 
-**Open question:** `rig`'s delve found 11 distinct, but fix 23 batched 9 (D1–D6, D9–D11); D7 and D8 were left out
-and I didn't find why. Check `skulkr scour fix rig --dry` and the ledger before re-sending them with `--defects D7,D8`.
+- Landed 237 ledgers (weasel `5343c0a1cb`), then each delve's: a fresh `scale` (5 distinct, unseen ≈ 0.8, after
+  fix 21's 12; the old estimate of ≈16 unseen was high), `prefs-editor`, `simulation`, `labkit.clock` (all stopped
+  ready to fix at pass 5 while still finding new, so they want a fresh delve after fixing), `core.core.layers`,
+  `core.core.geometry` (near saturated).
+- Fix statuses are scoped to the ledger's commit (`1e6ddf4`): a fresh ledger's D1–D5 had read as fixed by the old
+  ledger's run.
+- A running fix run's own batches show as fixing (`e8a690a`): a `--size`/`--defects` run had lit the default plan's
+  batch of the same number.
+- A woken fixer's tally-only reply no longer displaces its report, and a defect with no verdict line reads as fixed
+  from an unreverted commit's `Defect:` trailer (`5c9b55d`). Fix 30's 13 unread verdicts corrected in weasel
+  `a97ff2a622` by `scripts/fixUnreadVerdicts.mjs`; fix 31's still to do.
+- `--size` goes to 16 (`1024d62`; default 8). `scripts/fixBatchFit.mjs` fits batch cost on size: before the split,
+  ≈ $0.20 a batch + $0.29 a defect.
+- Filed TODO P1: the defect registry reads no scour fix record, so fixed defects stay `open` there.
+
+**Open question (older):** `rig`'s delve found 11 distinct, fix 23 batched 9; D7 and D8 were left out, reason not
+found. Check `skulkr scour fix rig --dry` before re-sending them with `--defects D7,D8`.
+
+## Earlier (2026-11-27 evening to 2026-11-28 morning)
 
 Done since 2026-11-27 evening (all local `claude -p`, Mike's account):
 
