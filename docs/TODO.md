@@ -16,6 +16,11 @@ Open work on skulkr. Each entry says when it closes.
   is reported as timed out, its cost is read from its transcript, and its verdicts are read from its commits or
   marked unread with that reason.
 
+- [ ] (P1) The defect registry (`.skulkr/defects/`, `src/registry.mjs`) reads no scour fix record, so a defect a fix
+  run fixed stays `open` there: weasel's `rig.jsonl` reads 11 open and 2 fixed after fix 23 fixed 9 of its 11
+  (checked 2026-11-28 at weasel `a97ff2a622`). Rewriting the registry after correcting fix 30's verdicts changed
+  nothing. The Scour page hides it by reading fix records itself (`fixShelfOf`), but anything reading the registry
+  (`skulkr q`, `registryFixedIn` in later fix plans) sees them open.
 - [ ] (P2) The dashboard runs on unreleased weasel (`dashboard/README.md`): `Tooltip`'s `anchorRect` (41906fd420, only on
   weasel's `batch/2026-11-27-scour`) and `LiveQuantity` (2e6a59c4be, on weasel `main`). Until a weasel release carries
   both: the hover cards draw at the window's top-left whenever the linked `~/src/weasel` dist lacks 41906fd420; the
