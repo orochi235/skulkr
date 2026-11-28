@@ -16,12 +16,6 @@ Open work on skulkr. Each entry says when it closes.
   is reported as timed out, its cost is read from its transcript, and its verdicts are read from its commits or
   marked unread with that reason.
 
-- [ ] (P2) A test that times out and then passes on onto's retry reads as failed for the rest of a gate run: onto's
-  progress lines carry `failed 1/N` from the timeout on (fix run 14's second gate, 2026-11-27,
-  `autoReset.surfaces.test.tsx`), and only the closing `⚠ … passed on retry` line says otherwise, so a green run
-  looks red while it runs. Closes when the map and dashboard show a timed-out test as `retrying`, not failed, until
-  the retry's result is in.
-
 - [ ] (P2) The dashboard runs on unreleased weasel (`dashboard/README.md`): `Tooltip`'s `anchorRect` (41906fd420, only on
   weasel's `batch/2026-11-27-scour`) and `LiveQuantity` (2e6a59c4be, on weasel `main`). Until a weasel release carries
   both: the hover cards draw at the window's top-left whenever the linked `~/src/weasel` dist lacks 41906fd420; the
