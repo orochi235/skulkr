@@ -11,7 +11,7 @@ Commit each verified change on `main` without asking (Mike, 2026-11-27).
 ## Running now (2026-11-28 ~07:30 local, all local mode)
 
 The fix queue (`skulkr scour fix --queue`, pid 50815, one lane, log `.playwright-mcp/logs/fix-queue.log`) is draining
-`scale` (fix 21, landing), then `headless` and `rig`. Each run lands itself on weasel `main`; per-area logs are
+`headless`, then `rig` (`scale`, fix 21, landed at weasel `4a3dcd2e38`). Each run lands itself on weasel `main`; per-area logs are
 `<state>/scour/fix-<area>.log` (`<state>` = `~/.local/state/weasel-skulkr`). `skulkr scour queue ls` shows where it is.
 Watch with Monitor on those logs (`grep -E "^fix queue|^(batch [0-9]+:.*(fixed|failed)|repair|land|gate|capstone)|rror|failed|limit"`),
 30-minute expiry; this session's watchers die with it.
@@ -24,7 +24,7 @@ Done since 2026-11-27 evening (all local `claude -p`, Mike's account):
 | Delves `select`, `parallax` (log `.playwright-mcp/logs/delve-select-parallax.log`) | each ready to fix after 5 passes, 3 distinct |
 | Delves `ui.components.Field`, `scale`, `headless`, `rig` (log `.playwright-mcp/logs/delve-field-scale-headless-rig.log`) | all ready to fix after 5 passes: 6, 12, 4, 11 distinct |
 | Fix 18 `select`, 19 `parallax`, 20 `ui.components.Field` | all fixed, each landed (weasel `main` → `bb201046c7` after 20) |
-| Fix 21 `scale` | 12 fixed in 2 batches, landing |
+| Fix 21 `scale` | 12 fixed in 2 batches, landed (weasel `main` → `4a3dcd2e38`) |
 
 Decisions from conversation:
 
