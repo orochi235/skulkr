@@ -10,8 +10,8 @@ Commit each verified change on `main` without asking (Mike, 2026-11-27).
 
 ## Running now (2026-11-28)
 
-A fresh `scale` delve at weasel `5343c0a1cb` (log `.playwright-mcp/logs/delve-scale-2.log`; the old ledger set aside
-as `scale.<commit>`). Before it, `scour land --all` landed 237 ledgers (weasel `5343c0a1cb`, 1325 defects), so the
+Nothing. A fresh `scale` delve at weasel `5343c0a1cb` stopped ready to fix after 5 passes: 5 distinct (5.4 per kloc),
+unseen ≈ 0.8, next-new 15%, $4.22; landed at weasel `cb221bc44a` (log `.playwright-mcp/logs/delve-scale-2.log`). Before it, `scour land --all` landed 237 ledgers (weasel `5343c0a1cb`, 1325 defects), so the
 "Ledgers to land" list below is done.
 
 Before that: The fix queue drained: its last run, fix 23 on `rig`, landed and weasel `main` is at `f30993007a`. Per-area
