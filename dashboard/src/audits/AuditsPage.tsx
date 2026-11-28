@@ -36,7 +36,7 @@ import { useTenantChoice, useTenants } from '@dash/tenants/useTenants';
 import { readSize, useViewerPref } from './viewerPref';
 import { useDashPref } from './dashPrefs';
 import { heatStopsOf } from './heatSchemes';
-import { LoupeButton, PrefsButton } from './PrefsButton';
+import { LoupeButton } from './PrefsButton';
 import type { SkulkrMap } from './skulkrMap.types';
 import palette from './palette.module.css';
 import s from './AuditsPage.module.css';
@@ -260,7 +260,6 @@ export function AuditsPage({ source = {} }: { source?: AuditsSource } = {}) {
     <>
       <LaneViewControls view={view} />
       <LoupeButton />
-      <PrefsButton />
       {continuous && <span className={s.continuous} title={map.continuous?.next}>{continuous}</span>}
       <span className={stale === null ? s.stamp : `${s.stamp} ${s.stale}`}>{stampOf(map, stale)}</span>
     </>

@@ -1,10 +1,11 @@
 import { useEffect, type ReactNode } from 'react';
 import { ColorModeControl } from '@weasel-js/ui/components/ColorModeControl';
+import { PrefsButton } from './audits/PrefsButton';
 import { useColorModeChoice } from './colorMode';
 import s from './Shell.module.css';
 
-/** The page's frame: a header with its title, `nav` beside it, `header`'s controls, and the viewer's color mode at its far
- *  right, over a body that fills the rest. `title` also names the document while the shell is mounted; `heading`, when
+/** The page's frame: a header with its title, `nav` beside it, `header`'s controls, then the prefs button and the
+ *  viewer's color mode at its far right on every page, over a body that fills the rest. `title` also names the document while the shell is mounted; `heading`, when
  *  given, is drawn in its place. */
 export function Shell({ title, heading, nav, header, children }: { title: string; heading?: ReactNode; nav?: ReactNode; header?: ReactNode; children: ReactNode }) {
   useEffect(() => {
@@ -20,12 +21,11 @@ export function Shell({ title, heading, nav, header, children }: { title: string
       <header className={s.header}>
         <h1 className={s.title}>{heading ?? title}</h1>
         {nav && <nav className={s.nav}>{nav}</nav>}
-        {(header || colorMode) && (
-          <div className={s.actions}>
-            {header}
-            {colorMode && <ColorModeControl size="sm" value={colorMode.preference} onChange={colorMode.setPreference} />}
-          </div>
-        )}
+        <div className={s.actions}>
+          {header}
+          <PrefsButton />
+          {colorMode && <ColorModeControl size="sm" value={colorMode.preference} onChange={colorMode.setPreference} />}
+        </div>
       </header>
       <main className={s.body}>{children}</main>
     </div>
