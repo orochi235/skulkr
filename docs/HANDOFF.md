@@ -24,8 +24,9 @@ Fix run 14 relanded: weasel `main` fast-forwarded to `d7ad6e6c8b`. The dispatche
 Both runs were stopped by the usage limit at ~21:00 local and retry on their own after 02:40Z (21:40 local).
 
 **Ledgers to land** (Mike has approved each landing asked so far): `animator.engine`, `animator.timeline`,
-`apps.theme-editor.src` and `geom.paths.part1` landed at weasel `fa11f1f06b`. Still to land: `geom.paths.part2` once
-its delve stops, and `routing.interactions.dispatcher` (t-657) once fix run 17 ends, since the run holds its ledger.
+`apps.theme-editor.src` and `geom.paths.part1` landed at weasel `fa11f1f06b`; `geom.paths.part2` (stopped at pass
+19, 23 distinct, next defect over its limit) at `1408b23ddf`. Still to land: `routing.interactions.dispatcher` (t-657)
+once fix run 17 ends, since the run holds its ledger.
 
 **Outline mask:** weasel-63's inflight register shows `outline-mask` ready at `a9a929275f`, awaiting its batch.
 
