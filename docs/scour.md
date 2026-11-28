@@ -114,6 +114,9 @@ lands nothing and records the branch as `ready`, for the repository's own batchi
   retries rounds' left-out branches nor records its own. A branch that does not land stays the area's newest, and the
   next fix run stacks on it.
 - **After it lands**, the area's fix branches `main` now holds are deleted, so the next run starts from `main`.
+- **Landing again.** `skulkr scour fix <area> --land` lands the area's newest fix branch with no fixing, for a run
+  whose landing crashed, was stopped or went red: it reopens the run that made the branch (its number, directory and
+  record, marked `relanded`) and lands as that run would have.
 - **Not built: close.** The fixers' verdicts still live only in the run records; nothing yet writes them to the
   registry as statuses.
 

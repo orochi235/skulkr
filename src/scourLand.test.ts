@@ -57,6 +57,20 @@ describe('landing a scour fix run', () => {
     expect(red.git('rev-parse', 'main')).toBe(before);
     expect(red.git('branch', '--list', 'scour1-src-b2')).toContain('scour1-src-b2');
 
+    // --land lands the kept branch once the gate is green, as the same run, without fixing anything.
+    red.cfg.gate.command = ['true'];
+    const said: string[] = [];
+    const relanded = await scourFix(red.cfg, fixingRunner().runner, red.root, 'src', { land: true }, (l: string) => said.push(l));
+    expect(relanded.run).toBe(1);
+    expect(relanded.batches).toHaveLength(2);
+    expect(relanded.relanded).toBeTruthy();
+    expect(relanded.landing).toMatch(/^main fast-forwarded/);
+    expect(red.git('show', 'main:src/b2.ts')).toContain('b2');
+    expect(red.git('branch', '--list', 'scour1-*')).toBe('');
+    expect(existsSync(join(red.cfg.state, 'scour', 'fix-2'))).toBe(false);
+    expect(said.some((l) => l.includes('landing only'))).toBe(true);
+    await expect(scourFix(red.cfg, fixingRunner().runner, red.root, 'src', { land: true }, () => {})).rejects.toThrow(/no unlanded fix branch/);
+
     const ready = fixable(['true']);
     const was = ready.git('rev-parse', 'main');
     const kept = await scourFix(ready.cfg, fixingRunner().runner, ready.root, 'src', { ready: true }, () => {});

@@ -117,6 +117,7 @@ export const scourFix = async (cfg, runner, root, id, args, say) => {
     for (const line of fixPlanLines(id, plan)) say(line);
     return { plan };
   }
+  if (args.land) return relandFix(cfg, runner, root, id, ledger, args, say);
   if (args.batch !== undefined && args.defects !== undefined) throw new Error('give --batch or --defects, not both');
   const wanted = args.batch === undefined ? null : new Set(String(args.batch).split(',').map(Number));
   const batches = args.defects !== undefined ? [defectsBatchOf(plan, String(args.defects).split(',').map((x) => x.trim()).filter(Boolean))]
@@ -127,20 +128,38 @@ export const scourFix = async (cfg, runner, root, id, args, say) => {
   return withLedgerHeld(cfg, id, { about: { does: 'fix', max: batches.length, jobs: `fix-${n}` } }, () => fixBatches(cfg, runner, root, id, ledger, batches, n, runDir, args, loggingSay(cfg, id, say)));
 };
 
+/**
+ * `skulkr scour fix <area> --land`: lands the area's newest fix branch with no fixing, as its run would have, for a
+ * run whose landing crashed or was stopped. The landing is that run's: its directory, its record, its number.
+ */
+const relandFix = (cfg, runner, root, id, ledger, args, say) => {
+  if (args.ready || args.batch !== undefined || args.defects !== undefined || args.on !== undefined) throw new Error('--land takes no other fix flag');
+  const runs = fixRunsIn(cfg);
+  const newest = stackBranchFor(cfg, root, id, runs);
+  if (!newest) throw new Error(`${id} has no unlanded fix branch`);
+  const run = runs.find((r) => r.record?.batches.some((b) => b.branch === newest));
+  if (!run) throw new Error(`no fix run on record made ${newest}`);
+  const seed = JSON.parse(readFileSync(join(run.dir, 'record.json'), 'utf8'));
+  return withLedgerHeld(cfg, id, { about: { does: 'fix', max: seed.batches.length, jobs: `fix-${run.n}` } },
+    () => fixBatches(cfg, runner, root, id, ledger, [], run.n, run.dir, args, loggingSay(cfg, id, say), seed));
+};
+
 /** Moves the run's frozen tree to `tip`, and its jobs with it: what they sync from, check against, and are told. */
 const moveTo = (ctx, tip, base) => {
   gitIn(ctx.frozen)('checkout', '--quiet', '--detach', tip);
   Object.assign(ctx, { commit: tip, base, frozenTree: gitIn(ctx.frozen)('rev-parse', 'HEAD^{tree}') });
 };
 
-/** Fix run `n`'s `batches` of ledger `id`, one at a time, recorded in `runDir`. Answers the run's record. */
-const fixBatches = async (cfg, runner, root, id, ledger, batches, n, runDir, args, say) => {
+/** Fix run `n`'s `batches` of ledger `id`, one at a time, recorded in `runDir`, then its landing. `seed` is the run's
+ *  record when `--land` lands an earlier run's branch, which this run then keeps instead of starting one. */
+const fixBatches = async (cfg, runner, root, id, ledger, batches, n, runDir, args, say, seed = null) => {
   const stacked = args.on === undefined ? stackBranchFor(cfg, root, id) : null;
   const on = args.on ?? stacked ?? cfg.git.main;
   const commit = freezeCommitOf(cfg, root, on);
   const git = gitIn(root);
   const frozen = addWorktree(root, `${cfg.naming.prefix}-scour-fix${n}`, commit);
-  const record = { run: n, area: id, commit, on, ledgerCommit: ledger.commit, started: new Date().toISOString(), batches: [] };
+  const record = seed ? { ...seed, relanded: new Date().toISOString() }
+    : { run: n, area: id, commit, on, ledgerCommit: ledger.commit, started: new Date().toISOString(), batches: [] };
   const keep = () => writeFileSync(join(runDir, 'record.json'), `${JSON.stringify(record, null, 1)}\n`);
   const baseOf = (tip) => {
     try { return git('merge-base', tip, `${cfg.git.remote}/${cfg.git.main}`); } catch { return tip; /* no remote */ }
@@ -161,7 +180,7 @@ const fixBatches = async (cfg, runner, root, id, ledger, batches, n, runDir, arg
       layRepair: createRepairLayer(cfg, frozen),
     };
     const why = stacked ? ', the area\'s newest fix branch' : '';
-    say(`scour fix ${n} on ${id} at ${commit.slice(0, 10)}, ${tipOf(on)}${why} (ledger at ${ledger.commit.slice(0, 10)}): ${batches.length} batches`);
+    say(`scour fix ${n} on ${id} at ${commit.slice(0, 10)}, ${tipOf(on)}${why} (ledger at ${ledger.commit.slice(0, 10)}): ${seed ? 'landing only' : `${batches.length} batches`}`);
     let at = on;
     for (const b of batches) {
       const tip = git('rev-parse', `${at}^{commit}`);
