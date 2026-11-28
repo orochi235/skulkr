@@ -95,7 +95,7 @@ their verify and checks on the fleet (`runner: 'local'`, so `checksOnFleet` hold
   batch when they share a file a fix would touch or a stated cause, a group past eight split in file and line order
   (2026-11-26). A reviewer's file mention is resolved against the ledger's files and the full paths other defects
   name; prose in it is dropped.
-- **Batch size** (2026-11-27): `--size N` (1 to 8) caps how many defects a batch holds, and the run's record keeps it
+- **Batch size** (2026-11-27): `--size N` (1 to 16; 8 unless given) caps how many defects a batch holds, and the run's record keeps it
   as `size`. With `--size`, `--defects` names the defects to plan at that size rather than one batch to send.
   `skulkr scour batches [--json]` lists every fix run's batches from `<state>/scour/fix-*/record.json` (its cap,
   defects, files, fixes, dollars, minutes, repairs), then dollars, minutes and the share fixed per defect at each

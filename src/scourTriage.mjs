@@ -4,8 +4,11 @@
  */
 import { isRecurrent } from './triageFields.mjs';
 
-/** The most defects one fixer is handed. */
+/** The most defects one fixer is handed unless `--size` says otherwise. */
 export const BATCH_MAX = 8;
+
+/** The largest `--size`: past 8 only for measuring what batch size costs (docs/scour.md "Whether batching saves"). */
+export const SIZE_LIMIT = 16;
 
 /** A `where` or `fix` entry's file: `src/a.ts:120 (fn)` and `` `src/a.ts` (`fn`) `` are `src/a.ts`. */
 export const fileOf = (where) => String(where ?? '').replace(/`/g, '').trim().split(/[\s:(]/)[0] ?? '';

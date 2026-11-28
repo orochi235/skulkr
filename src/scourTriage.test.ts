@@ -32,14 +32,15 @@ describe('scour fix triage', () => {
     expect(groups.find((g: string[]) => g.includes('D3'))).toContain('D4');
   });
 
-  it('caps batches at the size given, never packing small ones past it, and refuses a size outside 1 to 8', () => {
+  it('caps batches at the size given, never packing small ones past it, and refuses a size outside 1 to 16', () => {
     const plan = fixPlanFor(ledgerOf([d('D1', 'src/a.ts:1'), d('D2', 'src/a.ts:2'), d('D3', 'src/b.ts:1'), d('D4', 'src/c.ts:1')]), { size: 1 });
     expect(plan.batches.map((b: { defects: unknown[] }) => b.defects.length)).toEqual([1, 1, 1, 1]);
     const two = fixPlanFor(ledgerOf(Array.from({ length: 5 }, (_, i) => d(`D${i + 1}`, `src/a.ts:${i + 1}`))), { size: 2 });
     expect(two.batches.map((b: { defects: unknown[] }) => b.defects.length)).toEqual([2, 2, 1]);
     expect(fixSizeOf(undefined)).toBe(8);
     expect(fixSizeOf('3')).toBe(3);
-    expect(() => fixSizeOf('9')).toThrow('--size wants a whole number of defects from 1 to 8, not 9');
+    expect(fixSizeOf('16')).toBe(16);
+    expect(() => fixSizeOf('17')).toThrow('--size wants a whole number of defects from 1 to 16, not 17');
     expect(() => fixSizeOf('0')).toThrow('--size');
   });
 

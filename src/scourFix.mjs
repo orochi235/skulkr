@@ -22,7 +22,7 @@ import { VERDICTS, fixRunsIn, registryFixedIn, verdictIn } from './scourFixStatu
 import { registeredIn, registryLinesOf } from './saturationList.mjs';
 import { landFixBranch } from './scourLand.mjs';
 import { revertedDefectsOf, withRevertsRead } from './scourReverts.mjs';
-import { BATCH_MAX, fixPlanFor, fixPlanLines, filesOf } from './scourTriage.mjs';
+import { BATCH_MAX, SIZE_LIMIT, fixPlanFor, fixPlanLines, filesOf } from './scourTriage.mjs';
 
 
 /** Claims the next fix run: one past the highest `fix-<N>` in the scour state directory, its directory made here.
@@ -87,11 +87,11 @@ export const scourVerdictsOf = (report, ids) => {
 /** The defect ids a `--defects D1,D2,…` value names. */
 const defectIdsOf = (value) => String(value).split(',').map((x) => x.trim()).filter(Boolean);
 
-/** The most defects a batch holds: `--size`'s whole number from 1 to `BATCH_MAX`, else `BATCH_MAX`. */
+/** The most defects a batch holds: `--size`'s whole number from 1 to `SIZE_LIMIT`, else `BATCH_MAX`. */
 export const fixSizeOf = (value) => {
   if (value === undefined) return BATCH_MAX;
   const n = Number(value);
-  if (!Number.isInteger(n) || n < 1 || n > BATCH_MAX) throw new Error(`--size wants a whole number of defects from 1 to ${BATCH_MAX}, not ${value}`);
+  if (!Number.isInteger(n) || n < 1 || n > SIZE_LIMIT) throw new Error(`--size wants a whole number of defects from 1 to ${SIZE_LIMIT}, not ${value}`);
   return n;
 };
 
