@@ -96,12 +96,12 @@ export const lastFixRunOf = (area, runs) => {
   return { n: run.n, started: run.record?.started ?? null, finished: run.record?.finished ?? null };
 };
 
-/** A ledger's shelf: its plan's batches (ids in order, with each one's size and whether it recurs), what goes to ask,
+/** A ledger's shelf: its plan's batches, less `fixedElsewhere` (`registryFixedIn`'s) as a fix run plans them (ids in order, with each one's size and whether it recurs), what goes to ask,
  *  and each defect's fix status, with its `stage` (`fixStagesIn`) while its batch is out, and `flagged` (with
  *  the `verdict` it overrides) where a person flagged it (`scourFlags.mjs`). */
-export const fixShelfOf = (cfg, ledger, runs = fixRunsIn(cfg), flags = scourFlagsOf(cfg)) => {
+export const fixShelfOf = (cfg, ledger, runs = fixRunsIn(cfg), flags = scourFlagsOf(cfg), fixedElsewhere = new Set()) => {
   if (ledger.defects.length === 0) return null;
-  const plan = fixPlanFor(ledger, { recurrent: cfg.saturate.recurrent });
+  const plan = fixPlanFor(ledger, { open: (d) => !fixedElsewhere.has(d.id), recurrent: cfg.saturate.recurrent });
   const statuses = fixStatusesFor(ledger.area, runs);
   // A batch out with no record yet names no ids; the plan, computed the same way, says which they are, and its job
   // directory where each one stands.
@@ -126,13 +126,21 @@ export const fixShelfOf = (cfg, ledger, runs = fixRunsIn(cfg), flags = scourFlag
   };
 };
 
+/** The ids of the defects whose registry line (`lines`, by ledger defect id) records them fixed: closed outside a fix
+ *  run, by a round's fixer or by hand, so no fix plan hands them to a fixer again. */
+export const registryFixedIn = (lines) => new Set([...lines].filter(([, line]) => line?.status === 'fixed').map(([id]) => id));
+
+/** A ledger summary's `defects` as registry lines by id, as `registryFixedIn` takes them. */
+export const registryLinesIn = (defects) => new Map(defects.map((d) => [d.id, d.registry]));
+
 /**
  * `shelf` with each defect the registry records fixed (`defects`, a ledger summary's, with their `registry` lines)
  * shown as fixed, where no fix run has fixed it: a round's fixer, or a hand fix, closed it outside skulkr's fix runs.
  */
 export const withRegistryFixes = (shelf, defects) => {
   if (!shelf) return shelf;
-  const fixed = defects.filter((d) => d.registry?.status === 'fixed' && shelf.statuses[d.id]?.status !== 'fixed');
+  const elsewhere = registryFixedIn(registryLinesIn(defects));
+  const fixed = defects.filter((d) => elsewhere.has(d.id) && shelf.statuses[d.id]?.status !== 'fixed');
   if (!fixed.length) return shelf;
   const statuses = { ...shelf.statuses };
   for (const d of fixed) statuses[d.id] = { status: 'fixed', run: null, branch: null, verified: true, sha: d.registry.sha ?? null, registry: true };

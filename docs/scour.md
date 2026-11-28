@@ -73,6 +73,8 @@ and cost, is `<state>/scour/fix-<N>/record.json`. The run then lands (below). Lo
 their verify and checks on the fleet (`runner: 'local'`, so `checksOnFleet` holds). A run holds its ledger as a delve
  does (`does: 'fix'`), so the Scour page shows it live, each batch's jobs read from the run's directory.
 
+- **Fixed elsewhere** (2026-11-27): the plan leaves out every defect the registry records `fixed` (a round's fixer
+  or a hand fix closed it), and the Scour page's shelf and fix queue plan the same way (`registryFixedIn`).
 - **Sending defects again** (2026-11-27): `--defects D37,D22,…` makes one batch of exactly those defects, numbered as
   the first one's batch, for what a batch left unfixed.
 - **Stacking** (2026-11-27, `src/scourFixBase.mjs`): an area's fixes build on each other, so its newest

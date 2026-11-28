@@ -18,7 +18,8 @@ import { createSaturateContext } from './saturateJobs.mjs';
 import { scourStateDirOf } from './scourPaths.mjs';
 import { stackBranchFor } from './scourFixBase.mjs';
 import { createRepairLayer } from './scourFixLay.mjs';
-import { VERDICTS, fixRunsIn, verdictIn } from './scourFixStatus.mjs';
+import { VERDICTS, fixRunsIn, registryFixedIn, verdictIn } from './scourFixStatus.mjs';
+import { registeredIn, registryLinesOf } from './saturationList.mjs';
 import { landFixBranch } from './scourLand.mjs';
 import { revertedDefectsOf, withRevertsRead } from './scourReverts.mjs';
 import { fixPlanFor, fixPlanLines, filesOf } from './scourTriage.mjs';
@@ -112,7 +113,8 @@ const branchWith = (root, branch, commit, mbox) => {
 export const scourFix = async (cfg, runner, root, id, args, say) => {
   const ledger = ledgerOf(cfg, id);
   if (!ledger) throw new Error(`${id} has no scour ledger`);
-  const plan = fixPlanFor(ledger, { recurrent: cfg.saturate.recurrent });
+  const fixedElsewhere = registryFixedIn(registryLinesOf(ledger, registeredIn(cfg, root)));
+  const plan = fixPlanFor(ledger, { open: (d) => !fixedElsewhere.has(d.id), recurrent: cfg.saturate.recurrent });
   if (args.dry) {
     for (const line of fixPlanLines(id, plan)) say(line);
     return { plan };

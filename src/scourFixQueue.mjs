@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { liveScourOf } from './delveLive.mjs';
 import { ledgerOf } from './ledger.mjs';
 import { scourStateDirOf } from './scourPaths.mjs';
-import { fixRunsIn, fixStatusesFor } from './scourFixStatus.mjs';
+import { fixRunsIn, fixStatusesFor, registryFixedIn, registryLinesIn } from './scourFixStatus.mjs';
 import { fixPlanFor } from './scourTriage.mjs';
 
 const BIN = fileURLToPath(new URL('../bin/skulkr.mjs', import.meta.url));
@@ -42,13 +42,15 @@ export const withQueued = (queue, ids) => [...queue, ...ids.filter((id, i) => !q
 /** The queue less `ids`. */
 export const withDropped = (queue, ids) => queue.filter((id) => !ids.includes(id));
 
-/** What a fix run on ledger `id` would take on now: its defects no fix run has settled, and the batches triage makes of
+/** What a fix run on ledger `id` would take on now: its defects no fix run has settled and the registry does not record
+ *  fixed (`fixedElsewhere`, `registryFixedIn`'s), and the batches triage makes of
  *  them; null with no ledger. */
-export const fixWorkOf = (cfg, id, runs = fixRunsIn(cfg)) => {
+export const fixWorkOf = (cfg, id, runs = fixRunsIn(cfg), fixedElsewhere = new Set()) => {
   const ledger = ledgerOf(cfg, id);
   if (!ledger) return null;
   const statuses = fixStatusesFor(ledger.area, runs);
-  const plan = fixPlanFor(ledger, { open: (d) => !SETTLED.has(statuses[d.id]?.status), recurrent: cfg.saturate.recurrent });
+  const open = (d) => !fixedElsewhere.has(d.id) && !SETTLED.has(statuses[d.id]?.status);
+  const plan = fixPlanFor(ledger, { open, recurrent: cfg.saturate.recurrent });
   return { open: plan.batches.reduce((n, b) => n + b.defects.length, 0) + plan.ask.length, batches: plan.batches.length };
 };
 
@@ -70,7 +72,8 @@ export const fixQueueIn = (cfg, list, runs = fixRunsIn(cfg)) => {
     return { area: l.area, running: true, done, batches: max, open: null, phase: landing ? 'landing' : phaseOf(job?.step), progress: landing ? null : job?.progress ?? null };
   });
   const live = new Set(running.map((r) => r.area));
-  const queued = fixQueueOf(cfg).filter((id) => !live.has(id)).map((id) => ({ area: id, running: false, done: 0, ...(fixWorkOf(cfg, id, runs) ?? { open: null, batches: null }) }));
+  const elsewhere = (id) => registryFixedIn(registryLinesIn(list.find((l) => l.id === id)?.defects ?? []));
+  const queued = fixQueueOf(cfg).filter((id) => !live.has(id)).map((id) => ({ area: id, running: false, done: 0, ...(fixWorkOf(cfg, id, runs, elsewhere(id)) ?? { open: null, batches: null }) }));
   return [...running, ...queued];
 };
 

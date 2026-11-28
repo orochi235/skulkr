@@ -14,14 +14,14 @@ import { candidatePricesOf, scourQueueOf } from './scourQueue.mjs';
 import { ledgerLinesOf, perKloc } from './scourLines.mjs';
 import { landedLedgersUnder, scourStateDirOf } from './scourPaths.mjs';
 import { isRecurrent } from './triageFields.mjs';
-import { fixRunsIn, fixShelfOf, withRegistryFixes } from './scourFixStatus.mjs';
+import { fixRunsIn, fixShelfOf, registryFixedIn, registryLinesIn, withRegistryFixes } from './scourFixStatus.mjs';
 
 /**
  * One ledger's summary and defects; `id` is its directory, an area or a set-aside `<area>.<commit>`. `registered`
  * answers, for a landed ledger's key, each of its defects' registry line by defect id (`{ id, status, sha }`).
  */
 export const ledgerSummaryOf = (cfg, id, ledger, registered = () => new Map(), rule = scourRuleOf(cfg, undefined)) => {
-  const inRegistry = registered(`${ledger.area}@${ledger.commit.slice(0, 10)}`);
+  const inRegistry = registryLinesOf(ledger, registered);
   const stats = chao2(ledger.occasions, ledger.defects);
   const price = nextPriceOf(ledger, rule.factor, rule.priceBy);
   const costUsd = ledger.occasions.reduce((sum, o) => sum + (o.costUsd ?? 0), 0);
@@ -64,8 +64,11 @@ export const ledgerSummaryOf = (cfg, id, ledger, registered = () => new Map(), r
   };
 };
 
+/** A landed ledger's registry lines by defect id, from `registered` (`registeredIn`'s). */
+export const registryLinesOf = (ledger, registered) => registered(`${ledger.area}@${ledger.commit.slice(0, 10)}`);
+
 /** For a landed ledger's key, its defects' registry lines by defect id, read from the index of the record under `root`. */
-const registeredIn = (cfg, root) => {
+export const registeredIn = (cfg, root) => {
   let rows = [];
   try {
     rows = queryIndex(cfg, gitIn(root), root, 'select s.ledger, s.ledger_defect, d.id, d.status, d.resolved_sha from sightings s join defects d on d.id = s.defect where s.ledger is not null');
@@ -94,7 +97,8 @@ export const ledgerListOf = (cfg, root) => {
   const runs = fixRunsIn(cfg);
   return ledgers.map(([id, ledger]) => {
     const summary = ledgerSummaryOf(cfg, id, ledger, registered, rule);
-    return { ...summary, running: liveScourOf(cfg, id), fix: id === ledger.area ? withRegistryFixes(fixShelfOf(cfg, ledger, runs), summary.defects) : null };
+    const shelf = id === ledger.area ? fixShelfOf(cfg, ledger, runs, undefined, registryFixedIn(registryLinesIn(summary.defects))) : null;
+    return { ...summary, running: liveScourOf(cfg, id), fix: withRegistryFixes(shelf, summary.defects) };
   });
 };
 
