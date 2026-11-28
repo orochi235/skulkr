@@ -1,49 +1,51 @@
 # Handoff
 
-For the next session in skulkr. Updated 2026-11-27 ~19:05 local. Check each claim against the tree.
+For the next session in skulkr. Updated 2026-11-27 ~19:40 local. Check each claim against the tree.
 
 ## State
 
 On `main`, pushed. Live jobs: `pgrep -fl "scour fix|scour delve|fix-lane"`; per-run figures `node scripts/fixRunStats.mjs`.
 Commit each verified change on `main` without asking (Mike, 2026-11-27).
 
-## Running now (started 2026-11-27 ~18:13 local, all local mode)
+## Running now (2026-11-27 ~19:40 local, all local mode)
 
-| What | Started by | Log |
-|---|---|---|
-| Fix run 14 `animator.engine` (3 batches), then `animator` (2 batches) | `.playwright-mcp/fix-lane.sh animator-a …` | `.playwright-mcp/logs/fix-<area>.log`, lane in `fix-animator-a.log` |
-| Fix run 15 `animator.timeline` (2 batches) | `.playwright-mcp/fix-lane.sh animator-b …` | same, `fix-animator-b.log` |
+| What | Log |
+|---|---|
+| Fix run 14 `animator.engine` batch 3 of 3, then the lane starts `animator` (2 batches) | `.playwright-mcp/logs/fix-animator.engine.log`, lane in `fix-animator-a.log` |
+| Delve `apps.theme-editor.src` (resumed from 13 passes at `9c4522d635`) | `.playwright-mcp/logs/delve-apps.theme-editor.src.log` |
 
-`animator` and `animator.engine` share `createHostedAnimator.ts`, `engine/animatorApi.ts` and `engine/core.ts`, so
-they run one after the other: each fix run lands on weasel's `main` when its batches end (stacking + landing,
-`docs/scour.md` "Landing"), and the next starts from the landed tip. Report each landing to Mike (did `main`
-fast-forward, did `.skulkr/scour/fix-<N>/` land, were `scour<N>-*` deleted).
+Re-arm watches under Monitor (30-minute expiry): `.playwright-mcp/stallwatch.sh 14 animator.engine`, and a
+`tail -F … | grep -E "^[0-9]+/[0-9]+ |stopped|rror|failed"` on the delve log. Judge a stall by output growth, not time
+(memory `in-flight-is-not-almost-done`). Report fix run 14's landing to Mike: did `main` fast-forward, did
+`.skulkr/scour/fix-14/` land, were `scour14-*` deleted. Then land its ledger and `animator.timeline`'s
+(`skulkr scour land animator.engine animator.timeline`; kouhai t-652). Land `apps.theme-editor.src` when its delve stops.
 
-Status at ~19:05: both fix runs on batch 2. Both started before `c656e33` (a repair's revert reads as `not fixed`), so
-run 15 records D11 fixed although its batch-1 repair `git revert`ed that fix: kouhai t-650 corrects it when the run ends.
+## Handed to weasel-63: merging what's ready (Mike, 2026-11-27)
 
-The `text.layout` delve stopped at pass 5 on the cost rule (next defect ≈ $1.50 over the $1.49 limit): 12 distinct
-defects, $11.31, report in `<state>/scour/text.layout/report.md`. It is not landed: weasel's `main` holds 126 landed
-ledgers against ~260 in the state directory, no `text.*` among them. `skulkr scour land --all` would land them all in
-one commit and push weasel's `main` — waiting on Mike's go.
+Mike: "work with weasel-63 to merge whatever's ready to main". I sent weasel-63 the list and proposed it batch, gate
+and fast-forward these, taking skulkr's merge lock (`<state>/merge.lock`) and leaving `scour14-*` alone:
 
-Watch spawned jobs from their start (memory `in-flight-is-not-almost-done`): a delve pass normally takes ~7 min
-but pass 4 took 14 and was healthy, so judge a stall by output growth, not time or the file counter alone.
-`.playwright-mcp/stallwatch.sh 14 animator.engine 15 animator.timeline` watches both fix runs; re-arm it under Monitor
-(30-minute expiry).
+- Fix run 15 `animator.timeline`: `batch/2026-11-28-scour15` = `scour15-animator.timeline-b2` (stacks b1) plus the
+  record commit. skulkr's own landing crashed: its preflight failed only on `check:test-projects` (`git ls-files` past
+  1 MB after the 235-ledger landing; fixed on weasel `main` as `045d593f04`), then `failingOnMain` hit an undefined
+  `ctx.root` (fixed, `4365d09`). Still owed: kouhai t-650, run 15's D11 recorded fixed though a repair reverted it.
+- Fix runs 9, 11, 12: every `scour<N>-*` branch (pre-stacking, each holds only its own batch; no record commits).
 
-Fix run 13 (`core.canvas.SceneCanvas.part2`) was the first scour landing: `main` fast-forwarded to `471ca1528c` and
-pushed, record committed, branches deleted (kouhai t-635, settled).
+Nothing has come back from weasel-63 yet. Check `git -C ~/src/weasel branch --list 'scour*' 'batch/*'` against
+`main` before redoing any of it; the proposed `skulkr scour fix <area> --land` stays unbuilt.
 
-## Waiting on Mike's go: landing fix runs 9, 11, 12
+## Done this session (2026-11-27 evening)
 
-Runs 1–8 and 10 landed in weasel-7a's hand batch `batch/2026-11-27-scour`. Runs 9 (`forge.vite.part2`, b1–b8),
-11 (`core.canvas.nodeShapes`, b1–b3) and 12 (`core.canvas.part4`, b1–b4) finished before landing existed; their
-`scour<N>-*` branches sit in weasel, each cut from `main` on its own (pre-stacking), so the newest holds only its own
-batch. Nothing lands a finished fix run. Proposed (not built): `skulkr scour fix <area> --land`, which runs no
-batches and lands the area's unlanded verified branches: the newest alone when it holds the rest (`landFixBranch`),
-else all of them as one `batchAndTest` with conflict repair, gate and capstone, one mbox per branch. It pushes weasel's
-`main` per area, so it needs his go to build and to run; conflict repairs are local Claude jobs.
+- Landed 235 ledgers (weasel `8188c702bf`), then `apps.theme-editor` (7 defects, 6 passes) and `text.layout`
+  (13 defects, 6 passes) again after the 4× limit.
+- `scour land --all` skips ledgers a live scour holds (`01bac8e`); `scour delve --deep` turns off the ready-to-fix stop
+  for one delve (`016ad6e`); default per-defect limit back to 4× (`1eeca48`); queue ties broken by known defects per
+  kloc, since ~200 areas sit at the opening price after one Codex pass and the queue read alphabetically
+  (`1c54106`, after Mike: "numbered upcoming looks broken" — confirm with him that this was what he saw).
+- weasel's fixer brief runs `check:size` before any test, and its verify runs it first and stops there
+  (`cee22f4`; Mike: catch gate failures like line count before a full suite). Fix runs started before it keep the old
+  order. The GUI half of verify is a separate job and does not stop on it.
+- Fix readout shows the batch under way as an index, `batch 3/3` (`41f7a16`).
 
 ## Dashboard, this session (`0a2855f`, `71053f7`, `b5e5d82`, `2f00e57`, `c654dc3`, `d94027c`)
 
