@@ -13,6 +13,11 @@ Commit each verified change on `main` without asking (Mike, 2026-11-27).
 The fix queue (log `.playwright-mcp/logs/fix-queue-2.log`, one lane, each run landing): `scale`, then the 20 ready-to-fix
 areas never fixed, smallest first, ≈400 defects at ≈$0.31 each. `scour queue ls` shows what is left.
 Delves on `prefs-editor`, `simulation`, `labkit.clock` (next in the queue; log `.playwright-mcp/logs/delve-prefs-sim-clock.log`).
+The batch-size split (docs/scour.md "Whether batching saves"; Mike's go 2026-11-28), one `scour fix` run per arm, arms
+run in turn by `.playwright-mcp/split.mjs` (gitignored), logs `.playwright-mcp/logs/split-<area>.log` holding each
+arm's defects: `labkit.loupe.lens` sizes 1, 8, 16 (8, 8, 16 defects), `diagram-formats` sizes 16, 8, 1 (16, 16, 19).
+Both areas were dropped from the fix queue. When both end, rerun `scripts/fixBatchFit.mjs`, update that doc section,
+and retire the TODO P3 entry. Minutes are inflated by the fix queue running beside them.
 
 Before that: A fresh `scale` delve at weasel `5343c0a1cb` stopped ready to fix after 5 passes: 5 distinct (5.4 per kloc),
 unseen ≈ 0.8, next-new 15%, $4.22; landed at weasel `cb221bc44a` (log `.playwright-mcp/logs/delve-scale-2.log`). Before it, `scour land --all` landed 237 ledgers (weasel `5343c0a1cb`, 1325 defects), so the
