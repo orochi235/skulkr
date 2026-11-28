@@ -14,7 +14,7 @@ Commit each verified change on `main` without asking (Mike, 2026-11-27).
 |---|---|
 | Done: `scour run geom.paths.part1 geom.paths.part2`; part2 stopped at pass 19/40, 23 distinct, next defect ≈ $1.97 over the $1.97 limit | `.playwright-mcp/logs/delve-geom.paths.log` |
 | Done: `scour run select parallax` (2026-11-27 23:21); each stopped ready to fix after 5 passes, 3 distinct apiece, $1.46 and $2.59 | `.playwright-mcp/logs/delve-select-parallax.log` |
-| Fix run 17 `routing.interactions.dispatcher` (pid 29085), 7 batches, started on weasel `main` `ce4c8b3c9b` | `.playwright-mcp/logs/fix-routing.interactions.dispatcher.log` |
+| Landed: fix run 17 `routing.interactions.dispatcher`, 47 fixed and 2 not defects in 7 batches, $17.89; weasel `main` fast-forwarded to `fa57555d6c` (2026-11-28 ~05:00) | `.playwright-mcp/logs/fix-routing.interactions.dispatcher.log` |
 
 Watch each with Monitor (`tail -F … | grep -E "^(record|preflight|gate|main|land|capstone|batch):|rror|failed|^[0-9]+/[0-9]+ |stopped"`),
 30-minute expiry; the last session's watchers died with it.
