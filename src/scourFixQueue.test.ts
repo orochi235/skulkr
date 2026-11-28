@@ -34,6 +34,8 @@ describe('the fix queue', () => {
       'forge.vite.part2       fixing 3/8',
       'cursor                14        2',
     ]);
+    expect(fixQueueLines([{ area: 'animator.engine', running: true, done: 3, batches: 3, open: null, phase: 'landing' }])[1])
+      .toBe('animator.engine      landing 3/3');
     expect(fixQueueLines([])).toEqual(['the fix queue is empty']);
   });
 });

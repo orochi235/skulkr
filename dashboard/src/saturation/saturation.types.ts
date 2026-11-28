@@ -159,7 +159,8 @@ export interface FixQueueRow {
   readonly done: number;
   readonly batches: number | null;
   readonly open: number | null;
-  /** A running row's batch: `fixing`, `verifying`, `repairing` or `starting`, and that step's count. */
+  /** A running row's batch: `fixing`, `verifying`, `repairing` or `starting`, and that step's count; `landing` once
+   *  every batch is back. */
   readonly phase?: string;
   readonly progress?: { readonly done: number; readonly of: number } | null;
 }
