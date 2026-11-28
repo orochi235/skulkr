@@ -10,7 +10,10 @@ Commit each verified change on `main` without asking (Mike, 2026-11-27).
 
 ## Running now (2026-11-28)
 
-Nothing. A fresh `scale` delve at weasel `5343c0a1cb` stopped ready to fix after 5 passes: 5 distinct (5.4 per kloc),
+The fix queue (log `.playwright-mcp/logs/fix-queue-2.log`, one lane, each run landing): `scale`, then the 20 ready-to-fix
+areas never fixed, smallest first, ≈400 defects at ≈$0.31 each. `scour queue ls` shows what is left.
+
+Before that: A fresh `scale` delve at weasel `5343c0a1cb` stopped ready to fix after 5 passes: 5 distinct (5.4 per kloc),
 unseen ≈ 0.8, next-new 15%, $4.22; landed at weasel `cb221bc44a` (log `.playwright-mcp/logs/delve-scale-2.log`). Before it, `scour land --all` landed 237 ledgers (weasel `5343c0a1cb`, 1325 defects), so the
 "Ledgers to land" list below is done.
 
