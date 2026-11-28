@@ -1,39 +1,45 @@
 # Handoff
 
-For the next session in skulkr. Updated 2026-11-27 ~19:40 local. Check each claim against the tree.
+For the next session in skulkr. Updated 2026-11-27 ~20:00 local by skulkr-e0. Check each claim against the tree.
 
 ## State
 
 On `main`, pushed. Live jobs: `pgrep -fl "scour fix|scour delve|fix-lane"`; per-run figures `node scripts/fixRunStats.mjs`.
 Commit each verified change on `main` without asking (Mike, 2026-11-27).
 
-## Running now (2026-11-27 ~19:40 local, all local mode)
+## Running now (2026-11-27 ~20:00 local, all local mode)
 
 | What | Log |
 |---|---|
-| Fix run 14 `animator.engine` batch 3 of 3, then the lane starts `animator` (2 batches) | `.playwright-mcp/logs/fix-animator.engine.log`, lane in `fix-animator-a.log` |
-| `scour run geom.paths.part1 geom.paths.part2` (Mike: "delve the rest of geom.paths in order"; part1 already stopped, part2 delving from 1 pass) | `.playwright-mcp/logs/delve-geom.paths.log` |
+| Fix run 14 `animator.engine` landing again via `skulkr scour fix animator.engine --land` (record at `3bda036a44` on `batch/2026-11-28-scour14`, onto weasel `main` `88658f8cbe`) | `.playwright-mcp/logs/fix-animator.engine.reland.log` |
+| `scour run geom.paths.part1 geom.paths.part2`: part1 stopped; part2 at pass 6, 10 distinct | `.playwright-mcp/logs/delve-geom.paths.log` |
+| `scour delve routing.interactions.dispatcher --deep` (Mike: delve to the cost cap; pid 53571), pass 32/40, 50 distinct | `.playwright-mcp/logs/delve-routing.interactions.dispatcher.log` |
 
-Re-arm watches under Monitor (30-minute expiry): `.playwright-mcp/stallwatch.sh 14 animator.engine`, and a
-`tail -F … | grep -E "^[0-9]+/[0-9]+ |stopped|rror|failed"` on the delve log. Judge a stall by output growth, not time
-(memory `in-flight-is-not-almost-done`). Report fix run 14's landing to Mike: did `main` fast-forward, did
-`.skulkr/scour/fix-14/` land, were `scour14-*` deleted. Then land its ledger and `animator.timeline`'s
-(`skulkr scour land animator.engine animator.timeline`; kouhai t-652). `apps.theme-editor.src` stopped at pass 14 on the 4× limit (20 defects) and is not landed yet; land it with
-`geom.paths.part2` when that delve stops (Mike has approved each ledger landing asked so far).
+Watch each with Monitor (`tail -F … | grep -E "^(record|preflight|gate|main|land|capstone):|rror|failed|^[0-9]+/[0-9]+ |stopped"`),
+30-minute expiry. weasel-63 holds off `main` until told fix run 14 has landed: message it either way.
 
-## Handed to weasel-63: merging what's ready (Mike, 2026-11-27)
+When fix run 14 lands, report to Mike: did `main` fast-forward, did `.skulkr/scour/fix-14/` land, were `scour14-*`
+and `batch/2026-11-28-scour14` deleted. If it goes red, triage with `failingOnMain` in the log before anything else.
+Then land ledgers: `skulkr scour land animator.engine animator.timeline` (kouhai t-652); `apps.theme-editor.src`
+(stopped at pass 14, 20 defects) with `geom.paths.part2` when that delve stops; `routing.interactions.dispatcher` when
+its delve stops (kouhai t-657). Mike has approved each ledger landing asked so far.
 
-Mike: "work with weasel-63 to merge whatever's ready to main". I sent weasel-63 the list and proposed it batch, gate
-and fast-forward these, taking skulkr's merge lock (`<state>/merge.lock`) and leaving `scour14-*` alone:
+The `animator` fix lane never ran: fix run 14's crash killed `fix-lane.sh`'s loop before it reached `animator`.
 
-- Fix run 15 `animator.timeline`: `batch/2026-11-28-scour15` = `scour15-animator.timeline-b2` (stacks b1) plus the
-  record commit. skulkr's own landing crashed: its preflight failed only on `check:test-projects` (`git ls-files` past
-  1 MB after the 235-ledger landing; fixed on weasel `main` as `045d593f04`), then `failingOnMain` hit an undefined
-  `ctx.root` (fixed, `4365d09`). Still owed: kouhai t-650, run 15's D11 recorded fixed though a repair reverted it.
-- Fix runs 9, 11, 12: every `scour<N>-*` branch (pre-stacking, each holds only its own batch; no record commits).
+## Done by skulkr-e0 (2026-11-27 ~19:30–20:00)
 
-Nothing has come back from weasel-63 yet. Check `git -C ~/src/weasel branch --list 'scour*' 'batch/*'` against
-`main` before redoing any of it; the proposed `skulkr scour fix <area> --land` stays unbuilt.
+- Fix runs 15, 9, 11 and 12 landed by weasel-63 at weasel `88658f8cbe` (gate 47,330 passed), branches deleted.
+  Run 15's D11 now reads `not fixed (a repair reverted its fix …)` in the state record and in weasel (`bc4e18359d`);
+  t-650 settled.
+- Fix run 14's first landing went red on one test, `scripts/lib/fleet-triggers.test.ts` (`spawnSync git ENOBUFS`, the
+  same 1 MB `git ls-files` overflow as `045d593f04`), then crashed in `failingOnMain` because the process predated
+  `4365d09`. Test fixed on weasel `main` (`bdabff33bb`, now in `88658f8cbe`).
+- `skulkr scour fix <area> --land` (`e04d17c`): lands the area's newest fix branch again as the run that made it.
+- Fix plans leave out defects the registry records fixed (`889a9fc`, `registryFixedIn`): the dispatcher's plan went
+  from 50 defects to 45. Not checked: whether the running dashboard dev server needs `emilia restart skulkr/dashboard`
+  to pick it up.
+- ❓ kouhai q-655, for Mike: ~128 untracked `*-review-saturation-codex.md` files plus `ingested/` and
+  `other-commit/` in `~/src/weasel`. No session claims them; they don't block a fast-forward (only tracked changes do).
 
 ## Done this session (2026-11-27 evening)
 
@@ -50,15 +56,10 @@ Nothing has come back from weasel-63 yet. Check `git -C ~/src/weasel branch --li
 
 ## From skulkr-67's last turns (2026-11-27 ~20:00)
 
-- Fix run 16 (`routing.interactions.dispatcher`) was canceled at Mike's ask; `<state>/scour/fix-16/` is a dead run's record.
-  Instead its delve runs to the cost cap: `scour delve routing.interactions.dispatcher --deep`, log
-  `.playwright-mcp/logs/delve-routing.interactions.dispatcher.log`. Land its ledger when it stops (kouhai t-657).
+- Fix run 16 (`routing.interactions.dispatcher`) was canceled at Mike's ask; `<state>/scour/fix-16/` is a dead run's
+  record. Its delve runs to the cost cap instead (see "Running now").
 - `animator`'s delve stops at once: Chao2 puts 2.5 defects unseen (0.60 per kloc, under 1). Mike asked why it is so
   sure; the answer is that it is a point estimate from 5 mostly-Claude passes, a floor, not a bound.
-- **Bug, unfixed: the fix plan ignores the registry.** `fixPlanFor` in `scourFix.mjs`, `fixShelfOf` and
-  `fixWorkOf` plan every ledger defect, including ones the registry records fixed (the dispatcher has 5, fixed by
-  rounds), so a fix run hands fixers defects already fixed. The registry lines come from `registeredIn` in
-  `saturationList.mjs`; the plan needs them as its `open` filter. The dashboard now shows them fixed (`f5f2986`).
 - Prefs button on every page's topbar (`43244c7`); Fix queue says `landing N/N` (`2309e0c`, `2c9ae4e`).
 
 ## Dashboard, this session (`0a2855f`, `71053f7`, `b5e5d82`, `2f00e57`, `c654dc3`, `d94027c`)
