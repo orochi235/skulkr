@@ -51,11 +51,9 @@ The `animator` fix lane never ran: fix run 14's crash killed `fix-lane.sh`'s loo
 - Dashboard: estimates (left, next new, next defect) in sky blue via `--sk-estimate` in `dashboard/src/app.css`,
   no italic; a delve's kloc and files moved into its header before the pid; the live row leads with pass or batch,
   clock second (`44091e9`, `1d867ac`).
-- **Outline occlusion** (kouhai t-661): Mike wants the selection outline covered by raised cells in front of it, as a
-  weasel feature. weasel-63 owns the build (an agent of its own, in `~/src/weasel/.worktrees/outline-mask`, option
-  `outline: { follow: 'shape', mask: true }`) and will message skulkr when it is on weasel `main`. Then set
-  `mask: true` in `dashboard/src/audits/Treemap.tsx` `LAYERS.selectionOverlay.outline` and check routing.dispatcher
-  over routing.actions on the live map.
+- **Outline occlusion** (kouhai t-661): done; `mask: true` is on (`9a788c1`), checked on labkit.config's cell, whose
+  right edge gives way to its later neighbor. Not yet checked: routing.dispatcher raised over routing.actions, the
+  case Mike named.
 - **Batch size** (`b7eb802`): `scour fix --size N` and `scour batches`; docs/scour.md "Whether batching saves" has the
   data so far and the split that would settle it. Running the split waits for Mike's go (docs/TODO.md P3).
 - onto: the background agent landed retried timeouts reading as timed out, not failed (onto `7499b5c`, local `main`,
