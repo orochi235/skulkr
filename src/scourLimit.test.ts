@@ -57,9 +57,9 @@ describe('scourRuleOf', () => {
     expect(limitText(fixed)).toBe('$2.50');
   });
 
-  it('defaults to three times the going rate', () => {
+  it('defaults to four times the going rate', () => {
     const { root, cfg } = project();
-    expect(scourRuleOf(cfg, root).limit.times).toBe(3);
+    expect(scourRuleOf(cfg, root).limit.times).toBe(4);
     expect(scourRuleOf(cfg, root).openingUsd).toBe(cfg.saturate.openingUsdPerDefect);
   });
 
