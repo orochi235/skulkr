@@ -647,7 +647,7 @@ area still stops by its own rule.
 | `--by` | Each pass goes to |
 |---|---|
 | `finish` (default) | The areas in turn, each until its stop rule holds: the named ones in the order given, otherwise cheapest first. |
-| `cheapest` | The area whose next defect costs least. An area with under two passes is priced at the opening price: what new defects cost over the first five passes of the project's ledgers pooled, else `saturate.openingUsdPerDefect` (0.40). So fresh areas get their cheap passes before any area goes deep. |
+| `cheapest` | The area whose next defect costs least. An area with under two passes is priced at the opening price: what new defects cost over the first five passes of the project's ledgers pooled, else `saturate.openingUsdPerDefect` (0.40). So fresh areas get their cheap passes before any area goes deep. A tie goes to the area with the most defects known per thousand lines (2026-11-27). |
 | `spread` | Each area until it has `--passes` (10), in the same order as `finish`; about 74% of what weasel's ledgers found came by pass 10. |
 
 A fresh area's first pass has no price of its own, so `--usd` can be overspent by that one pass.

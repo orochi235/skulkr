@@ -12,4 +12,14 @@ describe('scourQueueOf', () => {
     ];
     expect(scourQueueOf(candidates, (id) => id === 'e').map((c) => c.id)).toEqual(['b', 'a', 'c']);
   });
+
+  it('breaks a price tie by known defects per thousand lines, densest first', () => {
+    const candidates = [
+      { id: 'a', usd: 0.4, stopped: null, known: 1 },
+      { id: 'b', usd: 0.4, stopped: null, known: 6 },
+      { id: 'c', usd: 0.4, stopped: null, known: 0 },
+      { id: 'd', usd: 0.3, stopped: null, known: 0 },
+    ];
+    expect(scourQueueOf(candidates).map((c) => c.id)).toEqual(['d', 'b', 'a', 'c']);
+  });
 });
