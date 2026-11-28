@@ -65,11 +65,11 @@ export const liveStatsOf = (l: SaturationLedger, stamp: Stamp, span: ClockSpan =
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSpan(); } }}>{clock}</span>
   ) : clock;
   const elapsed: Stat = [word, value, STAT_TONE.clock, tip];
-  if (r.does === 'fix') return [elapsed, ...fixStatsOf(l, r.max)];
+  if (r.does === 'fix') { const [batch, ...rest] = fixStatsOf(l, r.max); return [batch!, elapsed, ...rest]; }
   const light = STAT_TONE.light;
   return [
-    elapsed,
     ['pass', String(l.occasions + 1), undefined, r.max ? `up to ${r.max}` : undefined],
+    elapsed,
     ['found', String(l.distinct)],
     leftStatOf(l),
     ['next new', percent(l.nextNew), STAT_TONE.estimate],
