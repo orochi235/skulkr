@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { revertedDefectsOf, withRevertsRead } from './scourReverts.mjs';
+import { revertedDefectsOf, trailerFixesOf, withRevertsRead, withTrailersRead } from './scourReverts.mjs';
 import { verdictIn } from './scourFixStatus.mjs';
 
 const patch = (n: number, subject: string, body: string) =>
@@ -16,6 +16,18 @@ describe('revertedDefectsOf', () => {
   it("names the defects whose only fix a revert takes back, matching folded subjects", () => {
     expect([...revertedDefectsOf(MBOX)]).toEqual(['D11']);
     expect(revertedDefectsOf(MBOX.split('From 3333')[0]).size).toBe(0);
+  });
+});
+
+describe('withTrailersRead', () => {
+  it('reads a defect the report gave no line for as fixed by the unreverted commit naming it, and leaves read verdicts alone', () => {
+    const fixes = trailerFixesOf(MBOX);
+    expect([...fixes]).toEqual([['D4', '1111111111'], ['D12', '4444444444']]);
+    const [d4, d11, d12] = withTrailersRead([{ id: 'D4', verdict: null, line: null, sha: null }, { id: 'D11', verdict: null, line: null, sha: null }, { id: 'D12', verdict: 'not fixed', line: 'x', sha: null }], fixes);
+    expect(d4).toMatchObject({ verdict: 'fixed', sha: '1111111111' });
+    expect(verdictIn(d4!.line).verdict).toBe('fixed');
+    expect(d11!.verdict).toBeNull();
+    expect(d12!.verdict).toBe('not fixed');
   });
 });
 

@@ -256,7 +256,10 @@ export const FIXED_MARK = /\bfixed (?:in )?`?[0-9a-f]{7,}/i;
 const SAYS_CHARS = 240;
 
 /** Text that reads as a fixer's report: its closing tally line, or a verdict. */
-const isReport = (text) => /^tally: /m.test(text) || FIXED_MARK.test(text);
+const isReport = (text) => /^tally: /m.test(text) || hasVerdicts(text);
+
+/** Text that gives verdicts, not only a tally: a woken fixer's closing note can repeat its tally and nothing else. */
+const hasVerdicts = (text) => FIXED_MARK.test(text) || /^\W*\[D\d+\]/m.test(text) || /\bnot a defect\b/i.test(text);
 
 /** The text of the event's assistant message. */
 const assistantText = (event) => {
@@ -286,9 +289,9 @@ export const createCommitProgress = (findings, tally = null) => {
     }
     // A fixer that starts a background task can be woken after its report by the task's end, and its last reply is
     // then about that; the report it wrote last goes into the result beside it.
-    if (event?.type === 'result') return { result: isReport(String(event.result ?? '')) || !report ? line : JSON.stringify({ ...event, report }) };
+    if (event?.type === 'result') return { result: hasVerdicts(String(event.result ?? '')) || !report ? line : JSON.stringify({ ...event, report }) };
     const text = assistantText(event);
-    if (isReport(text)) report = text;
+    if (hasVerdicts(text)) report = text;
     const lines = checks.see(event);
     const notes = text.trim() && !isReport(text) ? [`skulkr: says: ${clip(text, SAYS_CHARS)}`] : [];
     let counted = false;

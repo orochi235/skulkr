@@ -124,6 +124,11 @@ describe('createCommitProgress', () => {
     feed(say('A background watcher hit its time limit; nothing was lost.'));
     const kept = feed(result('A background watcher hit its time limit; nothing was lost.')).result!;
     expect(parseEnvelope(kept).reply).toBe('fixed 1a2b3c4d | a thing (A)\ntally: 1 of 1 fixed, 0 extra fixed');
+    const woken = createCommitProgress(1);
+    woken.feed(say('[D2] a thing (scour): fixed 1a2b3c4d\ntally: 1 of 1 fixed, 0 extra fixed'));
+    woken.feed(say('The exit code came from a broken cat, not a test; my report above holds.\n\ntally: 1 of 1 fixed, 0 extra fixed'));
+    const again = woken.feed(result('The exit code came from a broken cat, not a test; my report above holds.\n\ntally: 1 of 1 fixed, 0 extra fixed')).result!;
+    expect(parseEnvelope(again).reply).toMatch(/^\[D2\] a thing \(scour\): fixed 1a2b3c4d/);
     const plain = createCommitProgress(1);
     plain.feed(say('fixed 1a2b3c4d | a thing (A)'));
     expect(JSON.parse(plain.feed(result('fixed 1a2b3c4d | a thing (A)')).result!)).not.toHaveProperty('report');

@@ -21,7 +21,7 @@ import { createRepairLayer } from './scourFixLay.mjs';
 import { VERDICTS, fixRunsIn, registryFixedIn, verdictIn } from './scourFixStatus.mjs';
 import { registeredIn, registryLinesOf } from './saturationList.mjs';
 import { landFixBranch } from './scourLand.mjs';
-import { revertedDefectsOf, withRevertsRead } from './scourReverts.mjs';
+import { revertedDefectsOf, trailerFixesOf, withTrailersRead, withRevertsRead } from './scourReverts.mjs';
 import { BATCH_MAX, SIZE_LIMIT, fixPlanFor, fixPlanLines, filesOf } from './scourTriage.mjs';
 
 
@@ -214,8 +214,8 @@ const fixBatches = async (cfg, runner, root, id, ledger, batches, n, runDir, arg
       mkdirSync(dir, { recursive: true });
       say(`batch ${b.n}: ${b.defects.length} defects (${b.defects.map((d) => d.id).join(' ')}) over ${b.files.length} files, on ${tipOf(at)}`);
       const fixed = await fixInto(ctx, area, dir, b.defects.length, scourSource(area.id, ctx.commit, tipOf(at), ledger.commit, b.defects.length));
-      const verdicts = withRevertsRead(scourVerdictsOf(fixed.report, b.defects.map((d) => d.id)),
-        fixed.mbox && existsSync(fixed.mbox) ? revertedDefectsOf(readFileSync(fixed.mbox, 'utf8')) : new Set());
+      const mbox = fixed.mbox && existsSync(fixed.mbox) ? readFileSync(fixed.mbox, 'utf8') : '';
+      const verdicts = withRevertsRead(withTrailersRead(scourVerdictsOf(fixed.report, b.defects.map((d) => d.id)), trailerFixesOf(mbox)), revertedDefectsOf(mbox));
       const branch = `scour${n}-${id}-b${b.n}`;
       const applied = fixed.mbox ? branchWith(root, branch, ctx.commit, fixed.mbox) : false;
       // The next batch stacks on this one only if it is sound: a failed verify is kept on its branch for a look, not built on.
