@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { gitIn } from './batch.mjs';
 import { resolveConfig } from './config.mjs';
 import { batchAndTest } from './land.mjs';
-import { freshLog } from './gateRun.mjs';
+import { freshLog, untestedOnly } from './gateRun.mjs';
 import { leftOutIn } from './leftOut.mjs';
 
 const dirs: string[] = [];
@@ -72,6 +72,19 @@ const project = (gate = ['true'], gateExtra: object = {}) => {
   };
   return { cfg, root, git, remote, frozen, branch, night };
 };
+
+describe('untestedOnly', () => {
+  const untested = ['^HANDOFF\\.md$', '^\\.skulkr/'];
+  it('takes a change touching only untested paths', () => {
+    expect(untestedOnly(['HANDOFF.md', '.skulkr/defects/a.json'], untested)).toBe(true);
+  });
+  it('refuses a change touching any other path, an empty change, or no untested paths', () => {
+    expect(untestedOnly(['HANDOFF.md', 'src/a.ts'], untested)).toBe(false);
+    expect(untestedOnly(['docs/HANDOFF.md'], untested)).toBe(false);
+    expect(untestedOnly([], untested)).toBe(false);
+    expect(untestedOnly(['HANDOFF.md'], [])).toBe(false);
+  });
+});
 
 describe('batchAndTest', () => {
   it('names a conflict\'s paths, records the branch, and merges it in a later round once it merges cleanly', async () => {

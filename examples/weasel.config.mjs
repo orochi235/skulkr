@@ -178,6 +178,8 @@ const config = {
     failPrefix: 'fleet-fail:',
     failRun: { build: 'postbuild' },
     blame: blameStep,
+    // Session handoffs and skulkr's own record and ledgers, which no weasel test or check reads.
+    untested: ['^HANDOFF\\.md$', '^\\.skulkr/'],
   },
 
   setup: {

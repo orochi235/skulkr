@@ -172,6 +172,8 @@ weasel cutover.
     preloaded reviewer shows progress before its findings (2026-11-27).
   - weasel's fixer brief running `check:size` before any test, and its verify running it first and stopping there when
     it fails, unless the fixer's `checks:gate` passed at that commit (2026-11-27).
+  - a landing whose `main` moved during its gate by only `gate.untested` paths (weasel: `HANDOFF.md`, `.skulkr/`)
+    merging it in without gating again, its `batch:` line saying so (2026-11-27).
   Everything else stays at parity.
 - Never run a real round from here against a project without being asked: a run spends money and fast-forwards
   that project's `main`.

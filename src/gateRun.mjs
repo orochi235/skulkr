@@ -4,13 +4,18 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { catchUpWithMain, runGate } from './batch.mjs';
+import { catchUpWithMain, gitIn, runGate } from './batch.mjs';
 import { failedWhereIn } from './gate.mjs';
 import { fleetDir, waitForFleet } from './fleet.mjs';
 import { isTestPath } from './verify.mjs';
 
 /** How many times a green batch merges a moved main in and tests again before leaving the fast-forward to fail. */
 const MAIN_CATCH_UPS = 2;
+
+/** Whether every one of `paths` matches one of `untested` (regex sources, the config's `gate.untested`): a change the
+ *  gate's suite never reads, so merging it in needs no second gate. An empty change never qualifies. */
+export const untestedOnly = (paths, untested = []) =>
+  paths.length > 0 && untested.length > 0 && paths.every((p) => untested.some((u) => new RegExp(u).test(p)));
 
 /** `<dir>/<name><suffix>`, or with `.r2`, `.r3`… before `suffix` where an earlier run of the round (a resumed one's)
  *  left that file: the gate appends to its log, and progress read from a log holding two runs reads the first. */
@@ -48,10 +53,17 @@ const testBatch = async ({ cfg, root, batch, nightDir, merge, say, tip, rebuild,
   const logName = `${batch.name.replace(/\//g, '-')}${tag}`;
   const main = cfg.git.main;
   const gate = cfg.gate.name;
+  // Answers whether the batch needs gating again: false when main had not moved, or brought in only untested paths.
   const catchUp = async () => {
+    const before = tip ?? gitIn(batch.tree)('rev-parse', 'HEAD');
     const caught = catchUpWithMain(batch.tree, main, cfg.record.ledger ?? null);
     if (caught.moved) {
       tip = caught.tip;
+      const changed = gitIn(batch.tree)('diff', '--name-only', before, tip).split('\n').filter(Boolean);
+      if (untestedOnly(changed, cfg.gate.untested)) {
+        say(`batch: ${main} moved; merged it in at ${tip.slice(0, 10)}, changing only paths the gate does not test (${changed.join(', ')}), so not testing again`);
+        return false;
+      }
       say(`batch: ${main} moved; merged it in at ${tip.slice(0, 10)} and testing that`);
       return true;
     }
