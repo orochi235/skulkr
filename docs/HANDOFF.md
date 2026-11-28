@@ -11,7 +11,7 @@ Commit each verified change on `main` without asking (Mike, 2026-11-27).
 ## Running now (2026-11-28 ~07:30 local, all local mode)
 
 The fix queue (`skulkr scour fix --queue`, pid 50815, one lane, log `.playwright-mcp/logs/fix-queue.log`) is draining
-`headless`, then `rig` (`scale`, fix 21, landed at weasel `4a3dcd2e38`). Each run lands itself on weasel `main`; per-area logs are
+`rig` (fix 23), the last; `scale` (fix 21) and `headless` (fix 22) landed, weasel `main` at `f2c7e2dfd4` after 22. Each run lands itself on weasel `main`; per-area logs are
 `<state>/scour/fix-<area>.log` (`<state>` = `~/.local/state/weasel-skulkr`). `skulkr scour queue ls` shows where it is.
 Watch with Monitor on those logs (`grep -E "^fix queue|^(batch [0-9]+:.*(fixed|failed)|repair|land|gate|capstone)|rror|failed|limit"`),
 30-minute expiry; this session's watchers die with it.
