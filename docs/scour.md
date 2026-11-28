@@ -65,7 +65,7 @@ project's `.skulkr/`, never from one machine's state directory.
 
 ## Building the fix stage
 
-**Built (2026-11-26): triage and fix.** `skulkr scour fix <area> [--dry] [--batch k,…] [--defects D1,…] [--on <ref>] [--ready]`
+**Built (2026-11-26): triage and fix.** `skulkr scour fix <area> [--dry] [--batch k,…] [--defects D1,…] [--size N] [--on <ref>] [--ready]`
 (`src/scourFix.mjs`) plans the area's batches (`src/scourTriage.mjs`), runs each through a round's fixer job
 (`area.mjs:fixInto`: verify and up to two repairs), and puts its commits on a branch of its own,
 `scour<N>-<area>-b<k>`. Its record, one row per defect with its verdict, and each batch's commits, verify, repairs
@@ -95,6 +95,18 @@ their verify and checks on the fleet (`runner: 'local'`, so `checksOnFleet` hold
   batch when they share a file a fix would touch or a stated cause, a group past eight split in file and line order
   (2026-11-26). A reviewer's file mention is resolved against the ledger's files and the full paths other defects
   name; prose in it is dropped.
+- **Batch size** (2026-11-27): `--size N` (1 to 8) caps how many defects a batch holds, and the run's record keeps it
+  as `size`. With `--size`, `--defects` names the defects to plan at that size rather than one batch to send.
+  `skulkr scour batches [--json]` lists every fix run's batches from `<state>/scour/fix-*/record.json` (its cap,
+  defects, files, fixes, dollars, minutes, repairs), then dollars, minutes and the share fixed per defect at each
+  batch size.
+- **Whether batching saves** is open. As of 2026-11-27 (fix runs 1–15), a defect cost about $0.31 at every size
+  from 3 to 8, and time per defect fell from about 4 minutes to 2.8. But batch size there follows the work: a small
+  batch is mostly unrelated leftovers packed at a plan's end, and only one batch each held 1 or 2 defects. The test
+  is a split: on two or three areas with 16 or more open defects, divide each area's open defects in half at random,
+  fix one half as usual (`scour fix <area> --defects <half> --size 8`) and the other one to a batch (`--defects
+  <other half> --size 1`), then compare `scour batches` by cap, counting each batch's verify. It has not been run,
+  since it spends fixer time (estimated $15–25 at the rates above).
 - **A recurrent defect is flagged, nothing more**: one seen in a quarter of its ledger's passes and at least five
   times (`saturate.recurrent`) is marked in `ls --json`, the defects table and the plan, and may later go straight
   to fix (2026-11-26).

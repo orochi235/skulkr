@@ -22,7 +22,7 @@ import { VERDICTS, fixRunsIn, registryFixedIn, verdictIn } from './scourFixStatu
 import { registeredIn, registryLinesOf } from './saturationList.mjs';
 import { landFixBranch } from './scourLand.mjs';
 import { revertedDefectsOf, withRevertsRead } from './scourReverts.mjs';
-import { fixPlanFor, fixPlanLines, filesOf } from './scourTriage.mjs';
+import { BATCH_MAX, fixPlanFor, fixPlanLines, filesOf } from './scourTriage.mjs';
 
 
 /** Claims the next fix run: one past the highest `fix-<N>` in the scour state directory, its directory made here.
@@ -84,6 +84,17 @@ export const scourVerdictsOf = (report, ids) => {
  * One batch of exactly the defects `ids` names, taken from `plan`'s batches with their files, numbered as the first
  * one's batch: to send again the defects a batch left unfixed. Throws for an id no batch holds.
  */
+/** The defect ids a `--defects D1,D2,…` value names. */
+const defectIdsOf = (value) => String(value).split(',').map((x) => x.trim()).filter(Boolean);
+
+/** The most defects a batch holds: `--size`'s whole number from 1 to `BATCH_MAX`, else `BATCH_MAX`. */
+export const fixSizeOf = (value) => {
+  if (value === undefined) return BATCH_MAX;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > BATCH_MAX) throw new Error(`--size wants a whole number of defects from 1 to ${BATCH_MAX}, not ${value}`);
+  return n;
+};
+
 export const defectsBatchOf = (plan, ids) => {
   const all = plan.batches.flatMap((b) => b.defects.map((d) => ({ d, n: b.n })));
   const picked = ids.map((id) => all.find((x) => x.d.id === id) ?? (() => { throw new Error(`no batch holds ${id}`); })());
@@ -105,8 +116,8 @@ const branchWith = (root, branch, commit, mbox) => {
 };
 
 /**
- * `skulkr scour fix <area> [--dry] [--batch k,…] [--defects D1,…] [--on <ref>]`: the plan with `--dry`, else every batch
- * (those listed, or one of exactly the defects named) through a fixer, one at a time, from `--on`'s tip, else the
+ * `skulkr scour fix <area> [--dry] [--batch k,…] [--defects D1,…] [--size N] [--on <ref>]`: the plan with `--dry`, else every batch
+ * (those listed, one of exactly the defects named, or with `--size` those defects planned at most N to a batch) through a fixer, one at a time, from `--on`'s tip, else the
  * area's newest fix branch (`stackBranchFor`), else `main`'s.
  * Answers the run's record.
  */
@@ -114,7 +125,16 @@ export const scourFix = async (cfg, runner, root, id, args, say) => {
   const ledger = ledgerOf(cfg, id);
   if (!ledger) throw new Error(`${id} has no scour ledger`);
   const fixedElsewhere = registryFixedIn(registryLinesOf(ledger, registeredIn(cfg, root)));
-  const plan = fixPlanFor(ledger, { open: (d) => !fixedElsewhere.has(d.id), recurrent: cfg.saturate.recurrent });
+  const size = fixSizeOf(args.size);
+  // With `--size`, `--defects` names what to plan rather than one batch to send: half an area at one size.
+  const named = args.size !== undefined && args.defects !== undefined ? defectIdsOf(args.defects) : null;
+  const open = (d) => !fixedElsewhere.has(d.id) && (!named || named.includes(d.id));
+  const plan = fixPlanFor(ledger, { open, recurrent: cfg.saturate.recurrent, size });
+  if (named) {
+    const planned = new Set(plan.batches.flatMap((b) => b.defects.map((d) => d.id)));
+    const missing = named.filter((d) => !planned.has(d));
+    if (missing.length) throw new Error(`${id} has no open defect ${missing.join(', ')} to fix`);
+  }
   if (args.dry) {
     for (const line of fixPlanLines(id, plan)) say(line);
     return { plan };
@@ -122,7 +142,7 @@ export const scourFix = async (cfg, runner, root, id, args, say) => {
   if (args.land) return relandFix(cfg, runner, root, id, ledger, args, say);
   if (args.batch !== undefined && args.defects !== undefined) throw new Error('give --batch or --defects, not both');
   const wanted = args.batch === undefined ? null : new Set(String(args.batch).split(',').map(Number));
-  const batches = args.defects !== undefined ? [defectsBatchOf(plan, String(args.defects).split(',').map((x) => x.trim()).filter(Boolean))]
+  const batches = args.defects !== undefined && !named ? [defectsBatchOf(plan, defectIdsOf(args.defects))]
     : wanted ? plan.batches.filter((b) => wanted.has(b.n)) : plan.batches;
   if (batches.length === 0) throw new Error(`${id} has no batch ${args.batch}`);
   const { n, runDir } = claimFixRunIn(cfg);
@@ -161,7 +181,7 @@ const fixBatches = async (cfg, runner, root, id, ledger, batches, n, runDir, arg
   const git = gitIn(root);
   const frozen = addWorktree(root, `${cfg.naming.prefix}-scour-fix${n}`, commit);
   const record = seed ? { ...seed, relanded: new Date().toISOString() }
-    : { run: n, area: id, commit, on, ledgerCommit: ledger.commit, started: new Date().toISOString(), batches: [] };
+    : { run: n, area: id, commit, on, ledgerCommit: ledger.commit, size: fixSizeOf(args.size), started: new Date().toISOString(), batches: [] };
   const keep = () => writeFileSync(join(runDir, 'record.json'), `${JSON.stringify(record, null, 1)}\n`);
   const baseOf = (tip) => {
     try { return git('merge-base', tip, `${cfg.git.remote}/${cfg.git.main}`); } catch { return tip; /* no remote */ }

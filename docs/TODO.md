@@ -141,3 +141,7 @@ Open work on skulkr. Each entry says when it closes.
   busy: a sync is updating it`). `cameHome` then refuses it, so a resume reruns and pays for it again, and a rerun
   review replaces the report its area's reused fixer was given (likely why cursor A reran on the first resume). Closes when a
   job's result file coming home empty is fetched again or refused at fetch, not discovered on resume.
+- [ ] (P2) `skulkr scour` takes any `--flag` it does not know (`saturateArgsOf` in `src/saturate.mjs` keeps every
+  `--x value`), and answers no `--help`: a misspelled `--szie 1` runs a fix at the default size.
+- [ ] (P3) Run the batch-size split (docs/scour.md "Whether batching saves"): it spends fixer time, so it waits for
+  Mike's go on which areas.

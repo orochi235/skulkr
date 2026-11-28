@@ -38,8 +38,9 @@ import { writeReport } from './saturationReport.mjs';
 import { createSaturateContext, occasionJobsOf, requireSources, runReview } from './saturateJobs.mjs';
 import { foldPending, stageReport } from './scourFold.mjs';
 import { nextLines, scourNext } from './scourSession.mjs';
+import { fixBatchesCommand } from './fixBatchStats.mjs';
 
-export const SATURATE_USAGE = 'usage: skulkr scour next <area> [--agent <id>] [--metered] [--release] [--max N] [--per-defect $] [--price-by defect|kloc] [--at <sha>] | [delve] <area> [--fleet] [--account <config dir>] [--metered] [--sources claude,codex] [--max N] [--per-defect $] [--price-by defect|kloc] [--usd $] [--at <sha>] [--fresh] [--deep] | run [areas…] [--fleet] [--account <config dir>] [--metered] [--by finish|cheapest|spread] [--usd $] [--passes N] [--per-defect $] [--price-by defect|kloc] | fold <area> | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | fix <area> [--dry] [--batch k,…] [--defects D1,…] [--on <ref>] [--ready] | fix <area> --land | fix --queue [--lanes N] [--ready] | queue add|drop <area>… | queue ls | flag <area> <ids…> [--clear] | land <area>… | land --all | ls [--json] | ls --source <name> --ids | report <area> | rm <area>';
+export const SATURATE_USAGE = 'usage: skulkr scour next <area> [--agent <id>] [--metered] [--release] [--max N] [--per-defect $] [--price-by defect|kloc] [--at <sha>] | [delve] <area> [--fleet] [--account <config dir>] [--metered] [--sources claude,codex] [--max N] [--per-defect $] [--price-by defect|kloc] [--usd $] [--at <sha>] [--fresh] [--deep] | run [areas…] [--fleet] [--account <config dir>] [--metered] [--by finish|cheapest|spread] [--usd $] [--passes N] [--per-defect $] [--price-by defect|kloc] | fold <area> | ingest <area> <report.md> --source <name> [--at <sha>] | import <area> <dir> --at <sha> [--fresh] | fix <area> [--dry] [--batch k,…] [--defects D1,…] [--size N] [--on <ref>] [--ready] | batches [--json] | fix <area> --land | fix --queue [--lanes N] [--ready] | queue add|drop <area>… | queue ls | flag <area> <ids…> [--clear] | land <area>… | land --all | ls [--json] | ls --source <name> --ids | report <area> | rm <area>';
 
 /** `argv`'s positional words and flags. */
 export const saturateArgsOf = (cfg, argv) => {
@@ -63,7 +64,7 @@ export const saturateArgsOf = (cfg, argv) => {
   const passes = flags.passes === undefined ? undefined : Number(flags.passes);
   if (passes !== undefined && (!Number.isInteger(passes) || passes < 1)) throw new Error(`--passes wants a whole number, not ${flags.passes}`);
   return {
-    words, max, sources, fresh: Boolean(flags.fresh), all: Boolean(flags.all), json: Boolean(flags.json), ids: Boolean(flags.ids), source: flags.source, at: flags.at, agent: flags.agent, metered: Boolean(flags.metered), release: Boolean(flags.release), account: flags.account, dry: Boolean(flags.dry), clear: Boolean(flags.clear), batch: flags.batch, defects: flags.defects, on: flags.on, queue: Boolean(flags.queue), land: Boolean(flags.land), ready: Boolean(flags.ready), deep: Boolean(flags.deep), lanes: flags.lanes,
+    words, max, sources, fresh: Boolean(flags.fresh), all: Boolean(flags.all), json: Boolean(flags.json), ids: Boolean(flags.ids), source: flags.source, at: flags.at, agent: flags.agent, metered: Boolean(flags.metered), release: Boolean(flags.release), account: flags.account, dry: Boolean(flags.dry), clear: Boolean(flags.clear), batch: flags.batch, defects: flags.defects, size: flags.size, on: flags.on, queue: Boolean(flags.queue), land: Boolean(flags.land), ready: Boolean(flags.ready), deep: Boolean(flags.deep), lanes: flags.lanes,
     usd: dollars('usd'), perDefect: flags['per-defect'] === undefined ? undefined : (limitSpecOf(flags['per-defect']), flags['per-defect']), passes, by: flags.by,
     priceBy: flags['price-by'] === undefined ? undefined : priceByOf(flags['price-by']),
   };
@@ -252,6 +253,7 @@ export const saturateCommand = async (cfg0, runner, root, argv, say = (line) => 
     // A local fix run is the local runner's: its verify and its fixers' checks go to the fleet (`checksOnFleet`).
     return scourFix(fleet ? cfg : { ...cfg, runner: 'local' }, runner, root, rest[0], args, say);
   }
+  if (first === 'batches') return fixBatchesCommand(cfg, args, say);
   if (first === 'flag') {
     const [id, ...ids] = rest;
     const ledger = id ? ledgerOf(cfg, id) : null;

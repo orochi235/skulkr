@@ -38,9 +38,9 @@ export const filesOf = (d, known = []) => {
 /**
  * The fix plan for a ledger's open defects: `design`-sized ones set aside to ask, the rest in batches of defects
  * that share a file a fix would touch or a stated cause, so one fixer reads each file once. A group larger than
- * `BATCH_MAX` is split in file and line order, keeping neighbors together. Each defect carries `recurrent`.
+ * `size` (`BATCH_MAX` unless given) is split in file and line order, keeping neighbors together. Each defect carries `recurrent`.
  */
-export const fixPlanFor = (ledger, { open = () => true, recurrent } = {}) => {
+export const fixPlanFor = (ledger, { open = () => true, recurrent, size = BATCH_MAX } = {}) => {
   const occasions = ledger.occasions.length;
   // The ledger's files, and the full paths reviewers named outside them, which a shorter mention may be the tail of.
   const named = ledger.defects.flatMap((d) => (d.fix ?? []).map(fileOf)).filter((f) => (f.match(/\//g) ?? []).length >= 2);
@@ -66,15 +66,15 @@ export const fixPlanFor = (ledger, { open = () => true, recurrent } = {}) => {
   const batches = [...groups.values()]
     .flatMap((g) => {
       const sorted = [...g].sort(inOrder);
-      const parts = Math.ceil(sorted.length / BATCH_MAX);
-      const size = Math.ceil(sorted.length / parts);
-      return Array.from({ length: parts }, (_, k) => sorted.slice(k * size, (k + 1) * size));
+      const parts = Math.ceil(sorted.length / size);
+      const each = Math.ceil(sorted.length / parts);
+      return Array.from({ length: parts }, (_, k) => sorted.slice(k * each, (k + 1) * each));
     })
     // Small batches that share nothing fill up together, in file order, so no fixer is started for one line.
     .sort((a, b) => b.length - a.length || inOrder(a[0], b[0]));
   const packed = [];
   for (const b of batches) {
-    const room = packed.find((p) => p.length + b.length <= BATCH_MAX && b.length <= 2 && p.length < BATCH_MAX);
+    const room = packed.find((p) => p.length + b.length <= size && b.length <= 2 && p.length < size);
     if (room) room.push(...b);
     else packed.push([...b]);
   }
