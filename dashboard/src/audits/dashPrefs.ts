@@ -66,6 +66,9 @@ export const DASH_PREFS = pref.group('Dashboard', {
     shelfOrder: pref.enum<'batch' | 'status'>('Order the fix shelf by', 'batch', ['batch', 'status'], {
       description: "Whether an area's fix shelf groups its defects by batch or runs them in one row by status; the switch at the shelf's edge switches it too.",
     }),
+    clock: pref.enum<'run' | 'step'>('Live run clock', 'run', ['run', 'step'], {
+      description: "What a live run's clock counts: the whole run, or the pass or batch under way; clicking any live run's clock switches it for all of them.",
+    }),
     collapseResolved: pref.boolean('Collapse resolved passes', false, {
       description: "Hide each pass of an area's delve chart whose defects are all fixed or closed; the checkbox under the chart switches it too.",
     }),

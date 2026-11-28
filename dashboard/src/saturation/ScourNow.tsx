@@ -1,3 +1,4 @@
+import { useDashPref } from '@dash/audits/dashPrefs';
 import { minutesText } from '@dash/audits/runData';
 import { elapsedReading, type Stamp } from '@dash/audits/liveTime';
 import { duration } from '@weasel-js/quantity';
@@ -8,7 +9,6 @@ import { FixShelf } from './FixShelf';
 import { PassPill } from './PassPill';
 import { STAT_TONE, StatRow, leftStatOf, limitStatOf, nextDefectStatOf, shelfToneOf, type Stat } from './LedgerHero';
 import { percent, usd } from './format';
-import { useState } from 'react';
 import type { ScourJob, ScourLive, SaturationLedger, Tally } from './saturation.types';
 import s from './ScourNow.module.css';
 
@@ -34,7 +34,7 @@ export const timedLines = (log: readonly string[], since: string, n = 3): string
 
 const HELD = duration();
 
-/** Which span a live run's clock counts: the whole run, or the pass or batch under way. */
+/** Which span a live run's clock counts: the whole run, or the pass or batch under way; the `saturation.clock` pref. */
 export type ClockSpan = 'run' | 'step';
 
 /** When the pass or batch under way started: the newest job out's start; with none out, the log's last line (a pass
@@ -141,7 +141,7 @@ function LiveRun({ ledger: l, onPick, onPickDefect, stamp }: {
   ledger: SaturationLedger; onPick: (id: string) => void; onPickDefect: (area: string, id: string) => void; stamp: Stamp;
 }) {
   const r = l.running!;
-  const [span, setSpan] = useState<ClockSpan>('run');
+  const [span, setSpan] = useDashPref('saturation.clock');
   const { hostEvents, traced, setTraced, at } = useDefectCallout<HTMLElement>();
   const pickDefect = (id: string) => onPickDefect(l.id, id);
   return (
