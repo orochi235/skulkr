@@ -80,7 +80,17 @@ describe('fixStatsOf', () => {
     };
     const l = { fix: { lastRun: { n: 3, started: null, finished: null }, batches: [], ask: [], statuses } } as unknown as SaturationLedger;
     expect(Object.fromEntries(fixStatsOf(l, 4).map(([word, value]) => [word, value]))).toEqual({
-      batch: '0/4', analyzing: '1', writing: '1', verifying: '2', fixed: '1',
+      batch: '1/4', analyzing: '1', writing: '1', verifying: '2', fixed: '1',
     });
+  });
+
+  it('numbers the batch under way, and stays on the last once every batch is back', () => {
+    const batches = [{ defects: [{ id: 'D1' }] }, { defects: [{ id: 'D2' }] }];
+    const ledger = (d2: string) => ({ fix: { lastRun: { n: 3, started: null, finished: null }, batches, ask: [], statuses: {
+      D1: { status: 'fixed', run: 3, branch: 'b', verified: true }, D2: { status: d2, run: 3, branch: null, stage: 'writing' },
+    } } }) as unknown as SaturationLedger;
+    const batch = (l: SaturationLedger) => fixStatsOf(l, 2).find(([word]) => word === 'batch')?.[1];
+    expect(batch(ledger('fixing'))).toBe('2/2');
+    expect(batch(ledger('fixed'))).toBe('2/2');
   });
 });

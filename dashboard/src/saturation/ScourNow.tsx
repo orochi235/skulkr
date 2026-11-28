@@ -80,7 +80,8 @@ export const liveStatsOf = (l: SaturationLedger, stamp: Stamp, span: ClockSpan =
   ];
 };
 
-/** A running fix run's tally from its own verdicts: batches back of the run's, and its defects by where they stand,
+/** A running fix run's tally from its own verdicts: the batch under way (the one after those back, an index, never past
+ *  the last), and its defects by where they stand,
  *  those out in a batch by stage (`checking` reads as verifying); a count at 0 is left out. */
 export const fixStatsOf = (l: SaturationLedger, max: number | null): Stat[] => {
   const shelf = l.fix;
@@ -91,7 +92,7 @@ export const fixStatsOf = (l: SaturationLedger, max: number | null): Stat[] => {
   const count = (...of: string[]) => Object.keys(shelf?.statuses ?? {}).filter((id) => of.includes(mine(id)?.status ?? '')).length;
   const at = (stage: string) => String(Object.keys(shelf?.statuses ?? {}).filter((id) => mine(id)?.status === 'fixing' && mine(id)?.stage === stage).length);
   const stats: Stat[] = [
-    ['batch', max ? `${back}/${max}` : String(back), STAT_TONE.light],
+    ['batch', max ? `${Math.min(back + 1, max)}/${max}` : String(back + 1), STAT_TONE.light],
     ['analyzing', at('analyzing'), shelfToneOf('analyzing')],
     ['writing', at('writing'), shelfToneOf('writing')],
     ['written', at('written'), shelfToneOf('written')],
