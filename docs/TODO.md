@@ -16,6 +16,12 @@ Open work on skulkr. Each entry says when it closes.
   is reported as timed out, its cost is read from its transcript, and its verdicts are read from its commits or
   marked unread with that reason.
 
+- [ ] (P2) A landing gates again whenever `main` moves during its gate, even when the move touches no code: fix run
+  14's landing on 2026-11-27 ran its full gate three times, twice for other sessions' commits to weasel `main`, one
+  of them only a `HANDOFF.md` note (`4b944b7604`). After `MAIN_CATCH_UPS` (2) catch-ups it stops merging, so a third
+  move fails the fast-forward. Closes when a catch-up whose merged-in change touches only paths the gate cannot
+  reach (docs, `HANDOFF.md`) merges without gating again, or the merge lock holds other sessions off `main`.
+
 - [ ] (P2) The dashboard runs on unreleased weasel (`dashboard/README.md`): `Tooltip`'s `anchorRect` (41906fd420, only on
   weasel's `batch/2026-11-27-scour`) and `LiveQuantity` (2e6a59c4be, on weasel `main`). Until a weasel release carries
   both: the hover cards draw at the window's top-left whenever the linked `~/src/weasel` dist lacks 41906fd420; the
