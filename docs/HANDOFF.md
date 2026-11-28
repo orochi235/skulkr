@@ -1,6 +1,6 @@
 # Handoff
 
-For the next session in skulkr. Updated 2026-11-27 ~21:00 local. Check each claim against the tree.
+For the next session in skulkr. Updated 2026-11-28 ~07:30 local. Check each claim against the tree.
 
 ## State
 
@@ -8,30 +8,41 @@ On `main`; unpushed commits: `git log --oneline @{u}..HEAD`. Live jobs: `pgrep -
 step times `node scripts/fixRunStats.mjs`; cost per defect by batch size `skulkr scour batches`.
 Commit each verified change on `main` without asking (Mike, 2026-11-27).
 
-## Running now (2026-11-27 ~21:00 local, all local mode)
+## Running now (2026-11-28 ~07:30 local, all local mode)
 
-| What | Log |
+The fix queue (`skulkr scour fix --queue`, pid 50815, one lane, log `.playwright-mcp/logs/fix-queue.log`) is draining
+`scale` (fix 21, landing), then `headless` and `rig`. Each run lands itself on weasel `main`; per-area logs are
+`<state>/scour/fix-<area>.log` (`<state>` = `~/.local/state/weasel-skulkr`). `skulkr scour queue ls` shows where it is.
+Watch with Monitor on those logs (`grep -E "^fix queue|^(batch [0-9]+:.*(fixed|failed)|repair|land|gate|capstone)|rror|failed|limit"`),
+30-minute expiry; this session's watchers die with it.
+
+Done since 2026-11-27 evening (all local `claude -p`, Mike's account):
+
+| What | Result |
 |---|---|
-| Done: `scour run geom.paths.part1 geom.paths.part2`; part2 stopped at pass 19/40, 23 distinct, next defect ≈ $1.97 over the $1.97 limit | `.playwright-mcp/logs/delve-geom.paths.log` |
-| Done: `scour run select parallax` (2026-11-27 23:21); each stopped ready to fix after 5 passes, 3 distinct apiece, $1.46 and $2.59 | `.playwright-mcp/logs/delve-select-parallax.log` |
-| Done: `scour run ui.components.Field scale headless rig` (2026-11-28 05:12); all four stopped ready to fix after 5 passes: 6, 12, 4, 11 distinct | `.playwright-mcp/logs/delve-field-scale-headless-rig.log` |
-| Fix queue (pid 50815, one lane): `select` landed (fix 18), `parallax` landing (fix 19), then `ui.components.Field`, `scale`, `headless`, `rig`; each lands itself | `<state>/scour/fix-<area>.log`, `.playwright-mcp/logs/fix-queue.log` |
-| Landed: fix run 17 `routing.interactions.dispatcher`, 47 fixed and 2 not defects in 7 batches, $17.89; weasel `main` fast-forwarded to `fa57555d6c` (2026-11-28 ~05:00) | `.playwright-mcp/logs/fix-routing.interactions.dispatcher.log` |
+| Fix 17 `routing.interactions.dispatcher` | 47 fixed, 2 not defects, 7 batches, $17.89; weasel `main` → `fa57555d6c` |
+| Delves `select`, `parallax` (log `.playwright-mcp/logs/delve-select-parallax.log`) | each ready to fix after 5 passes, 3 distinct |
+| Delves `ui.components.Field`, `scale`, `headless`, `rig` (log `.playwright-mcp/logs/delve-field-scale-headless-rig.log`) | all ready to fix after 5 passes: 6, 12, 4, 11 distinct |
+| Fix 18 `select`, 19 `parallax`, 20 `ui.components.Field` | all fixed, each landed (weasel `main` → `bb201046c7` after 20) |
+| Fix 21 `scale` | 12 fixed in 2 batches, landing |
 
-Watch each with Monitor (`tail -F … | grep -E "^(record|preflight|gate|main|land|capstone|batch):|rror|failed|^[0-9]+/[0-9]+ |stopped"`),
-30-minute expiry; the last session's watchers died with it.
+Decisions from conversation:
 
-Fix run 14 relanded: weasel `main` fast-forwarded to `d7ad6e6c8b`. The dispatcher's `--deep` delve has finished
-(report at `<state>/scour/routing.interactions.dispatcher/report.md`).
+- "A couple"/"four more" delves counts areas, run uncapped, next in `scour ls --json`'s `queue` (2026-11-27).
+- Mike asked for fix runs on "the ready areas" (2026-11-28); I added each delve that later stopped ready to fix
+  (`scale`, `headless`, `rig`) to the queue on that reading. He hasn't objected.
+- **`scale` wants another delve after fix 21 lands:** at its ready-to-fix stop it was still finding 3 new per pass,
+  ≈16 unseen. The ready-to-fix stop fires at `minPasses` (5) regardless of how far from saturated an area is, and no
+  stop (cost or saturation) applies before pass 5 (`src/saturation.mjs`).
 
-Both runs were stopped by the usage limit at ~21:00 local and retry on their own after 02:40Z (21:40 local).
+**Ledgers to land** (`skulkr scour land <area>`; Mike has approved each landing asked so far, but ask): 
+`routing.interactions.dispatcher` (t-657, free now that fix 17 ended), and the six areas delved this session once
+their fix runs end. Earlier ledgers landed at weasel `fa11f1f06b` and `1408b23ddf`.
 
-**Ledgers to land** (Mike has approved each landing asked so far): `animator.engine`, `animator.timeline`,
-`apps.theme-editor.src` and `geom.paths.part1` landed at weasel `fa11f1f06b`; `geom.paths.part2` (stopped at pass
-19, 23 distinct, next defect over its limit) at `1408b23ddf`. Still to land: `routing.interactions.dispatcher` (t-657)
-once fix run 17 ends, since the run holds its ledger.
-
-**Outline mask:** weasel-63's inflight register shows `outline-mask` ready at `a9a929275f`, awaiting its batch.
+**Dashboard outline mask:** `outline.mask` is on in `dashboard/src/audits/Treemap.tsx` (`9a788c1`), served from the
+`~/src/weasel` checkout through the alpo link (`.alpo.local.json`, untracked, lists the needed weasel commits). That
+checkout's `packages/*/dist` came from a fleet build at weasel `23763806`; local `npm run build` there is refused by a
+hook, so rebuild with `onto do --kind build … --out` (flags before `--`).
 
 The `animator` fix lane never ran: fix run 14's crash killed `fix-lane.sh`'s loop before it reached `animator`.
 
