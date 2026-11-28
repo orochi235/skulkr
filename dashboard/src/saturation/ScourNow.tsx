@@ -6,7 +6,7 @@ import { DefectCallout, useDefectCallout } from './DefectCallout';
 import { DelveAbout, DelveChart } from './DelveChart';
 import { FixShelf } from './FixShelf';
 import { PassPill } from './PassPill';
-import { STAT_TONE, StatRow, limitStatOf, nextDefectStatOf, shelfToneOf, type Stat } from './LedgerHero';
+import { STAT_TONE, StatRow, leftStatOf, limitStatOf, nextDefectStatOf, shelfToneOf, type Stat } from './LedgerHero';
 import { percent, usd } from './format';
 import { useState } from 'react';
 import type { ScourJob, ScourLive, SaturationLedger, Tally } from './saturation.types';
@@ -54,7 +54,7 @@ export const clockWordsOf = (span: ClockSpan, does: string | null): readonly [st
 
 /** A live delve's figures in one row: its clock (the whole run's, or with `span` `step` the pass or batch under way's,
  *  counting on from `stamp`; clicking it calls `onSpan`), its size in thousands of lines and files, the pass under way
- *  (its cap in a tooltip), found, what a next pass looks like, and the spend, dollars set light. A fix run's are its own. */
+ *  (its cap in a tooltip), found, the estimate of those left, what a next pass looks like, and the spend, dollars set light. A fix run's are its own. */
 export const liveStatsOf = (l: SaturationLedger, stamp: Stamp, span: ClockSpan = 'run', onSpan?: () => void): Stat[] => {
   const r = l.running!;
   const held = elapsedReading(span === 'run' ? r.since : stepSinceOf(r), null, true, stamp);
@@ -73,6 +73,7 @@ export const liveStatsOf = (l: SaturationLedger, stamp: Stamp, span: ClockSpan =
     ['files', String(l.files), light],
     ['pass', String(l.occasions + 1), undefined, r.max ? `up to ${r.max}` : undefined],
     ['found', String(l.distinct)],
+    leftStatOf(l),
     ['next new', percent(l.nextNew)],
     nextDefectStatOf(l, light),
     limitStatOf(l, light),

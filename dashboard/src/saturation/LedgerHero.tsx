@@ -45,6 +45,10 @@ export const nextDefectStatOf = (ledger: SaturationLedger, tone: string): Stat =
   return [word, usdOrDash(ledger.nextUsd), over ? `${tone} ${s.over}` : tone, kloc ? PER_KLOC_TIP : undefined];
 };
 
+/** The estimate of a ledger's defects no pass has found yet, rounded, in the estimate's tone. */
+export const leftStatOf = (ledger: SaturationLedger): Stat =>
+  ['left (est.)', ledger.unseen === null ? '–' : String(Math.round(ledger.unseen)), s.estimate];
+
 /** The per-defect limit a ledger's delve stops at, in tone `tone`, its unit named as `nextDefectStatOf` names it. */
 export const limitStatOf = (ledger: SaturationLedger, tone?: string): Stat =>
   ledger.priceBy === 'kloc' ? ['limit/kloc', usd(ledger.limit.usd), tone, PER_KLOC_TIP] : ['limit', usd(ledger.limit.usd), tone];
@@ -80,7 +84,7 @@ export function LedgerHero({ ledger }: { ledger: SaturationLedger }) {
     ...(c.fixing ? [['fixing', String(c.fixing), shelfToneOf('fixing')] as Stat] : []),
     ['open', String(c.open), shelfToneOf('waiting')],
     ...(c.ignored ? [['ignored', String(c.ignored)] as Stat] : []),
-    ['left (est.)', c.unseen === null ? '–' : String(Math.round(c.unseen)), s.estimate],
+    leftStatOf(ledger),
   ];
   const outlook: Stat[] = [
     ['next new', percent(ledger.nextNew), s.estimate],
