@@ -71,7 +71,7 @@ export const landFixBranch = async ({ ctx, cfg, root, area, branch, runs, say })
   writeFileSync(join(ctx.nightDir, 'areas', id, 'fix.mbox'), `${git('format-patch', '--stdout', `${commit}..${branch}`)}\n`);
   const fixCommits = git('rev-list', '--reverse', `${commit}..${branch}`).split('\n').filter(Boolean);
   gitIn(ctx.frozen)('checkout', '--quiet', '--detach', commit);
-  const land = { ...ctx, cfg: scour, round, commit, frozenTree: gitIn(ctx.frozen)('rev-parse', 'HEAD^{tree}') };
+  const land = { ...ctx, cfg: scour, root, round, commit, frozenTree: gitIn(ctx.frozen)('rev-parse', 'HEAD^{tree}') };
   const carried = runsIn(git, runs, area, branch, commit);
   const results = [{ id, fixCommits }];
   say(`land: ${branch}, ${fixCommits.length} commits from fix runs ${carried.join(', ')}, onto ${main}`);

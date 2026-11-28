@@ -149,7 +149,7 @@ const fixBatches = async (cfg, runner, root, id, ledger, batches, n, runDir, arg
   try {
     const ctx = {
       ...createSaturateContext({ cfg, runner, frozen, base: baseOf(commit), commit, area: id, say }),
-      round: `scour fix ${n}`, nightDir: runDir, date: record.started.slice(0, 10),
+      root, round: `scour fix ${n}`, nightDir: runDir, date: record.started.slice(0, 10),
       frozenTree: git('rev-parse', `${commit}^{tree}`),
       identity: Object.fromEntries(['NAME', 'EMAIL'].flatMap((k) => {
         const v = git('config', `user.${k.toLowerCase()}`);
