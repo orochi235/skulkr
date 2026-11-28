@@ -48,6 +48,19 @@ Nothing has come back from weasel-63 yet. Check `git -C ~/src/weasel branch --li
   order. The GUI half of verify is a separate job and does not stop on it.
 - Fix readout shows the batch under way as an index, `batch 3/3` (`41f7a16`).
 
+## From skulkr-67's last turns (2026-11-27 ~20:00)
+
+- Fix run 16 (`routing.interactions.dispatcher`) was canceled at Mike's ask; `<state>/scour/fix-16/` is a dead run's record.
+  Instead its delve runs to the cost cap: `scour delve routing.interactions.dispatcher --deep`, log
+  `.playwright-mcp/logs/delve-routing.interactions.dispatcher.log`. Land its ledger when it stops (kouhai t-657).
+- `animator`'s delve stops at once: Chao2 puts 2.5 defects unseen (0.60 per kloc, under 1). Mike asked why it is so
+  sure; the answer is that it is a point estimate from 5 mostly-Claude passes, a floor, not a bound.
+- **Bug, unfixed: the fix plan ignores the registry.** `fixPlanFor` in `scourFix.mjs`, `fixShelfOf` and
+  `fixWorkOf` plan every ledger defect, including ones the registry records fixed (the dispatcher has 5, fixed by
+  rounds), so a fix run hands fixers defects already fixed. The registry lines come from `registeredIn` in
+  `saturationList.mjs`; the plan needs them as its `open` filter. The dashboard now shows them fixed (`f5f2986`).
+- Prefs button on every page's topbar (`43244c7`); Fix queue says `landing N/N` (`2309e0c`, `2c9ae4e`).
+
 ## Dashboard, this session (`0a2855f`, `71053f7`, `b5e5d82`, `2f00e57`, `c654dc3`, `d94027c`)
 
 Invert ramp checkbox (`map.invert`), the queue's place column fitted to its digits, batch pills reading `batch 1`, a
