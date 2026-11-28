@@ -1,30 +1,49 @@
 # Handoff
 
-For the next session in skulkr. Updated 2026-11-27 ~20:00 local by skulkr-e0. Check each claim against the tree.
+For the next session in skulkr. Updated 2026-11-27 ~21:00 local. Check each claim against the tree.
 
 ## State
 
-On `main`, pushed. Live jobs: `pgrep -fl "scour fix|scour delve|fix-lane"`; per-run figures `node scripts/fixRunStats.mjs`.
+On `main`; unpushed commits: `git log --oneline @{u}..HEAD`. Live jobs: `pgrep -fl "skulkr.mjs scour"`; per-run
+step times `node scripts/fixRunStats.mjs`; cost per defect by batch size `skulkr scour batches`.
 Commit each verified change on `main` without asking (Mike, 2026-11-27).
 
-## Running now (2026-11-27 ~20:00 local, all local mode)
+## Running now (2026-11-27 ~21:00 local, all local mode)
 
 | What | Log |
 |---|---|
-| Fix run 14 `animator.engine` landing again via `skulkr scour fix animator.engine --land` (record at `3bda036a44` on `batch/2026-11-28-scour14`, onto weasel `main` `88658f8cbe`) | `.playwright-mcp/logs/fix-animator.engine.reland.log` |
-| `scour run geom.paths.part1 geom.paths.part2`: part1 stopped; part2 at pass 6, 10 distinct | `.playwright-mcp/logs/delve-geom.paths.log` |
-| `scour delve routing.interactions.dispatcher --deep` (Mike: delve to the cost cap; pid 53571), pass 32/40, 50 distinct | `.playwright-mcp/logs/delve-routing.interactions.dispatcher.log` |
+| `scour run geom.paths.part1 geom.paths.part2` (pid 15682): part1 stopped; part2 at pass 16/40, 18 distinct, unseen still rising | `.playwright-mcp/logs/delve-geom.paths.log` |
+| Fix run 17 `routing.interactions.dispatcher` (pid 29085), 7 batches, started on weasel `main` `ce4c8b3c9b` | `.playwright-mcp/logs/fix-routing.interactions.dispatcher.log` |
 
-Watch each with Monitor (`tail -F … | grep -E "^(record|preflight|gate|main|land|capstone):|rror|failed|^[0-9]+/[0-9]+ |stopped"`),
-30-minute expiry. weasel keeps `main` still until told fix run 14 has landed or gone red: message whichever weasel session is active (weasel-63 is handing off). Local `main` moved to `47eb723686` (quantity-tones, five commits, unpushed) mid-landing; the gate merges it in and gates again.
+Watch each with Monitor (`tail -F … | grep -E "^(record|preflight|gate|main|land|capstone|batch):|rror|failed|^[0-9]+/[0-9]+ |stopped"`),
+30-minute expiry; the last session's watchers died with it.
 
-When fix run 14 lands, report to Mike: did `main` fast-forward, did `.skulkr/scour/fix-14/` land, were `scour14-*`
-and `batch/2026-11-28-scour14` deleted. If it goes red, triage with `failingOnMain` in the log before anything else.
-Then land ledgers: `skulkr scour land animator.engine animator.timeline` (kouhai t-652); `apps.theme-editor.src`
-(stopped at pass 14, 20 defects) with `geom.paths.part2` when that delve stops; `routing.interactions.dispatcher` when
-its delve stops (kouhai t-657). Mike has approved each ledger landing asked so far.
+Fix run 14 relanded: weasel `main` fast-forwarded to `d7ad6e6c8b`. The dispatcher's `--deep` delve has finished
+(report at `<state>/scour/routing.interactions.dispatcher/report.md`).
+
+**Ledgers to land** (Mike has approved each landing asked so far): check `skulkr scour ls` first, then
+`skulkr scour land` for whichever of these are still unlanded — `animator.engine animator.timeline` (kouhai t-652),
+`apps.theme-editor.src` (stopped at pass 14), `geom.paths.part1`, `geom.paths.part2` once its delve stops, and
+`routing.interactions.dispatcher` (t-657; its fix run 17 holds the ledger until it ends, and `land --all` skips held ones).
 
 The `animator` fix lane never ran: fix run 14's crash killed `fix-lane.sh`'s loop before it reached `animator`.
+
+## This session (2026-11-27 ~20:30–21:00)
+
+- Dashboard: estimates (left, next new, next defect) in sky blue via `--sk-estimate` in `dashboard/src/app.css`,
+  no italic; a delve's kloc and files moved into its header before the pid; the live row leads with pass or batch,
+  clock second (`44091e9`, `1d867ac`).
+- **Outline occlusion** (kouhai t-661): Mike wants the selection outline covered by raised cells in front of it, as a
+  weasel feature. weasel-63 owns the build (an agent of its own, in `~/src/weasel/.worktrees/outline-mask`, option
+  `outline: { follow: 'shape', mask: true }`) and will message skulkr when it is on weasel `main`. Then set
+  `mask: true` in `dashboard/src/audits/Treemap.tsx` `LAYERS.selectionOverlay.outline` and check routing.dispatcher
+  over routing.actions on the live map.
+- **Batch size** (`b7eb802`): `scour fix --size N` and `scour batches`; docs/scour.md "Whether batching saves" has the
+  data so far and the split that would settle it. Running the split waits for Mike's go (docs/TODO.md P3).
+- onto: the background agent landed retried timeouts reading as timed out, not failed (onto `7499b5c`, local `main`,
+  unpushed); its Swift tests compiled but were not run (`xcodebuild … -scheme Onto test` in `app/`).
+- Not typechecked here: the tsc hook refuses a whole-project check on the controller. Run the dashboard's typecheck
+  on the fleet, filtering the unreleased-weasel errors noted below.
 
 ## Done by skulkr-e0 (2026-11-27 ~19:30–20:00)
 
