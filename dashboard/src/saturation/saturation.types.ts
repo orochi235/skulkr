@@ -104,6 +104,9 @@ export interface FixStatusEntry {
   readonly stage?: FixStage;
   /** The fixer's reason, for any verdict but `fixed`, where it gave one. */
   readonly why?: string;
+  /** Fixed in the registry, outside skulkr's fix runs (`run` null), at `sha`. */
+  readonly registry?: boolean;
+  readonly sha?: string | null;
 }
 
 /** A ledger's fix plan, for the shelf: batches of defects in order, what goes to ask, and each touched defect's status. */

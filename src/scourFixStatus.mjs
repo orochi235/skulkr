@@ -125,3 +125,16 @@ export const fixShelfOf = (cfg, ledger, runs = fixRunsIn(cfg), flags = scourFlag
     statuses,
   };
 };
+
+/**
+ * `shelf` with each defect the registry records fixed (`defects`, a ledger summary's, with their `registry` lines)
+ * shown as fixed, where no fix run has fixed it: a round's fixer, or a hand fix, closed it outside skulkr's fix runs.
+ */
+export const withRegistryFixes = (shelf, defects) => {
+  if (!shelf) return shelf;
+  const fixed = defects.filter((d) => d.registry?.status === 'fixed' && shelf.statuses[d.id]?.status !== 'fixed');
+  if (!fixed.length) return shelf;
+  const statuses = { ...shelf.statuses };
+  for (const d of fixed) statuses[d.id] = { status: 'fixed', run: null, branch: null, verified: true, sha: d.registry.sha ?? null, registry: true };
+  return { ...shelf, statuses };
+};
