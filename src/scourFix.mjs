@@ -147,7 +147,7 @@ export const scourFix = async (cfg, runner, root, id, args, say) => {
   if (batches.length === 0) throw new Error(`${id} has no batch ${args.batch}`);
   const { n, runDir } = claimFixRunIn(cfg);
   // Held as a delve holds it, so the Scour page shows the run live and no delve starts on the ledger meanwhile.
-  return withLedgerHeld(cfg, id, { about: { does: 'fix', max: batches.length, jobs: `fix-${n}` } }, () => fixBatches(cfg, runner, root, id, ledger, batches, n, runDir, args, loggingSay(cfg, id, say)));
+  return withLedgerHeld(cfg, id, { about: { does: 'fix', max: batches.length, jobs: `fix-${n}`, batches: batches.map((b) => ({ n: b.n, ids: b.defects.map((d) => d.id) })) } }, () => fixBatches(cfg, runner, root, id, ledger, batches, n, runDir, args, loggingSay(cfg, id, say)));
 };
 
 /**

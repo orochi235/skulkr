@@ -103,19 +103,21 @@ export const lastFixRunOf = (ledger, runs) => {
 
 /** A ledger's shelf: its plan's batches, less `fixedElsewhere` (`registryFixedIn`'s) as a fix run plans them (ids in order, with each one's size and whether it recurs), what goes to ask,
  *  and each defect's fix status, with its `stage` (`fixStagesIn`) while its batch is out, and `flagged` (with
- *  the `verdict` it overrides) where a person flagged it (`scourFlags.mjs`). */
-export const fixShelfOf = (cfg, ledger, runs = fixRunsIn(cfg), flags = scourFlagsOf(cfg), fixedElsewhere = new Set()) => {
+ *  the `verdict` it overrides) where a person flagged it (`scourFlags.mjs`). A batch out is read by `live`, the running
+ *  run's own batches (`liveScourOf`'s), where given: a run with `--size` or `--defects` numbers its batches its own way. */
+export const fixShelfOf = (cfg, ledger, runs = fixRunsIn(cfg), flags = scourFlagsOf(cfg), fixedElsewhere = new Set(), live = null) => {
   if (ledger.defects.length === 0) return null;
   const plan = fixPlanFor(ledger, { open: (d) => !fixedElsewhere.has(d.id), recurrent: cfg.saturate.recurrent });
   const statuses = fixStatusesFor(ledger, runs);
   // A batch out with no record yet names no ids; the plan, computed the same way, says which they are, and its job
   // directory where each one stands.
-  for (const b of plan.batches) {
+  const outBatches = live ?? plan.batches.map((b) => ({ n: b.n, ids: b.defects.map((d) => d.id) }));
+  for (const b of outBatches) {
     const out = statuses[`b${b.n}`];
     if (out?.status !== 'fixing') continue;
     const dir = runs.find((r) => r.n === out.run)?.dir;
-    const stages = fixStagesIn(dir ? join(dir, 'jobs', `${ledger.area}~b${b.n}`) : null, b.defects.map((d) => d.id));
-    for (const d of b.defects) statuses[d.id] ??= { ...out, stage: stages[d.id] };
+    const stages = fixStagesIn(dir ? join(dir, 'jobs', `${ledger.area}~b${b.n}`) : null, b.ids);
+    for (const id of b.ids) statuses[id] ??= { ...out, stage: stages[id] };
     delete statuses[`b${b.n}`];
   }
   // A person's flag outranks a fix run's verdict: the verdict is what is in doubt.

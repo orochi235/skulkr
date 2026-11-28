@@ -97,8 +97,9 @@ export const ledgerListOf = (cfg, root) => {
   const runs = fixRunsIn(cfg);
   return ledgers.map(([id, ledger]) => {
     const summary = ledgerSummaryOf(cfg, id, ledger, registered, rule);
-    const shelf = id === ledger.area ? fixShelfOf(cfg, ledger, runs, undefined, registryFixedIn(registryLinesIn(summary.defects))) : null;
-    return { ...summary, running: liveScourOf(cfg, id), fix: withRegistryFixes(shelf, summary.defects) };
+    const running = liveScourOf(cfg, id);
+    const shelf = id === ledger.area ? fixShelfOf(cfg, ledger, runs, undefined, registryFixedIn(registryLinesIn(summary.defects)), running?.batches) : null;
+    return { ...summary, running, fix: withRegistryFixes(shelf, summary.defects) };
   });
 };
 

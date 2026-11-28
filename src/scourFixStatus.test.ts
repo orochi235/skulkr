@@ -15,6 +15,19 @@ describe('withRegistryFixes', () => {
   });
 });
 
+describe("a running run's batches", () => {
+  it('mark what the run itself sent as fixing, not the default plan\'s batch of the same number', () => {
+    const { cfg, git } = project();
+    const defect = (k: number) => ({ id: `D${k}`, claim: `claim ${k}`, where: `src/f.ts:${k}`, sightings: [1] });
+    const ledger = { area: 'src', commit: git('rev-parse', 'main'), files: ['src/f.ts'], occasions: Array.from({ length: 10 }, () => ({})), defects: Array.from({ length: 9 }, (_, k) => defect(k + 1)) };
+    writeLedger(cfg, ledger);
+    const runs = [{ n: 1, dir: '/nowhere', jobs: ['src~b2'], record: null }];
+    const fixing = (shelf: { statuses: Record<string, { status: string }> } | null) => Object.keys(shelf?.statuses ?? {}).filter((id) => shelf?.statuses[id].status === 'fixing');
+    expect(fixing(fixShelfOf(cfg, ledger, runs, {}, new Set(), [{ n: 1, ids: ['D4'] }, { n: 2, ids: ['D7'] }]))).toEqual(['D7']);
+    expect(fixing(fixShelfOf(cfg, ledger, runs, {}))).toEqual(['D6', 'D7', 'D8', 'D9']);
+  });
+});
+
 describe('a fix plan beside the registry', () => {
   it('leaves out the defects the registry records fixed, on the shelf and in the queue alike', () => {
     const { cfg, git } = project();

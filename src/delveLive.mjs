@@ -137,7 +137,8 @@ export const withJobProgress = (list, progress) => list.map((l) => {
 
 /**
  * What the live process holding ledger `id` is doing: its `pid`, `since` it took the ledger, what it `does` (`delve`,
- * `fold`, `ingest`, `fix`, or null for a process that did not say), the occasion cap it runs to (a fix run's batches), its jobs out, and the last
+ * `fold`, `ingest`, `fix`, or null for a process that did not say), the occasion cap it runs to (a fix run's batches), a fix run's
+ * `batches` (`{ n, ids }`, null for any other holder or a run started before they were recorded), its jobs out, and the last
  * `n` lines of its `scour.log`; null when no live process holds it.
  */
 export const liveScourOf = (cfg, id, n = 8) => {
@@ -152,6 +153,7 @@ export const liveScourOf = (cfg, id, n = 8) => {
     since: lease.at,
     does: lease.does ?? null,
     max: lease.max ?? null,
+    batches: lease.batches ?? null,
     jobs,
     log: existsSync(log) && statSync(log).mtimeMs >= Date.parse(lease.at) ? lastLines(log, n) : [],
   };
