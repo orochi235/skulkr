@@ -14,6 +14,11 @@ The fix queue (log `.playwright-mcp/logs/fix-queue-2.log`, one lane, each run la
 areas never fixed, smallest first, ≈400 defects at ≈$0.31 each. `scour queue ls` shows what is left.
 Delves on `prefs-editor`, `simulation`, `labkit.clock` all stopped ready to fix after 5 passes (10, 9, 9 distinct;
 $9.72), landed at weasel `a81a066aae`, and were added to the fix queue's end.
+**To correct once fix 30 and fix 31 land:** their batch 1 verdicts read `null` (unread), the fixer's woken
+tally-only reply displaced its report (fixed for later runs in `5c9b55d`). The commits' `Defect:` trailers say all 13
+of fix 30 b1 and fix 31 b1's D2 were fixed; rewrite those verdicts in `<state>/scour/fix-30|31/record.json` and in
+weasel's `.skulkr/scour/fix-30|31/record.json` with `withTrailersRead` over each batch's `fix.mbox`, then rerun
+`scripts/fixBatchFit.mjs` (its fixed share counts them).
 Delves on `core.core.layers` and `core.core.geometry` stopped ready to fix after 5 passes, both near saturated
 (10 and 6 distinct, unseen ≈ 0.4 and 0.5; $5.94), landed at weasel `dd947f643c`, and added to the fix queue's end.
 The batch-size split (docs/scour.md "Whether batching saves"; Mike's go 2026-11-28), one `scour fix` run per arm, arms
